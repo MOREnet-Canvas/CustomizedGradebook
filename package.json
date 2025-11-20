@@ -1,0 +1,11 @@
+{
+  "name": "customized-gradebook",
+  "version": "1.0.0",
+  "scripts": {
+    "build:dev": "node esbuild.config.js dev",
+    "build:prod": "node esbuild.config.js prod"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  }
+}
