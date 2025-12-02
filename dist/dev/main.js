@@ -6,6 +6,6 @@
 
   // src/main.js
   log("Hello from ESBuild Dev Bundle!");
-  alert("Bundler test loaded successfully!!!! v6");
+  alert("Bundler test loaded successfully!!!! v7");
 })();
 //# sourceMappingURL=main.js.map
