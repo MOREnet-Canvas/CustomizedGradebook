@@ -1,9 +1,9 @@
-name: Build and Deploy to GitHub Pages
+name: Build dev+prod and Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main   # or whatever branch you want as the deploy source
+      - main   # only main deploys to Pages
 
 permissions:
   contents: read
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,25 +32,19 @@ jobs:
       - name: Build dev bundle
         run: npm run build:dev
 
-      # Create a clean "site" folder for Pages
+      - name: Build prod bundle
+        run: npm run build:prod
+
       - name: Prepare Pages artifact
         run: |
           mkdir site
           cp -r dist site/dist
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
