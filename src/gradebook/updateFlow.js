@@ -649,7 +649,7 @@ async function createRubric(courseId, assignmentId, outcomeId) {
     return rubric.id;
 }
 
-async function startUpdateFlow() {
+export async function startUpdateFlow() {
     let courseId = getCourseId();
     if (!courseId) throw new Error("Course ID not found");
     const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
