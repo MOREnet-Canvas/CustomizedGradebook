@@ -1,4 +1,4 @@
-name: Build dev+prod and Deploy to GitHub Pages
+name: Build dev only and Deploy to GitHub Pages
 
 on:
   push:
@@ -32,8 +32,8 @@ jobs:
       - name: Build dev bundle
         run: npm run build:dev
 
-      - name: Build prod bundle
-        run: npm run build:prod
+      # - name: Build prod bundle
+      #   run: npm run build:prod
 
       - name: Prepare Pages artifact
         run: |
