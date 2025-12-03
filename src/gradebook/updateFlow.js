@@ -302,7 +302,7 @@ export function injectButtons() {
         buttonWrapper.appendChild(updateAveragesButton);
 
         // Render last update inside the same wrapper, under the button
-        renderLastUpdateNotice(buttonWrapper, courseId);
+        //renderLastUpdateNotice(buttonWrapper, courseId);
 
         // Add the wrapper into a column container so it stays on the right
         const buttonContainer = createButtonColumnContainer();
