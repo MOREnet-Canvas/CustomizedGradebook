@@ -290,7 +290,7 @@ export function injectButtons() {
             //tooltip: `v${SCRIPT_VERSION} - Update Current Score averages`,
             onClick: async () => {
                 try {
-                    await startUpdateFlow();
+                   // await startUpdateFlow();
                 } catch (error) {
                     console.error(`Error updating ${AVG_OUTCOME_NAME} scores:`, error);
                     alert(`Error updating ${AVG_OUTCOME_NAME} scores: ` + error.message);
