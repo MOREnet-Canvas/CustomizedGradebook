@@ -25,5 +25,4 @@ export function formatTimestampCentral(date) {
     return `${y}-${m}-${d} ${h}:${min}:${s} ${ampm}`;
 }
 
-const humanTime = formatTimestampCentral(new Date());
 
