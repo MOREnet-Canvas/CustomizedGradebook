@@ -309,7 +309,7 @@ export function injectButtons() {
         buttonContainer.appendChild(buttonWrapper);
         toolbar.appendChild(buttonContainer);
 
-        void resumeIfNeeded();
+        //void resumeIfNeeded();
     });
 }
 
