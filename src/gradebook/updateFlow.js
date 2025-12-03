@@ -649,130 +649,130 @@ async function createRubric(courseId, assignmentId, outcomeId) {
     return rubric.id;
 }
 
-export async function startUpdateFlow() {
-    let courseId = getCourseId();
-    if (!courseId) throw new Error("Course ID not found");
-    const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
-    const progressId = localStorage.getItem(`progressId_${courseId}`);
-    const startTime = localStorage.getItem(`startTime_${courseId}`);
-
-    if (inProgress && progressId && startTime) {
-        // Re-show the box and resume checking
-        const box = showFloatingBanner({
-            text: `Update in progress.`
-        });
-        await waitForBulkGrading(box); // reuse existing polling function
-    }
-    localStorage.setItem(`updateInProgress_${courseId}`,"true");
-
-    const box = showFloatingBanner({
-        text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
-    });
-    alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.")
-    try {
-
-        const {data, assignmentId, rubricId, rubricCriterionId, outcomeId}
-            = await setupOutcomeAssignmentRubric(courseId, box);
-
-        if (VERBOSE_LOGGING) console.log(`assigmentId: ${assignmentId}`)
-        if (VERBOSE_LOGGING) console.log(`rubricId: ${rubricId}`)
-
-        box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
-
-        // calculating student averages is fast, it is updating them to grade book that is slow.
-        const averages = calculateStudentAverages(data, outcomeId);
-        localStorage.setItem(`verificationPending_${courseId}`, "true");
-        localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
-        localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
-        localStorage.setItem(`startTime_${courseId}`, new Date().toISOString());
-
-        const numberOfUpdates = averages.length;
-
-        if (numberOfUpdates === 0) {
-            alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-            box.remove();
-            cleanUpLocalStorage()
-            return;
-        }
-
-        // check if testing parameters used
-        const testPerStudentUpdate = window.__TEST_ONE_BY_ONE__;
-        const testBulkUpdate = window.__TEST_BULK_UPLOAD__;
-
-        let testing = false;
-
-        if (testPerStudentUpdate) {
-            if (VERBOSE_LOGGING) {console.log("Entering per student testing...")}
-            box.hold(`TESTING: One-by-one updating "${AVG_OUTCOME_NAME}" scores for all students...`);
-            testing = true;
-            //await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = true);
-        }
-
-        if (testBulkUpdate) {
-            if (VERBOSE_LOGGING) {console.log("Entering bulk upload test...")}
-            box.hold(`TESTING: Bulk updating "${AVG_OUTCOME_NAME}" scores for all students...`);
-            // await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-            // await waitForBulkGrading(box);
-        }
-
-        //else { // no testing parameters used
-        if (numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD || testing) {
-            //box.setText(`Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`);
-            let message = `Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`
-            box.hold(message,3000);
-            if (VERBOSE_LOGGING) {
-                console.log('Per student update...')
-            }
-            await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
-        } else {
-            //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
-            let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
-            box.hold(message,3000);
-
-            if (VERBOSE_LOGGING) {
-                console.log(`Bulk update, Detected ${numberOfUpdates} changes`)
-            }
-            const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-            if (VERBOSE_LOGGING) console.log(`progressId: ${progressId}`)
-            await waitForBulkGrading(box);
-        }
-
-        //}
-
-        await verifyUIScores(courseId, averages, outcomeId, box);
-
-        let elapsedTime = getElapsedTimeSinceStart();
-
-        // Stop the elapsed timer to prevent duplicate elapsed time display
-        stopElapsedTimer(box);
-
-        box.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
-
-        // await new Promise(resolve => setTimeout(resolve, 50));
-        // setTimeout(() => box.remove(), 2500);
-
-        localStorage.setItem(`duration_${getCourseId()}`,elapsedTime);
-        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
-
-        const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
-        if (toolbar) renderLastUpdateNotice(toolbar, courseId);
-
-        alert(`"All ${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s) \nYou may need to refresh the page to see the new scores.`);
-    }//end of try
-    catch (error) {
-        // Clean up UI and localStorage when user declines or error occurs
-        console.warn("Update process stopped:", error.message);
-        box.setText(`Update cancelled: ${error.message}`);
-
-        // Remove the banner after a short delay
-        setTimeout(() => {
-            box.remove();
-        }, 3000);
-
-        cleanUpLocalStorage();
-    }
-    finally
-    {
-        cleanUpLocalStorage()
-    }
-}
+// export async function startUpdateFlow() {
+//     let courseId = getCourseId();
+//     if (!courseId) throw new Error("Course ID not found");
+//     const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
+//     const progressId = localStorage.getItem(`progressId_${courseId}`);
+//     const startTime = localStorage.getItem(`startTime_${courseId}`);
+//
+//     if (inProgress && progressId && startTime) {
+//         // Re-show the box and resume checking
+//         const box = showFloatingBanner({
+//             text: `Update in progress.`
+//         });
+//         await waitForBulkGrading(box); // reuse existing polling function
+//     }
+//     localStorage.setItem(`updateInProgress_${courseId}`,"true");
+//
+//     const box = showFloatingBanner({
+//         text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
+//     });
+//     alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.")
+//     try {
+//
+//         const {data, assignmentId, rubricId, rubricCriterionId, outcomeId}
+//             = await setupOutcomeAssignmentRubric(courseId, box);
+//
+//         if (VERBOSE_LOGGING) console.log(`assigmentId: ${assignmentId}`)
+//         if (VERBOSE_LOGGING) console.log(`rubricId: ${rubricId}`)
+//
+//         box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
+//
+//         // calculating student averages is fast, it is updating them to grade book that is slow.
+//         const averages = calculateStudentAverages(data, outcomeId);
+//         localStorage.setItem(`verificationPending_${courseId}`, "true");
+//         localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
+//         localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
+//         localStorage.setItem(`startTime_${courseId}`, new Date().toISOString());
+//
+//         const numberOfUpdates = averages.length;
+//
+//         if (numberOfUpdates === 0) {
+//             alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
+//             box.remove();
+//             cleanUpLocalStorage()
+//             return;
+//         }
+//
+//         // check if testing parameters used
+//         const testPerStudentUpdate = window.__TEST_ONE_BY_ONE__;
+//         const testBulkUpdate = window.__TEST_BULK_UPLOAD__;
+//
+//         let testing = false;
+//
+//         if (testPerStudentUpdate) {
+//             if (VERBOSE_LOGGING) {console.log("Entering per student testing...")}
+//             box.hold(`TESTING: One-by-one updating "${AVG_OUTCOME_NAME}" scores for all students...`);
+//             testing = true;
+//             //await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = true);
+//         }
+//
+//         if (testBulkUpdate) {
+//             if (VERBOSE_LOGGING) {console.log("Entering bulk upload test...")}
+//             box.hold(`TESTING: Bulk updating "${AVG_OUTCOME_NAME}" scores for all students...`);
+//             // await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+//             // await waitForBulkGrading(box);
+//         }
+//
+//         //else { // no testing parameters used
+//         if (numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD || testing) {
+//             //box.setText(`Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`);
+//             let message = `Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`
+//             box.hold(message,3000);
+//             if (VERBOSE_LOGGING) {
+//                 console.log('Per student update...')
+//             }
+//             await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
+//         } else {
+//             //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
+//             let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
+//             box.hold(message,3000);
+//
+//             if (VERBOSE_LOGGING) {
+//                 console.log(`Bulk update, Detected ${numberOfUpdates} changes`)
+//             }
+//             const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+//             if (VERBOSE_LOGGING) console.log(`progressId: ${progressId}`)
+//             await waitForBulkGrading(box);
+//         }
+//
+//         //}
+//
+//         await verifyUIScores(courseId, averages, outcomeId, box);
+//
+//         let elapsedTime = getElapsedTimeSinceStart();
+//
+//         // Stop the elapsed timer to prevent duplicate elapsed time display
+//         stopElapsedTimer(box);
+//
+//         box.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
+//
+//         // await new Promise(resolve => setTimeout(resolve, 50));
+//         // setTimeout(() => box.remove(), 2500);
+//
+//         localStorage.setItem(`duration_${getCourseId()}`,elapsedTime);
+//         localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
+//
+//         const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
+//         if (toolbar) renderLastUpdateNotice(toolbar, courseId);
+//
+//         alert(`"All ${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s) \nYou may need to refresh the page to see the new scores.`);
+//     }//end of try
+//     catch (error) {
+//         // Clean up UI and localStorage when user declines or error occurs
+//         console.warn("Update process stopped:", error.message);
+//         box.setText(`Update cancelled: ${error.message}`);
+//
+//         // Remove the banner after a short delay
+//         setTimeout(() => {
+//             box.remove();
+//         }, 3000);
+//
+//         cleanUpLocalStorage();
+//     }
+//     finally
+//     {
+//         cleanUpLocalStorage()
+//     }
+// }
