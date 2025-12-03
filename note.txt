@@ -1,0 +1,9 @@
+pushing will automatically update dev
+
+to update production:
+npm run build:dev
+npm run build:prod
+then push
+
+
+For checking version in DevTools: CG.version

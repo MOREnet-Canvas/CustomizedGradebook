@@ -1,6 +1,21 @@
-import { log } from "./utils/logger.js";
+import { log, logBanner, exposeVersion } from "./utils/logger.js";
 
-log("Hello from ESBuild Dev Bundle!");
+function init() {
+    // Banner + version stamp
+    logBanner(ENV_NAME, BUILD_VERSION);
+    exposeVersion(ENV_NAME, BUILD_VERSION);
 
-alert("Bundler test loaded successfully!");
+    if (ENV_DEV) {
+        log("Running in DEV mode");
+    }
+
+    if (ENV_PROD) {
+        log("Running in PROD mode");
+    }
+
+    log(`Build environment: ${ENV_NAME}`);
+}
+
+init();
+
 

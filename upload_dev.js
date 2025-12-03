@@ -1,4 +1,9 @@
 (function () {
+    if (document.getElementById("cg_dev_bundle")) {
+        console.log("[CG] Dev bundle already loaded; skipping");
+        return;
+    }
+
     const script = document.createElement("script");
     const cacheBuster = Date.now(); // new number every load
 
