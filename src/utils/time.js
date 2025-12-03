@@ -1,13 +1,29 @@
-export function formatTimestamp(date) {
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const seconds = date.getSeconds().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
+export function formatTimestampCentral(date) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+    }).formatToParts(date);
 
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
-    const year = date.getFullYear();
+    let y, m, d, h, min, s, ampm;
 
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${ampm}`;
+    for (const p of parts) {
+        if (p.type === "year") y = p.value;
+        if (p.type === "month") m = p.value;
+        if (p.type === "day") d = p.value;
+        if (p.type === "hour") h = p.value;
+        if (p.type === "minute") min = p.value;
+        if (p.type === "second") s = p.value;
+        if (p.type === "dayPeriod") ampm = p.value.toUpperCase();
+    }
+
+    return `${y}-${m}-${d} ${h}:${min}:${s} ${ampm}`;
 }
+
+const humanTime = formatTimestampCentral(new Date());
+
