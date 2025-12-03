@@ -287,7 +287,7 @@ export function injectButtons() {
         const updateAveragesButton = makeButton({
             label: UPDATE_AVG_BUTTON_LABEL,
             id: "update-scores-button",
-            tooltip: `v${SCRIPT_VERSION} - Update Current Score averages`,
+            //tooltip: `v${SCRIPT_VERSION} - Update Current Score averages`,
             onClick: async () => {
                 try {
                     await startUpdateFlow();
