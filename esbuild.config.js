@@ -1,13 +1,38 @@
 
 import esbuild from "esbuild";
+import { execSync } from "child_process";
+
 import { existsSync, mkdirSync } from "fs";
 
 const mode = process.argv[2] || "dev";
 
 const outdir = mode === "prod" ? "dist/prod" : "dist/dev";
 
-const buildTime = new Date().toISOString();
-const versionString = `${buildTime}-${mode}`;
+// ---- Build Timestamp ----
+function formatTimestamp(d) {
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    const seconds = d.getSeconds().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const day = d.getDate().toString().padStart(2, "0");
+    const year = d.getFullYear();
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${ampm}`;
+}
+
+// ---- Git Commit Hash ----
+let gitHash = "unknown";
+try {
+    gitHash = execSync("git rev-parse --short HEAD").toString().trim();
+} catch (e) {
+    console.warn("Warning: Could not read git hash:", e);
+}
+
+const humanTime = formatTimestamp(new Date());
+const versionString = `${humanTime} (${mode}, ${gitHash})`;
 
 // Ensure output folder exists
 if (!existsSync(outdir)) mkdirSync(outdir, { recursive: true });
