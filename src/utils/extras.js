@@ -1,6 +1,14 @@
 import { k } from "./keys.js";
-import {getCourseId} from "./canvas.js";
-import {VERBOSE_LOGGING} from "../config.js";
+import {getCourseId, getTokenCookie} from "./canvas.js";
+import {
+    AVG_ASSIGNMENT_NAME, AVG_OUTCOME_NAME,
+    ENABLE_GRADE_OVERRIDE,
+    EXCLUDED_OUTCOME_KEYWORDS,
+    OVERRIDE_SCALE,
+    VERBOSE_LOGGING
+} from "../config.js";
+import {showFloatingBanner} from "../ui/banner.js";
+import {makeButton} from "../ui/buttons.js";
 
 export async function getAssignmentId(courseId) {
     // finds the assignment id of AVG_ASSIGMENT_NAME
@@ -511,10 +519,10 @@ export function calculateStudentAverages(data, outcomeId) {
         const oldAverage = getCurrentOutcomeScore(rollup.scores)
 
         // see if url specifies to zero out scores for testing
-        if(window.__ZERO_ALL_AVERAGES__){
-            averages.push({userId, average: 0});
-            continue;
-        }
+        // if(window.__ZERO_ALL_AVERAGES__){
+        //     averages.push({userId, average: 0});
+        //     continue;
+        // }
 
 
         const relevantScores = rollup.scores.filter(s => {
@@ -617,7 +625,7 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
         };
         // Fire override in parallel (do not await)
         if (ENABLE_GRADE_OVERRIDE) {
-            queueOverride(courseId, userId, average);
+            await queueOverride(courseId, userId, average);
         }
     }
     if (VERBOSE_LOGGING) console.log("bulk gradeData payload:", gradeData);
