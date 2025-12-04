@@ -1,3 +1,18 @@
+import { k } from "./keys.js";
+
+export async function getAssignmentId(courseId) {
+    // finds the assignment id of AVG_ASSIGMENT_NAME
+    // getAssignmentId is used for displaying score on student course cards and as a fallback check
+    // when creating assignment
+    const response = await fetch(`/api/v1/courses/${courseId}/assignments?per_page=100`);
+    const assignments = await response.json();
+
+    const avgAssignment = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
+    //if (!avgAssignment) throw new Error(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.`);
+    return avgAssignment ? avgAssignment.id : null;
+
+}
+
 export function getElapsedTimeSinceStart(endTime = Date.now()) {
 
     const start = localStorage.getItem(`startTime_${getCourseId()}`);

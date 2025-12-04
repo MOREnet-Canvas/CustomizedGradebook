@@ -362,7 +362,7 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
         if (VERBOSE_LOGGING) console.log("assignment object: ", assignmentObj);
 
         if (!assignmentObj) { // Find the assignmentObj even if an outcome / rubric hasn't been associated yet
-            const assignmentObjFromName = await getAssignmentId(courseId);
+            const assignmentObjFromName = await extras.getAssignmentId(courseId);
             if (assignmentObjFromName) {
                 const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentObjFromName}`);
                 assignmentObj = await res.json();
@@ -695,8 +695,8 @@ async function startUpdateFlow() {
         }
 
         // check if testing parameters used
-        const testPerStudentUpdate = window.__TEST_ONE_BY_ONE__;
-        const testBulkUpdate = window.__TEST_BULK_UPLOAD__;
+        const testPerStudentUpdate = false //window.__TEST_ONE_BY_ONE__;
+        const testBulkUpdate = false //window.__TEST_BULK_UPLOAD__;
 
         let testing = false;
 
