@@ -1,5 +1,6 @@
 import { k } from "./keys.js";
 import {getCourseId} from "./canvas.js";
+import {VERBOSE_LOGGING} from "../config.js";
 
 export async function getAssignmentId(courseId) {
     // finds the assignment id of AVG_ASSIGMENT_NAME
