@@ -14,6 +14,11 @@ import {
     OVERRIDE_SCALE
 } from "../config.js";
 import { makeButton, createButtonColumnContainer } from "../ui/buttons.js";
+import { k } from "../utils/keys.js";
+import { showFloatingBanner } from "../ui/banner.js";
+import * as extras from "../utils/extras.js"
+
+
 
 
 import {
@@ -26,24 +31,14 @@ import {
 
 import { debounce, inheritFontStylesFrom } from "../utils/dom.js";
 
-// 👉 then paste your existing code from:
-// - BRAND_COLOR, k()
-// - makeButton, createButtonColumnContainer, showFloatingBanner
-// - injectButtons, waitForGradebookAndToolbar
-// - setupOutcomeAssignmentRubric, createOutcome, createAssignment, etc.
-// - startUpdateFlow, calculateStudentAverages, beginBulkUpdate, postPerStudentGrades, etc.
-// - plus any helper functions they depend on
-//
-// Only edits needed: remove the outer IIFE and any now-duplicate functions
-// that moved to utils or config.
 
 
 
-const BRAND_COLOR = getComputedStyle(document.documentElement)
-    .getPropertyValue('--ic-brand-primary')
-    .trim() || "#0c7d9d";
+// const BRAND_COLOR = getComputedStyle(document.documentElement)
+//     .getPropertyValue('--ic-brand-primary')
+//     .trim() || "#0c7d9d";
 
-const k = (name, courseId) => `${name}_${courseId}`;
+// const k = (name, courseId) => `${name}_${courseId}`;
 
 // function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
 //     const button = document.createElement("button");
@@ -100,181 +95,181 @@ const k = (name, courseId) => `${name}_${courseId}`;
 //     return container;
 // }
 
-function showFloatingBanner({
-                                text = "",
-                                duration = null,              // null = stays until removed; number = auto-hide after ms
-                                top = "20px",
-                                right = "20px",
-                                center = false,
-                                backgroundColor = BRAND_COLOR,
-                                textColor = "#ffffff",
-                                allowMultiple = false,         // keep existing banners?
-                                ariaLive = "polite"            // "polite" | "assertive" | "off"
-                            } = {}) {
-    // Remove existing banners unless explicitly allowed
-    if (!allowMultiple) {
-        document.querySelectorAll(".floating-banner").forEach(b => b.remove());
-    }
-
-    const baseElement =
-        document.querySelector(".ic-Layout-contentMain") ||
-        document.querySelector(".ic-app-header__menu-list-item__link") ||
-        document.body;
-
-    const styles = getComputedStyle(baseElement);
-    const fontFamily = styles.fontFamily;
-    const fontSize = styles.fontSize;
-    const fontWeight = styles.fontWeight;
-
-    // Create banner
-    const banner = document.createElement("div");
-    banner.className = "floating-banner";
-    banner.setAttribute("role", "status");
-    if (ariaLive && ariaLive !== "off") banner.setAttribute("aria-live", ariaLive);
-
-    // Core positioning + style
-    Object.assign(banner.style, {
-        position: "fixed",
-        top,
-        background: backgroundColor,
-        padding: "10px 20px",
-        borderRadius: "8px",
-        boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-        zIndex: "9999",
-        fontSize,
-        color: textColor,
-        fontFamily,
-        fontWeight,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "12px",
-        maxWidth: "min(90vw, 720px)",
-        lineHeight: "1.35",
-        wordBreak: "break-word"
-    });
-
-    if (center) {
-        banner.style.left = "50%";
-        banner.style.transform = "translateX(-50%)";
-    } else {
-        banner.style.right = right;
-    }
-
-    // Message node to keep the X button separate
-    const msg = document.createElement("span");
-    msg.className = "floating-banner__text";
-    banner.appendChild(msg);
-
-    // Dismiss "X"
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.setAttribute("aria-label", "Dismiss message");
-    closeBtn.textContent = "×";
-    Object.assign(closeBtn.style, {
-        cursor: "pointer",
-        fontWeight: "bold",
-        border: "none",
-        background: "transparent",
-        color: "inherit",
-        fontSize,
-        lineHeight: "1"
-    });
-    closeBtn.onclick = () => destroy();
-    banner.appendChild(closeBtn);
-
-    document.body.appendChild(banner);
-
-    // --- Messaging control (sticky, queue, soft) ---
-    let lockedUntil = 0;
-    let pending = null;
-    let holdTimer = null;
-    let autoTimer = null;
-
-    const now = () => Date.now();
-    const isLocked = () => now() < lockedUntil;
-
-    // const apply = (textValue) => { msg.textContent = textValue; };
-    const courseId = getCourseId();
-    const apply = (textValue) => {
-        msg.textContent = textValue;
-        if (courseId) localStorage.setItem(k('bannerLast', courseId), textValue);
-    };
-
-    const unlockAndFlush = () => {
-        lockedUntil = 0;
-        if (pending != null) {
-            apply(pending);
-            pending = null;
-        }
-    };
-
-
-    banner.setText = (newText) => {
-        if (isLocked()) {
-            pending = newText; // keep only the latest
-        } else {
-            apply(newText);
-        }
-    };
-
-    banner.hold = (newText, ms = 3000) => {
-        const now = Date.now();
-        // If currently locked, just queue the text; don't extend the lock
-        if (now < lockedUntil) {
-            pending = newText;       // will show when the current hold ends
-            return;
-        }
-
-        lockedUntil = now + ms;
-        apply(newText);
-
-        if (holdTimer) clearTimeout(holdTimer);
-        holdTimer = setTimeout(() => {
-            lockedUntil = 0;
-            if (pending != null) {
-                apply(pending);
-                pending = null;
-            }
-        }, ms);
-    };
-
-    // Non-sticky update ignored during a hold
-    banner.soft = (newText) => {
-        if (!isLocked()) apply(newText);
-    };
-
-    // Remove with fade-out
-    function destroy() {
-        if (holdTimer) clearTimeout(holdTimer);
-        if (autoTimer) clearTimeout(autoTimer);
-        banner.style.transition = "opacity 150ms";
-        banner.style.opacity = "0";
-        setTimeout(() => banner.remove(), 160);
-    }
-    banner.removeBanner = destroy; // expose a named remover
-
-    // Initial text
-    (duration === "hold")
-        ? banner.hold(text, 3000) // convenience: allow duration="hold"
-        : banner.setText(text);
-
-    // Auto-dismiss if a number is provided
-    if (typeof duration === "number" && isFinite(duration) && duration >= 0) {
-        autoTimer = setTimeout(destroy, duration);
-    }
-
-    closeBtn.onclick = () => {
-        if (courseId) localStorage.setItem(k('bannerDismissed', courseId), 'true');
-        destroy();
-        ensureStatusPill(courseId);
-    };
-
-    // when first shown, clear the dismissed flag and save text
-    if (courseId) localStorage.setItem(k('bannerDismissed', courseId), 'false');
-    (duration === "hold") ? banner.hold(text, 3000) : banner.setText(text);
-
-    return banner;
-}
+// function showFloatingBanner({
+//                                 text = "",
+//                                 duration = null,              // null = stays until removed; number = auto-hide after ms
+//                                 top = "20px",
+//                                 right = "20px",
+//                                 center = false,
+//                                 backgroundColor = BRAND_COLOR,
+//                                 textColor = "#ffffff",
+//                                 allowMultiple = false,         // keep existing banners?
+//                                 ariaLive = "polite"            // "polite" | "assertive" | "off"
+//                             } = {}) {
+//     // Remove existing banners unless explicitly allowed
+//     if (!allowMultiple) {
+//         document.querySelectorAll(".floating-banner").forEach(b => b.remove());
+//     }
+//
+//     const baseElement =
+//         document.querySelector(".ic-Layout-contentMain") ||
+//         document.querySelector(".ic-app-header__menu-list-item__link") ||
+//         document.body;
+//
+//     const styles = getComputedStyle(baseElement);
+//     const fontFamily = styles.fontFamily;
+//     const fontSize = styles.fontSize;
+//     const fontWeight = styles.fontWeight;
+//
+//     // Create banner
+//     const banner = document.createElement("div");
+//     banner.className = "floating-banner";
+//     banner.setAttribute("role", "status");
+//     if (ariaLive && ariaLive !== "off") banner.setAttribute("aria-live", ariaLive);
+//
+//     // Core positioning + style
+//     Object.assign(banner.style, {
+//         position: "fixed",
+//         top,
+//         background: backgroundColor,
+//         padding: "10px 20px",
+//         borderRadius: "8px",
+//         boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+//         zIndex: "9999",
+//         fontSize,
+//         color: textColor,
+//         fontFamily,
+//         fontWeight,
+//         display: "inline-flex",
+//         alignItems: "center",
+//         gap: "12px",
+//         maxWidth: "min(90vw, 720px)",
+//         lineHeight: "1.35",
+//         wordBreak: "break-word"
+//     });
+//
+//     if (center) {
+//         banner.style.left = "50%";
+//         banner.style.transform = "translateX(-50%)";
+//     } else {
+//         banner.style.right = right;
+//     }
+//
+//     // Message node to keep the X button separate
+//     const msg = document.createElement("span");
+//     msg.className = "floating-banner__text";
+//     banner.appendChild(msg);
+//
+//     // Dismiss "X"
+//     const closeBtn = document.createElement("button");
+//     closeBtn.type = "button";
+//     closeBtn.setAttribute("aria-label", "Dismiss message");
+//     closeBtn.textContent = "×";
+//     Object.assign(closeBtn.style, {
+//         cursor: "pointer",
+//         fontWeight: "bold",
+//         border: "none",
+//         background: "transparent",
+//         color: "inherit",
+//         fontSize,
+//         lineHeight: "1"
+//     });
+//     closeBtn.onclick = () => destroy();
+//     banner.appendChild(closeBtn);
+//
+//     document.body.appendChild(banner);
+//
+//     // --- Messaging control (sticky, queue, soft) ---
+//     let lockedUntil = 0;
+//     let pending = null;
+//     let holdTimer = null;
+//     let autoTimer = null;
+//
+//     const now = () => Date.now();
+//     const isLocked = () => now() < lockedUntil;
+//
+//     // const apply = (textValue) => { msg.textContent = textValue; };
+//     const courseId = getCourseId();
+//     const apply = (textValue) => {
+//         msg.textContent = textValue;
+//         if (courseId) localStorage.setItem(k('bannerLast', courseId), textValue);
+//     };
+//
+//     const unlockAndFlush = () => {
+//         lockedUntil = 0;
+//         if (pending != null) {
+//             apply(pending);
+//             pending = null;
+//         }
+//     };
+//
+//
+//     banner.setText = (newText) => {
+//         if (isLocked()) {
+//             pending = newText; // keep only the latest
+//         } else {
+//             apply(newText);
+//         }
+//     };
+//
+//     banner.hold = (newText, ms = 3000) => {
+//         const now = Date.now();
+//         // If currently locked, just queue the text; don't extend the lock
+//         if (now < lockedUntil) {
+//             pending = newText;       // will show when the current hold ends
+//             return;
+//         }
+//
+//         lockedUntil = now + ms;
+//         apply(newText);
+//
+//         if (holdTimer) clearTimeout(holdTimer);
+//         holdTimer = setTimeout(() => {
+//             lockedUntil = 0;
+//             if (pending != null) {
+//                 apply(pending);
+//                 pending = null;
+//             }
+//         }, ms);
+//     };
+//
+//     // Non-sticky update ignored during a hold
+//     banner.soft = (newText) => {
+//         if (!isLocked()) apply(newText);
+//     };
+//
+//     // Remove with fade-out
+//     function destroy() {
+//         if (holdTimer) clearTimeout(holdTimer);
+//         if (autoTimer) clearTimeout(autoTimer);
+//         banner.style.transition = "opacity 150ms";
+//         banner.style.opacity = "0";
+//         setTimeout(() => banner.remove(), 160);
+//     }
+//     banner.removeBanner = destroy; // expose a named remover
+//
+//     // Initial text
+//     (duration === "hold")
+//         ? banner.hold(text, 3000) // convenience: allow duration="hold"
+//         : banner.setText(text);
+//
+//     // Auto-dismiss if a number is provided
+//     if (typeof duration === "number" && isFinite(duration) && duration >= 0) {
+//         autoTimer = setTimeout(destroy, duration);
+//     }
+//
+//     closeBtn.onclick = () => {
+//         if (courseId) localStorage.setItem(k('bannerDismissed', courseId), 'true');
+//         destroy();
+//         ensureStatusPill(courseId);
+//     };
+//
+//     // when first shown, clear the dismissed flag and save text
+//     if (courseId) localStorage.setItem(k('bannerDismissed', courseId), 'false');
+//     (duration === "hold") ? banner.hold(text, 3000) : banner.setText(text);
+//
+//     return banner;
+// }
 
 export function injectButtons() {
     waitForGradebookAndToolbar((toolbar) => {
@@ -292,7 +287,7 @@ export function injectButtons() {
             //tooltip: `v${SCRIPT_VERSION} - Update Current Score averages`,
             onClick: async () => {
                 try {
-                   // await startUpdateFlow();
+                   await startUpdateFlow();
                 } catch (error) {
                     console.error(`Error updating ${AVG_OUTCOME_NAME} scores:`, error);
                     alert(`Error updating ${AVG_OUTCOME_NAME} scores: ` + error.message);
@@ -651,130 +646,132 @@ async function createRubric(courseId, assignmentId, outcomeId) {
     return rubric.id;
 }
 
-// export async function startUpdateFlow() {
-//     let courseId = getCourseId();
-//     if (!courseId) throw new Error("Course ID not found");
-//     const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
-//     const progressId = localStorage.getItem(`progressId_${courseId}`);
-//     const startTime = localStorage.getItem(`startTime_${courseId}`);
-//
-//     if (inProgress && progressId && startTime) {
-//         // Re-show the box and resume checking
-//         const box = showFloatingBanner({
-//             text: `Update in progress.`
-//         });
-//         await waitForBulkGrading(box); // reuse existing polling function
-//     }
-//     localStorage.setItem(`updateInProgress_${courseId}`,"true");
-//
-//     const box = showFloatingBanner({
-//         text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
-//     });
-//     alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.")
-//     try {
-//
-//         const {data, assignmentId, rubricId, rubricCriterionId, outcomeId}
-//             = await setupOutcomeAssignmentRubric(courseId, box);
-//
-//         if (VERBOSE_LOGGING) console.log(`assigmentId: ${assignmentId}`)
-//         if (VERBOSE_LOGGING) console.log(`rubricId: ${rubricId}`)
-//
-//         box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
-//
-//         // calculating student averages is fast, it is updating them to grade book that is slow.
-//         const averages = calculateStudentAverages(data, outcomeId);
-//         localStorage.setItem(`verificationPending_${courseId}`, "true");
-//         localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
-//         localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
-//         localStorage.setItem(`startTime_${courseId}`, new Date().toISOString());
-//
-//         const numberOfUpdates = averages.length;
-//
-//         if (numberOfUpdates === 0) {
-//             alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-//             box.remove();
-//             cleanUpLocalStorage()
-//             return;
-//         }
-//
-//         // check if testing parameters used
-//         const testPerStudentUpdate = window.__TEST_ONE_BY_ONE__;
-//         const testBulkUpdate = window.__TEST_BULK_UPLOAD__;
-//
-//         let testing = false;
-//
-//         if (testPerStudentUpdate) {
-//             if (VERBOSE_LOGGING) {console.log("Entering per student testing...")}
-//             box.hold(`TESTING: One-by-one updating "${AVG_OUTCOME_NAME}" scores for all students...`);
-//             testing = true;
-//             //await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = true);
-//         }
-//
-//         if (testBulkUpdate) {
-//             if (VERBOSE_LOGGING) {console.log("Entering bulk upload test...")}
-//             box.hold(`TESTING: Bulk updating "${AVG_OUTCOME_NAME}" scores for all students...`);
-//             // await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-//             // await waitForBulkGrading(box);
-//         }
-//
-//         //else { // no testing parameters used
-//         if (numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD || testing) {
-//             //box.setText(`Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`);
-//             let message = `Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`
-//             box.hold(message,3000);
-//             if (VERBOSE_LOGGING) {
-//                 console.log('Per student update...')
-//             }
-//             await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
-//         } else {
-//             //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
-//             let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
-//             box.hold(message,3000);
-//
-//             if (VERBOSE_LOGGING) {
-//                 console.log(`Bulk update, Detected ${numberOfUpdates} changes`)
-//             }
-//             const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-//             if (VERBOSE_LOGGING) console.log(`progressId: ${progressId}`)
-//             await waitForBulkGrading(box);
-//         }
-//
-//         //}
-//
-//         await verifyUIScores(courseId, averages, outcomeId, box);
-//
-//         let elapsedTime = getElapsedTimeSinceStart();
-//
-//         // Stop the elapsed timer to prevent duplicate elapsed time display
-//         stopElapsedTimer(box);
-//
-//         box.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
-//
-//         // await new Promise(resolve => setTimeout(resolve, 50));
-//         // setTimeout(() => box.remove(), 2500);
-//
-//         localStorage.setItem(`duration_${getCourseId()}`,elapsedTime);
-//         localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
-//
-//         const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
-//         if (toolbar) renderLastUpdateNotice(toolbar, courseId);
-//
-//         alert(`"All ${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s) \nYou may need to refresh the page to see the new scores.`);
-//     }//end of try
-//     catch (error) {
-//         // Clean up UI and localStorage when user declines or error occurs
-//         console.warn("Update process stopped:", error.message);
-//         box.setText(`Update cancelled: ${error.message}`);
-//
-//         // Remove the banner after a short delay
-//         setTimeout(() => {
-//             box.remove();
-//         }, 3000);
-//
-//         cleanUpLocalStorage();
-//     }
-//     finally
-//     {
-//         cleanUpLocalStorage()
-//     }
-// }
+async function startUpdateFlow() {
+    let courseId = getCourseId();
+    if (!courseId) throw new Error("Course ID not found");
+    const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
+    const progressId = localStorage.getItem(`progressId_${courseId}`);
+    const startTime = localStorage.getItem(`startTime_${courseId}`);
+
+    if (inProgress && progressId && startTime) {
+        // Re-show the box and resume checking
+        const box = showFloatingBanner({
+            text: `Update in progress.`
+        });
+        await extras.waitForBulkGrading(box); // reuse existing polling function
+    }
+    localStorage.setItem(`updateInProgress_${courseId}`,"true");
+
+    const box = showFloatingBanner({
+        text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
+    });
+    alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.")
+    try {
+
+        const {data, assignmentId, rubricId, rubricCriterionId, outcomeId}
+            = await setupOutcomeAssignmentRubric(courseId, box);
+
+        if (VERBOSE_LOGGING) console.log(`assigmentId: ${assignmentId}`)
+        if (VERBOSE_LOGGING) console.log(`rubricId: ${rubricId}`)
+
+        box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
+
+        // calculating student averages is fast, it is updating them to grade book that is slow.
+        const averages = calculateStudentAverages(data, outcomeId);
+        localStorage.setItem(`verificationPending_${courseId}`, "true");
+        localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
+        localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
+        localStorage.setItem(`startTime_${courseId}`, new Date().toISOString());
+
+        const numberOfUpdates = averages.length;
+
+        if (numberOfUpdates === 0) {
+            alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
+            box.remove();
+            extras.cleanUpLocalStorage()
+            return;
+        }
+
+        // check if testing parameters used
+        const testPerStudentUpdate = window.__TEST_ONE_BY_ONE__;
+        const testBulkUpdate = window.__TEST_BULK_UPLOAD__;
+
+        let testing = false;
+
+        if (testPerStudentUpdate) {
+            if (VERBOSE_LOGGING) {console.log("Entering per student testing...")}
+            box.hold(`TESTING: One-by-one updating "${AVG_OUTCOME_NAME}" scores for all students...`);
+            testing = true;
+            //await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = true);
+        }
+
+        if (testBulkUpdate) {
+            if (VERBOSE_LOGGING) {console.log("Entering bulk upload test...")}
+            box.hold(`TESTING: Bulk updating "${AVG_OUTCOME_NAME}" scores for all students...`);
+            // await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+            // await waitForBulkGrading(box);
+        }
+
+        //else { // no testing parameters used
+        if (numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD || testing) {
+            //box.setText(`Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`);
+            let message = `Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`
+            box.hold(message,3000);
+            if (VERBOSE_LOGGING) {
+                console.log('Per student update...')
+            }
+            await extras.postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
+        } else {
+            //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
+            let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
+            box.hold(message,3000);
+
+            if (VERBOSE_LOGGING) {
+                console.log(`Bulk update, Detected ${numberOfUpdates} changes`)
+            }
+            const progressId = await extras.beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+            if (VERBOSE_LOGGING) console.log(`progressId: ${progressId}`)
+            await extras.waitForBulkGrading(box);
+        }
+
+        //}
+
+        await extras.verifyUIScores(courseId, averages, outcomeId, box);
+
+        let elapsedTime = extras.getElapsedTimeSinceStart();
+
+        // Stop the elapsed timer to prevent duplicate elapsed time display
+        extras.stopElapsedTimer(box);
+
+        box.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
+
+        // await new Promise(resolve => setTimeout(resolve, 50));
+        // setTimeout(() => box.remove(), 2500);
+
+        localStorage.setItem(`duration_${getCourseId()}`,elapsedTime);
+        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
+
+        const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
+        if (toolbar) extras.renderLastUpdateNotice(toolbar, courseId);
+
+        alert(`"All ${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s) \nYou may need to refresh the page to see the new scores.`);
+    }//end of try
+    catch (error) {
+        // Clean up UI and localStorage when user declines or error occurs
+        console.warn("Update process stopped:", error.message);
+        box.setText(`Update cancelled: ${error.message}`);
+
+        // Remove the banner after a short delay
+        setTimeout(() => {
+            box.remove();
+        }, 3000);
+
+        extras.cleanUpLocalStorage();
+    }
+    finally
+    {
+        extras.cleanUpLocalStorage()
+    }
+}
+
+
