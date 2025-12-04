@@ -1,4 +1,6 @@
 // src/gradebook/updateFlow.js
+//TODO: getCourseId not defined
+
 import {
     VERBOSE_LOGGING,
     UPDATE_AVG_BUTTON_LABEL,
@@ -677,7 +679,7 @@ async function startUpdateFlow() {
         box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
 
         // calculating student averages is fast, it is updating them to grade book that is slow.
-        const averages = calculateStudentAverages(data, outcomeId);
+        const averages = extras.calculateStudentAverages(data, outcomeId);
         localStorage.setItem(`verificationPending_${courseId}`, "true");
         localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
         localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
