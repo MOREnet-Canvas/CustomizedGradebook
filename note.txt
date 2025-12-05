@@ -8,4 +8,4 @@ then push
 
 For checking version in DevTools: CG.version
 
-trying to get github to build
+trying to get Github to build
