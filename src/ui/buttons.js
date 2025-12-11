@@ -1,4 +1,4 @@
-
+//TODO: Button moves to center after verifying and the last time completed doesn't stay
 import { inheritFontStylesFrom } from "../utils/dom.js";
 
 const BRAND_COLOR_FALLBACK = "#0c7d9d";
