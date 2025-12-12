@@ -17,10 +17,12 @@ import {
 import { makeButton, createButtonColumnContainer } from "../ui/buttons.js";
 import { k } from "../utils/keys.js";
 import { showFloatingBanner } from "../ui/banner.js";
-import * as extras from "../utils/extras.js"
-
-
-
+import { getAssignmentId } from "../utils/canvasHelpers.js";
+import { calculateStudentAverages } from "../services/gradeCalculator.js";
+import { beginBulkUpdate, waitForBulkGrading, postPerStudentGrades } from "../services/gradeSubmission.js";
+import { verifyUIScores } from "../services/verification.js";
+import { cleanUpLocalStorage } from "../utils/stateManagement.js";
+import { getElapsedTimeSinceStart, stopElapsedTimer, renderLastUpdateNotice } from "../utils/uiHelpers.js";
 
 import {
     getCourseId,
@@ -121,7 +123,7 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
         if (VERBOSE_LOGGING) console.log("assignment object: ", assignmentObj);
 
         if (!assignmentObj) { // Find the assignmentObj even if an outcome / rubric hasn't been associated yet
-            const assignmentObjFromName = await extras.getAssignmentId(courseId);
+            const assignmentObjFromName = await getAssignmentId(courseId);
             if (assignmentObjFromName) {
                 const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentObjFromName}`);
                 assignmentObj = await res.json();
@@ -419,7 +421,7 @@ async function startUpdateFlow() {
         const box = showFloatingBanner({
             text: `Update in progress.`
         });
-        await extras.waitForBulkGrading(box); // reuse existing polling function
+        await waitForBulkGrading(box); // reuse existing polling function
     }
     localStorage.setItem(`updateInProgress_${courseId}`,"true");
 
@@ -438,7 +440,7 @@ async function startUpdateFlow() {
         box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
 
         // calculating student averages is fast, it is updating them to grade book that is slow.
-        const averages = extras.calculateStudentAverages(data, outcomeId);
+        const averages = calculateStudentAverages(data, outcomeId);
         localStorage.setItem(`verificationPending_${courseId}`, "true");
         localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
         localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
@@ -449,7 +451,7 @@ async function startUpdateFlow() {
         if (numberOfUpdates === 0) {
             alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
             box.remove();
-            extras.cleanUpLocalStorage()
+            cleanUpLocalStorage();
             return;
         }
 
@@ -481,7 +483,7 @@ async function startUpdateFlow() {
             if (VERBOSE_LOGGING) {
                 console.log('Per student update...')
             }
-            await extras.postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
+            await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
         } else {
             //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
             let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
@@ -490,19 +492,19 @@ async function startUpdateFlow() {
             if (VERBOSE_LOGGING) {
                 console.log(`Bulk update, Detected ${numberOfUpdates} changes`)
             }
-            const progressId = await extras.beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+            const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
             if (VERBOSE_LOGGING) console.log(`progressId: ${progressId}`)
-            await extras.waitForBulkGrading(box);
+            await waitForBulkGrading(box);
         }
 
         //}
 
-        await extras.verifyUIScores(courseId, averages, outcomeId, box);
+        await verifyUIScores(courseId, averages, outcomeId, box);
 
-        let elapsedTime = extras.getElapsedTimeSinceStart();
+        let elapsedTime = getElapsedTimeSinceStart();
 
         // Stop the elapsed timer to prevent duplicate elapsed time display
-        extras.stopElapsedTimer(box);
+        stopElapsedTimer(box);
 
         box.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
 
@@ -513,7 +515,7 @@ async function startUpdateFlow() {
         localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
 
         const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
-        if (toolbar) extras.renderLastUpdateNotice(toolbar, courseId);
+        if (toolbar) renderLastUpdateNotice(toolbar, courseId);
 
         alert(`"All ${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s) \nYou may need to refresh the page to see the new scores.`);
     }//end of try
@@ -527,11 +529,11 @@ async function startUpdateFlow() {
             box.remove();
         }, 3000);
 
-        extras.cleanUpLocalStorage();
+        cleanUpLocalStorage();
     }
     finally
     {
-        extras.cleanUpLocalStorage()
+        cleanUpLocalStorage();
     }
 }
 
