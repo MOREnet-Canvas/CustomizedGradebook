@@ -4,9 +4,14 @@
   "type": "module",
   "scripts": {
     "build:dev": "node esbuild.config.js dev",
-    "build:prod": "node esbuild.config.js prod"
+    "build:prod": "node esbuild.config.js prod",
+    "export:all": "node buildScripts/export-all-mermaid.js"
+
   },
   "devDependencies": {
     "esbuild": "^0.27.0"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.12.0"
   }
 }

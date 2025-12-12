@@ -1,0 +1,76 @@
+graph LR
+
+    %% ENTRY
+    A[src/main.js] --> B[src/gradebook/updateFlow.js]
+
+    %% LEFT SIDE: Core + UI
+    subgraph APP["Core & UI"]
+        direction TB
+
+        %% Core
+        subgraph CORE["Core Modules"]
+            direction TB
+            B --> C[src/gradebook/stateMachine.js]
+            B --> D[src/gradebook/setupOrchestrator.js]
+            B --> E[src/gradebook/gradeCalculator.js]
+            B --> F[src/gradebook/gradeUpdater.js]
+
+            C --> G[State Machine Core]
+            D --> H[Setup Logic]
+            E --> I[Average Calculation]
+            F --> J[Update Strategy]
+        end
+
+        %% UI
+        subgraph UI["src/ui/"]
+            direction TB
+            B --> Y
+            Y[ui/] --> Z[banner.js]
+            Y --> AA[buttons.js]
+            Y --> AB[uiHelpers.js]
+        end
+    end
+
+    %% RIGHT SIDE: Services + Utils
+    subgraph SUPPORT["Services & Utils"]
+        direction TB
+
+        %% Services
+        subgraph SERVICES["src/services/"]
+            direction TB
+            B --> K
+            K[services/] --> L[canvasApi.js]
+            K --> M[outcomeService.js]
+            K --> N[assignmentService.js]
+            K --> O[rubricService.js]
+            K --> P[gradeService.js]
+            K --> Q[enrollmentService.js]
+        end
+
+        %% Utils
+        subgraph UTILS["src/utils/"]
+            direction TB
+            B --> R
+            R[utils/] --> S[canvas.js]
+            R --> T[dom.js]
+            R --> U[logger.js]
+            R --> V[keys.js]
+            R --> W[time.js]
+            R --> X[errorHandler.js]
+        end
+    end
+
+    %% COLORS
+    style C fill:#90EE90
+    style D fill:#90EE90
+    style E fill:#90EE90
+    style F fill:#90EE90
+
+    style K fill:#FFD700
+    style R fill:#87CEEB
+    style Y fill:#FFA07A
+
+    classDef new fill:#90EE90,stroke:#333,stroke-width:2px
+    classDef service fill:#FFD700,stroke:#333,stroke-width:2px
+    classDef util fill:#87CEEB,stroke:#333,stroke-width:2px
+    classDef ui fill:#FFA07A,stroke:#333,stroke-width:2px
