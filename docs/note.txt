@@ -8,4 +8,5 @@ then push
 
 For checking version in DevTools: CG.version
 
-trying to get Github to build
+TODO: The Update button is pushed to the left after rendering last run information, but is reset on refresh.
+    this also removes the last run information.

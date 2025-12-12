@@ -1,7 +1,7 @@
 // src/ui/banner.js
 import { getCourseId } from "../utils/canvas.js";
 import { k } from "../utils/keys.js";
-import {ensureStatusPill} from "../utils/extras.js";
+import { ensureStatusPill } from "../utils/uiHelpers.js";
 
 const BRAND_COLOR =
     getComputedStyle(document.documentElement)
