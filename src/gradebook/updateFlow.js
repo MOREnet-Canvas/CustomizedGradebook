@@ -492,13 +492,14 @@ async function startUpdateFlow() {
             // Execute handler and get next state
             const nextState = await handler(stateMachine);
 
-            // Save state before transitioning
-            stateMachine.saveToLocalStorage(courseId);
-
             // Transition to next state
             if (nextState !== currentState) {
                 stateMachine.transition(nextState);
             }
+
+            // Save state AFTER transitioning to ensure we save the new state
+            stateMachine.saveToLocalStorage(courseId);
+            logger.debug(`State saved to localStorage: ${stateMachine.getCurrentState()}`);
         }
 
         // Update UI after completion
