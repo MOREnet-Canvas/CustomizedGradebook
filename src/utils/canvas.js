@@ -12,7 +12,6 @@ export function getCourseId() {
         return null;
     }
 
-    logger.debug("courseId:", pathCourseId);
     return courseId;
 }
 
