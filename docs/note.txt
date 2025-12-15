@@ -13,7 +13,6 @@ TODO: The Update button is pushed to the left after rendering last run informati
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Verify overrides
 TODO: better way to handle api headers and such
-TODO: Drop bulk uploading from the verifying banner
-TODO: Don't need finished alert when no updates needed
-TODO: The resmue button needs to go away after a successful resume / finish
-TODO: in Debug mode add a simple text box to UI with current state
+
+
+

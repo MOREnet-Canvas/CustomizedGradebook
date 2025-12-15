@@ -91,8 +91,16 @@ function resetButtonToNormal(button) {
     if (!button) return;
 
     button.textContent = UPDATE_AVG_BUTTON_LABEL;
-    button.style.backgroundColor = ''; // Reset to default
     button.title = '';
+    button.disabled = false; // Ensure button is enabled
+    button.style.cursor = 'pointer'; // Ensure cursor is pointer
+    button.style.opacity = '1'; // Ensure full opacity
+
+    // Restore the original primary button color from Canvas theme
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
+    button.style.backgroundColor = primaryButtonColor;
+
     logger.debug('Button reset to normal state');
 }
 
@@ -111,7 +119,7 @@ function updateDebugUI(stateMachine) {
         debugPanel.id = 'state-machine-debug-panel';
         debugPanel.style.cssText = `
             position: fixed;
-            top: 10px;
+            bottom: 10px;
             right: 10px;
             background: rgba(0, 0, 0, 0.85);
             color: #00ff00;
