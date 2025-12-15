@@ -247,7 +247,7 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
                             logger.warn(`[override] no enrollmentId for user ${userId}`);
                         }
                     } catch (e) {
-                        console.warn(`[override] failed for user ${userId}:`, e?.message || e);
+                        logger.warn(`[override] failed for user ${userId}:`, e?.message || e);
                         // don't fail the grade update on override issues
                     }
                 }
@@ -260,7 +260,7 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
                 lastError = err;
                 if (attempt === 1) retryCounts[userId] = 1;
                 else retryCounts[userId]++;
-                console.warn(`Attempt ${attempt} failed for student ${userId}:`, err.message);
+                logger.warn(`Attempt ${attempt} failed for student ${userId}:`, err.message);
             }
         }
 
@@ -282,7 +282,7 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
         }
     }
 
-    console.log(`Retrying ${deferred.length} students...`);
+    logger.info(`Retrying ${deferred.length} students...`);
 
     // Retry failed students
     for (const student of deferred) {
@@ -301,7 +301,7 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
         .filter(([_, count]) => count > 1)
         .map(([userId, count]) => ({ userId, attempts: count }));
 
-    console.log(`${totalRetried} students needed more than one attempt.`);
+    logger.info(`${totalRetried} students needed more than one attempt.`);
     console.table(retrySummary);
 
     let confirmSummaryDownload = false;
@@ -309,7 +309,7 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
     if (testing) { confirmSummaryDownload = true; }
 
     if (failedUpdates.length > 0) {
-        console.warn("Scores of the following students failed to update:", failedUpdates);
+        logger.warn("Scores of the following students failed to update:", failedUpdates);
     }
 
     if ((failedUpdates.length > 0 || retrySummary.length > 0) && !testing) {

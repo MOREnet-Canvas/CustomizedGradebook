@@ -33,7 +33,7 @@ import { logger } from "../utils/logger.js";
  */
 export function calculateStudentAverages(data, outcomeId) {
     const averages = [];
-    console.log("Calculating student averages...");
+    logger.info("Calculating student averages...");
 
     const excludedOutcomeIds = new Set([String(outcomeId)]);
 

@@ -279,13 +279,13 @@ async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
 
         const assignment = await res.json();
         if (assignment.name === AVG_ASSIGNMENT_NAME) {
-            console.log("Assignment found:", assignment);
+            logger.debug("Assignment found:", assignment);
             return assignment;
         }
     }
 
     // If no match found
-    console.warn(`Assignment "${AVG_ASSIGNMENT_NAME}" not found in alignments for course ${courseId}`);
+    logger.warn(`Assignment "${AVG_ASSIGNMENT_NAME}" not found in alignments`);
     return null;
 }
 
@@ -327,7 +327,7 @@ async function createAssignment(courseId) {
     );
 
     const assignment = await safeJsonParse(res, "createAssignment");
-    console.log("Assignment created:", assignment);
+    logger.info("Assignment created:", assignment.name);
     return assignment.id;
 }
 
