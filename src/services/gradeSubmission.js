@@ -24,6 +24,7 @@ import {
 } from "../config.js";
 import { getElapsedTimeSinceStart, startElapsedTimer } from "../utils/uiHelpers.js";
 import { queueOverride, getEnrollmentIdForUser, setOverrideScoreGQL } from "./gradeOverride.js";
+import { safeFetch, safeJsonParse, logError, TimeoutError } from "../utils/errorHandler.js";
 
 /**
  * Submit a rubric score for a single student
@@ -59,20 +60,18 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
 
     if (VERBOSE_LOGGING) console.log("Submitting rubric score for student", userId, payload);
 
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`, {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json",
+    const response = await safeFetch(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
+        {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload)
         },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Submission failed for user", userId, ":", errorText);
-        throw new Error(`Failed to update user ${userId}: ${errorText}`);
-    }
+        `submitRubricScore:${userId}`
+    );
 
     if (VERBOSE_LOGGING) console.log("Score submitted successfully for user", userId);
 }
@@ -89,7 +88,11 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
  */
 export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages) {
     const csrfToken = getTokenCookie('_csrf_token');
-    if (!csrfToken) throw new Error("CSRF token not found.");
+    if (!csrfToken) {
+        const error = new Error("CSRF token not found.");
+        logError(error, "beginBulkUpdate");
+        throw error;
+    }
     const timeStamp = new Date().toLocaleString();
 
     // Build grade_data object
@@ -113,26 +116,24 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
     }
     if (VERBOSE_LOGGING) console.log("bulk gradeData payload:", gradeData);
 
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/update_grades`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+    const response = await safeFetch(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/update_grades`,
+        {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                authenticity_token: csrfToken,
+                grade_data: gradeData
+            })
         },
-        body: JSON.stringify({
-            authenticity_token: csrfToken,
-            grade_data: gradeData
-        })
-    });
+        "beginBulkUpdate"
+    );
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Bulk grade update failed:", errorText);
-        throw new Error(`Failed to bulk update grades: ${errorText}`);
-    }
-
-    const result = await response.json();  // contains progress object
+    const result = await safeJsonParse(response, "beginBulkUpdate");
     const progressId = result.id;
     localStorage.setItem(`progressId_${getCourseId()}`, progressId);
 
@@ -160,8 +161,8 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
     startElapsedTimer(courseId, box); // makes elapsed time tick each second
 
     while (Date.now() - loopStartTime < timeout) {
-        const res = await fetch(`/api/v1/progress/${progressId}`);
-        const progress = await res.json();
+        const res = await safeFetch(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
+        const progress = await safeJsonParse(res, "waitForBulkGrading");
         let elapsed = getElapsedTimeSinceStart();
 
         state = progress.workflow_state;
@@ -198,8 +199,10 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
         await new Promise(r => setTimeout(r, interval));
     }
 
-    throw new Error(`Bulk update is taking longer than expected. In a few minutes try updating again.
-                        If there are no changes to be made the update completed`);
+    throw new TimeoutError(
+        `Bulk update is taking longer than expected. In a few minutes try updating again. If there are no changes to be made the update completed`,
+        timeout
+    );
 }
 
 

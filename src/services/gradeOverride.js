@@ -13,6 +13,7 @@
 
 import { getTokenCookie } from "../utils/canvas.js";
 import { ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE, VERBOSE_LOGGING } from "../config.js";
+import { safeFetch, safeJsonParse, logError } from "../utils/errorHandler.js";
 
 /**
  * Cache for enrollment IDs to avoid repeated API calls
@@ -29,7 +30,11 @@ export const __enrollmentMapCache = new Map();
  */
 export async function setOverrideScoreGQL(enrollmentId, overrideScore) {
     const csrfToken = getTokenCookie('_csrf_token');
-    if (!csrfToken) throw new Error("No CSRF token found.");
+    if (!csrfToken) {
+        const error = new Error("No CSRF token found.");
+        logError(error, "setOverrideScoreGQL");
+        throw error;
+    }
 
     const query = `
     mutation SetOverride($enrollmentId: ID!, $overrideScore: Float!) {
@@ -39,26 +44,33 @@ export async function setOverrideScoreGQL(enrollmentId, overrideScore) {
       }
     }`;
 
-    const res = await fetch("/api/graphql", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": csrfToken,
-            "X-Requested-With": "XMLHttpRequest"
+    const res = await safeFetch(
+        "/api/graphql",
+        {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": csrfToken,
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                query,
+                variables: {
+                    enrollmentId: String(enrollmentId),
+                    overrideScore: Number(overrideScore)
+                }
+            })
         },
-        body: JSON.stringify({
-            query,
-            variables: {
-                enrollmentId: String(enrollmentId),
-                overrideScore: Number(overrideScore)
-            }
-        })
-    });
+        "setOverrideScoreGQL"
+    );
 
-    if (!res.ok) throw new Error(`GQL HTTP ${res.status}`);
-    const json = await res.json();
-    if (json.errors) throw new Error(`GQL error: ${JSON.stringify(json.errors)}`);
+    const json = await safeJsonParse(res, "setOverrideScoreGQL");
+    if (json.errors) {
+        const error = new Error(`GQL error: ${JSON.stringify(json.errors)}`);
+        logError(error, "setOverrideScoreGQL", { enrollmentId, overrideScore });
+        throw error;
+    }
     return json.data?.setOverrideScore?.grades?.[0]?.overrideScore ?? null;
 }
 
@@ -85,9 +97,8 @@ export async function getEnrollmentIdForUser(courseId, userId) {
     let url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment&per_page=100`;
 
     while (url) {
-        const res = await fetch(url, { credentials: "same-origin" });
-        if (!res.ok) throw new Error(`Enrollments ${res.status}`);
-        const data = await res.json();
+        const res = await safeFetch(url, { credentials: "same-origin" }, "getEnrollmentIdForUser");
+        const data = await safeJsonParse(res, "getEnrollmentIdForUser");
         for (const e of data) {
             if (e?.user_id && e?.id) map.set(String(e.user_id), e.id);
         }
