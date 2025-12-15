@@ -12,8 +12,9 @@
  */
 
 import { getTokenCookie } from "../utils/canvas.js";
-import { ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE, VERBOSE_LOGGING } from "../config.js";
+import { ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE } from "../config.js";
 import { safeFetch, safeJsonParse, logError } from "../utils/errorHandler.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Cache for enrollment IDs to avoid repeated API calls

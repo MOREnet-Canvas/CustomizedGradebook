@@ -1,10 +1,10 @@
 // src/services/gradeCalculator.js
 /**
  * Grade Calculator Service
- * 
+ *
  * This module contains the core business logic for calculating student outcome averages.
  * It processes Canvas outcome rollup data and computes averages while excluding specific outcomes.
- * 
+ *
  * Key responsibilities:
  * - Filter out excluded outcomes (by ID and by keyword in title)
  * - Calculate average scores for each student
@@ -12,7 +12,8 @@
  * - Return only students whose averages have changed
  */
 
-import { EXCLUDED_OUTCOME_KEYWORDS, VERBOSE_LOGGING } from "../config.js";
+import { EXCLUDED_OUTCOME_KEYWORDS } from "../config.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Calculate student averages from outcome rollup data
@@ -46,12 +47,12 @@ export function calculateStudentAverages(data, outcomeId) {
      * @returns {number|null} Current score or null if not found
      */
     function getCurrentOutcomeScore(scores) {
-        if (VERBOSE_LOGGING) { console.log('Scores: ', scores); }
+        logger.debug('Scores: ', scores);
         const match = scores.find(s => String(s.links?.outcome) === String(outcomeId));
         return match?.score ?? null;  // return null if not found
     }
 
-    if (VERBOSE_LOGGING) console.log("data: data being sent to calculateStudentAverages", data);
+    logger.debug("data: data being sent to calculateStudentAverages", data);
 
     for (const rollup of data.rollups) {
         const userId = rollup.links?.user;
@@ -80,19 +81,19 @@ export function calculateStudentAverages(data, outcomeId) {
         let newAverage = total / (relevantScores.length);
         newAverage = parseFloat(newAverage.toFixed(2));
 
-        if (VERBOSE_LOGGING) console.log(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
-        if (VERBOSE_LOGGING) console.log(`Old average: ${oldAverage} New average: ${newAverage}`);
-        
+        logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
+        logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
+
         // Only include students whose average has changed
         if (oldAverage === newAverage) {
-            if (VERBOSE_LOGGING) { console.log("old average matches new average"); }
+            logger.debug("old average matches new average");
             continue; // no update needed
         }
 
         averages.push({ userId, average: newAverage });
     }
 
-    if (VERBOSE_LOGGING) { console.log("averages after calculations:", averages); }
+    logger.debug("averages after calculations:", averages);
     return averages;
 }
 

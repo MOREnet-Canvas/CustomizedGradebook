@@ -14,3 +14,4 @@ TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Verify overrides
 TODO: Prettier way to do verbose logging with environment variable
 TODO: better way to handle api headers and such
+TODO: Drop bulk uploading from the verifying banner

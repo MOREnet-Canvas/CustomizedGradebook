@@ -1,5 +1,4 @@
 // src/config.js
-export const VERBOSE_LOGGING = true; // Later we can wire VERBOSE_LOGGING to ENV_DEV / ENV_PROD, but for now just export the raw constants.
 export const ENABLE_STUDENT_GRADE_CUSTOMIZATION = true;
 export const REMOVE_ASSIGNMENT_TAB = false;
 export const PER_STUDENT_UPDATE_THRESHOLD = 500;

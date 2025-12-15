@@ -1,6 +1,6 @@
 import { getCourseId } from "../utils/canvas.js";
-import { VERBOSE_LOGGING } from "../config.js";
 import { getElapsedTimeSinceStart, startElapsedTimer } from "../utils/uiHelpers.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Verify that updated scores match the backend outcome rollups.
@@ -50,8 +50,8 @@ export async function verifyUIScores(courseId, averages, outcomeId, box, waitTim
         }
         
         const newRollupData = await response.json();
-        if (VERBOSE_LOGGING) console.log('newRollupData: ', newRollupData);
-        
+        logger.debug('newRollupData: ', newRollupData);
+
         const mismatches = [];
 
         // Compare expected vs actual scores for each student
@@ -82,15 +82,15 @@ export async function verifyUIScores(courseId, averages, outcomeId, box, waitTim
 
         // If all scores match, verification successful
         if (mismatches.length === 0) {
-            console.log("All averages match backend scores.");
+            logger.info("All averages match backend scores.");
             localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
             const durationSeconds = getElapsedTimeSinceStart();
             localStorage.setItem(`duration_${getCourseId()}`, durationSeconds);
             return;
         } else {
             // Mismatches found - wait and retry
-            if (VERBOSE_LOGGING) console.warn("Mismatches found:", mismatches);
-            console.log(`Waiting ${waitTimeMs / 1000} seconds before retrying...`);
+            logger.warn("Mismatches found:", mismatches);
+            logger.info(`Waiting ${waitTimeMs / 1000} seconds before retrying...`);
             await new Promise(resolve => setTimeout(resolve, waitTimeMs));
         }
     }
