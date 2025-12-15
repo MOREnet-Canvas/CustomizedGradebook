@@ -1,7 +1,6 @@
 // src/gradebook/updateFlow.js
 
 import {
-    VERBOSE_LOGGING,
     UPDATE_AVG_BUTTON_LABEL,
     AVG_OUTCOME_NAME,
     AVG_ASSIGNMENT_NAME,
@@ -42,6 +41,7 @@ import {
 } from "../utils/canvas.js";
 
 import { debounce, inheritFontStylesFrom } from "../utils/dom.js";
+import { logger } from "../utils/logger.js";
 
 export function injectButtons() {
     waitForGradebookAndToolbar((toolbar) => {
@@ -92,11 +92,11 @@ function waitForGradebookAndToolbar(callback) {
 
         if (onGradebookPage && documentReady && toolbar) {
             clearInterval(intervalId);
-            if (VERBOSE_LOGGING) console.log("Gradebook page and toolbar found.");
+            logger.debug("Gradebook page and toolbar found.");
             callback(toolbar);
         } else if (attempts++ > 33) {
             clearInterval(intervalId);
-            console.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
+            logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
         }
     }, 300);
 }
@@ -111,11 +111,11 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
     let outcomeAlignmentCorrectlySet = false;
     while (!outcomeAlignmentCorrectlySet) {
         data = await getRollup(courseId);
-        if (VERBOSE_LOGGING) console.log("data: ", data);
+        logger.debug("data: ", data);
 
         let outcomeObj = getOutcomeObjectByName(data);
-        if (VERBOSE_LOGGING) console.log("outcome match: ", outcomeObj);
-        if (VERBOSE_LOGGING) console.log("outcome id: ", outcomeObj?.id);
+        logger.debug("outcome match: ", outcomeObj);
+        logger.debug("outcome id: ", outcomeObj?.id);
         outcomeId = outcomeObj?.id;
 
         if (!outcomeId) {
@@ -128,14 +128,14 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
 
         // will only find assignmentObj if it has been associated with outcome
         let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj);
-        if (VERBOSE_LOGGING) console.log("assignment object: ", assignmentObj);
+        logger.debug("assignment object: ", assignmentObj);
 
         if (!assignmentObj) { // Find the assignmentObj even if an outcome / rubric hasn't been associated yet
             const assignmentObjFromName = await getAssignmentId(courseId);
             if (assignmentObjFromName) {
                 const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentObjFromName}`);
                 assignmentObj = await res.json();
-                if (VERBOSE_LOGGING) console.log("Fallback assignment found by name, has not been associated with outcome yet:", assignmentObj);
+                logger.debug("Fallback assignment found by name, has not been associated with outcome yet:", assignmentObj);
             }
         }
 
@@ -172,24 +172,24 @@ async function getRollup(courseId) {
         "getRollup"
     );
     const rollupData = await safeJsonParse(response, "getRollup");
-    if (VERBOSE_LOGGING) console.log("rollupData: ", rollupData);
+    logger.debug("rollupData: ", rollupData);
     return rollupData;
 }
 
 function getOutcomeObjectByName(data) {
     const outcomeTitle = AVG_OUTCOME_NAME;
-    if (VERBOSE_LOGGING) console.log("Outcome Title:", outcomeTitle);
-    if (VERBOSE_LOGGING) console.log("data:", data);
+    logger.debug("Outcome Title:", outcomeTitle);
+    logger.debug("data:", data);
     const outcomes = data?.linked?.outcomes ?? [];
-    if (VERBOSE_LOGGING) console.log("outcomes: ", outcomes)
+    logger.debug("outcomes: ", outcomes);
     if (outcomes.length === 0) {
-        console.warn("No outcomes found in rollup data.")
+        logger.warn("No outcomes found in rollup data.");
         return null;
     }
     const match = outcomes.find(o => o.title === outcomeTitle);
-    if (VERBOSE_LOGGING) console.log("match: ", match)
+    logger.debug("match: ", match);
     if (!match) {
-        console.warn(`Outcome not found: "${outcomeTitle}"`);
+        logger.warn(`Outcome not found: "${outcomeTitle}"`);
     }
     return match ?? null;//match?.id ?? null;
 }
@@ -210,7 +210,7 @@ async function createOutcome(courseId) {
         `"${vendorGuid}",outcome,"${AVG_OUTCOME_NAME}","Auto-generated outcome: ${AVG_OUTCOME_NAME}",latest,"${DEFAULT_MASTERY_THRESHOLD}",${ratingsCsv}`;
 
 
-    if (VERBOSE_LOGGING) console.log("Importing outcome via CSV...");
+    logger.debug("Importing outcome via CSV...");
 
     const importRes = await safeFetch(
         `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
@@ -228,7 +228,7 @@ async function createOutcome(courseId) {
 
     const importData = await safeJsonParse(importRes, "createOutcome");
     const importId = importData.id;
-    if (VERBOSE_LOGGING) console.log(`Outcome import started: ID ${importId}`);
+    logger.debug(`Outcome import started: ID ${importId}`);
 
     // Wait until the import completes
     let attempts = 0;
@@ -246,7 +246,7 @@ async function createOutcome(courseId) {
         const pollData = await safeJsonParse(pollRes, "createOutcome:poll");
 
         const state = pollData.workflow_state;
-        if (VERBOSE_LOGGING) console.log(`Poll attempt ${attempts}: ${state}`);
+        logger.debug(`Poll attempt ${attempts}: ${state}`);
 
         if (state === "succeeded") {
             status = pollData;
@@ -264,7 +264,7 @@ async function createOutcome(courseId) {
         );
     }
 
-    if (VERBOSE_LOGGING) console.log("Outcome fully created");
+    logger.debug("Outcome fully created");
 }
 
 async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
@@ -348,7 +348,7 @@ async function getRubricForAssignment(courseId, assignmentId) {
     const criterionId = rubricCriteria[0].id; // grab the first criterion's ID
     const rubricId = rubricSettings.id;
 
-    if (VERBOSE_LOGGING) console.log("Found rubric and first criterion ID:", {rubricId, criterionId});
+    logger.debug("Found rubric and first criterion ID:", {rubricId, criterionId});
 
     return {rubricId, criterionId};
 }
@@ -404,7 +404,7 @@ async function createRubric(courseId, assignmentId, outcomeId) {
     );
 
     const rubric = await safeJsonParse(response, "createRubric");
-    if (VERBOSE_LOGGING) console.log("Rubric created and linked to outcome:", rubric);
+    logger.debug("Rubric created and linked to outcome:", rubric);
     return rubric.id;
 }
 
@@ -433,8 +433,8 @@ async function startUpdateFlow() {
         const {data, assignmentId, rubricId, rubricCriterionId, outcomeId}
             = await setupOutcomeAssignmentRubric(courseId, box);
 
-        if (VERBOSE_LOGGING) console.log(`assigmentId: ${assignmentId}`)
-        if (VERBOSE_LOGGING) console.log(`rubricId: ${rubricId}`)
+        logger.debug(`assigmentId: ${assignmentId}`);
+        logger.debug(`rubricId: ${rubricId}`);
 
         box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
 
@@ -461,14 +461,14 @@ async function startUpdateFlow() {
         let testing = false;
 
         if (testPerStudentUpdate) {
-            if (VERBOSE_LOGGING) {console.log("Entering per student testing...")}
+            logger.debug("Entering per student testing...");
             box.hold(`TESTING: One-by-one updating "${AVG_OUTCOME_NAME}" scores for all students...`);
             testing = true;
             //await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = true);
         }
 
         if (testBulkUpdate) {
-            if (VERBOSE_LOGGING) {console.log("Entering bulk upload test...")}
+            logger.debug("Entering bulk upload test...");
             box.hold(`TESTING: Bulk updating "${AVG_OUTCOME_NAME}" scores for all students...`);
             // await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
             // await waitForBulkGrading(box);
@@ -479,20 +479,16 @@ async function startUpdateFlow() {
             //box.setText(`Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`);
             let message = `Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`
             box.hold(message,3000);
-            if (VERBOSE_LOGGING) {
-                console.log('Per student update...')
-            }
+            logger.debug('Per student update...');
             await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
         } else {
             //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
             let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
             box.hold(message,3000);
 
-            if (VERBOSE_LOGGING) {
-                console.log(`Bulk update, Detected ${numberOfUpdates} changes`)
-            }
+            logger.debug(`Bulk update, Detected ${numberOfUpdates} changes`);
             const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-            if (VERBOSE_LOGGING) console.log(`progressId: ${progressId}`)
+            logger.debug(`progressId: ${progressId}`);
             await waitForBulkGrading(box);
         }
 

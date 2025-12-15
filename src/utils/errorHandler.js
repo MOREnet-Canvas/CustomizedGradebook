@@ -1,5 +1,5 @@
 // src/utils/errorHandler.js
-import { VERBOSE_LOGGING } from "../config.js";
+import { logger } from "./logger.js";
 
 /**
  * Custom error types for better error categorization and handling
@@ -66,23 +66,23 @@ export function logError(error, context, metadata = {}) {
     };
 
     // Always log errors to console
-    console.error(`[${context}] ${error.name}: ${error.message}`, errorInfo);
+    logger.error(`[${context}] ${error.name}: ${error.message}`, errorInfo);
 
-    // Log stack trace in verbose mode
-    if (VERBOSE_LOGGING && error.stack) {
-        console.error("Stack trace:", error.stack);
+    // Log stack trace in debug mode
+    if (logger.isDebugEnabled() && error.stack) {
+        logger.error("Stack trace:", error.stack);
     }
 
     // Log additional error properties for custom error types
     if (error instanceof CanvasApiError) {
-        console.error(`  Status: ${error.statusCode}`);
-        if (VERBOSE_LOGGING && error.responseText) {
-            console.error(`  Response: ${error.responseText}`);
+        logger.error(`  Status: ${error.statusCode}`);
+        if (logger.isDebugEnabled() && error.responseText) {
+            logger.error(`  Response: ${error.responseText}`);
         }
     } else if (error instanceof TimeoutError) {
-        console.error(`  Timeout: ${error.timeoutMs}ms`);
+        logger.error(`  Timeout: ${error.timeoutMs}ms`);
     } else if (error instanceof ValidationError && error.field) {
-        console.error(`  Field: ${error.field}`);
+        logger.error(`  Field: ${error.field}`);
     }
 }
 

@@ -13,7 +13,7 @@ import { getCourseId } from "./canvas.js";
 import { k } from "./keys.js";
 import { showFloatingBanner } from "../ui/banner.js";
 import { makeButton } from "../ui/buttons.js";
-import { VERBOSE_LOGGING } from "../config.js";
+import { logger } from "./logger.js";
 
 /**
  * Calculate elapsed time since the update started

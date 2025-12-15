@@ -1,10 +1,10 @@
 import { getCourseId } from "./canvas.js";
-import { VERBOSE_LOGGING } from "../config.js";
 import { showFloatingBanner } from "../ui/banner.js";
 import { waitForBulkGrading } from "../services/gradeSubmission.js";
 import { verifyUIScores } from "../services/verification.js";
 import { renderLastUpdateNotice } from "./uiHelpers.js";
 import { handleError } from "./errorHandler.js";
+import { logger } from "./logger.js";
 
 /**
  * Clean up all localStorage entries related to grade updates for a course.
@@ -68,7 +68,7 @@ export async function resumeIfNeeded() {
     const outcomeId = localStorage.getItem(`outcomeId_${courseId}`);
     const expectedAverages = safeParse(localStorage.getItem(`expectedAverages_${courseId}`));
 
-    if (VERBOSE_LOGGING) console.log('Checking if resume is needed');
+    logger.debug('Checking if resume is needed');
     
     // If a job is still running, re-show banner and resume polling
     if (inProgress && progressId) {
@@ -79,7 +79,7 @@ export async function resumeIfNeeded() {
 
     // If verification was never done, run it now
     if (verificationPending && courseId && outcomeId && Array.isArray(expectedAverages)) {
-        if (VERBOSE_LOGGING) console.log('verificationPending');
+        logger.debug('verificationPending');
         const box = showFloatingBanner({ text: "Verifying updated scores" });
         try {
             await verifyUIScores(courseId, expectedAverages, outcomeId, box);

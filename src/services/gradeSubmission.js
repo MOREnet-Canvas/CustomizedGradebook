@@ -19,12 +19,12 @@ import { getCourseId, getTokenCookie } from "../utils/canvas.js";
 import {
     AVG_OUTCOME_NAME,
     ENABLE_GRADE_OVERRIDE,
-    OVERRIDE_SCALE,
-    VERBOSE_LOGGING
+    OVERRIDE_SCALE
 } from "../config.js";
 import { getElapsedTimeSinceStart, startElapsedTimer } from "../utils/uiHelpers.js";
 import { queueOverride, getEnrollmentIdForUser, setOverrideScoreGQL } from "./gradeOverride.js";
 import { safeFetch, safeJsonParse, logError, TimeoutError } from "../utils/errorHandler.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Submit a rubric score for a single student
@@ -38,10 +38,10 @@ import { safeFetch, safeJsonParse, logError, TimeoutError } from "../utils/error
  */
 export async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score) {
     const csrfToken = getTokenCookie('_csrf_token');
-    if (VERBOSE_LOGGING) console.log("csrfToken:", csrfToken);
+    logger.debug("csrfToken:", csrfToken);
     const timeStamp = new Date().toLocaleString();
 
-    if (VERBOSE_LOGGING) console.log("Submitting rubric score for student", userId);
+    logger.debug("Submitting rubric score for student", userId);
     const payload = {
         authenticity_token: csrfToken,
         rubric_assessment: {  // updates the rubric score.
@@ -58,7 +58,7 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
         }
     };
 
-    if (VERBOSE_LOGGING) console.log("Submitting rubric score for student", userId, payload);
+    logger.debug("Submitting rubric score for student", userId, payload);
 
     const response = await safeFetch(
         `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
@@ -73,7 +73,7 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
         `submitRubricScore:${userId}`
     );
 
-    if (VERBOSE_LOGGING) console.log("Score submitted successfully for user", userId);
+    logger.debug("Score submitted successfully for user", userId);
 }
 
 /**
@@ -97,9 +97,9 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
 
     // Build grade_data object
     const gradeData = {};
-    if (VERBOSE_LOGGING) console.log("averages:", averages);
+    logger.debug("averages:", averages);
     for (const { userId, average } of averages) {
-        if (VERBOSE_LOGGING) console.log("userId:", userId, "score:", average);
+        logger.debug("userId:", userId, "score:", average);
         gradeData[userId] = {
             posted_grade: average,
             text_comment: "Score: " + average + "  Updated: " + timeStamp,
@@ -114,7 +114,7 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
             await queueOverride(courseId, userId, average);
         }
     }
-    if (VERBOSE_LOGGING) console.log("bulk gradeData payload:", gradeData);
+    logger.debug("bulk gradeData payload:", gradeData);
 
     const response = await safeFetch(
         `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/update_grades`,
@@ -137,7 +137,7 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
     const progressId = result.id;
     localStorage.setItem(`progressId_${getCourseId()}`, progressId);
 
-    console.log("Waiting for grading to complete progress ID:", progressId);
+    logger.info("Waiting for grading to complete progress ID:", progressId);
     return progressId;
 }
 
@@ -167,7 +167,7 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
 
         state = progress.workflow_state;
 
-        if (VERBOSE_LOGGING) { console.log(`Bulk Uploading Status: ${state} (elapsed: ${elapsed}s)`); }
+        logger.debug(`Bulk Uploading Status: ${state} (elapsed: ${elapsed}s)`);
 
         // Don't show "COMPLETED" status to avoid user confusion
         if (state !== "completed") {
@@ -182,11 +182,11 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
                 break;
 
             case "failed":
-                if (VERBOSE_LOGGING) { console.error("Bulk update job failed."); }
+                logger.error("Bulk update job failed.");
                 throw new Error("Bulk update failed.");
 
             case "completed":
-                if (VERBOSE_LOGGING) { console.log("Bulk upload completed: " + progress.updated_at); }
+                logger.info("Bulk upload completed: " + progress.updated_at);
                 localStorage.setItem(`uploadFinishTime_${getCourseId()}`, progress.updated_at);
                 // Clear the updateInProgress flag so status restoration can move to verification
                 localStorage.removeItem(`updateInProgress_${getCourseId()}`);

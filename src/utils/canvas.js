@@ -1,5 +1,6 @@
 // src/utils/canvas.js
-import { VERBOSE_LOGGING, AVG_ASSIGNMENT_NAME } from "../config.js";
+import { AVG_ASSIGNMENT_NAME } from "../config.js";
+import { logger } from "./logger.js";
 
 export function getCourseId() {
     const envCourseId = ENV?.COURSE_ID;
@@ -7,11 +8,11 @@ export function getCourseId() {
     const courseId = envCourseId || pathCourseId;
 
     if (!courseId) {
-        console.error("Course ID not found on page.");
+        logger.error("Course ID not found on page.");
         return null;
     }
 
-    if (VERBOSE_LOGGING) console.log("courseId:", pathCourseId);
+    logger.debug("courseId:", pathCourseId);
     return courseId;
 }
 
