@@ -1536,9 +1536,8 @@ Would you like to create it?`);
       startTime: (/* @__PURE__ */ new Date()).toISOString()
     });
     if (numberOfUpdates === 0) {
-      alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-      banner.remove();
-      return STATES.IDLE;
+      stateMachine.updateContext({ zeroUpdates: true });
+      return STATES.COMPLETE;
     }
     localStorage.setItem(`verificationPending_${courseId}`, "true");
     localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
@@ -1556,6 +1555,7 @@ Would you like to create it?`);
       banner.hold(message, 3e3);
       logger.debug("Per student update...");
       await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, false);
+      logger.debug(`handleUpdatingGrades complete, transitioning to VERIFYING`);
       return STATES.VERIFYING;
     } else {
       const message = `Detected ${numberOfUpdates} changes - using bulk update for error prevention`;
@@ -1564,23 +1564,36 @@ Would you like to create it?`);
       const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
       stateMachine.updateContext({ progressId });
       logger.debug(`progressId: ${progressId}`);
+      logger.debug(`handleUpdatingGrades complete, transitioning to POLLING_PROGRESS`);
       return STATES.POLLING_PROGRESS;
     }
   }
   async function handlePollingProgress(stateMachine) {
     const { banner } = stateMachine.getContext();
+    logger.debug("Starting bulk update polling...");
     await waitForBulkGrading(banner);
+    logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
   }
   async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
+    logger.debug("Starting verification...");
     await verifyUIScores(courseId, averages, outcomeId, banner);
+    logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
   }
   async function handleComplete(stateMachine) {
-    const { numberOfUpdates, banner, courseId } = stateMachine.getContext();
+    const { numberOfUpdates, banner, courseId, zeroUpdates } = stateMachine.getContext();
     const elapsedTime = getElapsedTimeSinceStart();
     stopElapsedTimer(banner);
+    if (zeroUpdates || numberOfUpdates === 0) {
+      banner.setText(`No changes to ${AVG_OUTCOME_NAME} found.`);
+      alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
+      setTimeout(() => {
+        banner.remove();
+      }, 2e3);
+      return STATES.IDLE;
+    }
     banner.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
     localStorage.setItem(`duration_${courseId}`, elapsedTime);
     localStorage.setItem(`lastUpdateAt_${courseId}`, (/* @__PURE__ */ new Date()).toISOString());
@@ -1627,7 +1640,7 @@ You may need to refresh the page to see the new scores.`);
         //tooltip: `v${SCRIPT_VERSION} - Update Current Score averages`,
         onClick: async () => {
           try {
-            await startUpdateFlow();
+            await startUpdateFlow(updateAveragesButton);
           } catch (error) {
             handleError(error, "updateScores", { showAlert: true });
           }
@@ -1640,6 +1653,69 @@ You may need to refresh the page to see the new scores.`);
       toolbar.appendChild(buttonContainer);
       checkForResumableState(courseId, updateAveragesButton);
     });
+  }
+  function resetButtonToNormal(button) {
+    if (!button) return;
+    button.textContent = UPDATE_AVG_BUTTON_LABEL;
+    button.style.backgroundColor = "";
+    button.title = "";
+    logger.debug("Button reset to normal state");
+  }
+  function updateDebugUI(stateMachine) {
+    if (!logger.isDebugEnabled()) return;
+    let debugPanel = document.getElementById("state-machine-debug-panel");
+    if (!debugPanel) {
+      debugPanel = document.createElement("div");
+      debugPanel.id = "state-machine-debug-panel";
+      debugPanel.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #00ff00;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 10000;
+            min-width: 250px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid #00ff00;
+        `;
+      document.body.appendChild(debugPanel);
+    }
+    const context = stateMachine.getContext();
+    const history = stateMachine.getStateHistory();
+    const currentState = stateMachine.getCurrentState();
+    debugPanel.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 8px; color: #ffff00;">
+            \u{1F527} STATE MACHINE DEBUG
+        </div>
+        <div style="margin-bottom: 4px;">
+            <strong>Current State:</strong> <span style="color: #00ffff;">${currentState}</span>
+        </div>
+        <div style="margin-bottom: 4px;">
+            <strong>Transitions:</strong> ${history.length - 1}
+        </div>
+        <div style="margin-bottom: 4px;">
+            <strong>Update Mode:</strong> ${context.updateMode || "N/A"}
+        </div>
+        <div style="margin-bottom: 4px;">
+            <strong>Updates:</strong> ${context.numberOfUpdates || 0}
+        </div>
+        <div style="margin-bottom: 8px; font-size: 10px; color: #888;">
+            Last 3: ${history.slice(-3).join(" \u2192 ")}
+        </div>
+        <div style="font-size: 10px; color: #666; cursor: pointer;" onclick="this.parentElement.remove()">
+            [Click to close]
+        </div>
+    `;
+  }
+  function removeDebugUI() {
+    const debugPanel = document.getElementById("state-machine-debug-panel");
+    if (debugPanel) {
+      debugPanel.remove();
+    }
   }
   function checkForResumableState(courseId, button) {
     const stateMachine = new UpdateFlowStateMachine();
@@ -1880,7 +1956,7 @@ You may need to refresh the page to see the new scores.`);
     logger.debug("Rubric created and linked to outcome:", rubric);
     return rubric.id;
   }
-  async function startUpdateFlow() {
+  async function startUpdateFlow(button = null) {
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
@@ -1891,7 +1967,7 @@ You may need to refresh the page to see the new scores.`);
     const banner = showFloatingBanner({
       text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
     });
-    stateMachine.updateContext({ courseId, banner });
+    stateMachine.updateContext({ courseId, banner, button });
     alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.");
     try {
       if (!restored) {
@@ -1908,13 +1984,17 @@ You may need to refresh the page to see the new scores.`);
           throw new Error(`No handler found for state: ${currentState}`);
         }
         const nextState = await handler(stateMachine);
-        stateMachine.saveToLocalStorage(courseId);
         if (nextState !== currentState) {
           stateMachine.transition(nextState);
         }
+        stateMachine.saveToLocalStorage(courseId);
+        logger.debug(`State saved to localStorage: ${stateMachine.getCurrentState()}`);
+        updateDebugUI(stateMachine);
       }
       const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
       if (toolbar) renderLastUpdateNotice(toolbar, courseId);
+      resetButtonToNormal(button);
+      removeDebugUI();
     } catch (error) {
       stateMachine.updateContext({ error });
       stateMachine.transition(STATES.ERROR);
@@ -1930,6 +2010,8 @@ You may need to refresh the page to see the new scores.`);
         }, 3e3);
       }
       cleanUpLocalStorage();
+      resetButtonToNormal(button);
+      removeDebugUI();
     } finally {
       stateMachine.clearLocalStorage(courseId);
       cleanUpLocalStorage();
@@ -1938,8 +2020,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2025-12-15 3:21:08 PM (dev, 1b31d86)");
-    exposeVersion("dev", "2025-12-15 3:21:08 PM (dev, 1b31d86)");
+    logBanner("dev", "2025-12-15 3:39:24 PM (dev, 778e111)");
+    exposeVersion("dev", "2025-12-15 3:39:24 PM (dev, 778e111)");
     if (true) {
       log("Running in DEV mode");
     }

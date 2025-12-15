@@ -162,9 +162,9 @@ export async function handleCalculating(stateMachine) {
     });
     
     if (numberOfUpdates === 0) {
-        alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-        banner.remove();
-        return STATES.IDLE; // Skip COMPLETE state to avoid duplicate alert
+        // Mark as zero updates so COMPLETE handler can handle it appropriately
+        stateMachine.updateContext({ zeroUpdates: true });
+        return STATES.COMPLETE;
     }
     
     // Save expected averages for verification
@@ -248,11 +248,25 @@ export async function handleVerifying(stateMachine) {
  * Shows success message and cleans up
  */
 export async function handleComplete(stateMachine) {
-    const { numberOfUpdates, banner, courseId } = stateMachine.getContext();
+    const { numberOfUpdates, banner, courseId, zeroUpdates } = stateMachine.getContext();
 
     const elapsedTime = getElapsedTimeSinceStart();
     stopElapsedTimer(banner);
 
+    // Handle zero updates case (no changes needed)
+    if (zeroUpdates || numberOfUpdates === 0) {
+        banner.setText(`No changes to ${AVG_OUTCOME_NAME} found.`);
+        alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
+
+        // Remove banner after a short delay
+        setTimeout(() => {
+            banner.remove();
+        }, 2000);
+
+        return STATES.IDLE;
+    }
+
+    // Normal completion with updates
     banner.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
 
     // Save completion data
