@@ -59,10 +59,8 @@ export function getUserRoleGroup() {
 
     const normRoles = Array.from(collected).map(r => r.toLowerCase());
 
-    if (VERBOSE_LOGGING) {
-        console.log("[role debug] userId:", userId);
-        console.log("[role debug] normalized roles:", normRoles);
-    }
+    logger.debug("[role debug] userId:", userId);
+    logger.debug("[role debug] normalized roles:", normRoles);
 
     const teacherLike = ["teacher", "admin", "root_admin", "designer", "ta", "accountadmin"];
     const studentLike = ["student", "observer"];

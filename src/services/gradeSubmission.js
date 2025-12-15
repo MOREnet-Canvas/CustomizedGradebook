@@ -242,9 +242,9 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
                         if (enrollmentId) {
                             const override = OVERRIDE_SCALE(average);
                             await setOverrideScoreGQL(enrollmentId, override);
-                            if (VERBOSE_LOGGING) console.log(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
-                        } else if (VERBOSE_LOGGING) {
-                            console.warn(`[override] no enrollmentId for user ${userId}`);
+                            logger.debug(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
+                        } else {
+                            logger.warn(`[override] no enrollmentId for user ${userId}`);
                         }
                     } catch (e) {
                         console.warn(`[override] failed for user ${userId}:`, e?.message || e);

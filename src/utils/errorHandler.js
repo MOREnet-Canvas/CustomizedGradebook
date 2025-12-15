@@ -254,8 +254,8 @@ export async function safeJsonParse(response, context = "parseJSON") {
     try {
         return JSON.parse(rawText);
     } catch (error) {
-        if (VERBOSE_LOGGING) {
-            console.error(`[${context}] Failed to parse JSON:`, rawText);
+        if (logger.isDebugEnabled()) {
+            logger.error(`[${context}] Failed to parse JSON:`, rawText);
         }
         throw new CanvasApiError(
             "Invalid JSON response from Canvas API",
@@ -313,15 +313,15 @@ export async function retryWithBackoff(fn, options = {}) {
 
             // If this was the last attempt, throw
             if (attempt === maxAttempts) {
-                if (VERBOSE_LOGGING) {
-                    console.warn(`[${context}] All ${maxAttempts} attempts failed`);
+                if (logger.isDebugEnabled()) {
+                    logger.warn(`[${context}] All ${maxAttempts} attempts failed`);
                 }
                 throw error;
             }
 
             // Log retry attempt
-            if (VERBOSE_LOGGING) {
-                console.warn(`[${context}] Attempt ${attempt} failed, retrying in ${delayMs}ms...`, error.message);
+            if (logger.isDebugEnabled()) {
+                logger.warn(`[${context}] Attempt ${attempt} failed, retrying in ${delayMs}ms...`, error.message);
             }
 
             // Wait before retrying
