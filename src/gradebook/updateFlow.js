@@ -31,6 +31,8 @@ import {
     TimeoutError,
     ValidationError
 } from "../utils/errorHandler.js";
+import { UpdateFlowStateMachine, STATES } from "./stateMachine.js";
+import { STATE_HANDLERS } from "./stateHandlers.js";
 
 import {
     getCourseId,
@@ -165,7 +167,7 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
     return { data, assignmentId, rubricId, rubricCriterionId, outcomeId };
 }
 
-async function getRollup(courseId) {
+export async function getRollup(courseId) {
     const response = await safeFetch(
         `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
         {},
@@ -176,7 +178,7 @@ async function getRollup(courseId) {
     return rollupData;
 }
 
-function getOutcomeObjectByName(data) {
+export function getOutcomeObjectByName(data) {
     const outcomeTitle = AVG_OUTCOME_NAME;
     logger.debug("Outcome Title:", outcomeTitle);
     logger.debug("data:", data);
@@ -194,7 +196,7 @@ function getOutcomeObjectByName(data) {
     return match ?? null;//match?.id ?? null;
 }
 
-async function createOutcome(courseId) {
+export async function createOutcome(courseId) {
     const csrfToken = getTokenCookie('_csrf_token');
 
     const randomSuffix = Math.random().toString(36).substring(2, 10); // 8-char alphanumeric
@@ -267,7 +269,7 @@ async function createOutcome(courseId) {
     logger.debug("Outcome fully created");
 }
 
-async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
+export async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
     const alignments = outcomeObject.alignments ?? [];
 
     for (const alignment of alignments) {
@@ -289,7 +291,7 @@ async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
     return null;
 }
 
-async function createAssignment(courseId) {
+export async function createAssignment(courseId) {
     const csrfToken = getTokenCookie('_csrf_token');
 
     const payload = {
@@ -331,7 +333,7 @@ async function createAssignment(courseId) {
     return assignment.id;
 }
 
-async function getRubricForAssignment(courseId, assignmentId) {
+export async function getRubricForAssignment(courseId, assignmentId) {
     const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
     const assignment = await response.json();
 
@@ -353,7 +355,7 @@ async function getRubricForAssignment(courseId, assignmentId) {
     return {rubricId, criterionId};
 }
 
-async function createRubric(courseId, assignmentId, outcomeId) {
+export async function createRubric(courseId, assignmentId, outcomeId) {
     const csrfToken = getTokenCookie('_csrf_token');
 
     const rubricRatings = {};
@@ -409,131 +411,90 @@ async function createRubric(courseId, assignmentId, outcomeId) {
 }
 
 async function startUpdateFlow() {
-    let courseId = getCourseId();
+    const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
-    const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
-    const progressId = localStorage.getItem(`progressId_${courseId}`);
-    const startTime = localStorage.getItem(`startTime_${courseId}`);
 
-    if (inProgress && progressId && startTime) {
-        // Re-show the box and resume checking
-        const box = showFloatingBanner({
-            text: `Update in progress.`
-        });
-        await waitForBulkGrading(box); // reuse existing polling function
+    // Try to restore previous state
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+
+    if (restored) {
+        logger.info('Resuming update flow from saved state:', stateMachine.getCurrentState());
     }
-    localStorage.setItem(`updateInProgress_${courseId}`,"true");
 
-    const box = showFloatingBanner({
+    // Create banner
+    const banner = showFloatingBanner({
         text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
     });
-    alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.")
+
+    // Initialize context
+    stateMachine.updateContext({ courseId, banner });
+
+    // Alert user
+    alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.");
+
     try {
-
-        const {data, assignmentId, rubricId, rubricCriterionId, outcomeId}
-            = await setupOutcomeAssignmentRubric(courseId, box);
-
-        logger.debug(`assigmentId: ${assignmentId}`);
-        logger.debug(`rubricId: ${rubricId}`);
-
-        box.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
-
-        // calculating student averages is fast, it is updating them to grade book that is slow.
-        const averages = calculateStudentAverages(data, outcomeId);
-        localStorage.setItem(`verificationPending_${courseId}`, "true");
-        localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
-        localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
-        localStorage.setItem(`startTime_${courseId}`, new Date().toISOString());
-
-        const numberOfUpdates = averages.length;
-
-        if (numberOfUpdates === 0) {
-            alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-            box.remove();
-            cleanUpLocalStorage();
-            return;
+        // Start from IDLE if not restored, otherwise continue from saved state
+        if (!restored) {
+            stateMachine.transition(STATES.CHECKING_SETUP);
         }
 
-        // check if testing parameters used
-        const testPerStudentUpdate = false //window.__TEST_ONE_BY_ONE__;
-        const testBulkUpdate = false //window.__TEST_BULK_UPLOAD__;
+        // Run state machine loop
+        while (stateMachine.getCurrentState() !== STATES.IDLE) {
+            const currentState = stateMachine.getCurrentState();
 
-        let testing = false;
+            // Skip IDLE and ERROR states in the loop
+            if (currentState === STATES.IDLE || currentState === STATES.ERROR) {
+                break;
+            }
 
-        if (testPerStudentUpdate) {
-            logger.debug("Entering per student testing...");
-            box.hold(`TESTING: One-by-one updating "${AVG_OUTCOME_NAME}" scores for all students...`);
-            testing = true;
-            //await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = true);
+            logger.debug(`Executing state: ${currentState}`);
+
+            // Get handler for current state
+            const handler = STATE_HANDLERS[currentState];
+
+            if (!handler) {
+                throw new Error(`No handler found for state: ${currentState}`);
+            }
+
+            // Execute handler and get next state
+            const nextState = await handler(stateMachine);
+
+            // Save state before transitioning
+            stateMachine.saveToLocalStorage(courseId);
+
+            // Transition to next state
+            if (nextState !== currentState) {
+                stateMachine.transition(nextState);
+            }
         }
 
-        if (testBulkUpdate) {
-            logger.debug("Entering bulk upload test...");
-            box.hold(`TESTING: Bulk updating "${AVG_OUTCOME_NAME}" scores for all students...`);
-            // await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-            // await waitForBulkGrading(box);
-        }
-
-        //else { // no testing parameters used
-        if (numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD || testing) {
-            //box.setText(`Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`);
-            let message = `Detected ${numberOfUpdates} changes  updating scores one at a time for quicker processing.`
-            box.hold(message,3000);
-            logger.debug('Per student update...');
-            await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing);
-        } else {
-            //box.setText(Detected ${numberOfUpdates} changes  updating scores all at once for error prevention`);
-            let message = `Detected ${numberOfUpdates} changes using bulk update for error prevention`;
-            box.hold(message,3000);
-
-            logger.debug(`Bulk update, Detected ${numberOfUpdates} changes`);
-            const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
-            logger.debug(`progressId: ${progressId}`);
-            await waitForBulkGrading(box);
-        }
-
-        //}
-
-        await verifyUIScores(courseId, averages, outcomeId, box);
-
-        let elapsedTime = getElapsedTimeSinceStart();
-
-        // Stop the elapsed timer to prevent duplicate elapsed time display
-        stopElapsedTimer(box);
-
-        box.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
-
-        // await new Promise(resolve => setTimeout(resolve, 50));
-        // setTimeout(() => box.remove(), 2500);
-
-        localStorage.setItem(`duration_${getCourseId()}`,elapsedTime);
-        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
-
+        // Update UI after completion
         const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
         if (toolbar) renderLastUpdateNotice(toolbar, courseId);
 
-        alert(`"All ${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s) \nYou may need to refresh the page to see the new scores.`);
-    }//end of try
-    catch (error) {
-        // Clean up UI and localStorage when user declines or error occurs
+    } catch (error) {
+        // Transition to ERROR state
+        stateMachine.updateContext({ error });
+        stateMachine.transition(STATES.ERROR);
+        stateMachine.saveToLocalStorage(courseId);
 
-        // For user cancellations, show an alert and remove banner immediately
+        // Handle error display
         if (error instanceof UserCancelledError) {
             const userMessage = getUserFriendlyMessage(error);
             alert(`Update cancelled: ${userMessage}`);
-            box.remove();
+            banner.remove();
         } else {
-            // For other errors, show in banner and keep it visible for 3 seconds
-            const userMessage = handleError(error, "startUpdateFlow", { banner: box });
+            const userMessage = handleError(error, "startUpdateFlow", { banner });
             setTimeout(() => {
-                box.remove();
+                banner.remove();
             }, 3000);
         }
 
         cleanUpLocalStorage();
-    }
-    finally
-    {
+    } finally {
+        // Clear state machine from localStorage
+        stateMachine.clearLocalStorage(courseId);
         cleanUpLocalStorage();
     }
 }
