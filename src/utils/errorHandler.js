@@ -92,9 +92,9 @@ export function logError(error, context, metadata = {}) {
  * @returns {string} User-friendly error message
  */
 export function getUserFriendlyMessage(error) {
-    // User cancellation - don't show as an error
+    // User cancellation - use the specific message provided
     if (error instanceof UserCancelledError) {
-        return "Operation cancelled.";
+        return error.message || "Operation cancelled.";
     }
 
     // Timeout errors

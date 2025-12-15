@@ -25,6 +25,7 @@ import { cleanUpLocalStorage } from "../utils/stateManagement.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer, renderLastUpdateNotice } from "../utils/uiHelpers.js";
 import {
     handleError,
+    getUserFriendlyMessage,
     safeFetch,
     safeJsonParse,
     UserCancelledError,
@@ -519,15 +520,18 @@ async function startUpdateFlow() {
     }//end of try
     catch (error) {
         // Clean up UI and localStorage when user declines or error occurs
-        const userMessage = handleError(error, "startUpdateFlow", { banner: box });
 
-        // Remove the banner after a short delay (unless user cancelled)
-        if (!(error instanceof UserCancelledError)) {
+        // For user cancellations, show an alert and remove banner immediately
+        if (error instanceof UserCancelledError) {
+            const userMessage = getUserFriendlyMessage(error);
+            alert(`Update cancelled: ${userMessage}`);
+            box.remove();
+        } else {
+            // For other errors, show in banner and keep it visible for 3 seconds
+            const userMessage = handleError(error, "startUpdateFlow", { banner: box });
             setTimeout(() => {
                 box.remove();
             }, 3000);
-        } else {
-            box.remove(); // Remove immediately for user cancellations
         }
 
         cleanUpLocalStorage();
