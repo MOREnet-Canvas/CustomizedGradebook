@@ -10,3 +10,7 @@ For checking version in DevTools: CG.version
 
 TODO: The Update button is pushed to the left after rendering last run information, but is reset on refresh.
     this also removes the last run information.
+TODO: Have the button appear for CBE courses on both gradebook pages
+TODO: Verify overrides
+TODO: Prettier way to do verbose logging with environment variable
+TODO: better way to handle api headers and such
