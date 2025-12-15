@@ -1657,8 +1657,13 @@ You may need to refresh the page to see the new scores.`);
   function resetButtonToNormal(button) {
     if (!button) return;
     button.textContent = UPDATE_AVG_BUTTON_LABEL;
-    button.style.backgroundColor = "";
     button.title = "";
+    button.disabled = false;
+    button.style.cursor = "pointer";
+    button.style.opacity = "1";
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
+    button.style.backgroundColor = primaryButtonColor;
     logger.debug("Button reset to normal state");
   }
   function updateDebugUI(stateMachine) {
@@ -1669,7 +1674,7 @@ You may need to refresh the page to see the new scores.`);
       debugPanel.id = "state-machine-debug-panel";
       debugPanel.style.cssText = `
             position: fixed;
-            top: 10px;
+            bottom: 10px;
             right: 10px;
             background: rgba(0, 0, 0, 0.85);
             color: #00ff00;
@@ -2020,8 +2025,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2025-12-15 3:39:24 PM (dev, 778e111)");
-    exposeVersion("dev", "2025-12-15 3:39:24 PM (dev, 778e111)");
+    logBanner("dev", "2025-12-15 3:51:02 PM (dev, 73e9315)");
+    exposeVersion("dev", "2025-12-15 3:51:02 PM (dev, 73e9315)");
     if (true) {
       log("Running in DEV mode");
     }
