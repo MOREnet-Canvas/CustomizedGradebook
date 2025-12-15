@@ -4,6 +4,7 @@ import { showFloatingBanner } from "../ui/banner.js";
 import { waitForBulkGrading } from "../services/gradeSubmission.js";
 import { verifyUIScores } from "../services/verification.js";
 import { renderLastUpdateNotice } from "./uiHelpers.js";
+import { handleError } from "./errorHandler.js";
 
 /**
  * Clean up all localStorage entries related to grade updates for a course.
@@ -84,8 +85,7 @@ export async function resumeIfNeeded() {
             await verifyUIScores(courseId, expectedAverages, outcomeId, box);
             box.setText(`All ${expectedAverages.length} scores verified!`);
         } catch (e) {
-            console.warn("Verification on resume failed:", e);
-            box.setText("Verification failed. You can try updating again.");
+            handleError(e, "resumeIfNeeded:verification", { banner: box });
         } finally {
             // clear verification state regardless
             cleanUpLocalStorage();

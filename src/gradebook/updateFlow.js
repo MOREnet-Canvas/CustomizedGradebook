@@ -23,6 +23,14 @@ import { beginBulkUpdate, waitForBulkGrading, postPerStudentGrades } from "../se
 import { verifyUIScores } from "../services/verification.js";
 import { cleanUpLocalStorage } from "../utils/stateManagement.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer, renderLastUpdateNotice } from "../utils/uiHelpers.js";
+import {
+    handleError,
+    safeFetch,
+    safeJsonParse,
+    UserCancelledError,
+    TimeoutError,
+    ValidationError
+} from "../utils/errorHandler.js";
 
 import {
     getCourseId,
@@ -52,8 +60,7 @@ export function injectButtons() {
                 try {
                    await startUpdateFlow();
                 } catch (error) {
-                    console.error(`Error updating ${AVG_OUTCOME_NAME} scores:`, error);
-                    alert(`Error updating ${AVG_OUTCOME_NAME} scores: ` + error.message);
+                    handleError(error, "updateScores", { showAlert: true });
                 }
             },
             type: "primary"
@@ -112,7 +119,7 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
 
         if (!outcomeId) {
             let confirmCreate = confirm(`Outcome "${AVG_OUTCOME_NAME}" not found.\nWould you like to create:\nOutcome: "${AVG_OUTCOME_NAME}"?`);
-            if (!confirmCreate) throw new Error("User declined to create missing outcome.");
+            if (!confirmCreate) throw new UserCancelledError("User declined to create missing outcome.");
             box.setText(`Creating "${AVG_OUTCOME_NAME}" Outcome...`);
             await createOutcome(courseId);
             continue; // start while loop over to make sure outcome was created and found.
@@ -134,7 +141,7 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
         assignmentId = assignmentObj?.id; // if assigmentObj is still null even after looking by name, create it
         if (!assignmentId) {
             let confirmCreate = confirm(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.\nWould you like to create:\nAssignment: "${AVG_ASSIGNMENT_NAME}"?`);
-            if (!confirmCreate) throw new Error("User declined to create missing assignment.");
+            if (!confirmCreate) throw new UserCancelledError("User declined to create missing assignment.");
             box.setText(`Creating "${AVG_ASSIGNMENT_NAME}" Assignment...`);
             assignmentId = await createAssignment(courseId);
         }
@@ -145,7 +152,7 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
 
         if (!rubricId) {
             let confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.\nWould you like to create:\nRubric: "${AVG_RUBRIC_NAME}"?`);
-            if (!confirmCreate) throw new Error("User declined to create missing rubric.");
+            if (!confirmCreate) throw new UserCancelledError("User declined to create missing rubric.");
             box.setText(`Creating "${AVG_RUBRIC_NAME}" Rubric...`);
             rubricId = await createRubric(courseId, assignmentId, outcomeId);
             continue; // everything should be setup at this point, re-run while loop to make sure
@@ -158,9 +165,12 @@ async function setupOutcomeAssignmentRubric(courseId, box) {
 }
 
 async function getRollup(courseId) {
-    const response = await fetch(`/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`);
-    if (!response.ok) throw new Error("Failed to fetch outcome results");
-    const rollupData = await response.json();
+    const response = await safeFetch(
+        `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
+        {},
+        "getRollup"
+    );
+    const rollupData = await safeJsonParse(response, "getRollup");
     if (VERBOSE_LOGGING) console.log("rollupData: ", rollupData);
     return rollupData;
 }
@@ -201,41 +211,38 @@ async function createOutcome(courseId) {
 
     if (VERBOSE_LOGGING) console.log("Importing outcome via CSV...");
 
-    const importRes = await fetch(`/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-            "Content-Type": "text/csv",
-            "X-CSRF-Token": csrfToken
+    const importRes = await safeFetch(
+        `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
+        {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "text/csv",
+                "X-CSRF-Token": csrfToken
+            },
+            body: csvContent
         },
-        body: csvContent
-    });
+        "createOutcome"
+    );
 
-    const rawText = await importRes.text();
-    if (!importRes.ok) {
-        console.error("Outcome import failed:", rawText);
-        throw new Error(`Outcome import failed: ${rawText}`);
-    }
-
-    let importData;
-    try {
-        importData = JSON.parse(rawText);
-    } catch (err) {
-        console.error("Failed to parse outcome import response:", rawText);
-        throw new Error("Import response not JSON");
-    }
-
+    const importData = await safeJsonParse(importRes, "createOutcome");
     const importId = importData.id;
     if (VERBOSE_LOGGING) console.log(`Outcome import started: ID ${importId}`);
 
     // Wait until the import completes
     let attempts = 0;
     let status = null;
+    const maxAttempts = 15;
+    const pollIntervalMs = 2000;
 
-    while (attempts++ < 15) { // Allow more time
-        await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
-        const pollRes = await fetch(`/api/v1/courses/${courseId}/outcome_imports/${importId}`);
-        const pollData = await pollRes.json();
+    while (attempts++ < maxAttempts) {
+        await new Promise(r => setTimeout(r, pollIntervalMs));
+        const pollRes = await safeFetch(
+            `/api/v1/courses/${courseId}/outcome_imports/${importId}`,
+            {},
+            "createOutcome:poll"
+        );
+        const pollData = await safeJsonParse(pollRes, "createOutcome:poll");
 
         const state = pollData.workflow_state;
         if (VERBOSE_LOGGING) console.log(`Poll attempt ${attempts}: ${state}`);
@@ -244,14 +251,16 @@ async function createOutcome(courseId) {
             status = pollData;
             break;
         } else if (state === "failed") {
-            console.error("Outcome import failure reason:", pollData);
             throw new Error("Outcome import failed");
         }
     }
 
     // After 30s with no result
     if (!status) {
-        throw new Error("Timed out waiting for outcome import to complete");
+        throw new TimeoutError(
+            "Timed out waiting for outcome import to complete",
+            maxAttempts * pollIntervalMs
+        );
     }
 
     if (VERBOSE_LOGGING) console.log("Outcome fully created");
@@ -302,22 +311,21 @@ async function createAssignment(courseId) {
         }
     };
 
-    const res = await fetch(`/api/v1/courses/${courseId}/assignments`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": csrfToken
+    const res = await safeFetch(
+        `/api/v1/courses/${courseId}/assignments`,
+        {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": csrfToken
+            },
+            body: JSON.stringify(payload)
         },
-        body: JSON.stringify(payload)
-    });
+        "createAssignment"
+    );
 
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Failed to create assignment: ${errText}`);
-    }
-
-    const assignment = await res.json();
+    const assignment = await safeJsonParse(res, "createAssignment");
     console.log("Assignment created:", assignment);
     return assignment.id;
 }
@@ -380,38 +388,28 @@ async function createRubric(courseId, assignmentId, outcomeId) {
     };
 
 
-    const response = await fetch(`/api/v1/courses/${courseId}/rubrics`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": csrfToken
+    const response = await safeFetch(
+        `/api/v1/courses/${courseId}/rubrics`,
+        {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": csrfToken
+            },
+            body: JSON.stringify(rubricPayload)
         },
-        body: JSON.stringify(rubricPayload)
-    });
+        "createRubric"
+    );
 
-    const rawText = await response.text();
-
-    if (!response.ok) {
-        console.error("Rubric creation failed:", rawText);
-        throw new Error(`Failed to create rubric: ${rawText}`);
-    }
-
-    let rubric;
-    try {
-        rubric = JSON.parse(rawText);
-    } catch (e) {
-        console.error("Rubric response not JSON:", rawText);
-        throw new Error("Rubric API returned non-JSON data");
-    }
-
+    const rubric = await safeJsonParse(response, "createRubric");
     if (VERBOSE_LOGGING) console.log("Rubric created and linked to outcome:", rubric);
     return rubric.id;
 }
 
 async function startUpdateFlow() {
     let courseId = getCourseId();
-    if (!courseId) throw new Error("Course ID not found");
+    if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const inProgress = (localStorage.getItem(`updateInProgress_${courseId}`) || "false") === "true";
     const progressId = localStorage.getItem(`progressId_${courseId}`);
     const startTime = localStorage.getItem(`startTime_${courseId}`);
@@ -521,13 +519,16 @@ async function startUpdateFlow() {
     }//end of try
     catch (error) {
         // Clean up UI and localStorage when user declines or error occurs
-        console.warn("Update process stopped:", error.message);
-        box.setText(`Update cancelled: ${error.message}`);
+        const userMessage = handleError(error, "startUpdateFlow", { banner: box });
 
-        // Remove the banner after a short delay
-        setTimeout(() => {
-            box.remove();
-        }, 3000);
+        // Remove the banner after a short delay (unless user cancelled)
+        if (!(error instanceof UserCancelledError)) {
+            setTimeout(() => {
+                box.remove();
+            }, 3000);
+        } else {
+            box.remove(); // Remove immediately for user cancellations
+        }
 
         cleanUpLocalStorage();
     }
