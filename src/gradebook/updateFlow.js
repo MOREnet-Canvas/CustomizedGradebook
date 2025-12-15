@@ -79,8 +79,40 @@ export function injectButtons() {
         buttonContainer.appendChild(buttonWrapper);
         toolbar.appendChild(buttonContainer);
 
-        //void resumeIfNeeded();
+        // Check for resumable state and update UI accordingly
+        checkForResumableState(courseId, updateAveragesButton);
     });
+}
+
+/**
+ * Check if there's a resumable state in localStorage and update UI accordingly
+ */
+function checkForResumableState(courseId, button) {
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+
+    if (restored) {
+        const currentState = stateMachine.getCurrentState();
+        const stateTimestamp = stateMachine.getContext().timestamp || new Date().toISOString();
+        const minutesAgo = Math.round((Date.now() - new Date(stateTimestamp).getTime()) / 60000);
+
+        // Update button text to indicate resumable state
+        button.textContent = `Resume Update`;
+        button.style.backgroundColor = '#ff9800'; // Orange color to indicate resume
+        button.title = `Resume from ${currentState} (${minutesAgo} min ago)`;
+
+        // Show a banner notification
+        const banner = showFloatingBanner({
+            text: `Previous update interrupted at ${currentState} (${minutesAgo} min ago). Click "Resume Update" to continue.`
+        });
+
+        // Auto-dismiss banner after 10 seconds
+        setTimeout(() => {
+            banner.remove();
+        }, 10000);
+
+        logger.info(`Resumable state found: ${currentState} from ${minutesAgo} minutes ago`);
+    }
 }
 
 function waitForGradebookAndToolbar(callback) {

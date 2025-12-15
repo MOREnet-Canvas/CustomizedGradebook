@@ -774,7 +774,7 @@
     let state = "verifying";
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       let elapsed = getElapsedTimeSinceStart();
-      box.soft(`Bulk uploading status: ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
+      box.soft(`Verification status: ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
       startElapsedTimer(courseId, box);
       const response = await fetch(`/api/v1/courses/${courseId}/outcome_rollups?&outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`);
       if (!response.ok) {
@@ -1353,7 +1353,10 @@
     deserialize(data) {
       if (!data) return;
       this.currentState = data.currentState || STATES.IDLE;
-      this.context = __spreadValues(__spreadValues({}, this.context), data.context);
+      this.context = __spreadProps(__spreadValues(__spreadValues({}, this.context), data.context), {
+        timestamp: data.timestamp
+        // Preserve timestamp from serialization
+      });
       this.stateHistory = data.stateHistory || [this.currentState];
       logger.debug(`State machine restored to ${this.currentState}`);
     }
@@ -1534,7 +1537,8 @@ Would you like to create it?`);
     });
     if (numberOfUpdates === 0) {
       alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-      return STATES.COMPLETE;
+      banner.remove();
+      return STATES.IDLE;
     }
     localStorage.setItem(`verificationPending_${courseId}`, "true");
     localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
@@ -1634,7 +1638,27 @@ You may need to refresh the page to see the new scores.`);
       const buttonContainer = createButtonColumnContainer();
       buttonContainer.appendChild(buttonWrapper);
       toolbar.appendChild(buttonContainer);
+      checkForResumableState(courseId, updateAveragesButton);
     });
+  }
+  function checkForResumableState(courseId, button) {
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+    if (restored) {
+      const currentState = stateMachine.getCurrentState();
+      const stateTimestamp = stateMachine.getContext().timestamp || (/* @__PURE__ */ new Date()).toISOString();
+      const minutesAgo = Math.round((Date.now() - new Date(stateTimestamp).getTime()) / 6e4);
+      button.textContent = `Resume Update`;
+      button.style.backgroundColor = "#ff9800";
+      button.title = `Resume from ${currentState} (${minutesAgo} min ago)`;
+      const banner = showFloatingBanner({
+        text: `Previous update interrupted at ${currentState} (${minutesAgo} min ago). Click "Resume Update" to continue.`
+      });
+      setTimeout(() => {
+        banner.remove();
+      }, 1e4);
+      logger.info(`Resumable state found: ${currentState} from ${minutesAgo} minutes ago`);
+    }
   }
   function waitForGradebookAndToolbar(callback) {
     let attempts = 0;
@@ -1914,8 +1938,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2025-12-15 2:56:39 PM (dev, 001f68f)");
-    exposeVersion("dev", "2025-12-15 2:56:39 PM (dev, 001f68f)");
+    logBanner("dev", "2025-12-15 3:21:08 PM (dev, 1b31d86)");
+    exposeVersion("dev", "2025-12-15 3:21:08 PM (dev, 1b31d86)");
     if (true) {
       log("Running in DEV mode");
     }
