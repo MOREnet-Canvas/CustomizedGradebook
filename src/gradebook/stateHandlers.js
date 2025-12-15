@@ -163,7 +163,8 @@ export async function handleCalculating(stateMachine) {
     
     if (numberOfUpdates === 0) {
         alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
-        return STATES.COMPLETE;
+        banner.remove();
+        return STATES.IDLE; // Skip COMPLETE state to avoid duplicate alert
     }
     
     // Save expected averages for verification

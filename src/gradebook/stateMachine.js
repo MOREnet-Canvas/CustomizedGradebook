@@ -192,7 +192,8 @@ export class UpdateFlowStateMachine {
         this.currentState = data.currentState || STATES.IDLE;
         this.context = {
             ...this.context,
-            ...data.context
+            ...data.context,
+            timestamp: data.timestamp // Preserve timestamp from serialization
         };
         this.stateHistory = data.stateHistory || [this.currentState];
 
