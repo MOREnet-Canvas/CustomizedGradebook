@@ -197,6 +197,7 @@ export async function handleUpdatingGrades(stateMachine) {
 
         await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, false);
 
+        logger.debug(`handleUpdatingGrades complete, transitioning to VERIFYING`);
         return STATES.VERIFYING;
     } else {
         // Bulk update
@@ -208,6 +209,7 @@ export async function handleUpdatingGrades(stateMachine) {
         stateMachine.updateContext({ progressId });
         logger.debug(`progressId: ${progressId}`);
 
+        logger.debug(`handleUpdatingGrades complete, transitioning to POLLING_PROGRESS`);
         return STATES.POLLING_PROGRESS;
     }
 }
@@ -219,9 +221,11 @@ export async function handleUpdatingGrades(stateMachine) {
 export async function handlePollingProgress(stateMachine) {
     const { banner } = stateMachine.getContext();
 
+    logger.debug('Starting bulk update polling...');
     // waitForBulkGrading handles the polling internally
     await waitForBulkGrading(banner);
 
+    logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
 }
 
@@ -232,8 +236,10 @@ export async function handlePollingProgress(stateMachine) {
 export async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
 
+    logger.debug('Starting verification...');
     await verifyUIScores(courseId, averages, outcomeId, banner);
 
+    logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
 }
 
