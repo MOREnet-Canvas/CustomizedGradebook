@@ -8,7 +8,8 @@
  * - Extracting scores from the DOM
  */
 
-import { AVG_ASSIGNMENT_NAME, VERBOSE_LOGGING } from "../config.js";
+import { AVG_ASSIGNMENT_NAME } from "../config.js";
+import { logger } from "./logger.js";
 
 /**
  * Get the assignment ID for the average assignment by name
@@ -59,16 +60,14 @@ export function extractCurrentScoreFromPage() {
                 
                 const m = txt.match(/(\d+(?:\.\d+)?)/);
                 if (m) {
-                    if (VERBOSE_LOGGING) {
-                        console.log(`Found Current Score Assignment in table: ${m[1]} (from ${el.className})`);
-                    }
+                    logger.debug(`Found Current Score Assignment in table: ${m[1]} (from ${el.className})`);
                     return m[1]; // raw numeric, not a %
                 }
             }
         }
     }
-    
-    if (VERBOSE_LOGGING) console.log('No Current Score Assignment found');
+
+    logger.debug('No Current Score Assignment found');
     return null;
 }
 

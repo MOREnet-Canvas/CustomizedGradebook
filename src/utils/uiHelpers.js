@@ -127,11 +127,11 @@ export function waitForGradebookAndToolbar(callback) {
 
         if (onGradebookPage && documentReady && toolbar) {
             clearInterval(intervalId);
-            if (VERBOSE_LOGGING) console.log("Gradebook page and toolbar found.");
+            logger.debug("Gradebook page and toolbar found.");
             callback(toolbar);
         } else if (attempts++ > 33) {
             clearInterval(intervalId);
-            console.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
+            logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
         }
     }, 300);
 }
