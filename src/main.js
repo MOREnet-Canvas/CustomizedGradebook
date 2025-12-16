@@ -2,7 +2,7 @@ import { log, logBanner, exposeVersion } from "./utils/logger.js";
 //import { VERBOSE_LOGGING, ENABLE_STUDENT_GRADE_CUSTOMIZATION, REMOVE_ASSIGNMENT_TAB } from "./config.js";
 //import { getUserRoleGroup, isDashboardPage, courseHasAvgAssignment } from "./utils/canvas.js";
 //import { debounce } from "./utils/dom.js";
-import { injectButtons } from "./gradebook/updateFlow.js"; //startUpdateFlow, setupDashboardAverages, setupStudentPage, setupScoreCleanup, setupSpeedGrader
+import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 
 (function init() {
     // Banner + version stamp
