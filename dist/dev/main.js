@@ -132,34 +132,6 @@
     }
   });
 
-  // src/config.js
-  var PER_STUDENT_UPDATE_THRESHOLD, ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE, UPDATE_AVG_BUTTON_LABEL, AVG_OUTCOME_NAME, AVG_ASSIGNMENT_NAME, AVG_RUBRIC_NAME, DEFAULT_MAX_POINTS, DEFAULT_MASTERY_THRESHOLD, OUTCOME_AND_RUBRIC_RATINGS, EXCLUDED_OUTCOME_KEYWORDS;
-  var init_config = __esm({
-    "src/config.js"() {
-      PER_STUDENT_UPDATE_THRESHOLD = 500;
-      ENABLE_GRADE_OVERRIDE = true;
-      OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2));
-      UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
-      AVG_OUTCOME_NAME = "Current Score";
-      AVG_ASSIGNMENT_NAME = "Current Score Assignment";
-      AVG_RUBRIC_NAME = "Current Score Rubric";
-      DEFAULT_MAX_POINTS = 4;
-      DEFAULT_MASTERY_THRESHOLD = 3;
-      OUTCOME_AND_RUBRIC_RATINGS = [
-        { description: "Exemplary", points: 4 },
-        { description: "Beyond Target", points: 3.5 },
-        { description: "Target", points: 3 },
-        { description: "Approaching Target", points: 2.5 },
-        { description: "Developing", points: 2 },
-        { description: "Beginning", points: 1.5 },
-        { description: "Needs Partial Support", points: 1 },
-        { description: "Needs Full Support", points: 0.5 },
-        { description: "No Evidence", points: 0 }
-      ];
-      EXCLUDED_OUTCOME_KEYWORDS = ["Homework Completion"];
-    }
-  });
-
   // src/utils/dom.js
   function inheritFontStylesFrom(selector, element) {
     const source = document.querySelector(selector);
@@ -229,11 +201,31 @@
     }
   });
 
-  // src/utils/keys.js
-  var k;
-  var init_keys = __esm({
-    "src/utils/keys.js"() {
-      k = (name, courseId) => `${name}_${courseId}`;
+  // src/config.js
+  var PER_STUDENT_UPDATE_THRESHOLD, ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE, UPDATE_AVG_BUTTON_LABEL, AVG_OUTCOME_NAME, AVG_ASSIGNMENT_NAME, AVG_RUBRIC_NAME, DEFAULT_MAX_POINTS, DEFAULT_MASTERY_THRESHOLD, OUTCOME_AND_RUBRIC_RATINGS, EXCLUDED_OUTCOME_KEYWORDS;
+  var init_config = __esm({
+    "src/config.js"() {
+      PER_STUDENT_UPDATE_THRESHOLD = 25;
+      ENABLE_GRADE_OVERRIDE = true;
+      OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2));
+      UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
+      AVG_OUTCOME_NAME = "Current Score";
+      AVG_ASSIGNMENT_NAME = "Current Score Assignment";
+      AVG_RUBRIC_NAME = "Current Score Rubric";
+      DEFAULT_MAX_POINTS = 4;
+      DEFAULT_MASTERY_THRESHOLD = 3;
+      OUTCOME_AND_RUBRIC_RATINGS = [
+        { description: "Exemplary", points: 4 },
+        { description: "Beyond Target", points: 3.5 },
+        { description: "Target", points: 3 },
+        { description: "Approaching Target", points: 2.5 },
+        { description: "Developing", points: 2 },
+        { description: "Beginning", points: 1.5 },
+        { description: "Needs Partial Support", points: 1 },
+        { description: "Needs Full Support", points: 0.5 },
+        { description: "No Evidence", points: 0 }
+      ];
+      EXCLUDED_OUTCOME_KEYWORDS = ["Homework Completion"];
     }
   });
 
@@ -269,6 +261,14 @@
     "src/utils/canvas.js"() {
       init_config();
       init_logger();
+    }
+  });
+
+  // src/utils/keys.js
+  var k;
+  var init_keys = __esm({
+    "src/utils/keys.js"() {
+      k = (name, courseId) => `${name}_${courseId}`;
     }
   });
 
@@ -1105,96 +1105,13 @@
   // src/main.js
   init_logger();
 
-  // src/gradebook/updateFlow.js
-  init_config();
+  // src/gradebook/ui/buttonInjection.js
   init_buttons();
-  init_keys();
   init_banner();
-
-  // src/utils/canvasHelpers.js
-  init_config();
-  init_logger();
-  async function getAssignmentId(courseId) {
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments?per_page=100`);
-    const assignments = await response.json();
-    const avgAssignment = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
-    return avgAssignment ? avgAssignment.id : null;
-  }
-
-  // src/services/gradeCalculator.js
-  init_config();
-  init_logger();
-  function calculateStudentAverages(data, outcomeId) {
-    var _a, _b, _c;
-    const averages = [];
-    logger.info("Calculating student averages...");
-    const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
-    const outcomeMap = {};
-    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => outcomeMap[o.id] = o.title);
-    function getCurrentOutcomeScore(scores) {
-      var _a2;
-      logger.debug("Scores: ", scores);
-      const match = scores.find((s) => {
-        var _a3;
-        return String((_a3 = s.links) == null ? void 0 : _a3.outcome) === String(outcomeId);
-      });
-      return (_a2 = match == null ? void 0 : match.score) != null ? _a2 : null;
-    }
-    logger.debug("data: data being sent to calculateStudentAverages", data);
-    for (const rollup of data.rollups) {
-      const userId = (_c = rollup.links) == null ? void 0 : _c.user;
-      const oldAverage = getCurrentOutcomeScore(rollup.scores);
-      const relevantScores = rollup.scores.filter((s) => {
-        var _a2;
-        const id = String((_a2 = s.links) == null ? void 0 : _a2.outcome);
-        const title = (outcomeMap[id] || "").toLowerCase();
-        return typeof s.score === "number" && // must have a numeric score
-        !excludedOutcomeIds.has(id) && // not in the excluded IDs set
-        !EXCLUDED_OUTCOME_KEYWORDS.some(
-          (keyword) => title.includes(keyword.toLowerCase())
-          // title doesn't contain any keyword
-        );
-      });
-      if (relevantScores.length === 0) continue;
-      const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
-      let newAverage = total / relevantScores.length;
-      newAverage = parseFloat(newAverage.toFixed(2));
-      logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
-      logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
-      if (oldAverage === newAverage) {
-        logger.debug("old average matches new average");
-        continue;
-      }
-      averages.push({ userId, average: newAverage });
-    }
-    logger.debug("averages after calculations:", averages);
-    return averages;
-  }
-
-  // src/gradebook/updateFlow.js
-  init_gradeSubmission();
-  init_verification();
-
-  // src/utils/stateManagement.js
   init_canvas();
-  init_banner();
-  init_gradeSubmission();
-  init_verification();
-  init_uiHelpers();
+  init_config();
   init_errorHandler();
   init_logger();
-  function cleanUpLocalStorage() {
-    let courseId = getCourseId();
-    localStorage.removeItem(`verificationPending_${courseId}`);
-    localStorage.removeItem(`expectedAverages_${courseId}`);
-    localStorage.removeItem(`uploadFinishTime_${courseId}`);
-    localStorage.removeItem(`updateInProgress_${courseId}`);
-    localStorage.removeItem(`startTime_${courseId}`);
-  }
-
-  // src/gradebook/updateFlow.js
-  init_uiHelpers();
-  init_errorHandler();
 
   // src/gradebook/stateMachine.js
   init_logger();
@@ -1459,9 +1376,287 @@
   init_logger();
   init_config();
   init_errorHandler();
+
+  // src/services/gradeCalculator.js
+  init_config();
+  init_logger();
+  function calculateStudentAverages(data, outcomeId) {
+    var _a, _b, _c;
+    const averages = [];
+    logger.info("Calculating student averages...");
+    const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
+    const outcomeMap = {};
+    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => outcomeMap[o.id] = o.title);
+    function getCurrentOutcomeScore(scores) {
+      var _a2;
+      logger.debug("Scores: ", scores);
+      const match = scores.find((s) => {
+        var _a3;
+        return String((_a3 = s.links) == null ? void 0 : _a3.outcome) === String(outcomeId);
+      });
+      return (_a2 = match == null ? void 0 : match.score) != null ? _a2 : null;
+    }
+    logger.debug("data: data being sent to calculateStudentAverages", data);
+    for (const rollup of data.rollups) {
+      const userId = (_c = rollup.links) == null ? void 0 : _c.user;
+      const oldAverage = getCurrentOutcomeScore(rollup.scores);
+      const relevantScores = rollup.scores.filter((s) => {
+        var _a2;
+        const id = String((_a2 = s.links) == null ? void 0 : _a2.outcome);
+        const title = (outcomeMap[id] || "").toLowerCase();
+        return typeof s.score === "number" && // must have a numeric score
+        !excludedOutcomeIds.has(id) && // not in the excluded IDs set
+        !EXCLUDED_OUTCOME_KEYWORDS.some(
+          (keyword) => title.includes(keyword.toLowerCase())
+          // title doesn't contain any keyword
+        );
+      });
+      if (relevantScores.length === 0) continue;
+      const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
+      let newAverage = total / relevantScores.length;
+      newAverage = parseFloat(newAverage.toFixed(2));
+      logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
+      logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
+      if (oldAverage === newAverage) {
+        logger.debug("old average matches new average");
+        continue;
+      }
+      averages.push({ userId, average: newAverage });
+    }
+    logger.debug("averages after calculations:", averages);
+    return averages;
+  }
+
+  // src/gradebook/stateHandlers.js
   init_gradeSubmission();
   init_verification();
   init_uiHelpers();
+
+  // src/services/canvasOutcomes.js
+  init_errorHandler();
+  init_canvas();
+  init_config();
+  init_logger();
+  async function getRollup(courseId) {
+    const response = await safeFetch(
+      `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
+      {},
+      "getRollup"
+    );
+    const rollupData = await safeJsonParse(response, "getRollup");
+    logger.debug("rollupData: ", rollupData);
+    return rollupData;
+  }
+  function getOutcomeObjectByName(data) {
+    var _a, _b;
+    const outcomeTitle = AVG_OUTCOME_NAME;
+    logger.debug("Outcome Title:", outcomeTitle);
+    logger.debug("data:", data);
+    const outcomes = (_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : [];
+    logger.debug("outcomes: ", outcomes);
+    if (outcomes.length === 0) {
+      logger.warn("No outcomes found in rollup data.");
+      return null;
+    }
+    const match = outcomes.find((o) => o.title === outcomeTitle);
+    logger.debug("match: ", match);
+    if (!match) {
+      logger.warn(`Outcome not found: "${outcomeTitle}"`);
+    }
+    return match != null ? match : null;
+  }
+  async function createOutcome(courseId) {
+    const csrfToken = getTokenCookie("_csrf_token");
+    const randomSuffix = Math.random().toString(36).substring(2, 10);
+    const vendorGuid = `MOREnet_${randomSuffix}`;
+    const ratingsCsv = OUTCOME_AND_RUBRIC_RATINGS.map((r) => `${r.points},"${r.description}"`).join(",");
+    const csvContent = `vendor_guid,object_type,title,description,calculation_method,mastery_points
+"${vendorGuid}",outcome,"${AVG_OUTCOME_NAME}","Auto-generated outcome: ${AVG_OUTCOME_NAME}",latest,"${DEFAULT_MASTERY_THRESHOLD}",${ratingsCsv}`;
+    logger.debug("Importing outcome via CSV...");
+    const importRes = await safeFetch(
+      `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "text/csv",
+          "X-CSRF-Token": csrfToken
+        },
+        body: csvContent
+      },
+      "createOutcome"
+    );
+    const importData = await safeJsonParse(importRes, "createOutcome");
+    const importId = importData.id;
+    logger.debug(`Outcome import started: ID ${importId}`);
+    let attempts = 0;
+    let status = null;
+    const maxAttempts = 15;
+    const pollIntervalMs = 2e3;
+    while (attempts++ < maxAttempts) {
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      const pollRes = await safeFetch(
+        `/api/v1/courses/${courseId}/outcome_imports/${importId}`,
+        {},
+        "createOutcome:poll"
+      );
+      const pollData = await safeJsonParse(pollRes, "createOutcome:poll");
+      const state = pollData.workflow_state;
+      logger.debug(`Poll attempt ${attempts}: ${state}`);
+      if (state === "succeeded") {
+        status = pollData;
+        break;
+      } else if (state === "failed") {
+        throw new Error("Outcome import failed");
+      }
+    }
+    if (!status) {
+      throw new TimeoutError(
+        "Timed out waiting for outcome import to complete",
+        maxAttempts * pollIntervalMs
+      );
+    }
+    logger.debug("Outcome fully created");
+  }
+
+  // src/services/canvasAssignments.js
+  init_errorHandler();
+  init_canvas();
+  init_config();
+  init_logger();
+  async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
+    var _a;
+    const alignments = (_a = outcomeObject.alignments) != null ? _a : [];
+    for (const alignment of alignments) {
+      if (!alignment.startsWith("assignment_")) continue;
+      const assignmentId = alignment.split("_")[1];
+      const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
+      if (!res.ok) continue;
+      const assignment = await res.json();
+      if (assignment.name === AVG_ASSIGNMENT_NAME) {
+        logger.debug("Assignment found:", assignment);
+        return assignment;
+      }
+    }
+    logger.warn(`Assignment "${AVG_ASSIGNMENT_NAME}" not found in alignments`);
+    return null;
+  }
+  async function createAssignment(courseId) {
+    const csrfToken = getTokenCookie("_csrf_token");
+    const payload = {
+      authenticity_token: csrfToken,
+      assignment: {
+        name: AVG_ASSIGNMENT_NAME,
+        position: 1,
+        submission_types: ["none"],
+        // no student submissions needed
+        published: true,
+        notify_of_update: true,
+        points_possible: DEFAULT_MAX_POINTS,
+        grading_type: "gpa_scale",
+        omit_from_final_grade: true
+      }
+    };
+    const res = await safeFetch(
+      `/api/v1/courses/${courseId}/assignments`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify(payload)
+      },
+      "createAssignment"
+    );
+    const assignment = await safeJsonParse(res, "createAssignment");
+    logger.info("Assignment created:", assignment.name);
+    return assignment.id;
+  }
+
+  // src/services/canvasRubrics.js
+  init_errorHandler();
+  init_canvas();
+  init_config();
+  init_logger();
+  async function getRubricForAssignment(courseId, assignmentId) {
+    const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
+    const assignment = await response.json();
+    const rubricSettings = assignment.rubric_settings;
+    if (!rubricSettings || rubricSettings.title !== AVG_RUBRIC_NAME) {
+      return null;
+    }
+    const rubricCriteria = assignment.rubric;
+    if (!rubricCriteria || !Array.isArray(rubricCriteria) || rubricCriteria.length === 0) {
+      return null;
+    }
+    const criterionId = rubricCriteria[0].id;
+    const rubricId = rubricSettings.id;
+    logger.debug("Found rubric and first criterion ID:", { rubricId, criterionId });
+    return { rubricId, criterionId };
+  }
+  async function createRubric(courseId, assignmentId, outcomeId) {
+    const csrfToken = getTokenCookie("_csrf_token");
+    const rubricRatings = {};
+    OUTCOME_AND_RUBRIC_RATINGS.forEach((rating, index) => {
+      rubricRatings[index] = {
+        description: rating.description,
+        points: rating.points
+      };
+    });
+    const rubricPayload = {
+      "rubric": {
+        "title": AVG_RUBRIC_NAME,
+        "free_form_criterion_comments": false,
+        "criteria": {
+          "0": {
+            "description": `${AVG_OUTCOME_NAME} criteria was used to create this rubric`,
+            "criterion_use_range": false,
+            "points": DEFAULT_MAX_POINTS,
+            "mastery_points": DEFAULT_MASTERY_THRESHOLD,
+            "learning_outcome_id": outcomeId,
+            "ratings": rubricRatings
+          }
+        }
+      },
+      rubric_association: {
+        association_type: "Assignment",
+        association_id: assignmentId,
+        use_for_grading: true,
+        purpose: "grading",
+        hide_points: true
+      }
+    };
+    const response = await safeFetch(
+      `/api/v1/courses/${courseId}/rubrics`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify(rubricPayload)
+      },
+      "createRubric"
+    );
+    const rubric = await safeJsonParse(response, "createRubric");
+    logger.debug("Rubric created and linked to outcome:", rubric);
+    return rubric.id;
+  }
+
+  // src/utils/canvasHelpers.js
+  init_config();
+  init_logger();
+  async function getAssignmentId(courseId) {
+    const response = await fetch(`/api/v1/courses/${courseId}/assignments?per_page=100`);
+    const assignments = await response.json();
+    const avgAssignment = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
+    return avgAssignment ? avgAssignment.id : null;
+  }
+
+  // src/gradebook/stateHandlers.js
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
     banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
@@ -1623,49 +1818,11 @@ You may need to refresh the page to see the new scores.`);
     [STATES.ERROR]: handleError2
   };
 
-  // src/gradebook/updateFlow.js
-  init_canvas();
-  init_dom();
+  // src/gradebook/updateFlowOrchestrator.js
+  init_banner();
+
+  // src/gradebook/ui/debugPanel.js
   init_logger();
-  function injectButtons() {
-    waitForGradebookAndToolbar((toolbar) => {
-      const courseId = getCourseId();
-      const buttonWrapper = document.createElement("div");
-      buttonWrapper.style.display = "flex";
-      buttonWrapper.style.flexDirection = "column";
-      buttonWrapper.style.alignItems = "flex-end";
-      const updateAveragesButton = makeButton({
-        label: UPDATE_AVG_BUTTON_LABEL,
-        id: "update-scores-button",
-        //tooltip: `v${SCRIPT_VERSION} - Update Current Score averages`,
-        onClick: async () => {
-          try {
-            await startUpdateFlow(updateAveragesButton);
-          } catch (error) {
-            handleError(error, "updateScores", { showAlert: true });
-          }
-        },
-        type: "primary"
-      });
-      buttonWrapper.appendChild(updateAveragesButton);
-      const buttonContainer = createButtonColumnContainer();
-      buttonContainer.appendChild(buttonWrapper);
-      toolbar.appendChild(buttonContainer);
-      checkForResumableState(courseId, updateAveragesButton);
-    });
-  }
-  function resetButtonToNormal(button) {
-    if (!button) return;
-    button.textContent = UPDATE_AVG_BUTTON_LABEL;
-    button.title = "";
-    button.disabled = false;
-    button.style.cursor = "pointer";
-    button.style.opacity = "1";
-    const rootStyles = getComputedStyle(document.documentElement);
-    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
-    button.style.backgroundColor = primaryButtonColor;
-    logger.debug("Button reset to normal state");
-  }
   function updateDebugUI(stateMachine) {
     if (!logger.isDebugEnabled()) return;
     let debugPanel = document.getElementById("state-machine-debug-panel");
@@ -1722,245 +1879,32 @@ You may need to refresh the page to see the new scores.`);
       debugPanel.remove();
     }
   }
-  function checkForResumableState(courseId, button) {
-    const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-    if (restored) {
-      const currentState = stateMachine.getCurrentState();
-      const stateTimestamp = stateMachine.getContext().timestamp || (/* @__PURE__ */ new Date()).toISOString();
-      const minutesAgo = Math.round((Date.now() - new Date(stateTimestamp).getTime()) / 6e4);
-      button.textContent = `Resume Update`;
-      button.style.backgroundColor = "#ff9800";
-      button.title = `Resume from ${currentState} (${minutesAgo} min ago)`;
-      const banner = showFloatingBanner({
-        text: `Previous update interrupted at ${currentState} (${minutesAgo} min ago). Click "Resume Update" to continue.`
-      });
-      setTimeout(() => {
-        banner.remove();
-      }, 1e4);
-      logger.info(`Resumable state found: ${currentState} from ${minutesAgo} minutes ago`);
-    }
+
+  // src/gradebook/updateFlowOrchestrator.js
+  init_errorHandler();
+  init_canvas();
+
+  // src/utils/stateManagement.js
+  init_canvas();
+  init_banner();
+  init_gradeSubmission();
+  init_verification();
+  init_uiHelpers();
+  init_errorHandler();
+  init_logger();
+  function cleanUpLocalStorage() {
+    let courseId = getCourseId();
+    localStorage.removeItem(`verificationPending_${courseId}`);
+    localStorage.removeItem(`expectedAverages_${courseId}`);
+    localStorage.removeItem(`uploadFinishTime_${courseId}`);
+    localStorage.removeItem(`updateInProgress_${courseId}`);
+    localStorage.removeItem(`startTime_${courseId}`);
   }
-  function waitForGradebookAndToolbar(callback) {
-    let attempts = 0;
-    const intervalId = setInterval(() => {
-      const onGradebookPage = window.location.pathname.includes("/gradebook");
-      const documentReady = document.readyState === "complete";
-      const toolbar = document.querySelector(
-        '.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]'
-      );
-      if (onGradebookPage && documentReady && toolbar) {
-        clearInterval(intervalId);
-        logger.debug("Gradebook page and toolbar found.");
-        callback(toolbar);
-      } else if (attempts++ > 33) {
-        clearInterval(intervalId);
-        logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
-      }
-    }, 300);
-  }
-  async function getRollup(courseId) {
-    const response = await safeFetch(
-      `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
-      {},
-      "getRollup"
-    );
-    const rollupData = await safeJsonParse(response, "getRollup");
-    logger.debug("rollupData: ", rollupData);
-    return rollupData;
-  }
-  function getOutcomeObjectByName(data) {
-    var _a, _b;
-    const outcomeTitle = AVG_OUTCOME_NAME;
-    logger.debug("Outcome Title:", outcomeTitle);
-    logger.debug("data:", data);
-    const outcomes = (_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : [];
-    logger.debug("outcomes: ", outcomes);
-    if (outcomes.length === 0) {
-      logger.warn("No outcomes found in rollup data.");
-      return null;
-    }
-    const match = outcomes.find((o) => o.title === outcomeTitle);
-    logger.debug("match: ", match);
-    if (!match) {
-      logger.warn(`Outcome not found: "${outcomeTitle}"`);
-    }
-    return match != null ? match : null;
-  }
-  async function createOutcome(courseId) {
-    const csrfToken = getTokenCookie("_csrf_token");
-    const randomSuffix = Math.random().toString(36).substring(2, 10);
-    const vendorGuid = `MOREnet_${randomSuffix}`;
-    const ratingsCsv = OUTCOME_AND_RUBRIC_RATINGS.map((r) => `${r.points},"${r.description}"`).join(",");
-    const csvContent = `vendor_guid,object_type,title,description,calculation_method,mastery_points
-"${vendorGuid}",outcome,"${AVG_OUTCOME_NAME}","Auto-generated outcome: ${AVG_OUTCOME_NAME}",latest,"${DEFAULT_MASTERY_THRESHOLD}",${ratingsCsv}`;
-    logger.debug("Importing outcome via CSV...");
-    const importRes = await safeFetch(
-      `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "text/csv",
-          "X-CSRF-Token": csrfToken
-        },
-        body: csvContent
-      },
-      "createOutcome"
-    );
-    const importData = await safeJsonParse(importRes, "createOutcome");
-    const importId = importData.id;
-    logger.debug(`Outcome import started: ID ${importId}`);
-    let attempts = 0;
-    let status = null;
-    const maxAttempts = 15;
-    const pollIntervalMs = 2e3;
-    while (attempts++ < maxAttempts) {
-      await new Promise((r) => setTimeout(r, pollIntervalMs));
-      const pollRes = await safeFetch(
-        `/api/v1/courses/${courseId}/outcome_imports/${importId}`,
-        {},
-        "createOutcome:poll"
-      );
-      const pollData = await safeJsonParse(pollRes, "createOutcome:poll");
-      const state = pollData.workflow_state;
-      logger.debug(`Poll attempt ${attempts}: ${state}`);
-      if (state === "succeeded") {
-        status = pollData;
-        break;
-      } else if (state === "failed") {
-        throw new Error("Outcome import failed");
-      }
-    }
-    if (!status) {
-      throw new TimeoutError(
-        "Timed out waiting for outcome import to complete",
-        maxAttempts * pollIntervalMs
-      );
-    }
-    logger.debug("Outcome fully created");
-  }
-  async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
-    var _a;
-    const alignments = (_a = outcomeObject.alignments) != null ? _a : [];
-    for (const alignment of alignments) {
-      if (!alignment.startsWith("assignment_")) continue;
-      const assignmentId = alignment.split("_")[1];
-      const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
-      if (!res.ok) continue;
-      const assignment = await res.json();
-      if (assignment.name === AVG_ASSIGNMENT_NAME) {
-        logger.debug("Assignment found:", assignment);
-        return assignment;
-      }
-    }
-    logger.warn(`Assignment "${AVG_ASSIGNMENT_NAME}" not found in alignments`);
-    return null;
-  }
-  async function createAssignment(courseId) {
-    const csrfToken = getTokenCookie("_csrf_token");
-    const payload = {
-      authenticity_token: csrfToken,
-      assignment: {
-        name: AVG_ASSIGNMENT_NAME,
-        position: 1,
-        submission_types: ["none"],
-        // no student submissions needed
-        published: true,
-        notify_of_update: true,
-        points_possible: DEFAULT_MAX_POINTS,
-        grading_type: "gpa_scale",
-        omit_from_final_grade: true
-        // rubric_settings: {
-        //     id: rubricId,
-        //     title: AVG_RUBRIC_NAME,
-        //     purpose: "grading",
-        //     skip_updating_points_possible: false
-        // }
-      }
-    };
-    const res = await safeFetch(
-      `/api/v1/courses/${courseId}/assignments`,
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
-        },
-        body: JSON.stringify(payload)
-      },
-      "createAssignment"
-    );
-    const assignment = await safeJsonParse(res, "createAssignment");
-    logger.info("Assignment created:", assignment.name);
-    return assignment.id;
-  }
-  async function getRubricForAssignment(courseId, assignmentId) {
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
-    const assignment = await response.json();
-    const rubricSettings = assignment.rubric_settings;
-    if (!rubricSettings || rubricSettings.title !== AVG_RUBRIC_NAME) {
-      return null;
-    }
-    const rubricCriteria = assignment.rubric;
-    if (!rubricCriteria || !Array.isArray(rubricCriteria) || rubricCriteria.length === 0) {
-      return null;
-    }
-    const criterionId = rubricCriteria[0].id;
-    const rubricId = rubricSettings.id;
-    logger.debug("Found rubric and first criterion ID:", { rubricId, criterionId });
-    return { rubricId, criterionId };
-  }
-  async function createRubric(courseId, assignmentId, outcomeId) {
-    const csrfToken = getTokenCookie("_csrf_token");
-    const rubricRatings = {};
-    OUTCOME_AND_RUBRIC_RATINGS.forEach((rating, index) => {
-      rubricRatings[index] = {
-        description: rating.description,
-        points: rating.points
-      };
-    });
-    const rubricPayload = {
-      "rubric": {
-        "title": AVG_RUBRIC_NAME,
-        "free_form_criterion_comments": false,
-        "criteria": {
-          "0": {
-            "description": `${AVG_OUTCOME_NAME} criteria was used to create this rubric`,
-            "criterion_use_range": false,
-            "points": DEFAULT_MAX_POINTS,
-            "mastery_points": DEFAULT_MASTERY_THRESHOLD,
-            "learning_outcome_id": outcomeId,
-            "ratings": rubricRatings
-          }
-        }
-      },
-      rubric_association: {
-        association_type: "Assignment",
-        association_id: assignmentId,
-        use_for_grading: true,
-        purpose: "grading",
-        hide_points: true
-      }
-    };
-    const response = await safeFetch(
-      `/api/v1/courses/${courseId}/rubrics`,
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
-        },
-        body: JSON.stringify(rubricPayload)
-      },
-      "createRubric"
-    );
-    const rubric = await safeJsonParse(response, "createRubric");
-    logger.debug("Rubric created and linked to outcome:", rubric);
-    return rubric.id;
-  }
+
+  // src/gradebook/updateFlowOrchestrator.js
+  init_uiHelpers();
+  init_config();
+  init_logger();
   async function startUpdateFlow(button = null) {
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
@@ -2023,10 +1967,87 @@ You may need to refresh the page to see the new scores.`);
     }
   }
 
+  // src/gradebook/ui/buttonInjection.js
+  function injectButtons() {
+    waitForGradebookAndToolbar((toolbar) => {
+      const courseId = getCourseId();
+      const buttonWrapper = document.createElement("div");
+      buttonWrapper.style.display = "flex";
+      buttonWrapper.style.flexDirection = "column";
+      buttonWrapper.style.alignItems = "flex-end";
+      const updateAveragesButton = makeButton({
+        label: UPDATE_AVG_BUTTON_LABEL,
+        id: "update-scores-button",
+        onClick: async () => {
+          try {
+            await startUpdateFlow(updateAveragesButton);
+          } catch (error) {
+            handleError(error, "updateScores", { showAlert: true });
+          }
+        },
+        type: "primary"
+      });
+      buttonWrapper.appendChild(updateAveragesButton);
+      const buttonContainer = createButtonColumnContainer();
+      buttonContainer.appendChild(buttonWrapper);
+      toolbar.appendChild(buttonContainer);
+      checkForResumableState(courseId, updateAveragesButton);
+    });
+  }
+  function resetButtonToNormal(button) {
+    if (!button) return;
+    button.textContent = UPDATE_AVG_BUTTON_LABEL;
+    button.title = "";
+    button.disabled = false;
+    button.style.cursor = "pointer";
+    button.style.opacity = "1";
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
+    button.style.backgroundColor = primaryButtonColor;
+    logger.debug("Button reset to normal state");
+  }
+  function checkForResumableState(courseId, button) {
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+    if (restored) {
+      const currentState = stateMachine.getCurrentState();
+      const stateTimestamp = stateMachine.getContext().timestamp || (/* @__PURE__ */ new Date()).toISOString();
+      const minutesAgo = Math.round((Date.now() - new Date(stateTimestamp).getTime()) / 6e4);
+      button.textContent = `Resume Update`;
+      button.style.backgroundColor = "#ff9800";
+      button.title = `Resume from ${currentState} (${minutesAgo} min ago)`;
+      const banner = showFloatingBanner({
+        text: `Previous update interrupted at ${currentState} (${minutesAgo} min ago). Click "Resume Update" to continue.`
+      });
+      setTimeout(() => {
+        banner.remove();
+      }, 1e4);
+      logger.info(`Resumable state found: ${currentState} from ${minutesAgo} minutes ago`);
+    }
+  }
+  function waitForGradebookAndToolbar(callback) {
+    let attempts = 0;
+    const intervalId = setInterval(() => {
+      const onGradebookPage = window.location.pathname.includes("/gradebook");
+      const documentReady = document.readyState === "complete";
+      const toolbar = document.querySelector(
+        '.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]'
+      );
+      if (onGradebookPage && documentReady && toolbar) {
+        clearInterval(intervalId);
+        logger.debug("Gradebook page and toolbar found.");
+        callback(toolbar);
+      } else if (attempts++ > 33) {
+        clearInterval(intervalId);
+        logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
+      }
+    }, 300);
+  }
+
   // src/main.js
   (function init() {
-    logBanner("dev", "2025-12-15 3:51:02 PM (dev, 73e9315)");
-    exposeVersion("dev", "2025-12-15 3:51:02 PM (dev, 73e9315)");
+    logBanner("dev", "2025-12-16 1:28:47 PM (dev, 4e28fe2)");
+    exposeVersion("dev", "2025-12-16 1:28:47 PM (dev, 4e28fe2)");
     if (true) {
       log("Running in DEV mode");
     }

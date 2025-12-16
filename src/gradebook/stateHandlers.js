@@ -23,16 +23,10 @@ import { postPerStudentGrades, beginBulkUpdate, waitForBulkGrading } from "../se
 import { verifyUIScores } from "../services/verification.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer } from "../utils/uiHelpers.js";
 
-// Import helper functions from updateFlow.js (we'll need to export them)
-import {
-    getRollup,
-    getOutcomeObjectByName,
-    getAssignmentObjectFromOutcomeObj,
-    createOutcome,
-    createAssignment,
-    createRubric,
-    getRubricForAssignment
-} from "./updateFlow.js";
+// Import Canvas API service functions
+import { getRollup, getOutcomeObjectByName, createOutcome } from "../services/canvasOutcomes.js";
+import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services/canvasAssignments.js";
+import { getRubricForAssignment, createRubric } from "../services/canvasRubrics.js";
 import { getAssignmentId } from "../utils/canvasHelpers.js";
 
 /**
