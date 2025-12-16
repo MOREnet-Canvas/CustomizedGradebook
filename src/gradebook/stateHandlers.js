@@ -24,9 +24,9 @@ import { verifyUIScores } from "../services/verification.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer } from "../utils/uiHelpers.js";
 
 // Import Canvas API service functions
-import { getRollup, getOutcomeObjectByName, createOutcome } from "../services/canvasOutcomes.js";
-import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services/canvasAssignments.js";
-import { getRubricForAssignment, createRubric } from "../services/canvasRubrics.js";
+import { getRollup, getOutcomeObjectByName, createOutcome } from "../services/outcomeService.js";
+import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services/assignmentService.js";
+import { getRubricForAssignment, createRubric } from "../services/rubricService.js";
 import { getAssignmentId } from "../utils/canvasHelpers.js";
 
 /**

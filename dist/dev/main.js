@@ -485,14 +485,14 @@
     try {
       const enrollmentId = await getEnrollmentIdForUser(courseId, userId);
       if (!enrollmentId) {
-        if (VERBOSE_LOGGING) console.warn(`[override/concurrent] no enrollmentId for user ${userId}`);
+        logger.warn(`[override/concurrent] no enrollmentId for user ${userId}`);
         return;
       }
       const override = OVERRIDE_SCALE(average);
       await setOverrideScoreGQL(enrollmentId, override);
-      if (VERBOSE_LOGGING) console.log(`[override/concurrent] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
+      logger.debug(`[override/concurrent] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
     } catch (e) {
-      console.warn(`[override/concurrent] failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
+      logger.warn(`[override/concurrent] failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
     }
   }
   var __enrollmentMapCache;
@@ -1432,7 +1432,7 @@
   init_verification();
   init_uiHelpers();
 
-  // src/services/canvasOutcomes.js
+  // src/services/outcomeService.js
   init_errorHandler();
   init_canvas();
   init_config();
@@ -1519,7 +1519,7 @@
     logger.debug("Outcome fully created");
   }
 
-  // src/services/canvasAssignments.js
+  // src/services/assignmentService.js
   init_errorHandler();
   init_canvas();
   init_config();
@@ -1575,7 +1575,7 @@
     return assignment.id;
   }
 
-  // src/services/canvasRubrics.js
+  // src/services/rubricService.js
   init_errorHandler();
   init_canvas();
   init_config();
@@ -2046,8 +2046,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2025-12-16 1:28:47 PM (dev, 4e28fe2)");
-    exposeVersion("dev", "2025-12-16 1:28:47 PM (dev, 4e28fe2)");
+    logBanner("dev", "2025-12-16 2:03:38 PM (dev, 662803c)");
+    exposeVersion("dev", "2025-12-16 2:03:38 PM (dev, 662803c)");
     if (true) {
       log("Running in DEV mode");
     }
