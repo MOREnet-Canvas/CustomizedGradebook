@@ -1,7 +1,7 @@
 // src/config.js
 export const ENABLE_STUDENT_GRADE_CUSTOMIZATION = true;
 export const REMOVE_ASSIGNMENT_TAB = false;
-export const PER_STUDENT_UPDATE_THRESHOLD = 500;
+export const PER_STUDENT_UPDATE_THRESHOLD = 25;
 export const ENABLE_GRADE_OVERRIDE = true;
 
 export const OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2)); // 0–4 -> 0–100
