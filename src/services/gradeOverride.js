@@ -127,15 +127,15 @@ export async function queueOverride(courseId, userId, average) {
     try {
         const enrollmentId = await getEnrollmentIdForUser(courseId, userId);
         if (!enrollmentId) {
-            if (VERBOSE_LOGGING) console.warn(`[override/concurrent] no enrollmentId for user ${userId}`);
+            logger.warn(`[override/concurrent] no enrollmentId for user ${userId}`);
             return;
         }
 
         const override = OVERRIDE_SCALE(average);
         await setOverrideScoreGQL(enrollmentId, override);
-        if (VERBOSE_LOGGING) console.log(`[override/concurrent] user ${userId} → enrollment ${enrollmentId}: ${override}`);
+        logger.debug(`[override/concurrent] user ${userId} → enrollment ${enrollmentId}: ${override}`);
     } catch (e) {
-        console.warn(`[override/concurrent] failed for user ${userId}:`, e?.message || e);
+        logger.warn(`[override/concurrent] failed for user ${userId}:`, e?.message || e);
     }
 }
 
