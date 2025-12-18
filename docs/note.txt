@@ -13,6 +13,7 @@ TODO: The Update button is pushed to the left after rendering last run informati
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Verify overrides
 TODO: better way to handle api headers and such
+TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
 
 
 
