@@ -90,9 +90,11 @@ export async function resumeIfNeeded() {
             // clear verification state regardless
             cleanUpLocalStorage();
 
-            // refresh the header notice if present
-            const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
-            if (toolbar && typeof renderLastUpdateNotice === "function") renderLastUpdateNotice(toolbar);
+            // refresh the header notice if present - find the buttonWrapper
+            const buttonWrapper = document.querySelector('#update-scores-button')?.parentElement;
+            if (buttonWrapper && typeof renderLastUpdateNotice === "function") {
+                renderLastUpdateNotice(buttonWrapper, courseId);
+            }
         }
     }
 }
