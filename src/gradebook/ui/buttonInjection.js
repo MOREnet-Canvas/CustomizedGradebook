@@ -14,6 +14,7 @@ import { handleError } from "../../utils/errorHandler.js";
 import { logger } from "../../utils/logger.js";
 import { UpdateFlowStateMachine } from "../stateMachine.js";
 import { startUpdateFlow } from "../updateFlowOrchestrator.js";
+import { renderLastUpdateNotice } from "../../utils/uiHelpers.js";
 
 /**
  * Inject the "Update Average" button into Canvas gradebook toolbar
@@ -42,6 +43,9 @@ export function injectButtons() {
         });
 
         buttonWrapper.appendChild(updateAveragesButton);
+
+        // Render last update inside the same wrapper, under the button
+        renderLastUpdateNotice(buttonWrapper, courseId);
 
         // Add the wrapper into a column container so it stays on the right
         const buttonContainer = createButtonColumnContainer();

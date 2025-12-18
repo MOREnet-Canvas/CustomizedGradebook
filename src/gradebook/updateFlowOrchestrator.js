@@ -90,9 +90,9 @@ export async function startUpdateFlow(button = null) {
             updateDebugUI(stateMachine);
         }
 
-        // Update UI after completion
-        const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
-        if (toolbar) renderLastUpdateNotice(toolbar, courseId);
+        // Update UI after completion - find the buttonWrapper that contains the button
+        const buttonWrapper = document.querySelector('#update-scores-button')?.parentElement;
+        if (buttonWrapper) renderLastUpdateNotice(buttonWrapper, courseId);
 
         // Reset button to normal state after successful completion
         resetButtonToNormal(button);
