@@ -5,92 +5,94 @@ import { verifyUIScores } from "../services/verification.js";
 import { renderLastUpdateNotice } from "./uiHelpers.js";
 import { handleError } from "./errorHandler.js";
 import { logger } from "./logger.js";
+import { UpdateFlowStateMachine } from "../gradebook/stateMachine.js";
+import { STATES } from "../gradebook/stateMachine.js";
 
 /**
  * Clean up all localStorage entries related to grade updates for a course.
- * 
- * This function removes all temporary state flags and data used during
- * the grade update process. Should be called after successful completion
- * or when resetting the update state.
- * 
- * Removes the following localStorage keys:
- * - `verificationPending_{courseId}` - Flag indicating verification is pending
- * - `expectedAverages_{courseId}` - JSON array of expected student averages
- * - `uploadFinishTime_{courseId}` - Timestamp when bulk upload finished
- * - `updateInProgress_{courseId}` - Flag indicating update is in progress
- * - `startTime_{courseId}` - Timestamp when update started
- * 
+ *
+ * This function clears the state machine data from localStorage.
+ * All temporary state is now stored in the state machine context as a single source of truth.
+ *
+ * Note: This does NOT remove persistent keys like lastUpdateAt and duration,
+ * which are used for the "last update" message display.
+ *
  * @returns {void}
- * 
+ *
  * @example
- * cleanUpLocalStorage(); // Cleans up state for current course
+ * cleanUpLocalStorage(); // Clears state machine data for current course
  */
 export function cleanUpLocalStorage() {
-    let courseId = getCourseId();
-    localStorage.removeItem(`verificationPending_${courseId}`);
-    localStorage.removeItem(`expectedAverages_${courseId}`);
-    localStorage.removeItem(`uploadFinishTime_${courseId}`);
-    localStorage.removeItem(`updateInProgress_${courseId}`);
-    localStorage.removeItem(`startTime_${courseId}`);
+    const courseId = getCourseId();
+    const stateMachine = new UpdateFlowStateMachine();
+    stateMachine.clearLocalStorage(courseId);
 }
 
 /**
  * Resume interrupted grade update or verification processes.
- * 
- * This function checks localStorage for any interrupted processes and resumes them:
- * 1. If a bulk update is in progress, resumes polling the progress API
- * 2. If verification is pending, runs verification against outcome rollups
+ *
+ * This function checks the state machine for any interrupted processes and resumes them:
+ * 1. If a bulk update is in progress (POLLING_PROGRESS state), resumes polling the progress API
+ * 2. If verification is pending (VERIFYING state), runs verification against outcome rollups
  * 3. Cleans up state and refreshes UI after completion
- * 
+ *
  * This is typically called on page load to handle cases where:
  * - User refreshed the page during a bulk update
  * - Browser crashed during verification
  * - User navigated away and came back
- * 
- * The function reads the following from localStorage:
- * - `updateInProgress_{courseId}` - Boolean flag
- * - `verificationPending_{courseId}` - Boolean flag
- * - `progressId_{courseId}` - Canvas progress API ID
- * - `outcomeId_{courseId}` - Outcome ID to verify
- * - `expectedAverages_{courseId}` - JSON array of expected averages
- * 
+ *
+ * The function reads all data from the state machine context (single source of truth):
+ * - currentState - Current state of the update flow
+ * - context.progressId - Canvas progress API ID
+ * - context.outcomeId - Outcome ID to verify
+ * - context.averages - Array of expected student averages
+ *
  * @returns {Promise<void>}
- * 
+ *
  * @example
  * // Called on page load
  * await resumeIfNeeded();
  */
 export async function resumeIfNeeded() {
     const courseId = getCourseId();
-    const inProgress = localStorage.getItem(`updateInProgress_${courseId}`) === "true";
-    const verificationPending = localStorage.getItem(`verificationPending_${courseId}`) === "true";
-    const progressId = localStorage.getItem(`progressId_${courseId}`);
-    const outcomeId = localStorage.getItem(`outcomeId_${courseId}`);
-    const expectedAverages = safeParse(localStorage.getItem(`expectedAverages_${courseId}`));
 
-    logger.debug('Checking if resume is needed');
-    
-    // If a job is still running, re-show banner and resume polling
-    if (inProgress && progressId) {
-        const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-        await waitForBulkGrading(box); // this reads progressId from localStorage
-        // after this returns, we may still need to verify (next block)
+    // Load state machine data (single source of truth)
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+
+    if (!restored) {
+        logger.debug('No resumable state found');
+        return;
     }
 
-    // If verification was never done, run it now
-    if (verificationPending && courseId && outcomeId && Array.isArray(expectedAverages)) {
-        logger.debug('verificationPending');
+    const context = stateMachine.getContext();
+    const currentState = stateMachine.getCurrentState();
+
+    logger.debug(`Resumable state found: ${currentState}`);
+
+    // If bulk update is in progress, resume polling
+    if (currentState === STATES.POLLING_PROGRESS && context.progressId) {
+        logger.debug('Resuming bulk upload polling');
+        const box = showFloatingBanner({ text: "Resuming: checking upload status" });
+        await waitForBulkGrading(box);
+        // After polling completes, state machine will transition to VERIFYING
+        // We don't need to explicitly verify here - the state machine handles it
+    }
+
+    // If verification is pending, run it now
+    if (currentState === STATES.VERIFYING && context.averages && context.outcomeId) {
+        logger.debug('Resuming verification');
         const box = showFloatingBanner({ text: "Verifying updated scores" });
         try {
-            await verifyUIScores(courseId, expectedAverages, outcomeId, box);
-            box.setText(`All ${expectedAverages.length} scores verified!`);
+            await verifyUIScores(courseId, context.averages, context.outcomeId, box);
+            box.setText(`All ${context.averages.length} scores verified!`);
         } catch (e) {
             handleError(e, "resumeIfNeeded:verification", { banner: box });
         } finally {
-            // clear verification state regardless
+            // Clear state machine data
             cleanUpLocalStorage();
 
-            // refresh the header notice if present - find the buttonWrapper
+            // Refresh the header notice if present
             const buttonWrapper = document.querySelector('#update-scores-button')?.parentElement;
             if (buttonWrapper && typeof renderLastUpdateNotice === "function") {
                 renderLastUpdateNotice(buttonWrapper, courseId);

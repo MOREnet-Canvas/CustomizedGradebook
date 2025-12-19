@@ -172,13 +172,12 @@ export function showFloatingBanner({
     }
 
     closeBtn.onclick = () => {
-        if (courseId) localStorage.setItem(k('bannerDismissed', courseId), 'true');
+        // Note: bannerDismissed was removed as dead code (never read)
         destroy();
         ensureStatusPill(courseId);
     };
 
-    // when first shown, clear the dismissed flag and save text
-    if (courseId) localStorage.setItem(k('bannerDismissed', courseId), 'false');
+    // Save banner text for status pill restoration
     (duration === "hold") ? banner.hold(text, 3000) : banner.setText(text);
 
     return banner;

@@ -241,7 +241,7 @@ export class UpdateFlowStateMachine {
             const now = new Date();
             const ageInMinutes = (now - timestamp) / 1000 / 60;
 
-            if (ageInMinutes > 60) {
+            if (ageInMinutes > 20) {
                 logger.debug(`Stored state is ${ageInMinutes.toFixed(0)} minutes old, ignoring`);
                 this.clearLocalStorage(courseId);
                 return false;

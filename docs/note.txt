@@ -8,12 +8,12 @@ then push
 
 For checking version in DevTools: CG.version
 
-TODO: The Update button is pushed to the left after rendering last run information, but is reset on refresh.
-    this also removes the last run information.
+TODO: The resume feature is not working for the verification step. Resume button does not appear.
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Verify overrides
 TODO: better way to handle api headers and such
 TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
-
+TODO: GREY OUT BUTTON IF PROCESS IS ALREADY RUNNING
+TODO: ADD SPINNER INSTEAD OF TIMER
 
 
