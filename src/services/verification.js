@@ -38,7 +38,7 @@ export async function verifyUIScores(courseId, averages, outcomeId, box, waitTim
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         let elapsed = getElapsedTimeSinceStart();
-        box.soft(`Verification status: ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
+        box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
         startElapsedTimer(courseId, box);
 
         // Fetch current outcome rollups from Canvas
