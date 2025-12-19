@@ -10,7 +10,10 @@ import { injectButtons } from "./gradebook/ui/buttonInjection.js";
     if (ENV_PROD) {logger.info("Running in PROD mode");}
     logger.info(`Build environment: ${ENV_NAME}`);
 
-    if (window.location.pathname.includes("/gradebook")) {injectButtons();}
+    if (window.location.pathname.includes("/gradebook")) {
+        injectButtons();
+        //resumeIfNeeded();
+    }
 
 })();
 

@@ -34,6 +34,10 @@ import { getAssignmentId } from "../utils/canvasHelpers.js";
  * Checks if outcome, assignment, and rubric exist
  * Transitions to CREATING_* states if resources are missing
  * Transitions to CALCULATING if all resources exist
+ *
+ * @param {UpdateFlowStateMachine} stateMachine - State machine instance
+ * @returns {Promise<string>} Next state (CREATING_OUTCOME, CREATING_ASSIGNMENT, CREATING_RUBRIC, or CALCULATING)
+ * @throws {UserCancelledError} If user declines to create missing resources
  */
 export async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
@@ -193,7 +197,7 @@ export async function handleUpdatingGrades(stateMachine) {
         return STATES.VERIFYING;
     } else {
         // Bulk update
-        const message = `Detected ${numberOfUpdates} changes - using bulk update for error prevention`;
+        const message = `Detected ${numberOfUpdates} changes - using bulk update`;
         banner.hold(message, 3000);
         logger.debug(`Bulk update, detected ${numberOfUpdates} changes`);
 
@@ -277,7 +281,7 @@ export async function handleComplete(stateMachine) {
 export async function handleError(stateMachine) {
     const { error, banner } = stateMachine.getContext();
 
-    logger.error('Update flow error:', error);
+    logger.error('Update error:', error);
 
     if (banner) {
         banner.setText(`Error: ${error.message}`);
