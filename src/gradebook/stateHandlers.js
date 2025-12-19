@@ -160,13 +160,11 @@ export async function handleCalculating(stateMachine) {
         stateMachine.updateContext({ zeroUpdates: true });
         return STATES.COMPLETE;
     }
-    
-    // Save expected averages for verification
-    localStorage.setItem(`verificationPending_${courseId}`, "true");
-    localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
-    localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
-    localStorage.setItem(`startTime_${courseId}`, new Date().toISOString());
-    
+
+    // Note: Individual localStorage keys removed - state machine context is now the single source of truth
+    // The state machine already has: averages, outcomeId, startTime in its context
+    // State machine will be saved to localStorage after this handler returns
+
     return STATES.UPDATING_GRADES;
 }
 

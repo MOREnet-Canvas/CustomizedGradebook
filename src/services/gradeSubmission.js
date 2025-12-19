@@ -187,9 +187,8 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
 
             case "completed":
                 logger.info("Bulk upload completed: " + progress.updated_at);
-                localStorage.setItem(`uploadFinishTime_${getCourseId()}`, progress.updated_at);
-                // Clear the updateInProgress flag so status restoration can move to verification
-                localStorage.removeItem(`updateInProgress_${getCourseId()}`);
+                // Note: uploadFinishTime was removed as dead code (never read)
+                // Note: updateInProgress was removed - state machine tracks progress instead
                 return;
 
             default:

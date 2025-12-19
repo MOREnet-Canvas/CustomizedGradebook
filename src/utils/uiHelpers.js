@@ -14,17 +14,25 @@ import { k } from "./keys.js";
 import { showFloatingBanner } from "../ui/banner.js";
 import { makeButton } from "../ui/buttons.js";
 import { logger } from "./logger.js";
+import { UpdateFlowStateMachine } from "../gradebook/stateMachine.js";
 
 /**
  * Calculate elapsed time since the update started
+ * Reads startTime from state machine context (single source of truth)
  * @param {Date|number} endTime - End time (default: now)
  * @returns {number} Elapsed time in seconds
  */
 export function getElapsedTimeSinceStart(endTime = Date.now()) {
-    const start = localStorage.getItem(`startTime_${getCourseId()}`);
-    if (!start) return 0;
+    const courseId = getCourseId();
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
 
-    const startMs = new Date(start).getTime();
+    if (!restored) return 0;
+
+    const context = stateMachine.getContext();
+    if (!context.startTime) return 0;
+
+    const startMs = new Date(context.startTime).getTime();
     const endMs = (endTime instanceof Date) ? endTime.getTime() : new Date(endTime).getTime();
 
     return Math.floor((endMs - startMs) / 1000); // seconds
@@ -181,37 +189,40 @@ export function ensureStatusPill(courseId) {
         tooltip: 'Show last update status',
         onClick: async () => {
             pill.remove();
-            localStorage.setItem(k('bannerDismissed', getCourseId()), 'false');
 
-            // Check if there's an active process that needs dynamic updating
+            // Check state machine for active process (single source of truth)
             const courseId = getCourseId();
-            const inProgress = localStorage.getItem(`updateInProgress_${courseId}`) === "true";
-            const verificationPending = localStorage.getItem(`verificationPending_${courseId}`) === "true";
-            const progressId = localStorage.getItem(`progressId_${courseId}`);
-            const outcomeId = localStorage.getItem(`outcomeId_${courseId}`);
-            const expectedAverages = safeParse(localStorage.getItem(`expectedAverages_${courseId}`));
+            const stateMachine = new UpdateFlowStateMachine();
+            const restored = stateMachine.loadFromLocalStorage(courseId);
 
-            // Import these dynamically to avoid circular dependencies at module load time
-            const { waitForBulkGrading } = await import("../services/gradeSubmission.js");
-            const { verifyUIScores } = await import("../services/verification.js");
+            if (restored) {
+                const context = stateMachine.getContext();
+                const currentState = stateMachine.getCurrentState();
 
-            // If there's an active process, resume with dynamic updating
-            if (inProgress && progressId) {
-                const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-                await waitForBulkGrading(box);
-                return;
-            }
+                // Import these dynamically to avoid circular dependencies at module load time
+                const { waitForBulkGrading } = await import("../services/gradeSubmission.js");
+                const { verifyUIScores } = await import("../services/verification.js");
+                const { STATES } = await import("../gradebook/stateMachine.js");
 
-            if (verificationPending && courseId && outcomeId && Array.isArray(expectedAverages)) {
-                const box = showFloatingBanner({ text: "Verifying updated scores" });
-                try {
-                    await verifyUIScores(courseId, expectedAverages, outcomeId, box);
-                    box.setText(`All ${expectedAverages.length} scores verified!`);
-                } catch (e) {
-                    console.warn("Verification on resume failed:", e);
-                    box.setText("Verification failed. You can try updating again.");
+                // If bulk upload is in progress, resume polling
+                if (currentState === STATES.POLLING_PROGRESS && context.progressId) {
+                    const box = showFloatingBanner({ text: "Resuming: checking upload status" });
+                    await waitForBulkGrading(box);
+                    return;
                 }
-                return;
+
+                // If verification is pending, run it now
+                if (currentState === STATES.VERIFYING && context.averages && context.outcomeId) {
+                    const box = showFloatingBanner({ text: "Verifying updated scores" });
+                    try {
+                        await verifyUIScores(courseId, context.averages, context.outcomeId, box);
+                        box.setText(`All ${context.averages.length} scores verified!`);
+                    } catch (e) {
+                        logger.warn("Verification on resume failed:", e);
+                        box.setText("Verification failed. You can try updating again.");
+                    }
+                    return;
+                }
             }
 
             // Otherwise, just show the last static message
