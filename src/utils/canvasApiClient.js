@@ -133,22 +133,35 @@ export class CanvasApiClient {
      */
     async #makeRequest(url, method, data, options = {}, context = 'request') {
         // Build headers with CSRF token
+        // Custom headers are spread first, then CSRF token is set to ensure it cannot be overridden
         const headers = {
             'Content-Type': 'application/json',
-            'X-CSRF-Token': this.csrfToken,
-            ...options.headers
+            ...options.headers,
+            'X-CSRF-Token': this.csrfToken
         };
 
         // Build request body
         let body = null;
         if (data) {
-            // Add authenticity_token to request body if not already present
-            // This supports Canvas endpoints that expect token in body
-            if (!data.authenticity_token) {
-                data = { ...data, authenticity_token: this.csrfToken };
+            // Determine if we should JSON.stringify based on Content-Type
+            const contentType = headers['Content-Type'] || 'application/json';
+            const isJson = contentType.includes('application/json');
+
+            if (isJson) {
+                // Add authenticity_token to request body if not already present
+                // This supports Canvas endpoints that expect token in body
+                if (!data.authenticity_token) {
+                    data = { ...data, authenticity_token: this.csrfToken };
+                }
+                body = JSON.stringify(data);
+            } else {
+                // For non-JSON content (e.g., CSV), pass data as-is
+                body = data;
             }
-            body = JSON.stringify(data);
         }
+
+        // Extract headers from options to prevent them from being spread again
+        const { headers: _optionsHeaders, ...restOptions } = options;
 
         // Make request using safeFetch for consistent error handling
         const response = await safeFetch(
@@ -158,7 +171,7 @@ export class CanvasApiClient {
                 credentials: 'same-origin',
                 headers,
                 body,
-                ...options
+                ...restOptions  // Spread remaining options (excluding headers)
             },
             context
         );
