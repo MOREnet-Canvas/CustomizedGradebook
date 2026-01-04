@@ -1,5 +1,6 @@
 import { getCourseId } from "./canvas.js";
 import { showFloatingBanner } from "../ui/banner.js";
+import { CanvasApiClient } from "./canvasApiClient.js";
 import { waitForBulkGrading } from "../services/gradeSubmission.js";
 import { verifyUIScores } from "../services/verification.js";
 import { renderLastUpdateNotice } from "./uiHelpers.js";
@@ -74,7 +75,8 @@ export async function resumeIfNeeded() {
     if (currentState === STATES.POLLING_PROGRESS && context.progressId) {
         logger.debug('Resuming bulk upload polling');
         const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-        await waitForBulkGrading(box);
+        const apiClient = new CanvasApiClient();
+        await waitForBulkGrading(box, apiClient);
         // After polling completes, state machine will transition to VERIFYING
         // We don't need to explicitly verify here - the state machine handles it
     }
@@ -83,8 +85,9 @@ export async function resumeIfNeeded() {
     if (currentState === STATES.VERIFYING && context.averages && context.outcomeId) {
         logger.debug('Resuming verification');
         const box = showFloatingBanner({ text: "Verifying updated scores" });
+        const apiClient = new CanvasApiClient();
         try {
-            await verifyUIScores(courseId, context.averages, context.outcomeId, box);
+            await verifyUIScores(courseId, context.averages, context.outcomeId, box, apiClient);
             box.setText(`All ${context.averages.length} scores verified!`);
         } catch (e) {
             handleError(e, "resumeIfNeeded:verification", { banner: box });

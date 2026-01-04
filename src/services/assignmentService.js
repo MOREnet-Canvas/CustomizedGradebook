@@ -7,8 +7,7 @@
  * - Creating new assignments
  */
 
-import { safeFetch, safeJsonParse } from "../utils/errorHandler.js";
-import { getTokenCookie } from "../utils/canvas.js";
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
 import { AVG_ASSIGNMENT_NAME, DEFAULT_MAX_POINTS } from "../config.js";
 import { logger } from "../utils/logger.js";
 
@@ -16,22 +15,31 @@ import { logger } from "../utils/logger.js";
  * Find an assignment by name from outcome alignments
  * @param {string} courseId - Canvas course ID
  * @param {object} outcomeObject - Outcome object with alignments
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<object|null>} Assignment object or null if not found
  */
-export async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
+export async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient) {
     const alignments = outcomeObject.alignments ?? [];
 
     for (const alignment of alignments) {
         if (!alignment.startsWith("assignment_")) continue;
 
         const assignmentId = alignment.split("_")[1];
-        const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
-        if (!res.ok) continue;
+        try {
+            const assignment = await apiClient.get(
+                `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+                {},
+                "getAssignment"
+            );
 
-        const assignment = await res.json();
-        if (assignment.name === AVG_ASSIGNMENT_NAME) {
-            logger.debug("Assignment found:", assignment);
-            return assignment;
+            if (assignment.name === AVG_ASSIGNMENT_NAME) {
+                logger.debug("Assignment found:", assignment);
+                return assignment;
+            }
+        } catch (error) {
+            // If assignment not found or error, continue to next alignment
+            logger.debug(`Assignment ${assignmentId} not accessible:`, error.message);
+            continue;
         }
     }
 
@@ -43,13 +51,11 @@ export async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject)
 /**
  * Create a new assignment via Canvas API
  * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<string>} Created assignment ID
  */
-export async function createAssignment(courseId) {
-    const csrfToken = getTokenCookie('_csrf_token');
-
+export async function createAssignment(courseId, apiClient) {
     const payload = {
-        authenticity_token: csrfToken,
         assignment: {
             name: AVG_ASSIGNMENT_NAME,
             position: 1,
@@ -62,21 +68,13 @@ export async function createAssignment(courseId) {
         }
     };
 
-    const res = await safeFetch(
+    const assignment = await apiClient.post(
         `/api/v1/courses/${courseId}/assignments`,
-        {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-Token": csrfToken
-            },
-            body: JSON.stringify(payload)
-        },
+        payload,
+        {},
         "createAssignment"
     );
 
-    const assignment = await safeJsonParse(res, "createAssignment");
     logger.info("Assignment created:", assignment.name);
     return assignment.id;
 }

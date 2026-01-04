@@ -8,27 +8,27 @@
  * - Creating new outcomes
  */
 
-import { safeFetch, safeJsonParse, TimeoutError } from "../utils/errorHandler.js";
-import { getTokenCookie } from "../utils/canvas.js";
-import { 
-    AVG_OUTCOME_NAME, 
-    DEFAULT_MASTERY_THRESHOLD, 
-    OUTCOME_AND_RUBRIC_RATINGS 
+import { TimeoutError } from "../utils/errorHandler.js";
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
+import {
+    AVG_OUTCOME_NAME,
+    DEFAULT_MASTERY_THRESHOLD,
+    OUTCOME_AND_RUBRIC_RATINGS
 } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 /**
  * Fetch outcome rollup data for a course
  * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<object>} Rollup data including outcomes and users
  */
-export async function getRollup(courseId) {
-    const response = await safeFetch(
+export async function getRollup(courseId, apiClient) {
+    const rollupData = await apiClient.get(
         `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
         {},
         "getRollup"
     );
-    const rollupData = await safeJsonParse(response, "getRollup");
     logger.debug("rollupData: ", rollupData);
     return rollupData;
 }
@@ -59,11 +59,10 @@ export function getOutcomeObjectByName(data) {
 /**
  * Create a new outcome via Canvas CSV import API
  * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<void>}
  */
-export async function createOutcome(courseId) {
-    const csrfToken = getTokenCookie('_csrf_token');
-
+export async function createOutcome(courseId, apiClient) {
     const randomSuffix = Math.random().toString(36).substring(2, 10); // 8-char alphanumeric
     const vendorGuid = `MOREnet_${randomSuffix}`;
 
@@ -77,21 +76,17 @@ export async function createOutcome(courseId) {
 
     logger.debug("Importing outcome via CSV...");
 
-    const importRes = await safeFetch(
+    const importData = await apiClient.post(
         `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
+        csvContent,
         {
-            method: "POST",
-            credentials: "same-origin",
             headers: {
-                "Content-Type": "text/csv",
-                "X-CSRF-Token": csrfToken
-            },
-            body: csvContent
+                "Content-Type": "text/csv"
+            }
         },
         "createOutcome"
     );
 
-    const importData = await safeJsonParse(importRes, "createOutcome");
     const importId = importData.id;
     logger.debug(`Outcome import started: ID ${importId}`);
 
@@ -103,12 +98,11 @@ export async function createOutcome(courseId) {
 
     while (attempts++ < maxAttempts) {
         await new Promise(r => setTimeout(r, pollIntervalMs));
-        const pollRes = await safeFetch(
+        const pollData = await apiClient.get(
             `/api/v1/courses/${courseId}/outcome_imports/${importId}`,
             {},
             "createOutcome:poll"
         );
-        const pollData = await safeJsonParse(pollRes, "createOutcome:poll");
 
         const state = pollData.workflow_state;
         logger.debug(`Poll attempt ${attempts}: ${state}`);
