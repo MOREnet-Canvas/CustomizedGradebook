@@ -7,14 +7,13 @@
  * - Creating new rubrics linked to outcomes
  */
 
-import { safeFetch, safeJsonParse } from "../utils/errorHandler.js";
-import { getTokenCookie } from "../utils/canvas.js";
-import { 
-    AVG_RUBRIC_NAME, 
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
+import {
+    AVG_RUBRIC_NAME,
     AVG_OUTCOME_NAME,
-    DEFAULT_MAX_POINTS, 
+    DEFAULT_MAX_POINTS,
     DEFAULT_MASTERY_THRESHOLD,
-    OUTCOME_AND_RUBRIC_RATINGS 
+    OUTCOME_AND_RUBRIC_RATINGS
 } from "../config.js";
 import { logger } from "../utils/logger.js";
 
@@ -22,11 +21,15 @@ import { logger } from "../utils/logger.js";
  * Get rubric for an assignment
  * @param {string} courseId - Canvas course ID
  * @param {string} assignmentId - Assignment ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<object|null>} Object with {rubricId, criterionId} or null if not found
  */
-export async function getRubricForAssignment(courseId, assignmentId) {
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
-    const assignment = await response.json();
+export async function getRubricForAssignment(courseId, assignmentId, apiClient) {
+    const assignment = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+        {},
+        "getRubric"
+    );
 
     const rubricSettings = assignment.rubric_settings;
     if (!rubricSettings || rubricSettings.title !== AVG_RUBRIC_NAME) {
@@ -51,11 +54,10 @@ export async function getRubricForAssignment(courseId, assignmentId) {
  * @param {string} courseId - Canvas course ID
  * @param {string} assignmentId - Assignment ID to link rubric to
  * @param {string} outcomeId - Outcome ID to link rubric to
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<string>} Created rubric ID
  */
-export async function createRubric(courseId, assignmentId, outcomeId) {
-    const csrfToken = getTokenCookie('_csrf_token');
-
+export async function createRubric(courseId, assignmentId, outcomeId, apiClient) {
     const rubricRatings = {};
     OUTCOME_AND_RUBRIC_RATINGS.forEach((rating, index) => {
         rubricRatings[index] = {
@@ -88,21 +90,13 @@ export async function createRubric(courseId, assignmentId, outcomeId) {
         }
     };
 
-    const response = await safeFetch(
+    const rubric = await apiClient.post(
         `/api/v1/courses/${courseId}/rubrics`,
-        {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-Token": csrfToken
-            },
-            body: JSON.stringify(rubricPayload)
-        },
+        rubricPayload,
+        {},
         "createRubric"
     );
 
-    const rubric = await safeJsonParse(response, "createRubric");
     logger.debug("Rubric created and linked to outcome:", rubric);
     return rubric.id;
 }

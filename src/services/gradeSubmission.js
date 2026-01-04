@@ -15,7 +15,8 @@
  * - Download error summaries
  */
 
-import { getCourseId, getTokenCookie } from "../utils/canvas.js";
+import { getCourseId } from "../utils/canvas.js";
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
 import {
     AVG_OUTCOME_NAME,
     ENABLE_GRADE_OVERRIDE,
@@ -23,7 +24,7 @@ import {
 } from "../config.js";
 import { getElapsedTimeSinceStart, startElapsedTimer } from "../utils/uiHelpers.js";
 import { queueOverride, getEnrollmentIdForUser, setOverrideScoreGQL } from "./gradeOverride.js";
-import { safeFetch, safeJsonParse, logError, TimeoutError } from "../utils/errorHandler.js";
+import { logError, TimeoutError } from "../utils/errorHandler.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -33,17 +34,15 @@ import { logger } from "../utils/logger.js";
  * @param {string} userId - User ID
  * @param {string} rubricCriterionId - Rubric criterion ID
  * @param {number} score - Score to submit
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<void>}
  * @throws {Error} If submission fails
  */
-export async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score) {
-    const csrfToken = getTokenCookie('_csrf_token');
-    logger.debug("csrfToken:", csrfToken);
+export async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
     const timeStamp = new Date().toLocaleString();
 
     logger.debug("Submitting rubric score for student", userId);
     const payload = {
-        authenticity_token: csrfToken,
         rubric_assessment: {  // updates the rubric score.
             [rubricCriterionId.toString()]: {
                 points: score,
@@ -60,16 +59,10 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
 
     logger.debug("Submitting rubric score for student", userId, payload);
 
-    const response = await safeFetch(
+    await apiClient.put(
         `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
-        {
-            method: "PUT",
-            credentials: "same-origin",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload)
-        },
+        payload,
+        {},
         `submitRubricScore:${userId}`
     );
 
@@ -83,16 +76,11 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
  * @param {string} assignmentId - Assignment ID
  * @param {string} rubricCriterionId - Rubric criterion ID
  * @param {Array<{userId: string, average: number}>} averages - Array of student averages
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<string>} Progress ID for polling
- * @throws {Error} If CSRF token is missing or bulk update fails
+ * @throws {Error} If bulk update fails
  */
-export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages) {
-    const csrfToken = getTokenCookie('_csrf_token');
-    if (!csrfToken) {
-        const error = new Error("CSRF token not found.");
-        logError(error, "beginBulkUpdate");
-        throw error;
-    }
+export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient) {
     const timeStamp = new Date().toLocaleString();
 
     // Build grade_data object
@@ -111,29 +99,20 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
         };
         // Fire override in parallel (do not await)
         if (ENABLE_GRADE_OVERRIDE) {
-            await queueOverride(courseId, userId, average);
+            await queueOverride(courseId, userId, average, apiClient);
         }
     }
     logger.debug("bulk gradeData payload:", gradeData);
 
-    const response = await safeFetch(
+    const result = await apiClient.post(
         `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/update_grades`,
         {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            body: JSON.stringify({
-                authenticity_token: csrfToken,
-                grade_data: gradeData
-            })
+            grade_data: gradeData
         },
+        {},
         "beginBulkUpdate"
     );
 
-    const result = await safeJsonParse(response, "beginBulkUpdate");
     const progressId = result.id;
     localStorage.setItem(`progressId_${getCourseId()}`, progressId);
 
@@ -148,12 +127,13 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
  * Wait for bulk grading operation to complete
  * Polls the Canvas progress API until the operation completes, fails, or times out
  * @param {Object} box - Floating banner UI object with setText/soft methods
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @param {number} timeout - Maximum time to wait in milliseconds (default: 20 minutes)
  * @param {number} interval - Polling interval in milliseconds (default: 2 seconds)
  * @returns {Promise<void>}
  * @throws {Error} If bulk update fails or times out
  */
-export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000) {
+export async function waitForBulkGrading(box, apiClient, timeout = 1200000, interval = 2000) {
     const loopStartTime = Date.now();
     let state = "beginning upload";
     const courseId = getCourseId();
@@ -161,8 +141,7 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
     startElapsedTimer(courseId, box); // makes elapsed time tick each second
 
     while (Date.now() - loopStartTime < timeout) {
-        const res = await safeFetch(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
-        const progress = await safeJsonParse(res, "waitForBulkGrading");
+        const progress = await apiClient.get(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
         let elapsed = getElapsedTimeSinceStart();
 
         state = progress.workflow_state;
@@ -214,10 +193,11 @@ export async function waitForBulkGrading(box, timeout = 1200000, interval = 2000
  * @param {string} assignmentId - Assignment ID
  * @param {string} rubricCriterionId - Rubric criterion ID
  * @param {Object} box - Floating banner UI object
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @param {boolean} testing - If true, auto-download error summary without confirmation
  * @returns {Promise<number>} Elapsed time in seconds
  */
-export async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = false) {
+export async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, apiClient, testing = false) {
     const updateInterval = 1;
     const numberOfUpdates = averages.length;
 
@@ -233,14 +213,14 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                await submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, average);
+                await submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, average, apiClient);
                 // --- also set course override (non-blocking) ---
                 if (ENABLE_GRADE_OVERRIDE) {
                     try {
-                        const enrollmentId = await getEnrollmentIdForUser(courseId, userId);
+                        const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
                         if (enrollmentId) {
                             const override = OVERRIDE_SCALE(average);
-                            await setOverrideScoreGQL(enrollmentId, override);
+                            await setOverrideScoreGQL(enrollmentId, override, apiClient);
                             logger.debug(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
                         } else {
                             logger.warn(`[override] no enrollmentId for user ${userId}`);

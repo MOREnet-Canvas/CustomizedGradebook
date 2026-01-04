@@ -11,13 +11,14 @@
 
 import { STATES } from "./stateMachine.js";
 import { logger } from "../utils/logger.js";
-import { 
-    AVG_OUTCOME_NAME, 
-    AVG_ASSIGNMENT_NAME, 
+import {
+    AVG_OUTCOME_NAME,
+    AVG_ASSIGNMENT_NAME,
     AVG_RUBRIC_NAME,
-    PER_STUDENT_UPDATE_THRESHOLD 
+    PER_STUDENT_UPDATE_THRESHOLD
 } from "../config.js";
 import { UserCancelledError } from "../utils/errorHandler.js";
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
 import { calculateStudentAverages } from "../services/gradeCalculator.js";
 import { postPerStudentGrades, beginBulkUpdate, waitForBulkGrading } from "../services/gradeSubmission.js";
 import { verifyUIScores } from "../services/verification.js";
@@ -41,61 +42,65 @@ import { getAssignmentId } from "../utils/canvasHelpers.js";
  */
 export async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
-    
+    const apiClient = new CanvasApiClient();
+
     banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
-    
+
     // Fetch rollup data
-    const data = await getRollup(courseId);
+    const data = await getRollup(courseId, apiClient);
     stateMachine.updateContext({ rollupData: data });
-    
+
     // Check for outcome
     const outcomeObj = getOutcomeObjectByName(data);
     const outcomeId = outcomeObj?.id;
-    
+
     if (!outcomeId) {
         const confirmCreate = confirm(`Outcome "${AVG_OUTCOME_NAME}" not found.\nWould you like to create it?`);
         if (!confirmCreate) throw new UserCancelledError("User declined to create missing outcome.");
         return STATES.CREATING_OUTCOME;
     }
-    
+
     stateMachine.updateContext({ outcomeId });
-    
+
     // Check for assignment
-    let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj);
-    
+    let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
+
     // Fallback: try to find by name
     if (!assignmentObj) {
         const assignmentIdFromName = await getAssignmentId(courseId);
         if (assignmentIdFromName) {
-            const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`);
-            assignmentObj = await res.json();
+            assignmentObj = await apiClient.get(
+                `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
+                {},
+                "getAssignment:fallback"
+            );
             logger.debug("Fallback assignment found by name:", assignmentObj);
         }
     }
-    
+
     const assignmentId = assignmentObj?.id;
-    
+
     if (!assignmentId) {
         const confirmCreate = confirm(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.\nWould you like to create it?`);
         if (!confirmCreate) throw new UserCancelledError("User declined to create missing assignment.");
         return STATES.CREATING_ASSIGNMENT;
     }
-    
+
     stateMachine.updateContext({ assignmentId });
-    
+
     // Check for rubric
-    const result = await getRubricForAssignment(courseId, assignmentId);
+    const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
     const rubricId = result?.rubricId;
     const rubricCriterionId = result?.criterionId;
-    
+
     if (!rubricId) {
         const confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.\nWould you like to create it?`);
         if (!confirmCreate) throw new UserCancelledError("User declined to create missing rubric.");
         return STATES.CREATING_RUBRIC;
     }
-    
+
     stateMachine.updateContext({ rubricId, rubricCriterionId });
-    
+
     // All resources exist, move to calculating
     return STATES.CALCULATING;
 }
@@ -106,10 +111,11 @@ export async function handleCheckingSetup(stateMachine) {
  */
 export async function handleCreatingOutcome(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
-    
+    const apiClient = new CanvasApiClient();
+
     banner.setText(`Creating "${AVG_OUTCOME_NAME}" Outcome...`);
-    await createOutcome(courseId);
-    
+    await createOutcome(courseId, apiClient);
+
     return STATES.CHECKING_SETUP;
 }
 
@@ -119,11 +125,12 @@ export async function handleCreatingOutcome(stateMachine) {
  */
 export async function handleCreatingAssignment(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
-    
+    const apiClient = new CanvasApiClient();
+
     banner.setText(`Creating "${AVG_ASSIGNMENT_NAME}" Assignment...`);
-    const assignmentId = await createAssignment(courseId);
+    const assignmentId = await createAssignment(courseId, apiClient);
     stateMachine.updateContext({ assignmentId });
-    
+
     return STATES.CHECKING_SETUP;
 }
 
@@ -133,11 +140,12 @@ export async function handleCreatingAssignment(stateMachine) {
  */
 export async function handleCreatingRubric(stateMachine) {
     const { courseId, assignmentId, outcomeId, banner } = stateMachine.getContext();
-    
+    const apiClient = new CanvasApiClient();
+
     banner.setText(`Creating "${AVG_RUBRIC_NAME}" Rubric...`);
-    const rubricId = await createRubric(courseId, assignmentId, outcomeId);
+    const rubricId = await createRubric(courseId, assignmentId, outcomeId, apiClient);
     stateMachine.updateContext({ rubricId });
-    
+
     return STATES.CHECKING_SETUP;
 }
 
@@ -178,6 +186,7 @@ export async function handleCalculating(stateMachine) {
  */
 export async function handleUpdatingGrades(stateMachine) {
     const { averages, courseId, assignmentId, rubricCriterionId, numberOfUpdates, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
 
     // Decide update mode
     const usePerStudent = numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD;
@@ -191,7 +200,7 @@ export async function handleUpdatingGrades(stateMachine) {
         banner.hold(message, 3000);
         logger.debug('Per student update...');
 
-        await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, false);
+        await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, apiClient, false);
 
         logger.debug(`handleUpdatingGrades complete, transitioning to VERIFYING`);
         return STATES.VERIFYING;
@@ -201,7 +210,7 @@ export async function handleUpdatingGrades(stateMachine) {
         banner.hold(message, 3000);
         logger.debug(`Bulk update, detected ${numberOfUpdates} changes`);
 
-        const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+        const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient);
         stateMachine.updateContext({ progressId });
         logger.debug(`progressId: ${progressId}`);
 
@@ -216,10 +225,11 @@ export async function handleUpdatingGrades(stateMachine) {
  */
 export async function handlePollingProgress(stateMachine) {
     const { banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
 
     logger.debug('Starting bulk update polling...');
     // waitForBulkGrading handles the polling internally
-    await waitForBulkGrading(banner);
+    await waitForBulkGrading(banner, apiClient);
 
     logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
@@ -231,9 +241,10 @@ export async function handlePollingProgress(stateMachine) {
  */
 export async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
 
     logger.debug('Starting verification...');
-    await verifyUIScores(courseId, averages, outcomeId, banner);
+    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient);
 
     logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;

@@ -6,6 +6,9 @@
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __typeError = (msg) => {
+    throw TypeError(msg);
+  };
   var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
   var __spreadValues = (a, b) => {
     for (var prop in b || (b = {}))
@@ -19,6 +22,18 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
   var __esm = (fn, res) => function __init() {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   };
@@ -26,6 +41,9 @@
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
   };
+  var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
+  var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
+  var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
   // src/utils/logger.js
   function determineLogLevel() {
@@ -42,9 +60,6 @@
       console.warn("Failed to parse URL parameters for debug mode:", e);
     }
     return logLevel;
-  }
-  function log(...args) {
-    logger.debug(...args);
   }
   function logBanner(envName, buildVersion) {
     console.log(
@@ -241,22 +256,6 @@
     }
     return courseId;
   }
-  function getTokenCookie(name) {
-    const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
-    let cookieValue = null;
-    let i = 0;
-    while (i < cookies.length && cookieValue === null) {
-      const cookie = cookies[i].split("=", 2);
-      if (cookie[0] === name) {
-        cookieValue = decodeURIComponent(cookie[1]);
-      }
-      i++;
-    }
-    if (!cookieValue) {
-      throw new Error("CSRF token / cookie not found.");
-    }
-    return cookieValue;
-  }
   var init_canvas = __esm({
     "src/utils/canvas.js"() {
       init_config();
@@ -269,6 +268,275 @@
   var init_keys = __esm({
     "src/utils/keys.js"() {
       k = (name, courseId) => `${name}_${courseId}`;
+    }
+  });
+
+  // src/gradebook/stateMachine.js
+  var stateMachine_exports = {};
+  __export(stateMachine_exports, {
+    STATES: () => STATES,
+    UpdateFlowStateMachine: () => UpdateFlowStateMachine
+  });
+  var STATES, VALID_TRANSITIONS, UpdateFlowStateMachine;
+  var init_stateMachine = __esm({
+    "src/gradebook/stateMachine.js"() {
+      init_logger();
+      STATES = {
+        IDLE: "IDLE",
+        CHECKING_SETUP: "CHECKING_SETUP",
+        CREATING_OUTCOME: "CREATING_OUTCOME",
+        CREATING_ASSIGNMENT: "CREATING_ASSIGNMENT",
+        CREATING_RUBRIC: "CREATING_RUBRIC",
+        CALCULATING: "CALCULATING",
+        UPDATING_GRADES: "UPDATING_GRADES",
+        POLLING_PROGRESS: "POLLING_PROGRESS",
+        VERIFYING: "VERIFYING",
+        COMPLETE: "COMPLETE",
+        ERROR: "ERROR"
+      };
+      VALID_TRANSITIONS = {
+        [STATES.IDLE]: [STATES.CHECKING_SETUP],
+        [STATES.CHECKING_SETUP]: [STATES.CREATING_OUTCOME, STATES.CREATING_ASSIGNMENT, STATES.CREATING_RUBRIC, STATES.CALCULATING, STATES.ERROR],
+        [STATES.CREATING_OUTCOME]: [STATES.CHECKING_SETUP, STATES.ERROR],
+        [STATES.CREATING_ASSIGNMENT]: [STATES.CHECKING_SETUP, STATES.ERROR],
+        [STATES.CREATING_RUBRIC]: [STATES.CHECKING_SETUP, STATES.ERROR],
+        [STATES.CALCULATING]: [STATES.UPDATING_GRADES, STATES.COMPLETE, STATES.ERROR],
+        [STATES.UPDATING_GRADES]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
+        [STATES.POLLING_PROGRESS]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
+        [STATES.VERIFYING]: [STATES.VERIFYING, STATES.COMPLETE, STATES.ERROR],
+        [STATES.COMPLETE]: [STATES.IDLE],
+        [STATES.ERROR]: [STATES.IDLE]
+      };
+      UpdateFlowStateMachine = class {
+        /**
+         * Create a new state machine
+         * @param {string} initialState - Initial state (default: IDLE)
+         * @param {object} initialContext - Initial context data
+         */
+        constructor(initialState = STATES.IDLE, initialContext = {}) {
+          this.currentState = initialState;
+          this.context = __spreadValues({
+            courseId: null,
+            outcomeId: null,
+            assignmentId: null,
+            rubricId: null,
+            rubricCriterionId: null,
+            rollupData: null,
+            averages: null,
+            progressId: null,
+            startTime: null,
+            numberOfUpdates: 0,
+            banner: null,
+            error: null,
+            retryCount: 0,
+            updateMode: null
+          }, initialContext);
+          this.eventListeners = {};
+          this.stateHistory = [initialState];
+        }
+        /**
+         * Get the current state
+         * @returns {string} Current state name
+         */
+        getCurrentState() {
+          return this.currentState;
+        }
+        /**
+         * Get the current context
+         * @returns {object} Current context data
+         */
+        getContext() {
+          return __spreadValues({}, this.context);
+        }
+        /**
+         * Update context data
+         * @param {object} updates - Context updates to merge
+         */
+        updateContext(updates) {
+          this.context = __spreadValues(__spreadValues({}, this.context), updates);
+        }
+        /**
+         * Check if a transition is valid
+         * @param {string} toState - Target state
+         * @returns {boolean} True if transition is valid
+         */
+        canTransition(toState) {
+          const validStates = VALID_TRANSITIONS[this.currentState] || [];
+          return validStates.includes(toState);
+        }
+        /**
+         * Transition to a new state
+         * @param {string} toState - Target state
+         * @param {object} contextUpdates - Optional context updates
+         * @throws {Error} If transition is invalid
+         */
+        transition(toState, contextUpdates = {}) {
+          var _a;
+          if (!this.canTransition(toState)) {
+            throw new Error(
+              `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a.join(", ")) || "none"}`
+            );
+          }
+          const fromState = this.currentState;
+          this.currentState = toState;
+          this.stateHistory.push(toState);
+          this.updateContext(contextUpdates);
+          logger.debug(`State transition: ${fromState} \u2192 ${toState}`);
+          this.emit("stateChange", {
+            from: fromState,
+            to: toState,
+            context: this.getContext()
+          });
+        }
+        /**
+         * Register an event listener
+         * @param {string} event - Event name
+         * @param {function} callback - Callback function
+         */
+        on(event, callback) {
+          if (!this.eventListeners[event]) {
+            this.eventListeners[event] = [];
+          }
+          this.eventListeners[event].push(callback);
+        }
+        /**
+         * Emit an event
+         * @param {string} event - Event name
+         * @param {any} data - Event data
+         */
+        emit(event, data) {
+          const listeners = this.eventListeners[event] || [];
+          listeners.forEach((callback) => {
+            try {
+              callback(data);
+            } catch (error) {
+              logger.error(`Error in event listener for ${event}:`, error);
+            }
+          });
+        }
+        /**
+         * Serialize state machine to JSON
+         * @returns {object} Serialized state
+         */
+        serialize() {
+          return {
+            currentState: this.currentState,
+            context: __spreadProps(__spreadValues({}, this.context), {
+              banner: null
+              // Don't serialize UI references
+            }),
+            stateHistory: this.stateHistory,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString()
+          };
+        }
+        /**
+         * Deserialize state machine from JSON
+         * @param {object} data - Serialized state data
+         */
+        deserialize(data) {
+          if (!data) return;
+          this.currentState = data.currentState || STATES.IDLE;
+          this.context = __spreadProps(__spreadValues(__spreadValues({}, this.context), data.context), {
+            timestamp: data.timestamp
+            // Preserve timestamp from serialization
+          });
+          this.stateHistory = data.stateHistory || [this.currentState];
+          logger.debug(`State machine restored to ${this.currentState}`);
+        }
+        /**
+         * Save state to localStorage
+         * @param {string} courseId - Course ID for storage key
+         */
+        saveToLocalStorage(courseId) {
+          if (!courseId) {
+            logger.warn("Cannot save state: courseId is required");
+            return;
+          }
+          try {
+            const serialized = this.serialize();
+            localStorage.setItem(`updateFlow_state_${courseId}`, JSON.stringify(serialized));
+            logger.debug(`State saved to localStorage for course ${courseId}`);
+          } catch (error) {
+            logger.error("Failed to save state to localStorage:", error);
+          }
+        }
+        /**
+         * Load state from localStorage
+         * @param {string} courseId - Course ID for storage key
+         * @returns {boolean} True if state was loaded
+         */
+        loadFromLocalStorage(courseId) {
+          if (!courseId) {
+            logger.warn("Cannot load state: courseId is required");
+            return false;
+          }
+          try {
+            const stored = localStorage.getItem(`updateFlow_state_${courseId}`);
+            if (!stored) return false;
+            const data = JSON.parse(stored);
+            const timestamp = new Date(data.timestamp);
+            const now = /* @__PURE__ */ new Date();
+            const ageInMinutes = (now - timestamp) / 1e3 / 60;
+            if (ageInMinutes > 20) {
+              logger.debug(`Stored state is ${ageInMinutes.toFixed(0)} minutes old, ignoring`);
+              this.clearLocalStorage(courseId);
+              return false;
+            }
+            this.deserialize(data);
+            logger.info(`State restored from ${ageInMinutes.toFixed(1)} minutes ago`);
+            return true;
+          } catch (error) {
+            logger.error("Failed to load state from localStorage:", error);
+            return false;
+          }
+        }
+        /**
+         * Clear state from localStorage
+         * @param {string} courseId - Course ID for storage key
+         */
+        clearLocalStorage(courseId) {
+          if (!courseId) return;
+          try {
+            localStorage.removeItem(`updateFlow_state_${courseId}`);
+            logger.debug(`State cleared from localStorage for course ${courseId}`);
+          } catch (error) {
+            logger.error("Failed to clear state from localStorage:", error);
+          }
+        }
+        /**
+         * Get state history
+         * @returns {array} Array of state names in order
+         */
+        getStateHistory() {
+          return [...this.stateHistory];
+        }
+        /**
+         * Reset state machine to IDLE
+         */
+        reset() {
+          this.currentState = STATES.IDLE;
+          this.context = {
+            courseId: this.context.courseId,
+            // Keep courseId
+            outcomeId: null,
+            assignmentId: null,
+            rubricId: null,
+            rubricCriterionId: null,
+            rollupData: null,
+            averages: null,
+            progressId: null,
+            startTime: null,
+            numberOfUpdates: 0,
+            banner: null,
+            error: null,
+            retryCount: 0,
+            updateMode: null
+          };
+          this.stateHistory = [STATES.IDLE];
+          logger.debug("State machine reset to IDLE");
+          this.emit("reset", {});
+        }
+      };
     }
   });
 
@@ -413,15 +681,140 @@
     }
   });
 
-  // src/services/gradeOverride.js
-  async function setOverrideScoreGQL(enrollmentId, overrideScore) {
-    var _a, _b, _c, _d, _e;
-    const csrfToken = getTokenCookie("_csrf_token");
-    if (!csrfToken) {
-      const error = new Error("No CSRF token found.");
-      logError(error, "setOverrideScoreGQL");
-      throw error;
+  // src/utils/canvasApiClient.js
+  var _CanvasApiClient_instances, getTokenCookie_fn, makeRequest_fn, CanvasApiClient;
+  var init_canvasApiClient = __esm({
+    "src/utils/canvasApiClient.js"() {
+      init_errorHandler();
+      init_logger();
+      CanvasApiClient = class {
+        /**
+         * Create a new Canvas API client
+         * @throws {Error} If CSRF token is not found in cookies
+         */
+        constructor() {
+          __privateAdd(this, _CanvasApiClient_instances);
+          this.csrfToken = __privateMethod(this, _CanvasApiClient_instances, getTokenCookie_fn).call(this, "_csrf_token");
+          if (!this.csrfToken) {
+            throw new Error("CSRF token not found - user may not be authenticated");
+          }
+          logger.debug("CanvasApiClient initialized with cached CSRF token");
+        }
+        /**
+         * Make a GET request to the Canvas API
+         * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
+         * @param {Object} options - Additional fetch options
+         * @param {string} context - Context for error logging (optional)
+         * @returns {Promise<any>} Parsed JSON response
+         */
+        async get(url, options = {}, context = "get") {
+          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "GET", null, options, context);
+        }
+        /**
+         * Make a POST request to the Canvas API
+         * @param {string} url - API endpoint URL
+         * @param {Object} data - Request body data
+         * @param {Object} options - Additional fetch options
+         * @param {string} context - Context for error logging (optional)
+         * @returns {Promise<any>} Parsed JSON response
+         */
+        async post(url, data, options = {}, context = "post") {
+          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
+        }
+        /**
+         * Make a PUT request to the Canvas API
+         * @param {string} url - API endpoint URL
+         * @param {Object} data - Request body data
+         * @param {Object} options - Additional fetch options
+         * @param {string} context - Context for error logging (optional)
+         * @returns {Promise<any>} Parsed JSON response
+         */
+        async put(url, data, options = {}, context = "put") {
+          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "PUT", data, options, context);
+        }
+        /**
+         * Make a DELETE request to the Canvas API
+         * @param {string} url - API endpoint URL
+         * @param {Object} options - Additional fetch options
+         * @param {string} context - Context for error logging (optional)
+         * @returns {Promise<any>} Parsed JSON response
+         */
+        async delete(url, options = {}, context = "delete") {
+          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "DELETE", null, options, context);
+        }
+        /**
+         * Make a GraphQL request to the Canvas API
+         * @param {string} query - GraphQL query string
+         * @param {Object} variables - GraphQL variables (optional)
+         * @param {string} context - Context for error logging (optional)
+         * @returns {Promise<any>} Parsed JSON response
+         */
+        async graphql(query, variables = {}, context = "graphql") {
+          const url = "/api/graphql";
+          const data = { query, variables };
+          const options = {
+            headers: {
+              "Content-Type": "application/json"
+            }
+          };
+          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
+        }
+      };
+      _CanvasApiClient_instances = new WeakSet();
+      /**
+       * Get CSRF token from browser cookies
+       * @private
+       * @param {string} name - Cookie name
+       * @returns {string|null} Cookie value or null if not found
+       */
+      getTokenCookie_fn = function(name) {
+        const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
+        for (const cookie of cookies) {
+          const [key, value] = cookie.split("=", 2);
+          if (key === name) {
+            return decodeURIComponent(value);
+          }
+        }
+        return null;
+      };
+      makeRequest_fn = async function(url, method, data, options = {}, context = "request") {
+        const headers = __spreadProps(__spreadValues({
+          "Content-Type": "application/json"
+        }, options.headers), {
+          "X-CSRF-Token": this.csrfToken
+        });
+        let body = null;
+        if (data) {
+          const contentType = headers["Content-Type"] || "application/json";
+          const isJson = contentType.includes("application/json");
+          if (isJson) {
+            if (!data.authenticity_token) {
+              data = __spreadProps(__spreadValues({}, data), { authenticity_token: this.csrfToken });
+            }
+            body = JSON.stringify(data);
+          } else {
+            body = data;
+          }
+        }
+        const _a = options, { headers: _optionsHeaders } = _a, restOptions = __objRest(_a, ["headers"]);
+        const response = await safeFetch(
+          url,
+          __spreadValues({
+            method,
+            credentials: "same-origin",
+            headers,
+            body
+          }, restOptions),
+          context
+        );
+        return await safeJsonParse(response, context);
+      };
     }
+  });
+
+  // src/services/gradeOverride.js
+  async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) {
+    var _a, _b, _c, _d, _e;
     const query = `
     mutation SetOverride($enrollmentId: ID!, $overrideScore: Float!) {
       setOverrideScore(input: { enrollmentId: $enrollmentId, overrideScore: $overrideScore }) {
@@ -429,27 +822,14 @@
         __typename
       }
     }`;
-    const res = await safeFetch(
-      "/api/graphql",
+    const json = await apiClient.graphql(
+      query,
       {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken,
-          "X-Requested-With": "XMLHttpRequest"
-        },
-        body: JSON.stringify({
-          query,
-          variables: {
-            enrollmentId: String(enrollmentId),
-            overrideScore: Number(overrideScore)
-          }
-        })
+        enrollmentId: String(enrollmentId),
+        overrideScore: Number(overrideScore)
       },
       "setOverrideScoreGQL"
     );
-    const json = await safeJsonParse(res, "setOverrideScoreGQL");
     if (json.errors) {
       const error = new Error(`GQL error: ${JSON.stringify(json.errors)}`);
       logError(error, "setOverrideScoreGQL", { enrollmentId, overrideScore });
@@ -457,8 +837,7 @@
     }
     return (_e = (_d = (_c = (_b = (_a = json.data) == null ? void 0 : _a.setOverrideScore) == null ? void 0 : _b.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
   }
-  async function getEnrollmentIdForUser(courseId, userId) {
-    var _a, _b;
+  async function getEnrollmentIdForUser(courseId, userId, apiClient) {
     const courseKey = String(courseId);
     const userKey = String(userId);
     if (__enrollmentMapCache.has(courseKey)) {
@@ -468,28 +847,25 @@
     const map = /* @__PURE__ */ new Map();
     let url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment&per_page=100`;
     while (url) {
-      const res = await safeFetch(url, { credentials: "same-origin" }, "getEnrollmentIdForUser");
-      const data = await safeJsonParse(res, "getEnrollmentIdForUser");
+      const data = await apiClient.get(url, {}, "getEnrollmentIdForUser");
       for (const e of data) {
         if ((e == null ? void 0 : e.user_id) && (e == null ? void 0 : e.id)) map.set(String(e.user_id), e.id);
       }
-      const link = res.headers.get("Link");
-      const next = link == null ? void 0 : link.split(",").find((s) => s.includes('rel="next"'));
-      url = next ? (_b = (_a = next.match(/<([^>]+)>/)) == null ? void 0 : _a[1]) != null ? _b : null : null;
+      url = null;
     }
     __enrollmentMapCache.set(courseKey, map);
     return map.get(userKey) || null;
   }
-  async function queueOverride(courseId, userId, average) {
+  async function queueOverride(courseId, userId, average, apiClient) {
     if (!ENABLE_GRADE_OVERRIDE) return;
     try {
-      const enrollmentId = await getEnrollmentIdForUser(courseId, userId);
+      const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
       if (!enrollmentId) {
         logger.warn(`[override/concurrent] no enrollmentId for user ${userId}`);
         return;
       }
       const override = OVERRIDE_SCALE(average);
-      await setOverrideScoreGQL(enrollmentId, override);
+      await setOverrideScoreGQL(enrollmentId, override, apiClient);
       logger.debug(`[override/concurrent] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
     } catch (e) {
       logger.warn(`[override/concurrent] failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
@@ -498,7 +874,7 @@
   var __enrollmentMapCache;
   var init_gradeOverride = __esm({
     "src/services/gradeOverride.js"() {
-      init_canvas();
+      init_canvasApiClient();
       init_config();
       init_errorHandler();
       init_logger();
@@ -515,13 +891,10 @@
     submitRubricScore: () => submitRubricScore,
     waitForBulkGrading: () => waitForBulkGrading
   });
-  async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score) {
-    const csrfToken = getTokenCookie("_csrf_token");
-    logger.debug("csrfToken:", csrfToken);
+  async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
     const timeStamp = (/* @__PURE__ */ new Date()).toLocaleString();
     logger.debug("Submitting rubric score for student", userId);
     const payload = {
-      authenticity_token: csrfToken,
       rubric_assessment: {
         // updates the rubric score.
         [rubricCriterionId.toString()]: {
@@ -538,27 +911,15 @@
       }
     };
     logger.debug("Submitting rubric score for student", userId, payload);
-    const response = await safeFetch(
+    await apiClient.put(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
-      {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      },
+      payload,
+      {},
       `submitRubricScore:${userId}`
     );
     logger.debug("Score submitted successfully for user", userId);
   }
-  async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages) {
-    const csrfToken = getTokenCookie("_csrf_token");
-    if (!csrfToken) {
-      const error = new Error("CSRF token not found.");
-      logError(error, "beginBulkUpdate");
-      throw error;
-    }
+  async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient) {
     const timeStamp = (/* @__PURE__ */ new Date()).toLocaleString();
     const gradeData = {};
     logger.debug("averages:", averages);
@@ -574,41 +935,31 @@
         }
       };
       if (ENABLE_GRADE_OVERRIDE) {
-        await queueOverride(courseId, userId, average);
+        await queueOverride(courseId, userId, average, apiClient);
       }
     }
     logger.debug("bulk gradeData payload:", gradeData);
-    const response = await safeFetch(
+    const result = await apiClient.post(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/update_grades`,
       {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          authenticity_token: csrfToken,
-          grade_data: gradeData
-        })
+        grade_data: gradeData
       },
+      {},
       "beginBulkUpdate"
     );
-    const result = await safeJsonParse(response, "beginBulkUpdate");
     const progressId = result.id;
     localStorage.setItem(`progressId_${getCourseId()}`, progressId);
     logger.info("Waiting for grading to complete progress ID:", progressId);
     return progressId;
   }
-  async function waitForBulkGrading(box, timeout = 12e5, interval = 2e3) {
+  async function waitForBulkGrading(box, apiClient, timeout = 12e5, interval = 2e3) {
     const loopStartTime = Date.now();
     let state = "beginning upload";
     const courseId = getCourseId();
     const progressId = localStorage.getItem(`progressId_${courseId}`);
     startElapsedTimer(courseId, box);
     while (Date.now() - loopStartTime < timeout) {
-      const res = await safeFetch(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
-      const progress = await safeJsonParse(res, "waitForBulkGrading");
+      const progress = await apiClient.get(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
       let elapsed = getElapsedTimeSinceStart();
       state = progress.workflow_state;
       logger.debug(`Bulk Uploading Status: ${state} (elapsed: ${elapsed}s)`);
@@ -625,8 +976,6 @@
           throw new Error("Bulk update failed.");
         case "completed":
           logger.info("Bulk upload completed: " + progress.updated_at);
-          localStorage.setItem(`uploadFinishTime_${getCourseId()}`, progress.updated_at);
-          localStorage.removeItem(`updateInProgress_${getCourseId()}`);
           return;
         default:
           break;
@@ -638,7 +987,7 @@
       timeout
     );
   }
-  async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, testing = false) {
+  async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, apiClient, testing = false) {
     const updateInterval = 1;
     const numberOfUpdates = averages.length;
     box.setText(`Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...`);
@@ -650,13 +999,13 @@
       let lastError = null;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          await submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, average);
+          await submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, average, apiClient);
           if (ENABLE_GRADE_OVERRIDE) {
             try {
-              const enrollmentId = await getEnrollmentIdForUser(courseId, userId);
+              const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
               if (enrollmentId) {
                 const override = OVERRIDE_SCALE(average);
-                await setOverrideScoreGQL(enrollmentId, override);
+                await setOverrideScoreGQL(enrollmentId, override, apiClient);
                 logger.debug(`[override] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
               } else {
                 logger.warn(`[override] no enrollmentId for user ${userId}`);
@@ -757,6 +1106,7 @@
   var init_gradeSubmission = __esm({
     "src/services/gradeSubmission.js"() {
       init_canvas();
+      init_canvasApiClient();
       init_config();
       init_uiHelpers();
       init_gradeOverride();
@@ -770,17 +1120,17 @@
   __export(verification_exports, {
     verifyUIScores: () => verifyUIScores
   });
-  async function verifyUIScores(courseId, averages, outcomeId, box, waitTimeMs = 5e3, maxRetries = 50) {
+  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, waitTimeMs = 5e3, maxRetries = 50) {
     let state = "verifying";
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       let elapsed = getElapsedTimeSinceStart();
-      box.soft(`Verification status: ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
+      box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
       startElapsedTimer(courseId, box);
-      const response = await fetch(`/api/v1/courses/${courseId}/outcome_rollups?&outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch outcome results for update verification");
-      }
-      const newRollupData = await response.json();
+      const newRollupData = await apiClient.get(
+        `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`,
+        {},
+        "verifyUIScores"
+      );
       logger.debug("newRollupData: ", newRollupData);
       const mismatches = [];
       for (const { userId, average } of averages) {
@@ -818,6 +1168,7 @@
   var init_verification = __esm({
     "src/services/verification.js"() {
       init_canvas();
+      init_canvasApiClient();
       init_uiHelpers();
       init_logger();
     }
@@ -825,9 +1176,13 @@
 
   // src/utils/uiHelpers.js
   function getElapsedTimeSinceStart(endTime = Date.now()) {
-    const start = localStorage.getItem(`startTime_${getCourseId()}`);
-    if (!start) return 0;
-    const startMs = new Date(start).getTime();
+    const courseId = getCourseId();
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+    if (!restored) return 0;
+    const context = stateMachine.getContext();
+    if (!context.startTime) return 0;
+    const startMs = new Date(context.startTime).getTime();
     const endMs = endTime instanceof Date ? endTime.getTime() : new Date(endTime).getTime();
     return Math.floor((endMs - startMs) / 1e3);
   }
@@ -909,30 +1264,31 @@
       tooltip: "Show last update status",
       onClick: async () => {
         pill.remove();
-        localStorage.setItem(k("bannerDismissed", getCourseId()), "false");
         const courseId2 = getCourseId();
-        const inProgress = localStorage.getItem(`updateInProgress_${courseId2}`) === "true";
-        const verificationPending = localStorage.getItem(`verificationPending_${courseId2}`) === "true";
-        const progressId = localStorage.getItem(`progressId_${courseId2}`);
-        const outcomeId = localStorage.getItem(`outcomeId_${courseId2}`);
-        const expectedAverages = safeParse(localStorage.getItem(`expectedAverages_${courseId2}`));
-        const { waitForBulkGrading: waitForBulkGrading2 } = await Promise.resolve().then(() => (init_gradeSubmission(), gradeSubmission_exports));
-        const { verifyUIScores: verifyUIScores2 } = await Promise.resolve().then(() => (init_verification(), verification_exports));
-        if (inProgress && progressId) {
-          const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-          await waitForBulkGrading2(box);
-          return;
-        }
-        if (verificationPending && courseId2 && outcomeId && Array.isArray(expectedAverages)) {
-          const box = showFloatingBanner({ text: "Verifying updated scores" });
-          try {
-            await verifyUIScores2(courseId2, expectedAverages, outcomeId, box);
-            box.setText(`All ${expectedAverages.length} scores verified!`);
-          } catch (e) {
-            console.warn("Verification on resume failed:", e);
-            box.setText("Verification failed. You can try updating again.");
+        const stateMachine = new UpdateFlowStateMachine();
+        const restored = stateMachine.loadFromLocalStorage(courseId2);
+        if (restored) {
+          const context = stateMachine.getContext();
+          const currentState = stateMachine.getCurrentState();
+          const { waitForBulkGrading: waitForBulkGrading2 } = await Promise.resolve().then(() => (init_gradeSubmission(), gradeSubmission_exports));
+          const { verifyUIScores: verifyUIScores2 } = await Promise.resolve().then(() => (init_verification(), verification_exports));
+          const { STATES: STATES2 } = await Promise.resolve().then(() => (init_stateMachine(), stateMachine_exports));
+          if (currentState === STATES2.POLLING_PROGRESS && context.progressId) {
+            const box = showFloatingBanner({ text: "Resuming: checking upload status" });
+            await waitForBulkGrading2(box);
+            return;
           }
-          return;
+          if (currentState === STATES2.VERIFYING && context.averages && context.outcomeId) {
+            const box = showFloatingBanner({ text: "Verifying updated scores" });
+            try {
+              await verifyUIScores2(courseId2, context.averages, context.outcomeId, box);
+              box.setText(`All ${context.averages.length} scores verified!`);
+            } catch (e) {
+              logger.warn("Verification on resume failed:", e);
+              box.setText("Verification failed. You can try updating again.");
+            }
+            return;
+          }
         }
         const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
         showFloatingBanner({ text });
@@ -952,6 +1308,7 @@
       init_banner();
       init_buttons();
       init_logger();
+      init_stateMachine();
     }
   });
 
@@ -1084,11 +1441,9 @@
       autoTimer = setTimeout(destroy, duration);
     }
     closeBtn.onclick = () => {
-      if (courseId) localStorage.setItem(k("bannerDismissed", courseId), "true");
       destroy();
       ensureStatusPill(courseId);
     };
-    if (courseId) localStorage.setItem(k("bannerDismissed", courseId), "false");
     duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
     return banner;
   }
@@ -1112,270 +1467,17 @@
   init_config();
   init_errorHandler();
   init_logger();
+  init_stateMachine();
 
-  // src/gradebook/stateMachine.js
-  init_logger();
-  var STATES = {
-    IDLE: "IDLE",
-    CHECKING_SETUP: "CHECKING_SETUP",
-    CREATING_OUTCOME: "CREATING_OUTCOME",
-    CREATING_ASSIGNMENT: "CREATING_ASSIGNMENT",
-    CREATING_RUBRIC: "CREATING_RUBRIC",
-    CALCULATING: "CALCULATING",
-    UPDATING_GRADES: "UPDATING_GRADES",
-    POLLING_PROGRESS: "POLLING_PROGRESS",
-    VERIFYING: "VERIFYING",
-    COMPLETE: "COMPLETE",
-    ERROR: "ERROR"
-  };
-  var VALID_TRANSITIONS = {
-    [STATES.IDLE]: [STATES.CHECKING_SETUP],
-    [STATES.CHECKING_SETUP]: [STATES.CREATING_OUTCOME, STATES.CREATING_ASSIGNMENT, STATES.CREATING_RUBRIC, STATES.CALCULATING, STATES.ERROR],
-    [STATES.CREATING_OUTCOME]: [STATES.CHECKING_SETUP, STATES.ERROR],
-    [STATES.CREATING_ASSIGNMENT]: [STATES.CHECKING_SETUP, STATES.ERROR],
-    [STATES.CREATING_RUBRIC]: [STATES.CHECKING_SETUP, STATES.ERROR],
-    [STATES.CALCULATING]: [STATES.UPDATING_GRADES, STATES.COMPLETE, STATES.ERROR],
-    [STATES.UPDATING_GRADES]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
-    [STATES.POLLING_PROGRESS]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
-    [STATES.VERIFYING]: [STATES.VERIFYING, STATES.COMPLETE, STATES.ERROR],
-    [STATES.COMPLETE]: [STATES.IDLE],
-    [STATES.ERROR]: [STATES.IDLE]
-  };
-  var UpdateFlowStateMachine = class {
-    /**
-     * Create a new state machine
-     * @param {string} initialState - Initial state (default: IDLE)
-     * @param {object} initialContext - Initial context data
-     */
-    constructor(initialState = STATES.IDLE, initialContext = {}) {
-      this.currentState = initialState;
-      this.context = __spreadValues({
-        courseId: null,
-        outcomeId: null,
-        assignmentId: null,
-        rubricId: null,
-        rubricCriterionId: null,
-        rollupData: null,
-        averages: null,
-        progressId: null,
-        startTime: null,
-        numberOfUpdates: 0,
-        banner: null,
-        error: null,
-        retryCount: 0,
-        updateMode: null
-      }, initialContext);
-      this.eventListeners = {};
-      this.stateHistory = [initialState];
-    }
-    /**
-     * Get the current state
-     * @returns {string} Current state name
-     */
-    getCurrentState() {
-      return this.currentState;
-    }
-    /**
-     * Get the current context
-     * @returns {object} Current context data
-     */
-    getContext() {
-      return __spreadValues({}, this.context);
-    }
-    /**
-     * Update context data
-     * @param {object} updates - Context updates to merge
-     */
-    updateContext(updates) {
-      this.context = __spreadValues(__spreadValues({}, this.context), updates);
-    }
-    /**
-     * Check if a transition is valid
-     * @param {string} toState - Target state
-     * @returns {boolean} True if transition is valid
-     */
-    canTransition(toState) {
-      const validStates = VALID_TRANSITIONS[this.currentState] || [];
-      return validStates.includes(toState);
-    }
-    /**
-     * Transition to a new state
-     * @param {string} toState - Target state
-     * @param {object} contextUpdates - Optional context updates
-     * @throws {Error} If transition is invalid
-     */
-    transition(toState, contextUpdates = {}) {
-      var _a;
-      if (!this.canTransition(toState)) {
-        throw new Error(
-          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a.join(", ")) || "none"}`
-        );
-      }
-      const fromState = this.currentState;
-      this.currentState = toState;
-      this.stateHistory.push(toState);
-      this.updateContext(contextUpdates);
-      logger.debug(`State transition: ${fromState} \u2192 ${toState}`);
-      this.emit("stateChange", {
-        from: fromState,
-        to: toState,
-        context: this.getContext()
-      });
-    }
-    /**
-     * Register an event listener
-     * @param {string} event - Event name
-     * @param {function} callback - Callback function
-     */
-    on(event, callback) {
-      if (!this.eventListeners[event]) {
-        this.eventListeners[event] = [];
-      }
-      this.eventListeners[event].push(callback);
-    }
-    /**
-     * Emit an event
-     * @param {string} event - Event name
-     * @param {any} data - Event data
-     */
-    emit(event, data) {
-      const listeners = this.eventListeners[event] || [];
-      listeners.forEach((callback) => {
-        try {
-          callback(data);
-        } catch (error) {
-          logger.error(`Error in event listener for ${event}:`, error);
-        }
-      });
-    }
-    /**
-     * Serialize state machine to JSON
-     * @returns {object} Serialized state
-     */
-    serialize() {
-      return {
-        currentState: this.currentState,
-        context: __spreadProps(__spreadValues({}, this.context), {
-          banner: null
-          // Don't serialize UI references
-        }),
-        stateHistory: this.stateHistory,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      };
-    }
-    /**
-     * Deserialize state machine from JSON
-     * @param {object} data - Serialized state data
-     */
-    deserialize(data) {
-      if (!data) return;
-      this.currentState = data.currentState || STATES.IDLE;
-      this.context = __spreadProps(__spreadValues(__spreadValues({}, this.context), data.context), {
-        timestamp: data.timestamp
-        // Preserve timestamp from serialization
-      });
-      this.stateHistory = data.stateHistory || [this.currentState];
-      logger.debug(`State machine restored to ${this.currentState}`);
-    }
-    /**
-     * Save state to localStorage
-     * @param {string} courseId - Course ID for storage key
-     */
-    saveToLocalStorage(courseId) {
-      if (!courseId) {
-        logger.warn("Cannot save state: courseId is required");
-        return;
-      }
-      try {
-        const serialized = this.serialize();
-        localStorage.setItem(`updateFlow_state_${courseId}`, JSON.stringify(serialized));
-        logger.debug(`State saved to localStorage for course ${courseId}`);
-      } catch (error) {
-        logger.error("Failed to save state to localStorage:", error);
-      }
-    }
-    /**
-     * Load state from localStorage
-     * @param {string} courseId - Course ID for storage key
-     * @returns {boolean} True if state was loaded
-     */
-    loadFromLocalStorage(courseId) {
-      if (!courseId) {
-        logger.warn("Cannot load state: courseId is required");
-        return false;
-      }
-      try {
-        const stored = localStorage.getItem(`updateFlow_state_${courseId}`);
-        if (!stored) return false;
-        const data = JSON.parse(stored);
-        const timestamp = new Date(data.timestamp);
-        const now = /* @__PURE__ */ new Date();
-        const ageInMinutes = (now - timestamp) / 1e3 / 60;
-        if (ageInMinutes > 60) {
-          logger.debug(`Stored state is ${ageInMinutes.toFixed(0)} minutes old, ignoring`);
-          this.clearLocalStorage(courseId);
-          return false;
-        }
-        this.deserialize(data);
-        logger.info(`State restored from ${ageInMinutes.toFixed(1)} minutes ago`);
-        return true;
-      } catch (error) {
-        logger.error("Failed to load state from localStorage:", error);
-        return false;
-      }
-    }
-    /**
-     * Clear state from localStorage
-     * @param {string} courseId - Course ID for storage key
-     */
-    clearLocalStorage(courseId) {
-      if (!courseId) return;
-      try {
-        localStorage.removeItem(`updateFlow_state_${courseId}`);
-        logger.debug(`State cleared from localStorage for course ${courseId}`);
-      } catch (error) {
-        logger.error("Failed to clear state from localStorage:", error);
-      }
-    }
-    /**
-     * Get state history
-     * @returns {array} Array of state names in order
-     */
-    getStateHistory() {
-      return [...this.stateHistory];
-    }
-    /**
-     * Reset state machine to IDLE
-     */
-    reset() {
-      this.currentState = STATES.IDLE;
-      this.context = {
-        courseId: this.context.courseId,
-        // Keep courseId
-        outcomeId: null,
-        assignmentId: null,
-        rubricId: null,
-        rubricCriterionId: null,
-        rollupData: null,
-        averages: null,
-        progressId: null,
-        startTime: null,
-        numberOfUpdates: 0,
-        banner: null,
-        error: null,
-        retryCount: 0,
-        updateMode: null
-      };
-      this.stateHistory = [STATES.IDLE];
-      logger.debug("State machine reset to IDLE");
-      this.emit("reset", {});
-    }
-  };
+  // src/gradebook/updateFlowOrchestrator.js
+  init_stateMachine();
 
   // src/gradebook/stateHandlers.js
+  init_stateMachine();
   init_logger();
   init_config();
   init_errorHandler();
+  init_canvasApiClient();
 
   // src/services/gradeCalculator.js
   init_config();
@@ -1434,16 +1536,15 @@
 
   // src/services/outcomeService.js
   init_errorHandler();
-  init_canvas();
+  init_canvasApiClient();
   init_config();
   init_logger();
-  async function getRollup(courseId) {
-    const response = await safeFetch(
+  async function getRollup(courseId, apiClient) {
+    const rollupData = await apiClient.get(
       `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
       {},
       "getRollup"
     );
-    const rollupData = await safeJsonParse(response, "getRollup");
     logger.debug("rollupData: ", rollupData);
     return rollupData;
   }
@@ -1465,28 +1566,23 @@
     }
     return match != null ? match : null;
   }
-  async function createOutcome(courseId) {
-    const csrfToken = getTokenCookie("_csrf_token");
+  async function createOutcome(courseId, apiClient) {
     const randomSuffix = Math.random().toString(36).substring(2, 10);
     const vendorGuid = `MOREnet_${randomSuffix}`;
     const ratingsCsv = OUTCOME_AND_RUBRIC_RATINGS.map((r) => `${r.points},"${r.description}"`).join(",");
     const csvContent = `vendor_guid,object_type,title,description,calculation_method,mastery_points
 "${vendorGuid}",outcome,"${AVG_OUTCOME_NAME}","Auto-generated outcome: ${AVG_OUTCOME_NAME}",latest,"${DEFAULT_MASTERY_THRESHOLD}",${ratingsCsv}`;
     logger.debug("Importing outcome via CSV...");
-    const importRes = await safeFetch(
+    const importData = await apiClient.post(
       `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
+      csvContent,
       {
-        method: "POST",
-        credentials: "same-origin",
         headers: {
-          "Content-Type": "text/csv",
-          "X-CSRF-Token": csrfToken
-        },
-        body: csvContent
+          "Content-Type": "text/csv"
+        }
       },
       "createOutcome"
     );
-    const importData = await safeJsonParse(importRes, "createOutcome");
     const importId = importData.id;
     logger.debug(`Outcome import started: ID ${importId}`);
     let attempts = 0;
@@ -1495,12 +1591,11 @@
     const pollIntervalMs = 2e3;
     while (attempts++ < maxAttempts) {
       await new Promise((r) => setTimeout(r, pollIntervalMs));
-      const pollRes = await safeFetch(
+      const pollData = await apiClient.get(
         `/api/v1/courses/${courseId}/outcome_imports/${importId}`,
         {},
         "createOutcome:poll"
       );
-      const pollData = await safeJsonParse(pollRes, "createOutcome:poll");
       const state = pollData.workflow_state;
       logger.debug(`Poll attempt ${attempts}: ${state}`);
       if (state === "succeeded") {
@@ -1520,31 +1615,35 @@
   }
 
   // src/services/assignmentService.js
-  init_errorHandler();
-  init_canvas();
+  init_canvasApiClient();
   init_config();
   init_logger();
-  async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject) {
+  async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient) {
     var _a;
     const alignments = (_a = outcomeObject.alignments) != null ? _a : [];
     for (const alignment of alignments) {
       if (!alignment.startsWith("assignment_")) continue;
       const assignmentId = alignment.split("_")[1];
-      const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
-      if (!res.ok) continue;
-      const assignment = await res.json();
-      if (assignment.name === AVG_ASSIGNMENT_NAME) {
-        logger.debug("Assignment found:", assignment);
-        return assignment;
+      try {
+        const assignment = await apiClient.get(
+          `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+          {},
+          "getAssignment"
+        );
+        if (assignment.name === AVG_ASSIGNMENT_NAME) {
+          logger.debug("Assignment found:", assignment);
+          return assignment;
+        }
+      } catch (error) {
+        logger.debug(`Assignment ${assignmentId} not accessible:`, error.message);
+        continue;
       }
     }
     logger.warn(`Assignment "${AVG_ASSIGNMENT_NAME}" not found in alignments`);
     return null;
   }
-  async function createAssignment(courseId) {
-    const csrfToken = getTokenCookie("_csrf_token");
+  async function createAssignment(courseId, apiClient) {
     const payload = {
-      authenticity_token: csrfToken,
       assignment: {
         name: AVG_ASSIGNMENT_NAME,
         position: 1,
@@ -1557,32 +1656,26 @@
         omit_from_final_grade: true
       }
     };
-    const res = await safeFetch(
+    const assignment = await apiClient.post(
       `/api/v1/courses/${courseId}/assignments`,
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
-        },
-        body: JSON.stringify(payload)
-      },
+      payload,
+      {},
       "createAssignment"
     );
-    const assignment = await safeJsonParse(res, "createAssignment");
     logger.info("Assignment created:", assignment.name);
     return assignment.id;
   }
 
   // src/services/rubricService.js
-  init_errorHandler();
-  init_canvas();
+  init_canvasApiClient();
   init_config();
   init_logger();
-  async function getRubricForAssignment(courseId, assignmentId) {
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentId}`);
-    const assignment = await response.json();
+  async function getRubricForAssignment(courseId, assignmentId, apiClient) {
+    const assignment = await apiClient.get(
+      `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+      {},
+      "getRubric"
+    );
     const rubricSettings = assignment.rubric_settings;
     if (!rubricSettings || rubricSettings.title !== AVG_RUBRIC_NAME) {
       return null;
@@ -1596,8 +1689,7 @@
     logger.debug("Found rubric and first criterion ID:", { rubricId, criterionId });
     return { rubricId, criterionId };
   }
-  async function createRubric(courseId, assignmentId, outcomeId) {
-    const csrfToken = getTokenCookie("_csrf_token");
+  async function createRubric(courseId, assignmentId, outcomeId, apiClient) {
     const rubricRatings = {};
     OUTCOME_AND_RUBRIC_RATINGS.forEach((rating, index) => {
       rubricRatings[index] = {
@@ -1628,20 +1720,12 @@
         hide_points: true
       }
     };
-    const response = await safeFetch(
+    const rubric = await apiClient.post(
       `/api/v1/courses/${courseId}/rubrics`,
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
-        },
-        body: JSON.stringify(rubricPayload)
-      },
+      rubricPayload,
+      {},
       "createRubric"
     );
-    const rubric = await safeJsonParse(response, "createRubric");
     logger.debug("Rubric created and linked to outcome:", rubric);
     return rubric.id;
   }
@@ -1659,8 +1743,9 @@
   // src/gradebook/stateHandlers.js
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
-    const data = await getRollup(courseId);
+    const data = await getRollup(courseId, apiClient);
     stateMachine.updateContext({ rollupData: data });
     const outcomeObj = getOutcomeObjectByName(data);
     const outcomeId = outcomeObj == null ? void 0 : outcomeObj.id;
@@ -1671,12 +1756,15 @@ Would you like to create it?`);
       return STATES.CREATING_OUTCOME;
     }
     stateMachine.updateContext({ outcomeId });
-    let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj);
+    let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
     if (!assignmentObj) {
       const assignmentIdFromName = await getAssignmentId(courseId);
       if (assignmentIdFromName) {
-        const res = await fetch(`/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`);
-        assignmentObj = await res.json();
+        assignmentObj = await apiClient.get(
+          `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
+          {},
+          "getAssignment:fallback"
+        );
         logger.debug("Fallback assignment found by name:", assignmentObj);
       }
     }
@@ -1688,7 +1776,7 @@ Would you like to create it?`);
       return STATES.CREATING_ASSIGNMENT;
     }
     stateMachine.updateContext({ assignmentId });
-    const result = await getRubricForAssignment(courseId, assignmentId);
+    const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
     const rubricId = result == null ? void 0 : result.rubricId;
     const rubricCriterionId = result == null ? void 0 : result.criterionId;
     if (!rubricId) {
@@ -1702,21 +1790,24 @@ Would you like to create it?`);
   }
   async function handleCreatingOutcome(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     banner.setText(`Creating "${AVG_OUTCOME_NAME}" Outcome...`);
-    await createOutcome(courseId);
+    await createOutcome(courseId, apiClient);
     return STATES.CHECKING_SETUP;
   }
   async function handleCreatingAssignment(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     banner.setText(`Creating "${AVG_ASSIGNMENT_NAME}" Assignment...`);
-    const assignmentId = await createAssignment(courseId);
+    const assignmentId = await createAssignment(courseId, apiClient);
     stateMachine.updateContext({ assignmentId });
     return STATES.CHECKING_SETUP;
   }
   async function handleCreatingRubric(stateMachine) {
     const { courseId, assignmentId, outcomeId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     banner.setText(`Creating "${AVG_RUBRIC_NAME}" Rubric...`);
-    const rubricId = await createRubric(courseId, assignmentId, outcomeId);
+    const rubricId = await createRubric(courseId, assignmentId, outcomeId, apiClient);
     stateMachine.updateContext({ rubricId });
     return STATES.CHECKING_SETUP;
   }
@@ -1734,14 +1825,11 @@ Would you like to create it?`);
       stateMachine.updateContext({ zeroUpdates: true });
       return STATES.COMPLETE;
     }
-    localStorage.setItem(`verificationPending_${courseId}`, "true");
-    localStorage.setItem(`expectedAverages_${courseId}`, JSON.stringify(averages));
-    localStorage.setItem(`outcomeId_${courseId}`, String(outcomeId));
-    localStorage.setItem(`startTime_${courseId}`, (/* @__PURE__ */ new Date()).toISOString());
     return STATES.UPDATING_GRADES;
   }
   async function handleUpdatingGrades(stateMachine) {
     const { averages, courseId, assignmentId, rubricCriterionId, numberOfUpdates, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     const usePerStudent = numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD;
     const updateMode = usePerStudent ? "per-student" : "bulk";
     stateMachine.updateContext({ updateMode });
@@ -1749,14 +1837,14 @@ Would you like to create it?`);
       const message = `Detected ${numberOfUpdates} changes - updating scores one at a time for quicker processing.`;
       banner.hold(message, 3e3);
       logger.debug("Per student update...");
-      await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, false);
+      await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, apiClient, false);
       logger.debug(`handleUpdatingGrades complete, transitioning to VERIFYING`);
       return STATES.VERIFYING;
     } else {
-      const message = `Detected ${numberOfUpdates} changes - using bulk update for error prevention`;
+      const message = `Detected ${numberOfUpdates} changes - using bulk update`;
       banner.hold(message, 3e3);
       logger.debug(`Bulk update, detected ${numberOfUpdates} changes`);
-      const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages);
+      const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient);
       stateMachine.updateContext({ progressId });
       logger.debug(`progressId: ${progressId}`);
       logger.debug(`handleUpdatingGrades complete, transitioning to POLLING_PROGRESS`);
@@ -1765,15 +1853,17 @@ Would you like to create it?`);
   }
   async function handlePollingProgress(stateMachine) {
     const { banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     logger.debug("Starting bulk update polling...");
-    await waitForBulkGrading(banner);
+    await waitForBulkGrading(banner, apiClient);
     logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
   }
   async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     logger.debug("Starting verification...");
-    await verifyUIScores(courseId, averages, outcomeId, banner);
+    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient);
     logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
   }
@@ -1798,7 +1888,7 @@ You may need to refresh the page to see the new scores.`);
   }
   async function handleError2(stateMachine) {
     const { error, banner } = stateMachine.getContext();
-    logger.error("Update flow error:", error);
+    logger.error("Update error:", error);
     if (banner) {
       banner.setText(`Error: ${error.message}`);
       setTimeout(() => banner.remove(), 3e3);
@@ -1887,18 +1977,18 @@ You may need to refresh the page to see the new scores.`);
   // src/utils/stateManagement.js
   init_canvas();
   init_banner();
+  init_canvasApiClient();
   init_gradeSubmission();
   init_verification();
   init_uiHelpers();
   init_errorHandler();
   init_logger();
+  init_stateMachine();
+  init_stateMachine();
   function cleanUpLocalStorage() {
-    let courseId = getCourseId();
-    localStorage.removeItem(`verificationPending_${courseId}`);
-    localStorage.removeItem(`expectedAverages_${courseId}`);
-    localStorage.removeItem(`uploadFinishTime_${courseId}`);
-    localStorage.removeItem(`updateInProgress_${courseId}`);
-    localStorage.removeItem(`startTime_${courseId}`);
+    const courseId = getCourseId();
+    const stateMachine = new UpdateFlowStateMachine();
+    stateMachine.clearLocalStorage(courseId);
   }
 
   // src/gradebook/updateFlowOrchestrator.js
@@ -1906,6 +1996,7 @@ You may need to refresh the page to see the new scores.`);
   init_config();
   init_logger();
   async function startUpdateFlow(button = null) {
+    var _a;
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
@@ -1940,8 +2031,8 @@ You may need to refresh the page to see the new scores.`);
         logger.debug(`State saved to localStorage: ${stateMachine.getCurrentState()}`);
         updateDebugUI(stateMachine);
       }
-      const toolbar = document.querySelector('.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]');
-      if (toolbar) renderLastUpdateNotice(toolbar, courseId);
+      const buttonWrapper = (_a = document.querySelector("#update-scores-button")) == null ? void 0 : _a.parentElement;
+      if (buttonWrapper) renderLastUpdateNotice(buttonWrapper, courseId);
       resetButtonToNormal(button);
       removeDebugUI();
     } catch (error) {
@@ -1968,6 +2059,7 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/gradebook/ui/buttonInjection.js
+  init_uiHelpers();
   function injectButtons() {
     waitForGradebookAndToolbar((toolbar) => {
       const courseId = getCourseId();
@@ -1988,6 +2080,7 @@ You may need to refresh the page to see the new scores.`);
         type: "primary"
       });
       buttonWrapper.appendChild(updateAveragesButton);
+      renderLastUpdateNotice(buttonWrapper, courseId);
       const buttonContainer = createButtonColumnContainer();
       buttonContainer.appendChild(buttonWrapper);
       toolbar.appendChild(buttonContainer);
@@ -2046,15 +2139,15 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2025-12-16 2:18:31 PM (dev, 699d05a)");
-    exposeVersion("dev", "2025-12-16 2:18:31 PM (dev, 699d05a)");
+    logBanner("dev", "2026-01-04 2:14:35 PM (dev, 98b10b3)");
+    exposeVersion("dev", "2026-01-04 2:14:35 PM (dev, 98b10b3)");
     if (true) {
-      log("Running in DEV mode");
+      logger.info("Running in DEV mode");
     }
     if (false) {
-      log("Running in PROD mode");
+      logger.info("Running in PROD mode");
     }
-    log(`Build environment: ${"dev"}`);
+    logger.info(`Build environment: ${"dev"}`);
     if (window.location.pathname.includes("/gradebook")) {
       injectButtons();
     }
