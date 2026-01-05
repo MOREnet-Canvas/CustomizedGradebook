@@ -41,7 +41,7 @@ import { logger } from "../utils/logger.js";
 export async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
     const timeStamp = new Date().toLocaleString();
 
-    logger.debug("Submitting rubric score for student", userId);
+    logger.trace("Submitting rubric score for student", userId);
     const payload = {
         rubric_assessment: {  // updates the rubric score.
             [rubricCriterionId.toString()]: {
@@ -57,7 +57,7 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
         }
     };
 
-    logger.debug("Submitting rubric score for student", userId, payload);
+    logger.trace("Submitting rubric score for student", userId, payload);
 
     await apiClient.put(
         `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
@@ -66,7 +66,7 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
         `submitRubricScore:${userId}`
     );
 
-    logger.debug("Score submitted successfully for user", userId);
+    logger.trace("Score submitted successfully for user", userId);
 }
 
 /**
