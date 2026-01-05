@@ -218,6 +218,7 @@
 
   // src/config.js
   var PER_STUDENT_UPDATE_THRESHOLD = 25;
+  var ENABLE_OUTCOME_UPDATES = true;
   var ENABLE_GRADE_OVERRIDE = true;
   var OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2));
   var UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
@@ -792,13 +793,80 @@
   }
 
   // src/services/gradeCalculator.js
+  function buildOutcomeMap(data) {
+    var _a, _b;
+    const map = {};
+    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => {
+      map[String(o.id)] = o.title;
+    });
+    return map;
+  }
+  function getCurrentOutcomeScore(scores, outcomeId) {
+    var _a;
+    const match = scores.find((s) => {
+      var _a2;
+      return String((_a2 = s.links) == null ? void 0 : _a2.outcome) === String(outcomeId);
+    });
+    return (_a = match == null ? void 0 : match.score) != null ? _a : null;
+  }
+  function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywords) {
+    return scores.filter((s) => {
+      var _a;
+      const id = String((_a = s.links) == null ? void 0 : _a.outcome);
+      const title = (outcomeMap[id] || "").toLowerCase();
+      return typeof s.score === "number" && !excludedOutcomeIds.has(id) && !excludedKeywords.some((keyword) => title.includes(keyword.toLowerCase()));
+    });
+  }
+  function computeAverage(scores) {
+    const total = scores.reduce((sum, s) => sum + s.score, 0);
+    return Number((total / scores.length).toFixed(2));
+  }
+  function needsOutcomeUpdate(oldAverage, newAverage) {
+    return oldAverage !== newAverage;
+  }
+  function needsOverrideUpdate(userId, newAverage, overrideGrades, overrideScaleFn) {
+    if (!overrideGrades || overrideGrades.size === 0) return false;
+    const expected = overrideScaleFn(newAverage);
+    const actual = overrideGrades.get(String(userId));
+    if (actual === null || actual === void 0) return true;
+    return Math.abs(actual - expected) > 0.01;
+  }
+  function logStudentCalculation(userId, relevantScores, oldAverage, newAverage, outcomeUpdate, overrideUpdate, overrideGrades, overrideScaleFn) {
+    const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
+    logger.trace(`User ${userId}: total=${total}, count=${relevantScores.length}, average=${newAverage}`);
+    logger.trace(`  Old average: ${oldAverage}, New average: ${newAverage}`);
+    if (ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
+      const expected = overrideScaleFn(newAverage);
+      const actual = overrideGrades.get(String(userId));
+      if (actual === null || actual === void 0) {
+        logger.trace(`  Override: missing (expected ${expected}%) - needs update`);
+      } else {
+        const diff = Math.abs(actual - expected);
+        if (diff > 0.01) {
+          logger.trace(`  Override: mismatch (expected ${expected}%, got ${actual}%) - needs update`);
+        } else {
+          logger.trace(`  Override: matches (${actual}%)`);
+        }
+      }
+    }
+    if (outcomeUpdate || overrideUpdate) {
+      if (outcomeUpdate && overrideUpdate) {
+        logger.trace(`  \u2713 Including user ${userId}: both outcome and override need updates`);
+      } else if (outcomeUpdate) {
+        logger.trace(`  \u2713 Including user ${userId}: outcome needs update`);
+      } else {
+        logger.trace(`  \u2713 Including user ${userId}: override needs update`);
+      }
+    } else {
+      logger.trace(`  \u2717 Skipping user ${userId}: no updates needed`);
+    }
+  }
   async function calculateStudentAverages(data, outcomeId, courseId, apiClient) {
-    var _a, _b, _c;
-    const averages = [];
+    var _a, _b, _c, _d;
     logger.info("Calculating student averages...");
+    logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
+    const outcomeMap = buildOutcomeMap(data);
     const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
-    const outcomeMap = {};
-    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => outcomeMap[o.id] = o.title);
     let overrideGrades = /* @__PURE__ */ new Map();
     if (ENABLE_GRADE_OVERRIDE && courseId && apiClient) {
       try {
@@ -809,72 +877,44 @@
         logger.warn("Failed to fetch override grades for initial check, continuing without override checking:", error);
       }
     }
-    function getCurrentOutcomeScore(scores) {
-      var _a2;
-      logger.trace("Scores: ", scores);
-      const match = scores.find((s) => {
-        var _a3;
-        return String((_a3 = s.links) == null ? void 0 : _a3.outcome) === String(outcomeId);
-      });
-      return (_a2 = match == null ? void 0 : match.score) != null ? _a2 : null;
-    }
-    logger.debug("data: data being sent to calculateStudentAverages", data);
-    for (const rollup of data.rollups) {
-      const userId = (_c = rollup.links) == null ? void 0 : _c.user;
-      const oldAverage = getCurrentOutcomeScore(rollup.scores);
-      const relevantScores = rollup.scores.filter((s) => {
-        var _a2;
-        const id = String((_a2 = s.links) == null ? void 0 : _a2.outcome);
-        const title = (outcomeMap[id] || "").toLowerCase();
-        return typeof s.score === "number" && // must have a numeric score
-        !excludedOutcomeIds.has(id) && // not in the excluded IDs set
-        !EXCLUDED_OUTCOME_KEYWORDS.some(
-          (keyword) => title.includes(keyword.toLowerCase())
-          // title doesn't contain any keyword
-        );
-      });
+    const results = [];
+    for (const rollup of (_a = data == null ? void 0 : data.rollups) != null ? _a : []) {
+      const userId = (_b = rollup.links) == null ? void 0 : _b.user;
+      if (!userId) continue;
+      const oldAverage = getCurrentOutcomeScore((_c = rollup.scores) != null ? _c : [], outcomeId);
+      const relevantScores = getRelevantScores(
+        (_d = rollup.scores) != null ? _d : [],
+        outcomeMap,
+        excludedOutcomeIds,
+        EXCLUDED_OUTCOME_KEYWORDS
+      );
       if (relevantScores.length === 0) continue;
-      const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
-      let newAverage = total / relevantScores.length;
-      newAverage = parseFloat(newAverage.toFixed(2));
-      logger.trace(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
-      logger.trace(`Old average: ${oldAverage} New average: ${newAverage}`);
-      const outcomeNeedsUpdate = oldAverage !== newAverage;
-      let overrideNeedsUpdate = false;
-      if (ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
-        const expectedOverride = OVERRIDE_SCALE(newAverage);
-        const actualOverride = overrideGrades.get(String(userId));
-        if (actualOverride === null || actualOverride === void 0) {
-          overrideNeedsUpdate = true;
-          logger.trace(`  Override: missing (expected ${expectedOverride}%) - needs update`);
-        } else {
-          const diff = Math.abs(actualOverride - expectedOverride);
-          if (diff > 0.01) {
-            overrideNeedsUpdate = true;
-            logger.trace(`  Override: mismatch (expected ${expectedOverride}%, got ${actualOverride}%) - needs update`);
-          } else {
-            logger.trace(`  Override: matches (${actualOverride}%)`);
-          }
-        }
-      }
-      if (outcomeNeedsUpdate || overrideNeedsUpdate) {
-        if (outcomeNeedsUpdate && overrideNeedsUpdate) {
-          logger.trace(`  \u2713 Including user ${userId}: both outcome and override need updates`);
-        } else if (outcomeNeedsUpdate) {
-          logger.trace(`  \u2713 Including user ${userId}: outcome needs update`);
-        } else {
-          logger.trace(`  \u2713 Including user ${userId}: override needs update`);
-        }
-        averages.push({ userId, average: newAverage });
-      } else {
-        logger.trace(`  \u2717 Skipping user ${userId}: no updates needed`);
+      const newAverage = computeAverage(relevantScores);
+      const outcomeUpdate = ENABLE_OUTCOME_UPDATES && needsOutcomeUpdate(oldAverage, newAverage);
+      const overrideUpdate = ENABLE_GRADE_OVERRIDE && needsOverrideUpdate(userId, newAverage, overrideGrades, OVERRIDE_SCALE);
+      logStudentCalculation(
+        userId,
+        relevantScores,
+        oldAverage,
+        newAverage,
+        outcomeUpdate,
+        overrideUpdate,
+        overrideGrades,
+        OVERRIDE_SCALE
+      );
+      if (outcomeUpdate || overrideUpdate) {
+        results.push({ userId, average: newAverage });
       }
     }
-    logger.debug(`Calculation complete: ${averages.length} students need updates`);
-    if (ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
+    logger.debug(`Calculation complete: ${results.length} students need updates`);
+    if (ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
       logger.debug(`  (checked both outcome scores and override grades)`);
+    } else if (ENABLE_OUTCOME_UPDATES) {
+      logger.debug(`  (checked outcome scores only)`);
+    } else if (ENABLE_GRADE_OVERRIDE) {
+      logger.debug(`  (checked override grades only)`);
     }
-    return averages;
+    return results;
   }
 
   // src/utils/uiHelpers.js
@@ -975,8 +1015,12 @@
 
   // src/services/gradeSubmission.js
   async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
+    if (!ENABLE_OUTCOME_UPDATES) {
+      logger.trace(`Outcome updates disabled, skipping rubric score submission for user ${userId}`);
+      return;
+    }
     const timeStamp = (/* @__PURE__ */ new Date()).toLocaleString();
-    logger.debug("Submitting rubric score for student", userId);
+    logger.trace("Submitting rubric score for student", userId);
     const payload = {
       rubric_assessment: {
         // updates the rubric score.
@@ -993,16 +1037,20 @@
         text_comment: "Score: " + score + "  Updated: " + timeStamp
       }
     };
-    logger.debug("Submitting rubric score for student", userId, payload);
+    logger.trace("Submitting rubric score for student", userId, payload);
     await apiClient.put(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
       payload,
       {},
       `submitRubricScore:${userId}`
     );
-    logger.debug("Score submitted successfully for user", userId);
+    logger.trace("Score submitted successfully for user", userId);
   }
   async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient) {
+    if (!ENABLE_OUTCOME_UPDATES) {
+      logger.debug("Outcome updates disabled, skipping bulk update");
+      return "SKIPPED_NO_OUTCOME_UPDATES";
+    }
     const timeStamp = (/* @__PURE__ */ new Date()).toLocaleString();
     const gradeData = {};
     logger.debug("averages:", averages);
@@ -1070,6 +1118,7 @@
   async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, apiClient, testing = false) {
     const updateInterval = 1;
     const numberOfUpdates = averages.length;
+    logger.debug(`Per-student grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     box.setText(`Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...`);
     const failedUpdates = [];
     const retryCounts = {};
@@ -1430,51 +1479,65 @@
     const { courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
     banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
+    logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     const data = await getRollup(courseId, apiClient);
     stateMachine.updateContext({ rollupData: data });
-    const outcomeObj = getOutcomeObjectByName(data);
-    const outcomeId = outcomeObj == null ? void 0 : outcomeObj.id;
-    if (!outcomeId) {
-      const confirmCreate = confirm(`Outcome "${AVG_OUTCOME_NAME}" not found.
+    if (ENABLE_OUTCOME_UPDATES) {
+      const outcomeObj = getOutcomeObjectByName(data);
+      const outcomeId = outcomeObj == null ? void 0 : outcomeObj.id;
+      if (!outcomeId) {
+        const confirmCreate = confirm(`Outcome "${AVG_OUTCOME_NAME}" not found.
 Would you like to create it?`);
-      if (!confirmCreate) throw new UserCancelledError("User declined to create missing outcome.");
-      return STATES.CREATING_OUTCOME;
-    }
-    stateMachine.updateContext({ outcomeId });
-    let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
-    if (!assignmentObj) {
-      const assignmentIdFromName = await getAssignmentId(courseId);
-      if (assignmentIdFromName) {
-        assignmentObj = await apiClient.get(
-          `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
-          {},
-          "getAssignment:fallback"
-        );
-        logger.debug("Fallback assignment found by name:", assignmentObj);
+        if (!confirmCreate) throw new UserCancelledError("User declined to create missing outcome.");
+        return STATES.CREATING_OUTCOME;
+      }
+      stateMachine.updateContext({ outcomeId });
+      let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
+      if (!assignmentObj) {
+        const assignmentIdFromName = await getAssignmentId(courseId);
+        if (assignmentIdFromName) {
+          assignmentObj = await apiClient.get(
+            `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
+            {},
+            "getAssignment:fallback"
+          );
+          logger.debug("Fallback assignment found by name:", assignmentObj);
+        }
+      }
+      const assignmentId = assignmentObj == null ? void 0 : assignmentObj.id;
+      if (!assignmentId) {
+        const confirmCreate = confirm(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.
+Would you like to create it?`);
+        if (!confirmCreate) throw new UserCancelledError("User declined to create missing assignment.");
+        return STATES.CREATING_ASSIGNMENT;
+      }
+      stateMachine.updateContext({ assignmentId });
+      const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
+      const rubricId = result == null ? void 0 : result.rubricId;
+      const rubricCriterionId = result == null ? void 0 : result.criterionId;
+      if (!rubricId) {
+        const confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.
+Would you like to create it?`);
+        if (!confirmCreate) throw new UserCancelledError("User declined to create missing rubric.");
+        return STATES.CREATING_RUBRIC;
+      }
+      stateMachine.updateContext({ rubricId, rubricCriterionId });
+    } else {
+      logger.debug("Outcome updates disabled, skipping outcome/assignment/rubric checks");
+      const outcomeObj = getOutcomeObjectByName(data);
+      const outcomeId = outcomeObj == null ? void 0 : outcomeObj.id;
+      if (outcomeId) {
+        stateMachine.updateContext({ outcomeId });
+      } else {
+        logger.warn("No outcome found for calculating averages - this may cause issues");
       }
     }
-    const assignmentId = assignmentObj == null ? void 0 : assignmentObj.id;
-    if (!assignmentId) {
-      const confirmCreate = confirm(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.
-Would you like to create it?`);
-      if (!confirmCreate) throw new UserCancelledError("User declined to create missing assignment.");
-      return STATES.CREATING_ASSIGNMENT;
-    }
-    stateMachine.updateContext({ assignmentId });
-    const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
-    const rubricId = result == null ? void 0 : result.rubricId;
-    const rubricCriterionId = result == null ? void 0 : result.criterionId;
-    if (!rubricId) {
-      const confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.
-Would you like to create it?`);
-      if (!confirmCreate) throw new UserCancelledError("User declined to create missing rubric.");
-      return STATES.CREATING_RUBRIC;
-    }
-    stateMachine.updateContext({ rubricId, rubricCriterionId });
-    try {
-      await enableCourseOverride(courseId, apiClient);
-    } catch (error) {
-      logger.warn("Failed to enable course override, continuing anyway:", error);
+    if (ENABLE_GRADE_OVERRIDE) {
+      try {
+        await enableCourseOverride(courseId, apiClient);
+      } catch (error) {
+        logger.warn("Failed to enable course override, continuing anyway:", error);
+      }
     }
     return STATES.CALCULATING;
   }
@@ -1521,6 +1584,10 @@ Would you like to create it?`);
   async function handleUpdatingGrades(stateMachine) {
     const { averages, courseId, assignmentId, rubricCriterionId, numberOfUpdates, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
+    if (!ENABLE_OUTCOME_UPDATES) {
+      logger.debug("Outcome updates disabled, skipping UPDATING_GRADES state");
+      return STATES.VERIFYING;
+    }
     const usePerStudent = numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD;
     const updateMode = usePerStudent ? "per-student" : "bulk";
     stateMachine.updateContext({ updateMode });
@@ -1553,6 +1620,10 @@ Would you like to create it?`);
   async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
+    if (!ENABLE_OUTCOME_UPDATES) {
+      logger.debug("Outcome updates disabled, skipping VERIFYING state");
+      return STATES.VERIFYING_OVERRIDES;
+    }
     logger.debug("Starting outcome score verification...");
     await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
     logger.debug(`handleVerifying complete, transitioning to VERIFYING_OVERRIDES`);
@@ -1985,8 +2056,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-05 3:47:58 PM (dev, b52a977)");
-    exposeVersion("dev", "2026-01-05 3:47:58 PM (dev, b52a977)");
+    logBanner("dev", "2026-01-05 4:41:16 PM (dev, f27ff94)");
+    exposeVersion("dev", "2026-01-05 4:41:16 PM (dev, f27ff94)");
     if (true) {
       logger.info("Running in DEV mode");
     }
