@@ -57,22 +57,19 @@ export async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient
 }
 
 /**
- * Get the enrollment ID for a user in a course
- * Uses cached data when available; fetches and caches all enrollments if not cached
+ * Get all enrollment IDs for a course
+ * Fetches and caches all enrollments if not already cached
  * @param {string} courseId - Course ID
- * @param {string} userId - User ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @returns {Promise<string|null>} Enrollment ID or null if not found
+ * @returns {Promise<Map<string, string>>} Map of userId -> enrollmentId
  * @throws {Error} If enrollment fetch fails
  */
-export async function getEnrollmentIdForUser(courseId, userId, apiClient) {
+export async function getAllEnrollmentIds(courseId, apiClient) {
     const courseKey = String(courseId);
-    const userKey = String(userId);
 
     // Use cache if present
     if (__enrollmentMapCache.has(courseKey)) {
-        const cachedMap = __enrollmentMapCache.get(courseKey);
-        return cachedMap.get(userKey) || null;
+        return __enrollmentMapCache.get(courseKey);
     }
 
     // Build the map (paginated)
@@ -80,9 +77,9 @@ export async function getEnrollmentIdForUser(courseId, userId, apiClient) {
     let url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment&per_page=100`;
 
     while (url) {
-        const data = await apiClient.get(url, {}, "getEnrollmentIdForUser");
+        const data = await apiClient.get(url, {}, "getAllEnrollmentIds");
         for (const e of data) {
-            if (e?.user_id && e?.id) map.set(String(e.user_id), e.id);
+            if (e?.user_id && e?.id) map.set(String(e.user_id), String(e.id));
         }
         // pagination - Note: apiClient.get returns parsed JSON, not Response object
         // Pagination would need to be handled differently with CanvasApiClient
@@ -92,7 +89,21 @@ export async function getEnrollmentIdForUser(courseId, userId, apiClient) {
     }
 
     __enrollmentMapCache.set(courseKey, map);
-    return map.get(userKey) || null;
+    return map;
+}
+
+/**
+ * Get the enrollment ID for a user in a course
+ * Uses cached data when available; fetches and caches all enrollments if not cached
+ * @param {string} courseId - Course ID
+ * @param {string} userId - User ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<string|null>} Enrollment ID or null if not found
+ * @throws {Error} If enrollment fetch fails
+ */
+export async function getEnrollmentIdForUser(courseId, userId, apiClient) {
+    const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+    return enrollmentMap.get(String(userId)) || null;
 }
 
 /**
