@@ -2,7 +2,6 @@
   var __defProp = Object.defineProperty;
   var __defProps = Object.defineProperties;
   var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
-  var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -34,18 +33,17 @@
       }
     return target;
   };
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  };
-  var __export = (target, all) => {
-    for (var name in all)
-      __defProp(target, name, { get: all[name], enumerable: true });
-  };
   var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
   var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
   var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
   // src/utils/logger.js
+  var LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+  };
   function determineLogLevel() {
     let logLevel = true ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
     try {
@@ -61,6 +59,59 @@
     }
     return logLevel;
   }
+  var currentLogLevel = determineLogLevel();
+  var logger = {
+    /**
+     * Log debug messages (only shown in dev mode or with ?debug=true)
+     * @param {...any} args - Arguments to log
+     */
+    debug(...args) {
+      if (currentLogLevel <= LOG_LEVELS.DEBUG) {
+        console.log("[DEBUG]", ...args);
+      }
+    },
+    /**
+     * Log informational messages (always shown)
+     * @param {...any} args - Arguments to log
+     */
+    info(...args) {
+      if (currentLogLevel <= LOG_LEVELS.INFO) {
+        console.log("[INFO]", ...args);
+      }
+    },
+    /**
+     * Log warning messages (always shown)
+     * @param {...any} args - Arguments to log
+     */
+    warn(...args) {
+      if (currentLogLevel <= LOG_LEVELS.WARN) {
+        console.warn("[WARN]", ...args);
+      }
+    },
+    /**
+     * Log error messages (always shown)
+     * @param {...any} args - Arguments to log
+     */
+    error(...args) {
+      if (currentLogLevel <= LOG_LEVELS.ERROR) {
+        console.error("[ERROR]", ...args);
+      }
+    },
+    /**
+     * Check if debug logging is enabled
+     * @returns {boolean} True if debug logging is enabled
+     */
+    isDebugEnabled() {
+      return currentLogLevel <= LOG_LEVELS.DEBUG;
+    },
+    /**
+     * Get the current log level
+     * @returns {number} Current log level
+     */
+    getLogLevel() {
+      return currentLogLevel;
+    }
+  };
   function logBanner(envName, buildVersion) {
     console.log(
       "%cCustomized Gradebook Loaded",
@@ -82,70 +133,6 @@
       logLevel: currentLogLevel
     };
   }
-  var LOG_LEVELS, currentLogLevel, logger;
-  var init_logger = __esm({
-    "src/utils/logger.js"() {
-      LOG_LEVELS = {
-        DEBUG: 0,
-        INFO: 1,
-        WARN: 2,
-        ERROR: 3
-      };
-      currentLogLevel = determineLogLevel();
-      logger = {
-        /**
-         * Log debug messages (only shown in dev mode or with ?debug=true)
-         * @param {...any} args - Arguments to log
-         */
-        debug(...args) {
-          if (currentLogLevel <= LOG_LEVELS.DEBUG) {
-            console.log("[DEBUG]", ...args);
-          }
-        },
-        /**
-         * Log informational messages (always shown)
-         * @param {...any} args - Arguments to log
-         */
-        info(...args) {
-          if (currentLogLevel <= LOG_LEVELS.INFO) {
-            console.log("[INFO]", ...args);
-          }
-        },
-        /**
-         * Log warning messages (always shown)
-         * @param {...any} args - Arguments to log
-         */
-        warn(...args) {
-          if (currentLogLevel <= LOG_LEVELS.WARN) {
-            console.warn("[WARN]", ...args);
-          }
-        },
-        /**
-         * Log error messages (always shown)
-         * @param {...any} args - Arguments to log
-         */
-        error(...args) {
-          if (currentLogLevel <= LOG_LEVELS.ERROR) {
-            console.error("[ERROR]", ...args);
-          }
-        },
-        /**
-         * Check if debug logging is enabled
-         * @returns {boolean} True if debug logging is enabled
-         */
-        isDebugEnabled() {
-          return currentLogLevel <= LOG_LEVELS.DEBUG;
-        },
-        /**
-         * Get the current log level
-         * @returns {number} Current log level
-         */
-        getLogLevel() {
-          return currentLogLevel;
-        }
-      };
-    }
-  });
 
   // src/utils/dom.js
   function inheritFontStylesFrom(selector, element) {
@@ -159,12 +146,9 @@
     }
     return false;
   }
-  var init_dom = __esm({
-    "src/utils/dom.js"() {
-    }
-  });
 
   // src/ui/buttons.js
+  var BRAND_COLOR_FALLBACK = "#0c7d9d";
   function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
     const button = document.createElement("button");
     button.textContent = label;
@@ -208,41 +192,29 @@
     container.style.marginLeft = "1rem";
     return container;
   }
-  var BRAND_COLOR_FALLBACK;
-  var init_buttons = __esm({
-    "src/ui/buttons.js"() {
-      init_dom();
-      BRAND_COLOR_FALLBACK = "#0c7d9d";
-    }
-  });
 
   // src/config.js
-  var PER_STUDENT_UPDATE_THRESHOLD, ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE, UPDATE_AVG_BUTTON_LABEL, AVG_OUTCOME_NAME, AVG_ASSIGNMENT_NAME, AVG_RUBRIC_NAME, DEFAULT_MAX_POINTS, DEFAULT_MASTERY_THRESHOLD, OUTCOME_AND_RUBRIC_RATINGS, EXCLUDED_OUTCOME_KEYWORDS;
-  var init_config = __esm({
-    "src/config.js"() {
-      PER_STUDENT_UPDATE_THRESHOLD = 25;
-      ENABLE_GRADE_OVERRIDE = true;
-      OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2));
-      UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
-      AVG_OUTCOME_NAME = "Current Score";
-      AVG_ASSIGNMENT_NAME = "Current Score Assignment";
-      AVG_RUBRIC_NAME = "Current Score Rubric";
-      DEFAULT_MAX_POINTS = 4;
-      DEFAULT_MASTERY_THRESHOLD = 3;
-      OUTCOME_AND_RUBRIC_RATINGS = [
-        { description: "Exemplary", points: 4 },
-        { description: "Beyond Target", points: 3.5 },
-        { description: "Target", points: 3 },
-        { description: "Approaching Target", points: 2.5 },
-        { description: "Developing", points: 2 },
-        { description: "Beginning", points: 1.5 },
-        { description: "Needs Partial Support", points: 1 },
-        { description: "Needs Full Support", points: 0.5 },
-        { description: "No Evidence", points: 0 }
-      ];
-      EXCLUDED_OUTCOME_KEYWORDS = ["Homework Completion"];
-    }
-  });
+  var PER_STUDENT_UPDATE_THRESHOLD = 25;
+  var ENABLE_GRADE_OVERRIDE = true;
+  var OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2));
+  var UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
+  var AVG_OUTCOME_NAME = "Current Score";
+  var AVG_ASSIGNMENT_NAME = "Current Score Assignment";
+  var AVG_RUBRIC_NAME = "Current Score Rubric";
+  var DEFAULT_MAX_POINTS = 4;
+  var DEFAULT_MASTERY_THRESHOLD = 3;
+  var OUTCOME_AND_RUBRIC_RATINGS = [
+    { description: "Exemplary", points: 4 },
+    { description: "Beyond Target", points: 3.5 },
+    { description: "Target", points: 3 },
+    { description: "Approaching Target", points: 2.5 },
+    { description: "Developing", points: 2 },
+    { description: "Beginning", points: 1.5 },
+    { description: "Needs Partial Support", points: 1 },
+    { description: "Needs Full Support", points: 0.5 },
+    { description: "No Evidence", points: 0 }
+  ];
+  var EXCLUDED_OUTCOME_KEYWORDS = ["Homework Completion"];
 
   // src/utils/canvas.js
   function getCourseId() {
@@ -256,14 +228,36 @@
     }
     return courseId;
   }
-  var init_canvas = __esm({
-    "src/utils/canvas.js"() {
-      init_config();
-      init_logger();
-    }
-  });
 
   // src/utils/errorHandler.js
+  var CanvasApiError = class extends Error {
+    constructor(message, statusCode, responseText) {
+      super(message);
+      this.name = "CanvasApiError";
+      this.statusCode = statusCode;
+      this.responseText = responseText;
+    }
+  };
+  var UserCancelledError = class extends Error {
+    constructor(message = "User cancelled the operation") {
+      super(message);
+      this.name = "UserCancelledError";
+    }
+  };
+  var TimeoutError = class extends Error {
+    constructor(message, timeoutMs) {
+      super(message);
+      this.name = "TimeoutError";
+      this.timeoutMs = timeoutMs;
+    }
+  };
+  var ValidationError = class extends Error {
+    constructor(message, field) {
+      super(message);
+      this.name = "ValidationError";
+      this.field = field;
+    }
+  };
   function logError(error, context, metadata = {}) {
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const errorInfo = __spreadValues({
@@ -369,582 +363,365 @@
       );
     }
   }
-  var CanvasApiError, UserCancelledError, TimeoutError, ValidationError;
-  var init_errorHandler = __esm({
-    "src/utils/errorHandler.js"() {
-      init_logger();
-      CanvasApiError = class extends Error {
-        constructor(message, statusCode, responseText) {
-          super(message);
-          this.name = "CanvasApiError";
-          this.statusCode = statusCode;
-          this.responseText = responseText;
-        }
-      };
-      UserCancelledError = class extends Error {
-        constructor(message = "User cancelled the operation") {
-          super(message);
-          this.name = "UserCancelledError";
-        }
-      };
-      TimeoutError = class extends Error {
-        constructor(message, timeoutMs) {
-          super(message);
-          this.name = "TimeoutError";
-          this.timeoutMs = timeoutMs;
-        }
-      };
-      ValidationError = class extends Error {
-        constructor(message, field) {
-          super(message);
-          this.name = "ValidationError";
-          this.field = field;
-        }
-      };
-    }
-  });
 
   // src/gradebook/stateMachine.js
-  var stateMachine_exports = {};
-  __export(stateMachine_exports, {
-    STATES: () => STATES,
-    UpdateFlowStateMachine: () => UpdateFlowStateMachine
-  });
-  var STATES, VALID_TRANSITIONS, UpdateFlowStateMachine;
-  var init_stateMachine = __esm({
-    "src/gradebook/stateMachine.js"() {
-      init_logger();
-      STATES = {
-        IDLE: "IDLE",
-        CHECKING_SETUP: "CHECKING_SETUP",
-        CREATING_OUTCOME: "CREATING_OUTCOME",
-        CREATING_ASSIGNMENT: "CREATING_ASSIGNMENT",
-        CREATING_RUBRIC: "CREATING_RUBRIC",
-        CALCULATING: "CALCULATING",
-        UPDATING_GRADES: "UPDATING_GRADES",
-        POLLING_PROGRESS: "POLLING_PROGRESS",
-        VERIFYING: "VERIFYING",
-        COMPLETE: "COMPLETE",
-        ERROR: "ERROR"
-      };
-      VALID_TRANSITIONS = {
-        [STATES.IDLE]: [STATES.CHECKING_SETUP],
-        [STATES.CHECKING_SETUP]: [STATES.CREATING_OUTCOME, STATES.CREATING_ASSIGNMENT, STATES.CREATING_RUBRIC, STATES.CALCULATING, STATES.ERROR],
-        [STATES.CREATING_OUTCOME]: [STATES.CHECKING_SETUP, STATES.ERROR],
-        [STATES.CREATING_ASSIGNMENT]: [STATES.CHECKING_SETUP, STATES.ERROR],
-        [STATES.CREATING_RUBRIC]: [STATES.CHECKING_SETUP, STATES.ERROR],
-        [STATES.CALCULATING]: [STATES.UPDATING_GRADES, STATES.COMPLETE, STATES.ERROR],
-        [STATES.UPDATING_GRADES]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
-        [STATES.POLLING_PROGRESS]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
-        [STATES.VERIFYING]: [STATES.VERIFYING, STATES.COMPLETE, STATES.ERROR],
-        [STATES.COMPLETE]: [STATES.IDLE],
-        [STATES.ERROR]: [STATES.IDLE]
-      };
-      UpdateFlowStateMachine = class {
-        /**
-         * Create a new state machine
-         * @param {string} initialState - Initial state (default: IDLE)
-         * @param {object} initialContext - Initial context data
-         */
-        constructor(initialState = STATES.IDLE, initialContext = {}) {
-          this.currentState = initialState;
-          this.context = __spreadValues({
-            courseId: null,
-            outcomeId: null,
-            assignmentId: null,
-            rubricId: null,
-            rubricCriterionId: null,
-            rollupData: null,
-            averages: null,
-            progressId: null,
-            startTime: null,
-            numberOfUpdates: 0,
-            banner: null,
-            error: null,
-            retryCount: 0,
-            updateMode: null
-          }, initialContext);
-          this.eventListeners = {};
-          this.stateHistory = [initialState];
-        }
-        /**
-         * Get the current state
-         * @returns {string} Current state name
-         */
-        getCurrentState() {
-          return this.currentState;
-        }
-        /**
-         * Get the current context
-         * @returns {object} Current context data
-         */
-        getContext() {
-          return __spreadValues({}, this.context);
-        }
-        /**
-         * Update context data
-         * @param {object} updates - Context updates to merge
-         */
-        updateContext(updates) {
-          this.context = __spreadValues(__spreadValues({}, this.context), updates);
-        }
-        /**
-         * Check if a transition is valid
-         * @param {string} toState - Target state
-         * @returns {boolean} True if transition is valid
-         */
-        canTransition(toState) {
-          const validStates = VALID_TRANSITIONS[this.currentState] || [];
-          return validStates.includes(toState);
-        }
-        /**
-         * Transition to a new state
-         * @param {string} toState - Target state
-         * @param {object} contextUpdates - Optional context updates
-         * @throws {Error} If transition is invalid
-         */
-        transition(toState, contextUpdates = {}) {
-          var _a;
-          if (!this.canTransition(toState)) {
-            throw new Error(
-              `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a.join(", ")) || "none"}`
-            );
-          }
-          const fromState = this.currentState;
-          this.currentState = toState;
-          this.stateHistory.push(toState);
-          this.updateContext(contextUpdates);
-          logger.debug(`State transition: ${fromState} \u2192 ${toState}`);
-          this.emit("stateChange", {
-            from: fromState,
-            to: toState,
-            context: this.getContext()
-          });
-        }
-        /**
-         * Register an event listener
-         * @param {string} event - Event name
-         * @param {function} callback - Callback function
-         */
-        on(event, callback) {
-          if (!this.eventListeners[event]) {
-            this.eventListeners[event] = [];
-          }
-          this.eventListeners[event].push(callback);
-        }
-        /**
-         * Emit an event
-         * @param {string} event - Event name
-         * @param {any} data - Event data
-         */
-        emit(event, data) {
-          const listeners = this.eventListeners[event] || [];
-          listeners.forEach((callback) => {
-            try {
-              callback(data);
-            } catch (error) {
-              logger.error(`Error in event listener for ${event}:`, error);
-            }
-          });
-        }
-        /**
-         * Get state history
-         * @returns {array} Array of state names in order
-         */
-        getStateHistory() {
-          return [...this.stateHistory];
-        }
-        /**
-         * Reset state machine to IDLE
-         */
-        reset() {
-          this.currentState = STATES.IDLE;
-          this.context = {
-            courseId: this.context.courseId,
-            // Keep courseId
-            outcomeId: null,
-            assignmentId: null,
-            rubricId: null,
-            rubricCriterionId: null,
-            rollupData: null,
-            averages: null,
-            progressId: null,
-            startTime: null,
-            numberOfUpdates: 0,
-            banner: null,
-            error: null,
-            retryCount: 0,
-            updateMode: null
-          };
-          this.stateHistory = [STATES.IDLE];
-          logger.debug("State machine reset to IDLE");
-          this.emit("reset", {});
-        }
-      };
+  var STATES = {
+    IDLE: "IDLE",
+    CHECKING_SETUP: "CHECKING_SETUP",
+    CREATING_OUTCOME: "CREATING_OUTCOME",
+    CREATING_ASSIGNMENT: "CREATING_ASSIGNMENT",
+    CREATING_RUBRIC: "CREATING_RUBRIC",
+    CALCULATING: "CALCULATING",
+    UPDATING_GRADES: "UPDATING_GRADES",
+    POLLING_PROGRESS: "POLLING_PROGRESS",
+    VERIFYING: "VERIFYING",
+    COMPLETE: "COMPLETE",
+    ERROR: "ERROR"
+  };
+  var VALID_TRANSITIONS = {
+    [STATES.IDLE]: [STATES.CHECKING_SETUP],
+    [STATES.CHECKING_SETUP]: [STATES.CREATING_OUTCOME, STATES.CREATING_ASSIGNMENT, STATES.CREATING_RUBRIC, STATES.CALCULATING, STATES.ERROR],
+    [STATES.CREATING_OUTCOME]: [STATES.CHECKING_SETUP, STATES.ERROR],
+    [STATES.CREATING_ASSIGNMENT]: [STATES.CHECKING_SETUP, STATES.ERROR],
+    [STATES.CREATING_RUBRIC]: [STATES.CHECKING_SETUP, STATES.ERROR],
+    [STATES.CALCULATING]: [STATES.UPDATING_GRADES, STATES.COMPLETE, STATES.ERROR],
+    [STATES.UPDATING_GRADES]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
+    [STATES.POLLING_PROGRESS]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
+    [STATES.VERIFYING]: [STATES.VERIFYING, STATES.COMPLETE, STATES.ERROR],
+    [STATES.COMPLETE]: [STATES.IDLE],
+    [STATES.ERROR]: [STATES.IDLE]
+  };
+  var UpdateFlowStateMachine = class {
+    /**
+     * Create a new state machine
+     * @param {string} initialState - Initial state (default: IDLE)
+     * @param {object} initialContext - Initial context data
+     */
+    constructor(initialState = STATES.IDLE, initialContext = {}) {
+      this.currentState = initialState;
+      this.context = __spreadValues({
+        courseId: null,
+        outcomeId: null,
+        assignmentId: null,
+        rubricId: null,
+        rubricCriterionId: null,
+        rollupData: null,
+        averages: null,
+        progressId: null,
+        startTime: null,
+        numberOfUpdates: 0,
+        banner: null,
+        error: null,
+        retryCount: 0,
+        updateMode: null
+      }, initialContext);
+      this.eventListeners = {};
+      this.stateHistory = [initialState];
     }
-  });
+    /**
+     * Get the current state
+     * @returns {string} Current state name
+     */
+    getCurrentState() {
+      return this.currentState;
+    }
+    /**
+     * Get the current context
+     * @returns {object} Current context data
+     */
+    getContext() {
+      return __spreadValues({}, this.context);
+    }
+    /**
+     * Update context data
+     * @param {object} updates - Context updates to merge
+     */
+    updateContext(updates) {
+      this.context = __spreadValues(__spreadValues({}, this.context), updates);
+    }
+    /**
+     * Check if a transition is valid
+     * @param {string} toState - Target state
+     * @returns {boolean} True if transition is valid
+     */
+    canTransition(toState) {
+      const validStates = VALID_TRANSITIONS[this.currentState] || [];
+      return validStates.includes(toState);
+    }
+    /**
+     * Transition to a new state
+     * @param {string} toState - Target state
+     * @param {object} contextUpdates - Optional context updates
+     * @throws {Error} If transition is invalid
+     */
+    transition(toState, contextUpdates = {}) {
+      var _a;
+      if (!this.canTransition(toState)) {
+        throw new Error(
+          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a.join(", ")) || "none"}`
+        );
+      }
+      const fromState = this.currentState;
+      this.currentState = toState;
+      this.stateHistory.push(toState);
+      this.updateContext(contextUpdates);
+      logger.debug(`State transition: ${fromState} \u2192 ${toState}`);
+      this.emit("stateChange", {
+        from: fromState,
+        to: toState,
+        context: this.getContext()
+      });
+    }
+    /**
+     * Register an event listener
+     * @param {string} event - Event name
+     * @param {function} callback - Callback function
+     */
+    on(event, callback) {
+      if (!this.eventListeners[event]) {
+        this.eventListeners[event] = [];
+      }
+      this.eventListeners[event].push(callback);
+    }
+    /**
+     * Emit an event
+     * @param {string} event - Event name
+     * @param {any} data - Event data
+     */
+    emit(event, data) {
+      const listeners = this.eventListeners[event] || [];
+      listeners.forEach((callback) => {
+        try {
+          callback(data);
+        } catch (error) {
+          logger.error(`Error in event listener for ${event}:`, error);
+        }
+      });
+    }
+    /**
+     * Get state history
+     * @returns {array} Array of state names in order
+     */
+    getStateHistory() {
+      return [...this.stateHistory];
+    }
+    /**
+     * Reset state machine to IDLE
+     */
+    reset() {
+      this.currentState = STATES.IDLE;
+      this.context = {
+        courseId: this.context.courseId,
+        // Keep courseId
+        outcomeId: null,
+        assignmentId: null,
+        rubricId: null,
+        rubricCriterionId: null,
+        rollupData: null,
+        averages: null,
+        progressId: null,
+        startTime: null,
+        numberOfUpdates: 0,
+        banner: null,
+        error: null,
+        retryCount: 0,
+        updateMode: null
+      };
+      this.stateHistory = [STATES.IDLE];
+      logger.debug("State machine reset to IDLE");
+      this.emit("reset", {});
+    }
+  };
 
   // src/utils/canvasApiClient.js
-  var _CanvasApiClient_instances, getTokenCookie_fn, makeRequest_fn, CanvasApiClient;
-  var init_canvasApiClient = __esm({
-    "src/utils/canvasApiClient.js"() {
-      init_errorHandler();
-      init_logger();
-      CanvasApiClient = class {
-        /**
-         * Create a new Canvas API client
-         * @throws {Error} If CSRF token is not found in cookies
-         */
-        constructor() {
-          __privateAdd(this, _CanvasApiClient_instances);
-          this.csrfToken = __privateMethod(this, _CanvasApiClient_instances, getTokenCookie_fn).call(this, "_csrf_token");
-          if (!this.csrfToken) {
-            throw new Error("CSRF token not found - user may not be authenticated");
-          }
-          logger.debug("CanvasApiClient initialized with cached CSRF token");
-        }
-        /**
-         * Make a GET request to the Canvas API
-         * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async get(url, options = {}, context = "get") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "GET", null, options, context);
-        }
-        /**
-         * Make a POST request to the Canvas API
-         * @param {string} url - API endpoint URL
-         * @param {Object} data - Request body data
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async post(url, data, options = {}, context = "post") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
-        }
-        /**
-         * Make a PUT request to the Canvas API
-         * @param {string} url - API endpoint URL
-         * @param {Object} data - Request body data
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async put(url, data, options = {}, context = "put") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "PUT", data, options, context);
-        }
-        /**
-         * Make a DELETE request to the Canvas API
-         * @param {string} url - API endpoint URL
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async delete(url, options = {}, context = "delete") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "DELETE", null, options, context);
-        }
-        /**
-         * Make a GraphQL request to the Canvas API
-         * @param {string} query - GraphQL query string
-         * @param {Object} variables - GraphQL variables (optional)
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async graphql(query, variables = {}, context = "graphql") {
-          const url = "/api/graphql";
-          const data = { query, variables };
-          const options = {
-            headers: {
-              "Content-Type": "application/json"
-            }
-          };
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
-        }
-      };
-      _CanvasApiClient_instances = new WeakSet();
-      /**
-       * Get CSRF token from browser cookies
-       * @private
-       * @param {string} name - Cookie name
-       * @returns {string|null} Cookie value or null if not found
-       */
-      getTokenCookie_fn = function(name) {
-        const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
-        for (const cookie of cookies) {
-          const [key, value] = cookie.split("=", 2);
-          if (key === name) {
-            return decodeURIComponent(value);
-          }
-        }
-        return null;
-      };
-      makeRequest_fn = async function(url, method, data, options = {}, context = "request") {
-        const headers = __spreadProps(__spreadValues({
+  var _CanvasApiClient_instances, getTokenCookie_fn, makeRequest_fn;
+  var CanvasApiClient = class {
+    /**
+     * Create a new Canvas API client
+     * @throws {Error} If CSRF token is not found in cookies
+     */
+    constructor() {
+      __privateAdd(this, _CanvasApiClient_instances);
+      this.csrfToken = __privateMethod(this, _CanvasApiClient_instances, getTokenCookie_fn).call(this, "_csrf_token");
+      if (!this.csrfToken) {
+        throw new Error("CSRF token not found - user may not be authenticated");
+      }
+      logger.debug("CanvasApiClient initialized with cached CSRF token");
+    }
+    /**
+     * Make a GET request to the Canvas API
+     * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async get(url, options = {}, context = "get") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "GET", null, options, context);
+    }
+    /**
+     * Make a POST request to the Canvas API
+     * @param {string} url - API endpoint URL
+     * @param {Object} data - Request body data
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async post(url, data, options = {}, context = "post") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
+    }
+    /**
+     * Make a PUT request to the Canvas API
+     * @param {string} url - API endpoint URL
+     * @param {Object} data - Request body data
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async put(url, data, options = {}, context = "put") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "PUT", data, options, context);
+    }
+    /**
+     * Make a DELETE request to the Canvas API
+     * @param {string} url - API endpoint URL
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async delete(url, options = {}, context = "delete") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "DELETE", null, options, context);
+    }
+    /**
+     * Make a GraphQL request to the Canvas API
+     * @param {string} query - GraphQL query string
+     * @param {Object} variables - GraphQL variables (optional)
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async graphql(query, variables = {}, context = "graphql") {
+      const url = "/api/graphql";
+      const data = { query, variables };
+      const options = {
+        headers: {
           "Content-Type": "application/json"
-        }, options.headers), {
-          "X-CSRF-Token": this.csrfToken
-        });
-        let body = null;
-        if (data) {
-          const contentType = headers["Content-Type"] || "application/json";
-          const isJson = contentType.includes("application/json");
-          if (isJson) {
-            if (!data.authenticity_token) {
-              data = __spreadProps(__spreadValues({}, data), { authenticity_token: this.csrfToken });
-            }
-            body = JSON.stringify(data);
-          } else {
-            body = data;
-          }
         }
-        const _a = options, { headers: _optionsHeaders } = _a, restOptions = __objRest(_a, ["headers"]);
-        const response = await safeFetch(
-          url,
-          __spreadValues({
-            method,
-            credentials: "same-origin",
-            headers,
-            body
-          }, restOptions),
-          context
-        );
-        return await safeJsonParse(response, context);
       };
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
     }
-  });
-
-  // src/utils/keys.js
-  var k;
-  var init_keys = __esm({
-    "src/utils/keys.js"() {
-      k = (name, courseId) => `${name}_${courseId}`;
+  };
+  _CanvasApiClient_instances = new WeakSet();
+  /**
+   * Get CSRF token from browser cookies
+   * @private
+   * @param {string} name - Cookie name
+   * @returns {string|null} Cookie value or null if not found
+   */
+  getTokenCookie_fn = function(name) {
+    const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
+    for (const cookie of cookies) {
+      const [key, value] = cookie.split("=", 2);
+      if (key === name) {
+        return decodeURIComponent(value);
+      }
     }
-  });
-
-  // src/ui/banner.js
-  function showFloatingBanner({
-    text = "",
-    duration = null,
-    // null = stays until removed; number = auto-hide after ms
-    top = "20px",
-    right = "20px",
-    center = false,
-    backgroundColor = BRAND_COLOR,
-    textColor = "#ffffff",
-    allowMultiple = false,
-    // keep existing banners?
-    ariaLive = "polite"
-    // "polite" | "assertive" | "off"
-  } = {}) {
-    if (!allowMultiple) {
-      document.querySelectorAll(".floating-banner").forEach((b) => b.remove());
-    }
-    const baseElement = document.querySelector(".ic-Layout-contentMain") || document.querySelector(".ic-app-header__menu-list-item__link") || document.body;
-    const styles = getComputedStyle(baseElement);
-    const fontFamily = styles.fontFamily;
-    const fontSize = styles.fontSize;
-    const fontWeight = styles.fontWeight;
-    const banner = document.createElement("div");
-    banner.className = "floating-banner";
-    banner.setAttribute("role", "status");
-    if (ariaLive && ariaLive !== "off") banner.setAttribute("aria-live", ariaLive);
-    Object.assign(banner.style, {
-      position: "fixed",
-      top,
-      background: backgroundColor,
-      padding: "10px 20px",
-      borderRadius: "8px",
-      boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-      zIndex: "9999",
-      fontSize,
-      color: textColor,
-      fontFamily,
-      fontWeight,
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "12px",
-      maxWidth: "min(90vw, 720px)",
-      lineHeight: "1.35",
-      wordBreak: "break-word"
+    return null;
+  };
+  makeRequest_fn = async function(url, method, data, options = {}, context = "request") {
+    const headers = __spreadProps(__spreadValues({
+      "Content-Type": "application/json"
+    }, options.headers), {
+      "X-CSRF-Token": this.csrfToken
     });
-    if (center) {
-      banner.style.left = "50%";
-      banner.style.transform = "translateX(-50%)";
-    } else {
-      banner.style.right = right;
-    }
-    const msg = document.createElement("span");
-    msg.className = "floating-banner__text";
-    banner.appendChild(msg);
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.setAttribute("aria-label", "Dismiss message");
-    closeBtn.textContent = "\xD7";
-    Object.assign(closeBtn.style, {
-      cursor: "pointer",
-      fontWeight: "bold",
-      border: "none",
-      background: "transparent",
-      color: "inherit",
-      fontSize,
-      lineHeight: "1"
-    });
-    closeBtn.onclick = () => destroy();
-    banner.appendChild(closeBtn);
-    document.body.appendChild(banner);
-    let lockedUntil = 0;
-    let pending = null;
-    let holdTimer = null;
-    let autoTimer = null;
-    const now = () => Date.now();
-    const isLocked = () => now() < lockedUntil;
-    const courseId = getCourseId();
-    const apply = (textValue) => {
-      msg.textContent = textValue;
-      if (courseId) localStorage.setItem(k("bannerLast", courseId), textValue);
-    };
-    const unlockAndFlush = () => {
-      lockedUntil = 0;
-      if (pending != null) {
-        apply(pending);
-        pending = null;
-      }
-    };
-    banner.setText = (newText) => {
-      if (isLocked()) {
-        pending = newText;
-      } else {
-        apply(newText);
-      }
-    };
-    banner.hold = (newText, ms = 3e3) => {
-      const now2 = Date.now();
-      if (now2 < lockedUntil) {
-        pending = newText;
-        return;
-      }
-      lockedUntil = now2 + ms;
-      apply(newText);
-      if (holdTimer) clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => {
-        lockedUntil = 0;
-        if (pending != null) {
-          apply(pending);
-          pending = null;
+    let body = null;
+    if (data) {
+      const contentType = headers["Content-Type"] || "application/json";
+      const isJson = contentType.includes("application/json");
+      if (isJson) {
+        if (!data.authenticity_token) {
+          data = __spreadProps(__spreadValues({}, data), { authenticity_token: this.csrfToken });
         }
-      }, ms);
-    };
-    banner.soft = (newText) => {
-      if (!isLocked()) apply(newText);
-    };
-    function destroy() {
-      if (holdTimer) clearTimeout(holdTimer);
-      if (autoTimer) clearTimeout(autoTimer);
-      banner.style.transition = "opacity 150ms";
-      banner.style.opacity = "0";
-      setTimeout(() => banner.remove(), 160);
+        body = JSON.stringify(data);
+      } else {
+        body = data;
+      }
     }
-    banner.removeBanner = destroy;
-    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
-    if (typeof duration === "number" && isFinite(duration) && duration >= 0) {
-      autoTimer = setTimeout(destroy, duration);
-    }
-    closeBtn.onclick = () => {
-      destroy();
-      ensureStatusPill(courseId);
-    };
-    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
-    return banner;
-  }
-  var BRAND_COLOR;
-  var init_banner = __esm({
-    "src/ui/banner.js"() {
-      init_canvas();
-      init_keys();
-      init_uiHelpers();
-      BRAND_COLOR = getComputedStyle(document.documentElement).getPropertyValue("--ic-brand-primary").trim() || "#0c7d9d";
-    }
-  });
+    const _a = options, { headers: _optionsHeaders } = _a, restOptions = __objRest(_a, ["headers"]);
+    const response = await safeFetch(
+      url,
+      __spreadValues({
+        method,
+        credentials: "same-origin",
+        headers,
+        body
+      }, restOptions),
+      context
+    );
+    return await safeJsonParse(response, context);
+  };
 
-  // src/services/verification.js
-  var verification_exports = {};
-  __export(verification_exports, {
-    verifyUIScores: () => verifyUIScores
-  });
-  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, waitTimeMs = 5e3, maxRetries = 50) {
-    let state = "verifying";
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      let elapsed = getElapsedTimeSinceStart();
-      box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
-      startElapsedTimer(courseId, box);
-      const newRollupData = await apiClient.get(
-        `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`,
-        {},
-        "verifyUIScores"
-      );
-      logger.debug("newRollupData: ", newRollupData);
-      const mismatches = [];
-      for (const { userId, average } of averages) {
-        const matchingRollup = newRollupData.rollups.find(
-          (r) => r.links.user.toString() === userId.toString()
+  // src/services/gradeCalculator.js
+  function calculateStudentAverages(data, outcomeId) {
+    var _a, _b, _c;
+    const averages = [];
+    logger.info("Calculating student averages...");
+    const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
+    const outcomeMap = {};
+    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => outcomeMap[o.id] = o.title);
+    function getCurrentOutcomeScore(scores) {
+      var _a2;
+      logger.debug("Scores: ", scores);
+      const match = scores.find((s) => {
+        var _a3;
+        return String((_a3 = s.links) == null ? void 0 : _a3.outcome) === String(outcomeId);
+      });
+      return (_a2 = match == null ? void 0 : match.score) != null ? _a2 : null;
+    }
+    logger.debug("data: data being sent to calculateStudentAverages", data);
+    for (const rollup of data.rollups) {
+      const userId = (_c = rollup.links) == null ? void 0 : _c.user;
+      const oldAverage = getCurrentOutcomeScore(rollup.scores);
+      const relevantScores = rollup.scores.filter((s) => {
+        var _a2;
+        const id = String((_a2 = s.links) == null ? void 0 : _a2.outcome);
+        const title = (outcomeMap[id] || "").toLowerCase();
+        return typeof s.score === "number" && // must have a numeric score
+        !excludedOutcomeIds.has(id) && // not in the excluded IDs set
+        !EXCLUDED_OUTCOME_KEYWORDS.some(
+          (keyword) => title.includes(keyword.toLowerCase())
+          // title doesn't contain any keyword
         );
-        if (!matchingRollup) {
-          mismatches.push({ userId, reason: "No rollup found." });
-          continue;
-        }
-        const scoreObj = matchingRollup.scores[0];
-        if (!scoreObj) {
-          mismatches.push({ userId, reason: "No score found." });
-          continue;
-        }
-        const score = scoreObj.score;
-        const matches = Math.abs(score - average) < 1e-3;
-        if (!matches) {
-          mismatches.push({ userId, expected: average, actual: score });
-        }
+      });
+      if (relevantScores.length === 0) continue;
+      const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
+      let newAverage = total / relevantScores.length;
+      newAverage = parseFloat(newAverage.toFixed(2));
+      logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
+      logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
+      if (oldAverage === newAverage) {
+        logger.debug("old average matches new average");
+        continue;
       }
-      if (mismatches.length === 0) {
-        logger.info("All averages match backend scores.");
-        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, (/* @__PURE__ */ new Date()).toISOString());
-        const durationSeconds = getElapsedTimeSinceStart();
-        localStorage.setItem(`duration_${getCourseId()}`, durationSeconds);
-        return;
-      } else {
-        logger.warn("Mismatches found:", mismatches);
-        logger.info(`Waiting ${waitTimeMs / 1e3} seconds before retrying...`);
-        await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
-      }
+      averages.push({ userId, average: newAverage });
     }
+    logger.debug("averages after calculations:", averages);
+    return averages;
   }
-  var init_verification = __esm({
-    "src/services/verification.js"() {
-      init_canvas();
-      init_canvasApiClient();
-      init_uiHelpers();
-      init_logger();
-    }
-  });
 
   // src/utils/uiHelpers.js
-  function getElapsedTimeSinceStart(endTime = Date.now()) {
-    const courseId = getCourseId();
-    const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-    if (!restored) return 0;
+  function getElapsedTimeSinceStart(stateMachine, endTime = Date.now()) {
+    if (!stateMachine) return 0;
     const context = stateMachine.getContext();
     if (!context.startTime) return 0;
     const startMs = new Date(context.startTime).getTime();
     const endMs = endTime instanceof Date ? endTime.getTime() : new Date(endTime).getTime();
     return Math.floor((endMs - startMs) / 1e3);
   }
-  function startElapsedTimer(courseId, box) {
+  function startElapsedTimer(stateMachine, box) {
+    if (!stateMachine || !box) return;
     const node = box.querySelector(".floating-banner__text") || box;
     stopElapsedTimer(box);
     const re = /\(Elapsed time:\s*\d+s\)/;
     const tick = () => {
-      const elapsed = getElapsedTimeSinceStart();
+      const elapsed = getElapsedTimeSinceStart(stateMachine);
       const current = node.textContent || "";
       if (re.test(current)) {
         node.textContent = current.replace(re, `(Elapsed time: ${elapsed}s)`);
@@ -976,96 +753,9 @@
     const formatDuration = (s) => Number.isFinite(s) ? `${Math.floor(s / 60)}m ${s % 60}s` : "N/A";
     row.textContent = lastAt ? `Last update: ${new Date(lastAt).toLocaleString()} | Duration: ${formatDuration(durSec)}` : `Last update: none yet`;
   }
-  function ensureStatusPill(courseId) {
-    var _a;
-    if (document.getElementById("avg-status-pill")) return;
-    const safeParse = (s) => {
-      try {
-        return JSON.parse(s);
-      } catch (e) {
-        return null;
-      }
-    };
-    const buttonWrapper = (_a = document.querySelector("#update-scores-button")) == null ? void 0 : _a.parentElement;
-    if (!buttonWrapper) {
-      const pill2 = document.createElement("button");
-      pill2.id = "avg-status-pill";
-      pill2.textContent = "Show status";
-      Object.assign(pill2.style, {
-        position: "fixed",
-        bottom: "16px",
-        right: "16px",
-        padding: "6px 10px",
-        borderRadius: "16px",
-        border: "1px solid #ccc",
-        background: "#fff",
-        cursor: "pointer",
-        zIndex: 1e4
-      });
-      pill2.onclick = () => {
-        pill2.remove();
-        localStorage.setItem(k("bannerDismissed", getCourseId()), "false");
-        const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
-        showFloatingBanner({ courseId: getCourseId(), text });
-      };
-      document.body.appendChild(pill2);
-      return;
-    }
-    const pill = makeButton({
-      label: "Show Status",
-      id: "avg-status-pill",
-      tooltip: "Show last update status",
-      onClick: async () => {
-        pill.remove();
-        const courseId2 = getCourseId();
-        const stateMachine = new UpdateFlowStateMachine();
-        const restored = stateMachine.loadFromLocalStorage(courseId2);
-        if (restored) {
-          const context = stateMachine.getContext();
-          const currentState = stateMachine.getCurrentState();
-          const { waitForBulkGrading: waitForBulkGrading2 } = await Promise.resolve().then(() => (init_gradeSubmission(), gradeSubmission_exports));
-          const { verifyUIScores: verifyUIScores2 } = await Promise.resolve().then(() => (init_verification(), verification_exports));
-          const { STATES: STATES2 } = await Promise.resolve().then(() => (init_stateMachine(), stateMachine_exports));
-          if (currentState === STATES2.POLLING_PROGRESS && context.progressId) {
-            const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-            await waitForBulkGrading2(box);
-            return;
-          }
-          if (currentState === STATES2.VERIFYING && context.averages && context.outcomeId) {
-            const box = showFloatingBanner({ text: "Verifying updated scores" });
-            try {
-              await verifyUIScores2(courseId2, context.averages, context.outcomeId, box);
-              box.setText(`All ${context.averages.length} scores verified!`);
-            } catch (e) {
-              logger.warn("Verification on resume failed:", e);
-              box.setText("Verification failed. You can try updating again.");
-            }
-            return;
-          }
-        }
-        const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
-        showFloatingBanner({ text });
-      },
-      type: "secondary"
-    });
-    pill.style.fontSize = "11px";
-    pill.style.padding = "4px 8px";
-    pill.style.marginBottom = "4px";
-    pill.style.marginLeft = "0";
-    buttonWrapper.insertBefore(pill, buttonWrapper.firstChild);
-  }
-  var init_uiHelpers = __esm({
-    "src/utils/uiHelpers.js"() {
-      init_canvas();
-      init_keys();
-      init_banner();
-      init_buttons();
-      init_logger();
-      init_stateMachine();
-    }
-  });
 
   // src/services/gradeOverride.js
+  var __enrollmentMapCache = /* @__PURE__ */ new Map();
   async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) {
     var _a, _b, _c, _d, _e;
     const query = `
@@ -1126,26 +816,8 @@
       logger.warn(`[override/concurrent] failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
     }
   }
-  var __enrollmentMapCache;
-  var init_gradeOverride = __esm({
-    "src/services/gradeOverride.js"() {
-      init_canvasApiClient();
-      init_config();
-      init_errorHandler();
-      init_logger();
-      __enrollmentMapCache = /* @__PURE__ */ new Map();
-    }
-  });
 
   // src/services/gradeSubmission.js
-  var gradeSubmission_exports = {};
-  __export(gradeSubmission_exports, {
-    beginBulkUpdate: () => beginBulkUpdate,
-    downloadErrorSummary: () => downloadErrorSummary,
-    postPerStudentGrades: () => postPerStudentGrades,
-    submitRubricScore: () => submitRubricScore,
-    waitForBulkGrading: () => waitForBulkGrading
-  });
   async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
     const timeStamp = (/* @__PURE__ */ new Date()).toLocaleString();
     logger.debug("Submitting rubric score for student", userId);
@@ -1207,15 +879,15 @@
     logger.info("Waiting for grading to complete progress ID:", progressId);
     return progressId;
   }
-  async function waitForBulkGrading(box, apiClient, timeout = 12e5, interval = 2e3) {
+  async function waitForBulkGrading(box, apiClient, stateMachine, timeout = 12e5, interval = 2e3) {
     const loopStartTime = Date.now();
     let state = "beginning upload";
     const courseId = getCourseId();
     const progressId = localStorage.getItem(`progressId_${courseId}`);
-    startElapsedTimer(courseId, box);
+    startElapsedTimer(stateMachine, box);
     while (Date.now() - loopStartTime < timeout) {
       const progress = await apiClient.get(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
-      let elapsed = getElapsedTimeSinceStart();
+      let elapsed = getElapsedTimeSinceStart(stateMachine);
       state = progress.workflow_state;
       logger.debug(`Bulk Uploading Status: ${state} (elapsed: ${elapsed}s)`);
       if (state !== "completed") {
@@ -1358,98 +1030,55 @@
     link.click();
     URL.revokeObjectURL(url);
   }
-  var init_gradeSubmission = __esm({
-    "src/services/gradeSubmission.js"() {
-      init_canvas();
-      init_canvasApiClient();
-      init_config();
-      init_uiHelpers();
-      init_gradeOverride();
-      init_errorHandler();
-      init_logger();
-    }
-  });
 
-  // src/main.js
-  init_logger();
-
-  // src/gradebook/ui/buttonInjection.js
-  init_buttons();
-  init_canvas();
-  init_config();
-  init_errorHandler();
-  init_logger();
-
-  // src/gradebook/updateFlowOrchestrator.js
-  init_stateMachine();
-
-  // src/gradebook/stateHandlers.js
-  init_stateMachine();
-  init_logger();
-  init_config();
-  init_errorHandler();
-  init_canvasApiClient();
-
-  // src/services/gradeCalculator.js
-  init_config();
-  init_logger();
-  function calculateStudentAverages(data, outcomeId) {
-    var _a, _b, _c;
-    const averages = [];
-    logger.info("Calculating student averages...");
-    const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
-    const outcomeMap = {};
-    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => outcomeMap[o.id] = o.title);
-    function getCurrentOutcomeScore(scores) {
-      var _a2;
-      logger.debug("Scores: ", scores);
-      const match = scores.find((s) => {
-        var _a3;
-        return String((_a3 = s.links) == null ? void 0 : _a3.outcome) === String(outcomeId);
-      });
-      return (_a2 = match == null ? void 0 : match.score) != null ? _a2 : null;
-    }
-    logger.debug("data: data being sent to calculateStudentAverages", data);
-    for (const rollup of data.rollups) {
-      const userId = (_c = rollup.links) == null ? void 0 : _c.user;
-      const oldAverage = getCurrentOutcomeScore(rollup.scores);
-      const relevantScores = rollup.scores.filter((s) => {
-        var _a2;
-        const id = String((_a2 = s.links) == null ? void 0 : _a2.outcome);
-        const title = (outcomeMap[id] || "").toLowerCase();
-        return typeof s.score === "number" && // must have a numeric score
-        !excludedOutcomeIds.has(id) && // not in the excluded IDs set
-        !EXCLUDED_OUTCOME_KEYWORDS.some(
-          (keyword) => title.includes(keyword.toLowerCase())
-          // title doesn't contain any keyword
+  // src/services/verification.js
+  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, stateMachine, waitTimeMs = 5e3, maxRetries = 50) {
+    let state = "verifying";
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let elapsed = getElapsedTimeSinceStart(stateMachine);
+      box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
+      startElapsedTimer(stateMachine, box);
+      const newRollupData = await apiClient.get(
+        `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`,
+        {},
+        "verifyUIScores"
+      );
+      logger.debug("newRollupData: ", newRollupData);
+      const mismatches = [];
+      for (const { userId, average } of averages) {
+        const matchingRollup = newRollupData.rollups.find(
+          (r) => r.links.user.toString() === userId.toString()
         );
-      });
-      if (relevantScores.length === 0) continue;
-      const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
-      let newAverage = total / relevantScores.length;
-      newAverage = parseFloat(newAverage.toFixed(2));
-      logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
-      logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
-      if (oldAverage === newAverage) {
-        logger.debug("old average matches new average");
-        continue;
+        if (!matchingRollup) {
+          mismatches.push({ userId, reason: "No rollup found." });
+          continue;
+        }
+        const scoreObj = matchingRollup.scores[0];
+        if (!scoreObj) {
+          mismatches.push({ userId, reason: "No score found." });
+          continue;
+        }
+        const score = scoreObj.score;
+        const matches = Math.abs(score - average) < 1e-3;
+        if (!matches) {
+          mismatches.push({ userId, expected: average, actual: score });
+        }
       }
-      averages.push({ userId, average: newAverage });
+      if (mismatches.length === 0) {
+        logger.info("All averages match backend scores.");
+        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, (/* @__PURE__ */ new Date()).toISOString());
+        const durationSeconds = getElapsedTimeSinceStart(stateMachine);
+        localStorage.setItem(`duration_${getCourseId()}`, durationSeconds);
+        return;
+      } else {
+        logger.warn("Mismatches found:", mismatches);
+        logger.info(`Waiting ${waitTimeMs / 1e3} seconds before retrying...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+      }
     }
-    logger.debug("averages after calculations:", averages);
-    return averages;
   }
 
-  // src/gradebook/stateHandlers.js
-  init_gradeSubmission();
-  init_verification();
-  init_uiHelpers();
-
   // src/services/outcomeService.js
-  init_errorHandler();
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function getRollup(courseId, apiClient) {
     const rollupData = await apiClient.get(
       `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
@@ -1526,9 +1155,6 @@
   }
 
   // src/services/assignmentService.js
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient) {
     var _a;
     const alignments = (_a = outcomeObject.alignments) != null ? _a : [];
@@ -1578,9 +1204,6 @@
   }
 
   // src/services/rubricService.js
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function getRubricForAssignment(courseId, assignmentId, apiClient) {
     const assignment = await apiClient.get(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
@@ -1642,8 +1265,6 @@
   }
 
   // src/utils/canvasHelpers.js
-  init_config();
-  init_logger();
   async function getAssignmentId(courseId) {
     const response = await fetch(`/api/v1/courses/${courseId}/assignments?per_page=100`);
     const assignments = await response.json();
@@ -1652,9 +1273,6 @@
   }
 
   // src/services/gradeOverrideVerification.js
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function enableCourseOverride(courseId, apiClient) {
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping");
@@ -1754,7 +1372,6 @@
   }
 
   // src/gradebook/stateHandlers.js
-  init_gradeOverride();
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
@@ -1874,7 +1491,7 @@ Would you like to create it?`);
     const { banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
     logger.debug("Starting bulk update polling...");
-    await waitForBulkGrading(banner, apiClient);
+    await waitForBulkGrading(banner, apiClient, stateMachine);
     logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
   }
@@ -1882,7 +1499,7 @@ Would you like to create it?`);
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
     logger.debug("Starting outcome score verification...");
-    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient);
+    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
     try {
       logger.debug("Starting override score verification...");
       const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
@@ -1900,7 +1517,7 @@ Would you like to create it?`);
   }
   async function handleComplete(stateMachine) {
     const { numberOfUpdates, banner, courseId, zeroUpdates } = stateMachine.getContext();
-    const elapsedTime = getElapsedTimeSinceStart();
+    const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
     if (zeroUpdates || numberOfUpdates === 0) {
       banner.setText(`No changes to ${AVG_OUTCOME_NAME} found.`);
@@ -1939,11 +1556,146 @@ You may need to refresh the page to see the new scores.`);
     [STATES.ERROR]: handleError2
   };
 
-  // src/gradebook/updateFlowOrchestrator.js
-  init_banner();
+  // src/utils/keys.js
+  var k = (name, courseId) => `${name}_${courseId}`;
+
+  // src/ui/banner.js
+  var BRAND_COLOR = getComputedStyle(document.documentElement).getPropertyValue("--ic-brand-primary").trim() || "#0c7d9d";
+  function showFloatingBanner({
+    text = "",
+    duration = null,
+    // null = stays until removed; number = auto-hide after ms
+    top = "20px",
+    right = "20px",
+    center = false,
+    backgroundColor = BRAND_COLOR,
+    textColor = "#ffffff",
+    allowMultiple = false,
+    // keep existing banners?
+    ariaLive = "polite"
+    // "polite" | "assertive" | "off"
+  } = {}) {
+    if (!allowMultiple) {
+      document.querySelectorAll(".floating-banner").forEach((b) => b.remove());
+    }
+    const baseElement = document.querySelector(".ic-Layout-contentMain") || document.querySelector(".ic-app-header__menu-list-item__link") || document.body;
+    const styles = getComputedStyle(baseElement);
+    const fontFamily = styles.fontFamily;
+    const fontSize = styles.fontSize;
+    const fontWeight = styles.fontWeight;
+    const banner = document.createElement("div");
+    banner.className = "floating-banner";
+    banner.setAttribute("role", "status");
+    if (ariaLive && ariaLive !== "off") banner.setAttribute("aria-live", ariaLive);
+    Object.assign(banner.style, {
+      position: "fixed",
+      top,
+      background: backgroundColor,
+      padding: "10px 20px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+      zIndex: "9999",
+      fontSize,
+      color: textColor,
+      fontFamily,
+      fontWeight,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "12px",
+      maxWidth: "min(90vw, 720px)",
+      lineHeight: "1.35",
+      wordBreak: "break-word"
+    });
+    if (center) {
+      banner.style.left = "50%";
+      banner.style.transform = "translateX(-50%)";
+    } else {
+      banner.style.right = right;
+    }
+    const msg = document.createElement("span");
+    msg.className = "floating-banner__text";
+    banner.appendChild(msg);
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.setAttribute("aria-label", "Dismiss message");
+    closeBtn.textContent = "\xD7";
+    Object.assign(closeBtn.style, {
+      cursor: "pointer",
+      fontWeight: "bold",
+      border: "none",
+      background: "transparent",
+      color: "inherit",
+      fontSize,
+      lineHeight: "1"
+    });
+    closeBtn.onclick = () => destroy();
+    banner.appendChild(closeBtn);
+    document.body.appendChild(banner);
+    let lockedUntil = 0;
+    let pending = null;
+    let holdTimer = null;
+    let autoTimer = null;
+    const now = () => Date.now();
+    const isLocked = () => now() < lockedUntil;
+    const courseId = getCourseId();
+    const apply = (textValue) => {
+      msg.textContent = textValue;
+      if (courseId) localStorage.setItem(k("bannerLast", courseId), textValue);
+    };
+    const unlockAndFlush = () => {
+      lockedUntil = 0;
+      if (pending != null) {
+        apply(pending);
+        pending = null;
+      }
+    };
+    banner.setText = (newText) => {
+      if (isLocked()) {
+        pending = newText;
+      } else {
+        apply(newText);
+      }
+    };
+    banner.hold = (newText, ms = 3e3) => {
+      const now2 = Date.now();
+      if (now2 < lockedUntil) {
+        pending = newText;
+        return;
+      }
+      lockedUntil = now2 + ms;
+      apply(newText);
+      if (holdTimer) clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        lockedUntil = 0;
+        if (pending != null) {
+          apply(pending);
+          pending = null;
+        }
+      }, ms);
+    };
+    banner.soft = (newText) => {
+      if (!isLocked()) apply(newText);
+    };
+    function destroy() {
+      if (holdTimer) clearTimeout(holdTimer);
+      if (autoTimer) clearTimeout(autoTimer);
+      banner.style.transition = "opacity 150ms";
+      banner.style.opacity = "0";
+      setTimeout(() => banner.remove(), 160);
+    }
+    banner.removeBanner = destroy;
+    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
+    if (typeof duration === "number" && isFinite(duration) && duration >= 0) {
+      autoTimer = setTimeout(destroy, duration);
+    }
+    closeBtn.onclick = () => {
+      destroy();
+    };
+    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
+    return banner;
+  }
 
   // src/gradebook/ui/debugPanel.js
-  init_logger();
   function updateDebugUI(stateMachine) {
     if (!logger.isDebugEnabled()) return;
     let debugPanel = document.getElementById("state-machine-debug-panel");
@@ -2001,13 +1753,7 @@ You may need to refresh the page to see the new scores.`);
     }
   }
 
-  // src/gradebook/updateFlowOrchestrator.js
-  init_errorHandler();
-  init_canvas();
-
   // src/utils/stateManagement.js
-  init_canvas();
-  init_logger();
   function cleanUpLocalStorage() {
     const courseId = getCourseId();
     if (!courseId) return;
@@ -2023,9 +1769,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/gradebook/updateFlowOrchestrator.js
-  init_uiHelpers();
-  init_config();
-  init_logger();
   async function startUpdateFlow(button = null) {
     var _a;
     const courseId = getCourseId();
@@ -2079,7 +1822,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/gradebook/ui/buttonInjection.js
-  init_uiHelpers();
   function injectButtons() {
     waitForGradebookAndToolbar((toolbar) => {
       const courseId = getCourseId();
@@ -2139,8 +1881,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-05 8:52:03 AM (dev, 6fe6e14)");
-    exposeVersion("dev", "2026-01-05 8:52:03 AM (dev, 6fe6e14)");
+    logBanner("dev", "2026-01-05 9:58:35 AM (dev, bca18f9)");
+    exposeVersion("dev", "2026-01-05 9:58:35 AM (dev, bca18f9)");
     if (true) {
       logger.info("Running in DEV mode");
     }

@@ -5,29 +5,21 @@
  * This module contains UI-related helper functions including:
  * - Elapsed time tracking and display
  * - Last update notice rendering
- * - Status pill creation
  * - Gradebook DOM waiting
  */
 
 import { getCourseId } from "./canvas.js";
-import { k } from "./keys.js";
-import { showFloatingBanner } from "../ui/banner.js";
-import { makeButton } from "../ui/buttons.js";
 import { logger } from "./logger.js";
-import { UpdateFlowStateMachine } from "../gradebook/stateMachine.js";
 
 /**
  * Calculate elapsed time since the update started
- * Reads startTime from state machine context (single source of truth)
+ * Reads startTime from state machine context
+ * @param {UpdateFlowStateMachine} stateMachine - State machine instance
  * @param {Date|number} endTime - End time (default: now)
  * @returns {number} Elapsed time in seconds
  */
-export function getElapsedTimeSinceStart(endTime = Date.now()) {
-    const courseId = getCourseId();
-    const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-
-    if (!restored) return 0;
+export function getElapsedTimeSinceStart(stateMachine, endTime = Date.now()) {
+    if (!stateMachine) return 0;
 
     const context = stateMachine.getContext();
     if (!context.startTime) return 0;
@@ -54,10 +46,12 @@ export function formatDuration(seconds) {
 /**
  * Start a live elapsed time display in a banner
  * Updates the banner text every second with current elapsed time
- * @param {string} courseId - Course ID
+ * @param {UpdateFlowStateMachine} stateMachine - State machine instance
  * @param {HTMLElement} box - Banner element to update
  */
-export function startElapsedTimer(courseId, box) {
+export function startElapsedTimer(stateMachine, box) {
+    if (!stateMachine || !box) return;
+
     // Use the inner text node created in showFloatingBanner
     const node = box.querySelector('.floating-banner__text') || box;
 
@@ -67,7 +61,7 @@ export function startElapsedTimer(courseId, box) {
     const re = /\(Elapsed time:\s*\d+s\)/; // match your current phrasing
 
     const tick = () => {
-        const elapsed = getElapsedTimeSinceStart(); // already per-course via startTime_${getCourseId()}
+        const elapsed = getElapsedTimeSinceStart(stateMachine);
         const current = node.textContent || "";
 
         if (re.test(current)) {
@@ -142,102 +136,4 @@ export function waitForGradebookAndToolbar(callback) {
             logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
         }
     }, 300);
-}
-
-
-
-/**
- * Create a "Show Status" pill button that can restore the banner
- * This is shown when the user dismisses the banner but an update is still in progress
- * @param {string} courseId - Course ID
- */
-export function ensureStatusPill(courseId) {
-    if (document.getElementById('avg-status-pill')) return;
-
-    // Import these functions dynamically to avoid circular dependencies
-    // They will be available when this function is called
-    const safeParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
-
-    // Find the button wrapper where the main button is located
-    const buttonWrapper = document.querySelector('#update-scores-button')?.parentElement;
-    if (!buttonWrapper) {
-        // Fallback to old behavior if button wrapper not found
-        const pill = document.createElement('button');
-        pill.id = 'avg-status-pill';
-        pill.textContent = 'Show status';
-        Object.assign(pill.style, {
-            position: 'fixed', bottom: '16px', right: '16px',
-            padding: '6px 10px', borderRadius: '16px', border: '1px solid #ccc',
-            background: '#fff', cursor: 'pointer', zIndex: 10000
-        });
-
-        pill.onclick = () => {
-            pill.remove();
-            localStorage.setItem(k('bannerDismissed', getCourseId()), 'false');
-            const text = localStorage.getItem(k('bannerLast', getCourseId())) || 'Working';
-            showFloatingBanner({ courseId: getCourseId(), text });
-        };
-
-        document.body.appendChild(pill);
-        return;
-    }
-
-    // Create the status pill button to match existing UI
-    const pill = makeButton({
-        label: 'Show Status',
-        id: 'avg-status-pill',
-        tooltip: 'Show last update status',
-        onClick: async () => {
-            pill.remove();
-
-            // Check state machine for active process (single source of truth)
-            const courseId = getCourseId();
-            const stateMachine = new UpdateFlowStateMachine();
-            const restored = stateMachine.loadFromLocalStorage(courseId);
-
-            if (restored) {
-                const context = stateMachine.getContext();
-                const currentState = stateMachine.getCurrentState();
-
-                // Import these dynamically to avoid circular dependencies at module load time
-                const { waitForBulkGrading } = await import("../services/gradeSubmission.js");
-                const { verifyUIScores } = await import("../services/verification.js");
-                const { STATES } = await import("../gradebook/stateMachine.js");
-
-                // If bulk upload is in progress, resume polling
-                if (currentState === STATES.POLLING_PROGRESS && context.progressId) {
-                    const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-                    await waitForBulkGrading(box);
-                    return;
-                }
-
-                // If verification is pending, run it now
-                if (currentState === STATES.VERIFYING && context.averages && context.outcomeId) {
-                    const box = showFloatingBanner({ text: "Verifying updated scores" });
-                    try {
-                        await verifyUIScores(courseId, context.averages, context.outcomeId, box);
-                        box.setText(`All ${context.averages.length} scores verified!`);
-                    } catch (e) {
-                        logger.warn("Verification on resume failed:", e);
-                        box.setText("Verification failed. You can try updating again.");
-                    }
-                    return;
-                }
-            }
-
-            // Otherwise, just show the last static message
-            const text = localStorage.getItem(k('bannerLast', getCourseId())) || 'Working';
-            showFloatingBanner({ text });
-        },
-        type: "secondary"
-    });
-
-    // Style the pill to be smaller and positioned above the main button
-    pill.style.fontSize = '11px';
-    pill.style.padding = '4px 8px';
-    pill.style.marginBottom = '4px';
-    pill.style.marginLeft = '0';
-
-    // Insert the pill at the top of the button wrapper (above the main button)
-    buttonWrapper.insertBefore(pill, buttonWrapper.firstChild);
 }

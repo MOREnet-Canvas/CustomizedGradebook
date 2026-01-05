@@ -22,6 +22,7 @@ import { logger } from "../utils/logger.js";
  * @param {string} outcomeId - The outcome ID to verify against
  * @param {Object} box - Floating banner UI object with soft() and setText() methods
  * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @param {UpdateFlowStateMachine} stateMachine - State machine instance for elapsed time tracking
  * @param {number} [waitTimeMs=5000] - Milliseconds to wait between retry attempts
  * @param {number} [maxRetries=50] - Maximum number of verification attempts
  *
@@ -33,15 +34,15 @@ import { logger } from "../utils/logger.js";
  *   { userId: "12345", average: 3.5 },
  *   { userId: "67890", average: 2.8 }
  * ];
- * await verifyUIScores(courseId, averages, outcomeId, bannerBox, apiClient);
+ * await verifyUIScores(courseId, averages, outcomeId, bannerBox, apiClient, stateMachine);
  */
-export async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, waitTimeMs = 5000, maxRetries = 50) {
+export async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, stateMachine, waitTimeMs = 5000, maxRetries = 50) {
     let state = "verifying";
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        let elapsed = getElapsedTimeSinceStart();
+        let elapsed = getElapsedTimeSinceStart(stateMachine);
         box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
-        startElapsedTimer(courseId, box);
+        startElapsedTimer(stateMachine, box);
 
         // Fetch current outcome rollups from Canvas
         const newRollupData = await apiClient.get(
@@ -83,7 +84,7 @@ export async function verifyUIScores(courseId, averages, outcomeId, box, apiClie
         if (mismatches.length === 0) {
             logger.info("All averages match backend scores.");
             localStorage.setItem(`lastUpdateAt_${getCourseId()}`, new Date().toISOString());
-            const durationSeconds = getElapsedTimeSinceStart();
+            const durationSeconds = getElapsedTimeSinceStart(stateMachine);
             localStorage.setItem(`duration_${getCourseId()}`, durationSeconds);
             return;
         } else {
