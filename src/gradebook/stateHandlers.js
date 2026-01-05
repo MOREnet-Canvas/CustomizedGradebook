@@ -167,10 +167,11 @@ export async function handleCreatingRubric(stateMachine) {
  */
 export async function handleCalculating(stateMachine) {
     const { rollupData, outcomeId, courseId, banner } = stateMachine.getContext();
-    
+    const apiClient = new CanvasApiClient();
+
     banner.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
-    
-    const averages = calculateStudentAverages(rollupData, outcomeId);
+
+    const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
     const numberOfUpdates = averages.length;
     
     stateMachine.updateContext({ 
@@ -304,18 +305,38 @@ export async function handleVerifyingOverrides(stateMachine) {
 
     logger.info(`Grade override submission complete: ${successCount} succeeded, ${failCount} failed`);
 
-    // Verify override scores
-    try {
-        banner.soft('Verifying grade overrides...');
-        logger.debug('Starting override score verification...');
-        const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
-        const overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+    // Verify override scores with retry logic
+    const maxRetries = 3;
+    const retryDelayMs = 2000; // 2 seconds between retries
+    let overrideMismatches = [];
 
-        if (overrideMismatches.length > 0) {
-            logger.warn(`Found ${overrideMismatches.length} override score mismatches - these may resolve on retry`);
-            // Don't fail the flow, just log the mismatches
-        } else {
-            logger.info('All override scores verified successfully');
+    try {
+        const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            banner.soft(`Verifying grade overrides... (attempt ${attempt}/${maxRetries})`);
+            logger.debug(`Override verification attempt ${attempt}/${maxRetries}...`);
+
+            overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+
+            if (overrideMismatches.length === 0) {
+                logger.info(`All override scores verified successfully on attempt ${attempt}`);
+                break;
+            }
+
+            // If mismatches found and not the last attempt, wait and retry
+            if (attempt < maxRetries) {
+                logger.warn(`Found ${overrideMismatches.length} override score mismatches on attempt ${attempt}, retrying in ${retryDelayMs/1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+            } else {
+                // Last attempt - log final mismatches
+                logger.warn(`Found ${overrideMismatches.length} override score mismatches after ${maxRetries} attempts`);
+                logger.warn('Final mismatches:', overrideMismatches.map(m => ({
+                    userId: m.userId,
+                    expected: m.expected,
+                    actual: m.actual
+                })));
+            }
         }
     } catch (error) {
         logger.warn('Override verification failed, continuing anyway:', error);

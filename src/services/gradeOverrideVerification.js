@@ -50,7 +50,7 @@ export async function enableCourseOverride(courseId, apiClient) {
  * Fetch current override grades from Canvas
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @returns {Promise<Map<string, number>>} Map of enrollmentId -> percentage
+ * @returns {Promise<Map<string, number>>} Map of userId -> percentage (keys are userIds, NOT enrollmentIds)
  */
 export async function fetchOverrideGrades(courseId, apiClient) {
     if (!ENABLE_GRADE_OVERRIDE) {
@@ -68,15 +68,16 @@ export async function fetchOverrideGrades(courseId, apiClient) {
         const overrideMap = new Map();
         const overrides = response.final_grade_overrides || {};
 
-        for (const [enrollmentId, data] of Object.entries(overrides)) {
+        // IMPORTANT: The keys in final_grade_overrides are userIds, NOT enrollmentIds
+        for (const [userId, data] of Object.entries(overrides)) {
             const percentage = data?.course_grade?.percentage;
             if (percentage !== null && percentage !== undefined) {
-                overrideMap.set(enrollmentId, percentage);
+                overrideMap.set(userId, percentage);
+                logger.trace(`Override grade for user ${userId}: ${percentage}%`);
             }
         }
 
-        logger.debug(`Fetched ${overrideMap.size} override grades`);
-        logger.debug('overrides:', overrides);
+        logger.debug(`Fetched ${overrideMap.size} override grades from Canvas API`);
         return overrideMap;
     } catch (error) {
         logger.error('Failed to fetch override grades:', error);
@@ -88,7 +89,7 @@ export async function fetchOverrideGrades(courseId, apiClient) {
  * Verify that override scores match expected values
  * @param {string} courseId - Course ID
  * @param {Array<{userId: string, average: number}>} averages - Expected averages
- * @param {Map<string, string>} enrollmentMap - Map of userId -> enrollmentId
+ * @param {Map<string, string>} enrollmentMap - Map of userId -> enrollmentId (kept for debugging but not used for lookup)
  * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @param {number} tolerance - Tolerance for percentage comparison (default: 0.01)
  * @returns {Promise<Array<{userId: string, enrollmentId: string, expected: number, actual: number}>>} Array of mismatches
@@ -102,16 +103,19 @@ export async function verifyOverrideScores(courseId, averages, enrollmentMap, ap
     try {
         const overrideGrades = await fetchOverrideGrades(courseId, apiClient);
         const mismatches = [];
+        let matchCount = 0;
+
+        logger.debug(`Verifying ${averages.length} students' override grades...`);
 
         for (const { userId, average } of averages) {
-            const enrollmentId = enrollmentMap.get(String(userId));
-            if (!enrollmentId) {
-                logger.warn(`No enrollment ID found for user ${userId}`);
-                continue;
-            }
-
             const expectedPercentage = OVERRIDE_SCALE(average);
-            const actualPercentage = overrideGrades.get(String(enrollmentId));
+            // FIXED: Look up by userId directly (not enrollmentId)
+            const actualPercentage = overrideGrades.get(String(userId));
+
+            // Get enrollmentId for debugging purposes only
+            const enrollmentId = enrollmentMap.get(String(userId));
+
+            logger.trace(`User ${userId}: expected=${expectedPercentage}%, actual=${actualPercentage}%`);
 
             if (actualPercentage === null || actualPercentage === undefined) {
                 mismatches.push({
@@ -121,6 +125,7 @@ export async function verifyOverrideScores(courseId, averages, enrollmentMap, ap
                     actual: null,
                     reason: 'No override grade found'
                 });
+                logger.trace(`  ❌ No override grade found for user ${userId}`);
                 continue;
             }
 
@@ -133,13 +138,22 @@ export async function verifyOverrideScores(courseId, averages, enrollmentMap, ap
                     actual: actualPercentage,
                     diff
                 });
+                logger.trace(`  ❌ Mismatch: expected ${expectedPercentage}%, got ${actualPercentage}% (diff: ${diff.toFixed(2)}%)`);
+            } else {
+                matchCount++;
+                logger.trace(`  ✓ Match: ${actualPercentage}%`);
             }
         }
 
+        logger.debug(`Override verification complete: ${matchCount} matches, ${mismatches.length} mismatches`);
+
         if (mismatches.length > 0) {
-            logger.warn(`Found ${mismatches.length} override score mismatches:`, mismatches);
-        } else {
-            logger.info('All override scores match expected values');
+            logger.debug(`Mismatches found:`, mismatches.map(m => ({
+                userId: m.userId,
+                expected: m.expected,
+                actual: m.actual,
+                diff: m.diff
+            })));
         }
 
         return mismatches;
