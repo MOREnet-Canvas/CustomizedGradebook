@@ -15,7 +15,9 @@ import {
     AVG_OUTCOME_NAME,
     AVG_ASSIGNMENT_NAME,
     AVG_RUBRIC_NAME,
-    PER_STUDENT_UPDATE_THRESHOLD
+    PER_STUDENT_UPDATE_THRESHOLD,
+    ENABLE_GRADE_OVERRIDE,
+    OVERRIDE_SCALE
 } from "../config.js";
 import { UserCancelledError } from "../utils/errorHandler.js";
 import { CanvasApiClient } from "../utils/canvasApiClient.js";
@@ -30,7 +32,7 @@ import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services
 import { getRubricForAssignment, createRubric } from "../services/rubricService.js";
 import { getAssignmentId } from "../utils/canvasHelpers.js";
 import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOverrideVerification.js";
-import { getAllEnrollmentIds } from "../services/gradeOverride.js";
+import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from "../services/gradeOverride.js";
 
 /**
  * CHECKING_SETUP State Handler
@@ -247,7 +249,7 @@ export async function handlePollingProgress(stateMachine) {
 
 /**
  * VERIFYING State Handler
- * Verifies that outcome scores and override grades match expected values
+ * Verifies that outcome scores match expected values
  */
 export async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
@@ -256,8 +258,55 @@ export async function handleVerifying(stateMachine) {
     logger.debug('Starting outcome score verification...');
     await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
 
-    // Verify override scores if enabled
+    logger.debug(`handleVerifying complete, transitioning to VERIFYING_OVERRIDES`);
+    return STATES.VERIFYING_OVERRIDES;
+}
+
+/**
+ * VERIFYING_OVERRIDES State Handler
+ * Submits and verifies grade overrides for all students
+ */
+export async function handleVerifyingOverrides(stateMachine) {
+    const { courseId, averages, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
+
+    // Check if grade override is enabled
+    if (!ENABLE_GRADE_OVERRIDE) {
+        logger.debug('Grade override disabled, skipping VERIFYING_OVERRIDES state');
+        return STATES.COMPLETE;
+    }
+
+    logger.debug('Starting grade override submission and verification...');
+    banner.soft('Submitting grade overrides...');
+
+    // Submit all grade overrides sequentially
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const { userId, average } of averages) {
+        try {
+            const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
+            if (!enrollmentId) {
+                logger.warn(`[override] No enrollmentId for user ${userId}`);
+                failCount++;
+                continue;
+            }
+
+            const override = OVERRIDE_SCALE(average);
+            await setOverrideScoreGQL(enrollmentId, override, apiClient);
+            logger.debug(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
+            successCount++;
+        } catch (e) {
+            logger.warn(`[override] Failed for user ${userId}:`, e?.message || e);
+            failCount++;
+        }
+    }
+
+    logger.info(`Grade override submission complete: ${successCount} succeeded, ${failCount} failed`);
+
+    // Verify override scores
     try {
+        banner.soft('Verifying grade overrides...');
         logger.debug('Starting override score verification...');
         const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
         const overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
@@ -273,7 +322,7 @@ export async function handleVerifying(stateMachine) {
         // Don't fail the entire flow if override verification fails
     }
 
-    logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
+    logger.debug(`handleVerifyingOverrides complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
 }
 
@@ -342,6 +391,7 @@ export const STATE_HANDLERS = {
     [STATES.UPDATING_GRADES]: handleUpdatingGrades,
     [STATES.POLLING_PROGRESS]: handlePollingProgress,
     [STATES.VERIFYING]: handleVerifying,
+    [STATES.VERIFYING_OVERRIDES]: handleVerifyingOverrides,
     [STATES.COMPLETE]: handleComplete,
     [STATES.ERROR]: handleError
 };

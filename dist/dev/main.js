@@ -375,6 +375,7 @@
     UPDATING_GRADES: "UPDATING_GRADES",
     POLLING_PROGRESS: "POLLING_PROGRESS",
     VERIFYING: "VERIFYING",
+    VERIFYING_OVERRIDES: "VERIFYING_OVERRIDES",
     COMPLETE: "COMPLETE",
     ERROR: "ERROR"
   };
@@ -387,7 +388,8 @@
     [STATES.CALCULATING]: [STATES.UPDATING_GRADES, STATES.COMPLETE, STATES.ERROR],
     [STATES.UPDATING_GRADES]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
     [STATES.POLLING_PROGRESS]: [STATES.POLLING_PROGRESS, STATES.VERIFYING, STATES.ERROR],
-    [STATES.VERIFYING]: [STATES.VERIFYING, STATES.COMPLETE, STATES.ERROR],
+    [STATES.VERIFYING]: [STATES.VERIFYING, STATES.VERIFYING_OVERRIDES, STATES.ERROR],
+    [STATES.VERIFYING_OVERRIDES]: [STATES.VERIFYING_OVERRIDES, STATES.COMPLETE, STATES.ERROR],
     [STATES.COMPLETE]: [STATES.IDLE],
     [STATES.ERROR]: [STATES.IDLE]
   };
@@ -801,21 +803,6 @@
     const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
     return enrollmentMap.get(String(userId)) || null;
   }
-  async function queueOverride(courseId, userId, average, apiClient) {
-    if (!ENABLE_GRADE_OVERRIDE) return;
-    try {
-      const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
-      if (!enrollmentId) {
-        logger.warn(`[override/concurrent] no enrollmentId for user ${userId}`);
-        return;
-      }
-      const override = OVERRIDE_SCALE(average);
-      await setOverrideScoreGQL(enrollmentId, override, apiClient);
-      logger.debug(`[override/concurrent] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
-    } catch (e) {
-      logger.warn(`[override/concurrent] failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
-    }
-  }
 
   // src/services/gradeSubmission.js
   async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
@@ -861,9 +848,6 @@
           }
         }
       };
-      if (ENABLE_GRADE_OVERRIDE) {
-        await queueOverride(courseId, userId, average, apiClient);
-      }
     }
     logger.debug("bulk gradeData payload:", gradeData);
     const result = await apiClient.post(
@@ -1500,7 +1484,40 @@ Would you like to create it?`);
     const apiClient = new CanvasApiClient();
     logger.debug("Starting outcome score verification...");
     await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
+    logger.debug(`handleVerifying complete, transitioning to VERIFYING_OVERRIDES`);
+    return STATES.VERIFYING_OVERRIDES;
+  }
+  async function handleVerifyingOverrides(stateMachine) {
+    const { courseId, averages, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override disabled, skipping VERIFYING_OVERRIDES state");
+      return STATES.COMPLETE;
+    }
+    logger.debug("Starting grade override submission and verification...");
+    banner.soft("Submitting grade overrides...");
+    let successCount = 0;
+    let failCount = 0;
+    for (const { userId, average } of averages) {
+      try {
+        const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
+        if (!enrollmentId) {
+          logger.warn(`[override] No enrollmentId for user ${userId}`);
+          failCount++;
+          continue;
+        }
+        const override = OVERRIDE_SCALE(average);
+        await setOverrideScoreGQL(enrollmentId, override, apiClient);
+        logger.debug(`[override] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
+        successCount++;
+      } catch (e) {
+        logger.warn(`[override] Failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
+        failCount++;
+      }
+    }
+    logger.info(`Grade override submission complete: ${successCount} succeeded, ${failCount} failed`);
     try {
+      banner.soft("Verifying grade overrides...");
       logger.debug("Starting override score verification...");
       const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
       const overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
@@ -1512,7 +1529,7 @@ Would you like to create it?`);
     } catch (error) {
       logger.warn("Override verification failed, continuing anyway:", error);
     }
-    logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
+    logger.debug(`handleVerifyingOverrides complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
   }
   async function handleComplete(stateMachine) {
@@ -1552,6 +1569,7 @@ You may need to refresh the page to see the new scores.`);
     [STATES.UPDATING_GRADES]: handleUpdatingGrades,
     [STATES.POLLING_PROGRESS]: handlePollingProgress,
     [STATES.VERIFYING]: handleVerifying,
+    [STATES.VERIFYING_OVERRIDES]: handleVerifyingOverrides,
     [STATES.COMPLETE]: handleComplete,
     [STATES.ERROR]: handleError2
   };
@@ -1881,8 +1899,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-05 9:58:35 AM (dev, bca18f9)");
-    exposeVersion("dev", "2026-01-05 9:58:35 AM (dev, bca18f9)");
+    logBanner("dev", "2026-01-05 11:06:43 AM (dev, 7e81e09)");
+    exposeVersion("dev", "2026-01-05 11:06:43 AM (dev, 7e81e09)");
     if (true) {
       logger.info("Running in DEV mode");
     }

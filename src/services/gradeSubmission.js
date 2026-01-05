@@ -97,10 +97,6 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
                 }
             }
         };
-        // Fire override in parallel (do not await)
-        if (ENABLE_GRADE_OVERRIDE) {
-            await queueOverride(courseId, userId, average, apiClient);
-        }
     }
     logger.debug("bulk gradeData payload:", gradeData);
 
