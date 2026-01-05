@@ -13,5 +13,5 @@ TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
 TODO: GREY OUT BUTTON IF PROCESS IS ALREADY RUNNING
 TODO: ADD SPINNER INSTEAD OF TIMER
-TODO: option to zero out points possible toggle
+TODO: option to zero out points possible toggle.
 
