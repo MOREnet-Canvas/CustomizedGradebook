@@ -76,6 +76,7 @@ export async function fetchOverrideGrades(courseId, apiClient) {
         }
 
         logger.debug(`Fetched ${overrideMap.size} override grades`);
+        logger.debug('overrides:', overrides);
         return overrideMap;
     } catch (error) {
         logger.error('Failed to fetch override grades:', error);

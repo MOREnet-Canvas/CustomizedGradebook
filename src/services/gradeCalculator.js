@@ -81,12 +81,12 @@ export function calculateStudentAverages(data, outcomeId) {
         let newAverage = total / (relevantScores.length);
         newAverage = parseFloat(newAverage.toFixed(2));
 
-        logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
-        logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
+        logger.trace(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
+        logger.trace(`Old average: ${oldAverage} New average: ${newAverage}`);
 
         // Only include students whose average has changed
         if (oldAverage === newAverage) {
-            logger.debug("old average matches new average");
+            logger.trace("old average matches new average");
             continue; // no update needed
         }
 

@@ -294,7 +294,7 @@ export async function handleVerifyingOverrides(stateMachine) {
 
             const override = OVERRIDE_SCALE(average);
             await setOverrideScoreGQL(enrollmentId, override, apiClient);
-            logger.debug(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
+            logger.trace(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
             successCount++;
         } catch (e) {
             logger.warn(`[override] Failed for user ${userId}:`, e?.message || e);
