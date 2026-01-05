@@ -47,7 +47,7 @@ export function calculateStudentAverages(data, outcomeId) {
      * @returns {number|null} Current score or null if not found
      */
     function getCurrentOutcomeScore(scores) {
-        logger.debug('Scores: ', scores);
+        logger.trace('Scores: ', scores);
         const match = scores.find(s => String(s.links?.outcome) === String(outcomeId));
         return match?.score ?? null;  // return null if not found
     }
