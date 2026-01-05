@@ -58,7 +58,7 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
     }
 
     /**
-     * Get the current "Current Score" outcome score for a student
+     * Get the current AVG_OUTCOME_NAME outcome score for a student
      * @param {Array} scores - Array of score objects for a student
      * @returns {number|null} Current score or null if not found
      */
@@ -75,7 +75,7 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
 
         const oldAverage = getCurrentOutcomeScore(rollup.scores);
 
-        // Filter to only relevant scores (exclude "Current Score" and excluded keywords)
+        // Filter to only relevant scores
         const relevantScores = rollup.scores.filter(s => {
             const id = String(s.links?.outcome);
             const title = (outcomeMap[id] || "").toLowerCase();
@@ -140,10 +140,7 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
         }
     }
 
-    logger.debug(`Calculation complete: ${averages.length} students need updates`);
-    if (ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
-        logger.debug(`  (checked both outcome scores and override grades)`);
-    }
+    logger.debug("averages after calculations:", averages);
     return averages;
 }
 
