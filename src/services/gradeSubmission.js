@@ -19,6 +19,7 @@ import { getCourseId } from "../utils/canvas.js";
 import { CanvasApiClient } from "../utils/canvasApiClient.js";
 import {
     AVG_OUTCOME_NAME,
+    ENABLE_OUTCOME_UPDATES,
     ENABLE_GRADE_OVERRIDE,
     OVERRIDE_SCALE
 } from "../config.js";
@@ -39,6 +40,12 @@ import { logger } from "../utils/logger.js";
  * @throws {Error} If submission fails
  */
 export async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
+    // Check if outcome updates are enabled
+    if (!ENABLE_OUTCOME_UPDATES) {
+        logger.trace(`Outcome updates disabled, skipping rubric score submission for user ${userId}`);
+        return;
+    }
+
     const timeStamp = new Date().toLocaleString();
 
     logger.trace("Submitting rubric score for student", userId);
@@ -81,6 +88,13 @@ export async function submitRubricScore(courseId, assignmentId, userId, rubricCr
  * @throws {Error} If bulk update fails
  */
 export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient) {
+    // Check if outcome updates are enabled
+    if (!ENABLE_OUTCOME_UPDATES) {
+        logger.debug('Outcome updates disabled, skipping bulk update');
+        // Return a fake progress ID that will be handled gracefully
+        return 'SKIPPED_NO_OUTCOME_UPDATES';
+    }
+
     const timeStamp = new Date().toLocaleString();
 
     // Build grade_data object
@@ -197,6 +211,9 @@ export async function waitForBulkGrading(box, apiClient, stateMachine, timeout =
 export async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, apiClient, testing = false) {
     const updateInterval = 1;
     const numberOfUpdates = averages.length;
+
+    // Log grading mode
+    logger.debug(`Per-student grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
 
     box.setText(`Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...`);
 
