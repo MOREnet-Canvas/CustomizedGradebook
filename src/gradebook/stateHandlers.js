@@ -29,6 +29,8 @@ import { getRollup, getOutcomeObjectByName, createOutcome } from "../services/ou
 import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services/assignmentService.js";
 import { getRubricForAssignment, createRubric } from "../services/rubricService.js";
 import { getAssignmentId } from "../utils/canvasHelpers.js";
+import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOverrideVerification.js";
+import { getAllEnrollmentIds } from "../services/gradeOverride.js";
 
 /**
  * CHECKING_SETUP State Handler
@@ -100,6 +102,14 @@ export async function handleCheckingSetup(stateMachine) {
     }
 
     stateMachine.updateContext({ rubricId, rubricCriterionId });
+
+    // Enable final grade override if configured
+    try {
+        await enableCourseOverride(courseId, apiClient);
+    } catch (error) {
+        logger.warn('Failed to enable course override, continuing anyway:', error);
+        // Don't fail the entire flow if override setup fails
+    }
 
     // All resources exist, move to calculating
     return STATES.CALCULATING;
@@ -237,14 +247,31 @@ export async function handlePollingProgress(stateMachine) {
 
 /**
  * VERIFYING State Handler
- * Verifies that scores appear in the UI
+ * Verifies that outcome scores and override grades match expected values
  */
 export async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    logger.debug('Starting verification...');
+    logger.debug('Starting outcome score verification...');
     await verifyUIScores(courseId, averages, outcomeId, banner, apiClient);
+
+    // Verify override scores if enabled
+    try {
+        logger.debug('Starting override score verification...');
+        const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+        const overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+
+        if (overrideMismatches.length > 0) {
+            logger.warn(`Found ${overrideMismatches.length} override score mismatches - these may resolve on retry`);
+            // Don't fail the flow, just log the mismatches
+        } else {
+            logger.info('All override scores verified successfully');
+        }
+    } catch (error) {
+        logger.warn('Override verification failed, continuing anyway:', error);
+        // Don't fail the entire flow if override verification fails
+    }
 
     logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
@@ -287,16 +314,16 @@ export async function handleComplete(stateMachine) {
 
 /**
  * ERROR State Handler
- * Handles errors and allows retry
+ * Handles errors and indicates premature termination
  */
 export async function handleError(stateMachine) {
     const { error, banner } = stateMachine.getContext();
 
-    logger.error('Update error:', error);
+    logger.error('Update ended prematurely:', error);
 
     if (banner) {
-        banner.setText(`Error: ${error.message}`);
-        setTimeout(() => banner.remove(), 3000);
+        banner.setText(`Update ended prematurely: ${error.message}. You can re-run the update to ensure all scores are correctly set.`);
+        setTimeout(() => banner.remove(), 5000);
     }
 
     return STATES.IDLE;

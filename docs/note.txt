@@ -11,9 +11,9 @@ For checking version in DevTools: CG.version
 TODO: The resume feature is not working for the verification step. Resume button does not appear.
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Verify overrides
-TODO: better way to handle api headers and such
 TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
 TODO: GREY OUT BUTTON IF PROCESS IS ALREADY RUNNING
 TODO: ADD SPINNER INSTEAD OF TIMER
-
+TODO: When checking if updates need to be made, need to also check overrides.  just run verification?
+TODO: option to zero out points possible toggle
 

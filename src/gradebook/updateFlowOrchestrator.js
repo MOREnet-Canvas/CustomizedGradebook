@@ -31,13 +31,8 @@ export async function startUpdateFlow(button = null) {
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
 
-    // Try to restore previous state
+    // Create state machine
     const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-
-    if (restored) {
-        logger.info('Resuming update flow from saved state:', stateMachine.getCurrentState());
-    }
 
     // Create banner
     const banner = showFloatingBanner({
@@ -51,10 +46,8 @@ export async function startUpdateFlow(button = null) {
     alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.");
 
     try {
-        // Start from IDLE if not restored, otherwise continue from saved state
-        if (!restored) {
-            stateMachine.transition(STATES.CHECKING_SETUP);
-        }
+        // Start from CHECKING_SETUP
+        stateMachine.transition(STATES.CHECKING_SETUP);
 
         // Run state machine loop
         while (stateMachine.getCurrentState() !== STATES.IDLE) {
@@ -82,10 +75,6 @@ export async function startUpdateFlow(button = null) {
                 stateMachine.transition(nextState);
             }
 
-            // Save state AFTER transitioning to ensure we save the new state
-            stateMachine.saveToLocalStorage(courseId);
-            logger.debug(`State saved to localStorage: ${stateMachine.getCurrentState()}`);
-
             // Update debug UI if in debug mode
             updateDebugUI(stateMachine);
         }
@@ -104,7 +93,6 @@ export async function startUpdateFlow(button = null) {
         // Transition to ERROR state
         stateMachine.updateContext({ error });
         stateMachine.transition(STATES.ERROR);
-        stateMachine.saveToLocalStorage(courseId);
 
         // Handle error display
         if (error instanceof UserCancelledError) {
@@ -118,16 +106,13 @@ export async function startUpdateFlow(button = null) {
             }, 3000);
         }
 
-        cleanUpLocalStorage();
-
         // Reset button even on error
         resetButtonToNormal(button);
 
         // Remove debug UI on error
         removeDebugUI();
     } finally {
-        // Clear state machine from localStorage
-        stateMachine.clearLocalStorage(courseId);
+        // Clean up any legacy localStorage entries
         cleanUpLocalStorage();
     }
 }

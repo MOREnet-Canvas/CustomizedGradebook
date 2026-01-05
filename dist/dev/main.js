@@ -263,11 +263,144 @@
     }
   });
 
-  // src/utils/keys.js
-  var k;
-  var init_keys = __esm({
-    "src/utils/keys.js"() {
-      k = (name, courseId) => `${name}_${courseId}`;
+  // src/utils/errorHandler.js
+  function logError(error, context, metadata = {}) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const errorInfo = __spreadValues({
+      timestamp,
+      context,
+      name: error.name,
+      message: error.message
+    }, metadata);
+    logger.error(`[${context}] ${error.name}: ${error.message}`, errorInfo);
+    if (logger.isDebugEnabled() && error.stack) {
+      logger.error("Stack trace:", error.stack);
+    }
+    if (error instanceof CanvasApiError) {
+      logger.error(`  Status: ${error.statusCode}`);
+      if (logger.isDebugEnabled() && error.responseText) {
+        logger.error(`  Response: ${error.responseText}`);
+      }
+    } else if (error instanceof TimeoutError) {
+      logger.error(`  Timeout: ${error.timeoutMs}ms`);
+    } else if (error instanceof ValidationError && error.field) {
+      logger.error(`  Field: ${error.field}`);
+    }
+  }
+  function getUserFriendlyMessage(error) {
+    if (error instanceof UserCancelledError) {
+      return error.message || "Operation cancelled.";
+    }
+    if (error instanceof TimeoutError) {
+      return "The operation took too long and timed out. Please try again.";
+    }
+    if (error instanceof ValidationError) {
+      return error.message;
+    }
+    if (error instanceof CanvasApiError) {
+      if (error.statusCode === 401 || error.statusCode === 403) {
+        return "You don't have permission to perform this action.";
+      }
+      if (error.statusCode === 404) {
+        return "The requested resource was not found.";
+      }
+      if (error.statusCode >= 500) {
+        return "Canvas server error. Please try again later.";
+      }
+      return `Canvas API error: ${error.message}`;
+    }
+    const message = error.message || "An unknown error occurred";
+    const technicalKeywords = ["fetch", "JSON", "undefined", "null", "parse", "response"];
+    const isTechnical = technicalKeywords.some(
+      (keyword) => message.toLowerCase().includes(keyword.toLowerCase())
+    );
+    if (isTechnical) {
+      return "An unexpected error occurred. Please try again or contact support.";
+    }
+    return message;
+  }
+  function handleError(error, context, options = {}) {
+    const { showAlert = false, banner = null, metadata = {} } = options;
+    logError(error, context, metadata);
+    const userMessage = getUserFriendlyMessage(error);
+    if (banner && typeof banner.setText === "function") {
+      banner.setText(userMessage);
+    }
+    if (showAlert && !(error instanceof UserCancelledError)) {
+      alert(userMessage);
+    }
+    return userMessage;
+  }
+  async function safeFetch(url, options = {}, context = "fetch") {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new CanvasApiError(
+          `HTTP ${response.status}: ${response.statusText}`,
+          response.status,
+          responseText
+        );
+      }
+      return response;
+    } catch (error) {
+      if (error instanceof CanvasApiError) {
+        throw error;
+      }
+      throw new CanvasApiError(
+        `Network error: ${error.message}`,
+        0,
+        null
+      );
+    }
+  }
+  async function safeJsonParse(response, context = "parseJSON") {
+    const rawText = await response.text();
+    try {
+      return JSON.parse(rawText);
+    } catch (error) {
+      if (logger.isDebugEnabled()) {
+        logger.error(`[${context}] Failed to parse JSON:`, rawText);
+      }
+      throw new CanvasApiError(
+        "Invalid JSON response from Canvas API",
+        response.status,
+        rawText
+      );
+    }
+  }
+  var CanvasApiError, UserCancelledError, TimeoutError, ValidationError;
+  var init_errorHandler = __esm({
+    "src/utils/errorHandler.js"() {
+      init_logger();
+      CanvasApiError = class extends Error {
+        constructor(message, statusCode, responseText) {
+          super(message);
+          this.name = "CanvasApiError";
+          this.statusCode = statusCode;
+          this.responseText = responseText;
+        }
+      };
+      UserCancelledError = class extends Error {
+        constructor(message = "User cancelled the operation") {
+          super(message);
+          this.name = "UserCancelledError";
+        }
+      };
+      TimeoutError = class extends Error {
+        constructor(message, timeoutMs) {
+          super(message);
+          this.name = "TimeoutError";
+          this.timeoutMs = timeoutMs;
+        }
+      };
+      ValidationError = class extends Error {
+        constructor(message, field) {
+          super(message);
+          this.name = "ValidationError";
+          this.field = field;
+        }
+      };
     }
   });
 
@@ -415,95 +548,6 @@
           });
         }
         /**
-         * Serialize state machine to JSON
-         * @returns {object} Serialized state
-         */
-        serialize() {
-          return {
-            currentState: this.currentState,
-            context: __spreadProps(__spreadValues({}, this.context), {
-              banner: null
-              // Don't serialize UI references
-            }),
-            stateHistory: this.stateHistory,
-            timestamp: (/* @__PURE__ */ new Date()).toISOString()
-          };
-        }
-        /**
-         * Deserialize state machine from JSON
-         * @param {object} data - Serialized state data
-         */
-        deserialize(data) {
-          if (!data) return;
-          this.currentState = data.currentState || STATES.IDLE;
-          this.context = __spreadProps(__spreadValues(__spreadValues({}, this.context), data.context), {
-            timestamp: data.timestamp
-            // Preserve timestamp from serialization
-          });
-          this.stateHistory = data.stateHistory || [this.currentState];
-          logger.debug(`State machine restored to ${this.currentState}`);
-        }
-        /**
-         * Save state to localStorage
-         * @param {string} courseId - Course ID for storage key
-         */
-        saveToLocalStorage(courseId) {
-          if (!courseId) {
-            logger.warn("Cannot save state: courseId is required");
-            return;
-          }
-          try {
-            const serialized = this.serialize();
-            localStorage.setItem(`updateFlow_state_${courseId}`, JSON.stringify(serialized));
-            logger.debug(`State saved to localStorage for course ${courseId}`);
-          } catch (error) {
-            logger.error("Failed to save state to localStorage:", error);
-          }
-        }
-        /**
-         * Load state from localStorage
-         * @param {string} courseId - Course ID for storage key
-         * @returns {boolean} True if state was loaded
-         */
-        loadFromLocalStorage(courseId) {
-          if (!courseId) {
-            logger.warn("Cannot load state: courseId is required");
-            return false;
-          }
-          try {
-            const stored = localStorage.getItem(`updateFlow_state_${courseId}`);
-            if (!stored) return false;
-            const data = JSON.parse(stored);
-            const timestamp = new Date(data.timestamp);
-            const now = /* @__PURE__ */ new Date();
-            const ageInMinutes = (now - timestamp) / 1e3 / 60;
-            if (ageInMinutes > 20) {
-              logger.debug(`Stored state is ${ageInMinutes.toFixed(0)} minutes old, ignoring`);
-              this.clearLocalStorage(courseId);
-              return false;
-            }
-            this.deserialize(data);
-            logger.info(`State restored from ${ageInMinutes.toFixed(1)} minutes ago`);
-            return true;
-          } catch (error) {
-            logger.error("Failed to load state from localStorage:", error);
-            return false;
-          }
-        }
-        /**
-         * Clear state from localStorage
-         * @param {string} courseId - Course ID for storage key
-         */
-        clearLocalStorage(courseId) {
-          if (!courseId) return;
-          try {
-            localStorage.removeItem(`updateFlow_state_${courseId}`);
-            logger.debug(`State cleared from localStorage for course ${courseId}`);
-          } catch (error) {
-            logger.error("Failed to clear state from localStorage:", error);
-          }
-        }
-        /**
          * Get state history
          * @returns {array} Array of state names in order
          */
@@ -535,147 +579,6 @@
           this.stateHistory = [STATES.IDLE];
           logger.debug("State machine reset to IDLE");
           this.emit("reset", {});
-        }
-      };
-    }
-  });
-
-  // src/utils/errorHandler.js
-  function logError(error, context, metadata = {}) {
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-    const errorInfo = __spreadValues({
-      timestamp,
-      context,
-      name: error.name,
-      message: error.message
-    }, metadata);
-    logger.error(`[${context}] ${error.name}: ${error.message}`, errorInfo);
-    if (logger.isDebugEnabled() && error.stack) {
-      logger.error("Stack trace:", error.stack);
-    }
-    if (error instanceof CanvasApiError) {
-      logger.error(`  Status: ${error.statusCode}`);
-      if (logger.isDebugEnabled() && error.responseText) {
-        logger.error(`  Response: ${error.responseText}`);
-      }
-    } else if (error instanceof TimeoutError) {
-      logger.error(`  Timeout: ${error.timeoutMs}ms`);
-    } else if (error instanceof ValidationError && error.field) {
-      logger.error(`  Field: ${error.field}`);
-    }
-  }
-  function getUserFriendlyMessage(error) {
-    if (error instanceof UserCancelledError) {
-      return error.message || "Operation cancelled.";
-    }
-    if (error instanceof TimeoutError) {
-      return "The operation took too long and timed out. Please try again.";
-    }
-    if (error instanceof ValidationError) {
-      return error.message;
-    }
-    if (error instanceof CanvasApiError) {
-      if (error.statusCode === 401 || error.statusCode === 403) {
-        return "You don't have permission to perform this action.";
-      }
-      if (error.statusCode === 404) {
-        return "The requested resource was not found.";
-      }
-      if (error.statusCode >= 500) {
-        return "Canvas server error. Please try again later.";
-      }
-      return `Canvas API error: ${error.message}`;
-    }
-    const message = error.message || "An unknown error occurred";
-    const technicalKeywords = ["fetch", "JSON", "undefined", "null", "parse", "response"];
-    const isTechnical = technicalKeywords.some(
-      (keyword) => message.toLowerCase().includes(keyword.toLowerCase())
-    );
-    if (isTechnical) {
-      return "An unexpected error occurred. Please try again or contact support.";
-    }
-    return message;
-  }
-  function handleError(error, context, options = {}) {
-    const { showAlert = false, banner = null, metadata = {} } = options;
-    logError(error, context, metadata);
-    const userMessage = getUserFriendlyMessage(error);
-    if (banner && typeof banner.setText === "function") {
-      banner.setText(userMessage);
-    }
-    if (showAlert && !(error instanceof UserCancelledError)) {
-      alert(userMessage);
-    }
-    return userMessage;
-  }
-  async function safeFetch(url, options = {}, context = "fetch") {
-    try {
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        const responseText = await response.text();
-        throw new CanvasApiError(
-          `HTTP ${response.status}: ${response.statusText}`,
-          response.status,
-          responseText
-        );
-      }
-      return response;
-    } catch (error) {
-      if (error instanceof CanvasApiError) {
-        throw error;
-      }
-      throw new CanvasApiError(
-        `Network error: ${error.message}`,
-        0,
-        null
-      );
-    }
-  }
-  async function safeJsonParse(response, context = "parseJSON") {
-    const rawText = await response.text();
-    try {
-      return JSON.parse(rawText);
-    } catch (error) {
-      if (logger.isDebugEnabled()) {
-        logger.error(`[${context}] Failed to parse JSON:`, rawText);
-      }
-      throw new CanvasApiError(
-        "Invalid JSON response from Canvas API",
-        response.status,
-        rawText
-      );
-    }
-  }
-  var CanvasApiError, UserCancelledError, TimeoutError, ValidationError;
-  var init_errorHandler = __esm({
-    "src/utils/errorHandler.js"() {
-      init_logger();
-      CanvasApiError = class extends Error {
-        constructor(message, statusCode, responseText) {
-          super(message);
-          this.name = "CanvasApiError";
-          this.statusCode = statusCode;
-          this.responseText = responseText;
-        }
-      };
-      UserCancelledError = class extends Error {
-        constructor(message = "User cancelled the operation") {
-          super(message);
-          this.name = "UserCancelledError";
-        }
-      };
-      TimeoutError = class extends Error {
-        constructor(message, timeoutMs) {
-          super(message);
-          this.name = "TimeoutError";
-          this.timeoutMs = timeoutMs;
-        }
-      };
-      ValidationError = class extends Error {
-        constructor(message, field) {
-          super(message);
-          this.name = "ValidationError";
-          this.field = field;
         }
       };
     }
@@ -812,6 +715,356 @@
     }
   });
 
+  // src/utils/keys.js
+  var k;
+  var init_keys = __esm({
+    "src/utils/keys.js"() {
+      k = (name, courseId) => `${name}_${courseId}`;
+    }
+  });
+
+  // src/ui/banner.js
+  function showFloatingBanner({
+    text = "",
+    duration = null,
+    // null = stays until removed; number = auto-hide after ms
+    top = "20px",
+    right = "20px",
+    center = false,
+    backgroundColor = BRAND_COLOR,
+    textColor = "#ffffff",
+    allowMultiple = false,
+    // keep existing banners?
+    ariaLive = "polite"
+    // "polite" | "assertive" | "off"
+  } = {}) {
+    if (!allowMultiple) {
+      document.querySelectorAll(".floating-banner").forEach((b) => b.remove());
+    }
+    const baseElement = document.querySelector(".ic-Layout-contentMain") || document.querySelector(".ic-app-header__menu-list-item__link") || document.body;
+    const styles = getComputedStyle(baseElement);
+    const fontFamily = styles.fontFamily;
+    const fontSize = styles.fontSize;
+    const fontWeight = styles.fontWeight;
+    const banner = document.createElement("div");
+    banner.className = "floating-banner";
+    banner.setAttribute("role", "status");
+    if (ariaLive && ariaLive !== "off") banner.setAttribute("aria-live", ariaLive);
+    Object.assign(banner.style, {
+      position: "fixed",
+      top,
+      background: backgroundColor,
+      padding: "10px 20px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+      zIndex: "9999",
+      fontSize,
+      color: textColor,
+      fontFamily,
+      fontWeight,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "12px",
+      maxWidth: "min(90vw, 720px)",
+      lineHeight: "1.35",
+      wordBreak: "break-word"
+    });
+    if (center) {
+      banner.style.left = "50%";
+      banner.style.transform = "translateX(-50%)";
+    } else {
+      banner.style.right = right;
+    }
+    const msg = document.createElement("span");
+    msg.className = "floating-banner__text";
+    banner.appendChild(msg);
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.setAttribute("aria-label", "Dismiss message");
+    closeBtn.textContent = "\xD7";
+    Object.assign(closeBtn.style, {
+      cursor: "pointer",
+      fontWeight: "bold",
+      border: "none",
+      background: "transparent",
+      color: "inherit",
+      fontSize,
+      lineHeight: "1"
+    });
+    closeBtn.onclick = () => destroy();
+    banner.appendChild(closeBtn);
+    document.body.appendChild(banner);
+    let lockedUntil = 0;
+    let pending = null;
+    let holdTimer = null;
+    let autoTimer = null;
+    const now = () => Date.now();
+    const isLocked = () => now() < lockedUntil;
+    const courseId = getCourseId();
+    const apply = (textValue) => {
+      msg.textContent = textValue;
+      if (courseId) localStorage.setItem(k("bannerLast", courseId), textValue);
+    };
+    const unlockAndFlush = () => {
+      lockedUntil = 0;
+      if (pending != null) {
+        apply(pending);
+        pending = null;
+      }
+    };
+    banner.setText = (newText) => {
+      if (isLocked()) {
+        pending = newText;
+      } else {
+        apply(newText);
+      }
+    };
+    banner.hold = (newText, ms = 3e3) => {
+      const now2 = Date.now();
+      if (now2 < lockedUntil) {
+        pending = newText;
+        return;
+      }
+      lockedUntil = now2 + ms;
+      apply(newText);
+      if (holdTimer) clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        lockedUntil = 0;
+        if (pending != null) {
+          apply(pending);
+          pending = null;
+        }
+      }, ms);
+    };
+    banner.soft = (newText) => {
+      if (!isLocked()) apply(newText);
+    };
+    function destroy() {
+      if (holdTimer) clearTimeout(holdTimer);
+      if (autoTimer) clearTimeout(autoTimer);
+      banner.style.transition = "opacity 150ms";
+      banner.style.opacity = "0";
+      setTimeout(() => banner.remove(), 160);
+    }
+    banner.removeBanner = destroy;
+    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
+    if (typeof duration === "number" && isFinite(duration) && duration >= 0) {
+      autoTimer = setTimeout(destroy, duration);
+    }
+    closeBtn.onclick = () => {
+      destroy();
+      ensureStatusPill(courseId);
+    };
+    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
+    return banner;
+  }
+  var BRAND_COLOR;
+  var init_banner = __esm({
+    "src/ui/banner.js"() {
+      init_canvas();
+      init_keys();
+      init_uiHelpers();
+      BRAND_COLOR = getComputedStyle(document.documentElement).getPropertyValue("--ic-brand-primary").trim() || "#0c7d9d";
+    }
+  });
+
+  // src/services/verification.js
+  var verification_exports = {};
+  __export(verification_exports, {
+    verifyUIScores: () => verifyUIScores
+  });
+  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, waitTimeMs = 5e3, maxRetries = 50) {
+    let state = "verifying";
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let elapsed = getElapsedTimeSinceStart();
+      box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
+      startElapsedTimer(courseId, box);
+      const newRollupData = await apiClient.get(
+        `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`,
+        {},
+        "verifyUIScores"
+      );
+      logger.debug("newRollupData: ", newRollupData);
+      const mismatches = [];
+      for (const { userId, average } of averages) {
+        const matchingRollup = newRollupData.rollups.find(
+          (r) => r.links.user.toString() === userId.toString()
+        );
+        if (!matchingRollup) {
+          mismatches.push({ userId, reason: "No rollup found." });
+          continue;
+        }
+        const scoreObj = matchingRollup.scores[0];
+        if (!scoreObj) {
+          mismatches.push({ userId, reason: "No score found." });
+          continue;
+        }
+        const score = scoreObj.score;
+        const matches = Math.abs(score - average) < 1e-3;
+        if (!matches) {
+          mismatches.push({ userId, expected: average, actual: score });
+        }
+      }
+      if (mismatches.length === 0) {
+        logger.info("All averages match backend scores.");
+        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, (/* @__PURE__ */ new Date()).toISOString());
+        const durationSeconds = getElapsedTimeSinceStart();
+        localStorage.setItem(`duration_${getCourseId()}`, durationSeconds);
+        return;
+      } else {
+        logger.warn("Mismatches found:", mismatches);
+        logger.info(`Waiting ${waitTimeMs / 1e3} seconds before retrying...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+      }
+    }
+  }
+  var init_verification = __esm({
+    "src/services/verification.js"() {
+      init_canvas();
+      init_canvasApiClient();
+      init_uiHelpers();
+      init_logger();
+    }
+  });
+
+  // src/utils/uiHelpers.js
+  function getElapsedTimeSinceStart(endTime = Date.now()) {
+    const courseId = getCourseId();
+    const stateMachine = new UpdateFlowStateMachine();
+    const restored = stateMachine.loadFromLocalStorage(courseId);
+    if (!restored) return 0;
+    const context = stateMachine.getContext();
+    if (!context.startTime) return 0;
+    const startMs = new Date(context.startTime).getTime();
+    const endMs = endTime instanceof Date ? endTime.getTime() : new Date(endTime).getTime();
+    return Math.floor((endMs - startMs) / 1e3);
+  }
+  function startElapsedTimer(courseId, box) {
+    const node = box.querySelector(".floating-banner__text") || box;
+    stopElapsedTimer(box);
+    const re = /\(Elapsed time:\s*\d+s\)/;
+    const tick = () => {
+      const elapsed = getElapsedTimeSinceStart();
+      const current = node.textContent || "";
+      if (re.test(current)) {
+        node.textContent = current.replace(re, `(Elapsed time: ${elapsed}s)`);
+      } else {
+        node.textContent = current.trim().length ? `${current} (Elapsed time: ${elapsed}s)` : `(Elapsed time: ${elapsed}s)`;
+      }
+    };
+    tick();
+    box._elapsedTimerId = setInterval(tick, 1e3);
+  }
+  function stopElapsedTimer(box) {
+    if (box && box._elapsedTimerId) {
+      clearInterval(box._elapsedTimerId);
+      delete box._elapsedTimerId;
+    }
+  }
+  function renderLastUpdateNotice(container, courseId) {
+    let row = container.querySelector("#avg-last-update");
+    if (!row) {
+      row = document.createElement("div");
+      row.id = "avg-last-update";
+      row.style.fontSize = "12px";
+      row.style.marginTop = "4px";
+      row.style.opacity = "0.8";
+      container.appendChild(row);
+    }
+    const lastAt = localStorage.getItem(`lastUpdateAt_${courseId}`);
+    const durSec = parseInt(localStorage.getItem(`duration_${courseId}`), 10);
+    const formatDuration = (s) => Number.isFinite(s) ? `${Math.floor(s / 60)}m ${s % 60}s` : "N/A";
+    row.textContent = lastAt ? `Last update: ${new Date(lastAt).toLocaleString()} | Duration: ${formatDuration(durSec)}` : `Last update: none yet`;
+  }
+  function ensureStatusPill(courseId) {
+    var _a;
+    if (document.getElementById("avg-status-pill")) return;
+    const safeParse = (s) => {
+      try {
+        return JSON.parse(s);
+      } catch (e) {
+        return null;
+      }
+    };
+    const buttonWrapper = (_a = document.querySelector("#update-scores-button")) == null ? void 0 : _a.parentElement;
+    if (!buttonWrapper) {
+      const pill2 = document.createElement("button");
+      pill2.id = "avg-status-pill";
+      pill2.textContent = "Show status";
+      Object.assign(pill2.style, {
+        position: "fixed",
+        bottom: "16px",
+        right: "16px",
+        padding: "6px 10px",
+        borderRadius: "16px",
+        border: "1px solid #ccc",
+        background: "#fff",
+        cursor: "pointer",
+        zIndex: 1e4
+      });
+      pill2.onclick = () => {
+        pill2.remove();
+        localStorage.setItem(k("bannerDismissed", getCourseId()), "false");
+        const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
+        showFloatingBanner({ courseId: getCourseId(), text });
+      };
+      document.body.appendChild(pill2);
+      return;
+    }
+    const pill = makeButton({
+      label: "Show Status",
+      id: "avg-status-pill",
+      tooltip: "Show last update status",
+      onClick: async () => {
+        pill.remove();
+        const courseId2 = getCourseId();
+        const stateMachine = new UpdateFlowStateMachine();
+        const restored = stateMachine.loadFromLocalStorage(courseId2);
+        if (restored) {
+          const context = stateMachine.getContext();
+          const currentState = stateMachine.getCurrentState();
+          const { waitForBulkGrading: waitForBulkGrading2 } = await Promise.resolve().then(() => (init_gradeSubmission(), gradeSubmission_exports));
+          const { verifyUIScores: verifyUIScores2 } = await Promise.resolve().then(() => (init_verification(), verification_exports));
+          const { STATES: STATES2 } = await Promise.resolve().then(() => (init_stateMachine(), stateMachine_exports));
+          if (currentState === STATES2.POLLING_PROGRESS && context.progressId) {
+            const box = showFloatingBanner({ text: "Resuming: checking upload status" });
+            await waitForBulkGrading2(box);
+            return;
+          }
+          if (currentState === STATES2.VERIFYING && context.averages && context.outcomeId) {
+            const box = showFloatingBanner({ text: "Verifying updated scores" });
+            try {
+              await verifyUIScores2(courseId2, context.averages, context.outcomeId, box);
+              box.setText(`All ${context.averages.length} scores verified!`);
+            } catch (e) {
+              logger.warn("Verification on resume failed:", e);
+              box.setText("Verification failed. You can try updating again.");
+            }
+            return;
+          }
+        }
+        const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
+        showFloatingBanner({ text });
+      },
+      type: "secondary"
+    });
+    pill.style.fontSize = "11px";
+    pill.style.padding = "4px 8px";
+    pill.style.marginBottom = "4px";
+    pill.style.marginLeft = "0";
+    buttonWrapper.insertBefore(pill, buttonWrapper.firstChild);
+  }
+  var init_uiHelpers = __esm({
+    "src/utils/uiHelpers.js"() {
+      init_canvas();
+      init_keys();
+      init_banner();
+      init_buttons();
+      init_logger();
+      init_stateMachine();
+    }
+  });
+
   // src/services/gradeOverride.js
   async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) {
     var _a, _b, _c, _d, _e;
@@ -837,24 +1090,26 @@
     }
     return (_e = (_d = (_c = (_b = (_a = json.data) == null ? void 0 : _a.setOverrideScore) == null ? void 0 : _b.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
   }
-  async function getEnrollmentIdForUser(courseId, userId, apiClient) {
+  async function getAllEnrollmentIds(courseId, apiClient) {
     const courseKey = String(courseId);
-    const userKey = String(userId);
     if (__enrollmentMapCache.has(courseKey)) {
-      const cachedMap = __enrollmentMapCache.get(courseKey);
-      return cachedMap.get(userKey) || null;
+      return __enrollmentMapCache.get(courseKey);
     }
     const map = /* @__PURE__ */ new Map();
     let url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment&per_page=100`;
     while (url) {
-      const data = await apiClient.get(url, {}, "getEnrollmentIdForUser");
+      const data = await apiClient.get(url, {}, "getAllEnrollmentIds");
       for (const e of data) {
-        if ((e == null ? void 0 : e.user_id) && (e == null ? void 0 : e.id)) map.set(String(e.user_id), e.id);
+        if ((e == null ? void 0 : e.user_id) && (e == null ? void 0 : e.id)) map.set(String(e.user_id), String(e.id));
       }
       url = null;
     }
     __enrollmentMapCache.set(courseKey, map);
-    return map.get(userKey) || null;
+    return map;
+  }
+  async function getEnrollmentIdForUser(courseId, userId, apiClient) {
+    const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+    return enrollmentMap.get(String(userId)) || null;
   }
   async function queueOverride(courseId, userId, average, apiClient) {
     if (!ENABLE_GRADE_OVERRIDE) return;
@@ -1115,359 +1370,15 @@
     }
   });
 
-  // src/services/verification.js
-  var verification_exports = {};
-  __export(verification_exports, {
-    verifyUIScores: () => verifyUIScores
-  });
-  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, waitTimeMs = 5e3, maxRetries = 50) {
-    let state = "verifying";
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      let elapsed = getElapsedTimeSinceStart();
-      box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
-      startElapsedTimer(courseId, box);
-      const newRollupData = await apiClient.get(
-        `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`,
-        {},
-        "verifyUIScores"
-      );
-      logger.debug("newRollupData: ", newRollupData);
-      const mismatches = [];
-      for (const { userId, average } of averages) {
-        const matchingRollup = newRollupData.rollups.find(
-          (r) => r.links.user.toString() === userId.toString()
-        );
-        if (!matchingRollup) {
-          mismatches.push({ userId, reason: "No rollup found." });
-          continue;
-        }
-        const scoreObj = matchingRollup.scores[0];
-        if (!scoreObj) {
-          mismatches.push({ userId, reason: "No score found." });
-          continue;
-        }
-        const score = scoreObj.score;
-        const matches = Math.abs(score - average) < 1e-3;
-        if (!matches) {
-          mismatches.push({ userId, expected: average, actual: score });
-        }
-      }
-      if (mismatches.length === 0) {
-        logger.info("All averages match backend scores.");
-        localStorage.setItem(`lastUpdateAt_${getCourseId()}`, (/* @__PURE__ */ new Date()).toISOString());
-        const durationSeconds = getElapsedTimeSinceStart();
-        localStorage.setItem(`duration_${getCourseId()}`, durationSeconds);
-        return;
-      } else {
-        logger.warn("Mismatches found:", mismatches);
-        logger.info(`Waiting ${waitTimeMs / 1e3} seconds before retrying...`);
-        await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
-      }
-    }
-  }
-  var init_verification = __esm({
-    "src/services/verification.js"() {
-      init_canvas();
-      init_canvasApiClient();
-      init_uiHelpers();
-      init_logger();
-    }
-  });
-
-  // src/utils/uiHelpers.js
-  function getElapsedTimeSinceStart(endTime = Date.now()) {
-    const courseId = getCourseId();
-    const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-    if (!restored) return 0;
-    const context = stateMachine.getContext();
-    if (!context.startTime) return 0;
-    const startMs = new Date(context.startTime).getTime();
-    const endMs = endTime instanceof Date ? endTime.getTime() : new Date(endTime).getTime();
-    return Math.floor((endMs - startMs) / 1e3);
-  }
-  function startElapsedTimer(courseId, box) {
-    const node = box.querySelector(".floating-banner__text") || box;
-    stopElapsedTimer(box);
-    const re = /\(Elapsed time:\s*\d+s\)/;
-    const tick = () => {
-      const elapsed = getElapsedTimeSinceStart();
-      const current = node.textContent || "";
-      if (re.test(current)) {
-        node.textContent = current.replace(re, `(Elapsed time: ${elapsed}s)`);
-      } else {
-        node.textContent = current.trim().length ? `${current} (Elapsed time: ${elapsed}s)` : `(Elapsed time: ${elapsed}s)`;
-      }
-    };
-    tick();
-    box._elapsedTimerId = setInterval(tick, 1e3);
-  }
-  function stopElapsedTimer(box) {
-    if (box && box._elapsedTimerId) {
-      clearInterval(box._elapsedTimerId);
-      delete box._elapsedTimerId;
-    }
-  }
-  function renderLastUpdateNotice(container, courseId) {
-    let row = container.querySelector("#avg-last-update");
-    if (!row) {
-      row = document.createElement("div");
-      row.id = "avg-last-update";
-      row.style.fontSize = "12px";
-      row.style.marginTop = "4px";
-      row.style.opacity = "0.8";
-      container.appendChild(row);
-    }
-    const lastAt = localStorage.getItem(`lastUpdateAt_${courseId}`);
-    const durSec = parseInt(localStorage.getItem(`duration_${courseId}`), 10);
-    const formatDuration = (s) => Number.isFinite(s) ? `${Math.floor(s / 60)}m ${s % 60}s` : "N/A";
-    row.textContent = lastAt ? `Last update: ${new Date(lastAt).toLocaleString()} | Duration: ${formatDuration(durSec)}` : `Last update: none yet`;
-  }
-  function ensureStatusPill(courseId) {
-    var _a;
-    if (document.getElementById("avg-status-pill")) return;
-    const safeParse = (s) => {
-      try {
-        return JSON.parse(s);
-      } catch (e) {
-        return null;
-      }
-    };
-    const buttonWrapper = (_a = document.querySelector("#update-scores-button")) == null ? void 0 : _a.parentElement;
-    if (!buttonWrapper) {
-      const pill2 = document.createElement("button");
-      pill2.id = "avg-status-pill";
-      pill2.textContent = "Show status";
-      Object.assign(pill2.style, {
-        position: "fixed",
-        bottom: "16px",
-        right: "16px",
-        padding: "6px 10px",
-        borderRadius: "16px",
-        border: "1px solid #ccc",
-        background: "#fff",
-        cursor: "pointer",
-        zIndex: 1e4
-      });
-      pill2.onclick = () => {
-        pill2.remove();
-        localStorage.setItem(k("bannerDismissed", getCourseId()), "false");
-        const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
-        showFloatingBanner({ courseId: getCourseId(), text });
-      };
-      document.body.appendChild(pill2);
-      return;
-    }
-    const pill = makeButton({
-      label: "Show Status",
-      id: "avg-status-pill",
-      tooltip: "Show last update status",
-      onClick: async () => {
-        pill.remove();
-        const courseId2 = getCourseId();
-        const stateMachine = new UpdateFlowStateMachine();
-        const restored = stateMachine.loadFromLocalStorage(courseId2);
-        if (restored) {
-          const context = stateMachine.getContext();
-          const currentState = stateMachine.getCurrentState();
-          const { waitForBulkGrading: waitForBulkGrading2 } = await Promise.resolve().then(() => (init_gradeSubmission(), gradeSubmission_exports));
-          const { verifyUIScores: verifyUIScores2 } = await Promise.resolve().then(() => (init_verification(), verification_exports));
-          const { STATES: STATES2 } = await Promise.resolve().then(() => (init_stateMachine(), stateMachine_exports));
-          if (currentState === STATES2.POLLING_PROGRESS && context.progressId) {
-            const box = showFloatingBanner({ text: "Resuming: checking upload status" });
-            await waitForBulkGrading2(box);
-            return;
-          }
-          if (currentState === STATES2.VERIFYING && context.averages && context.outcomeId) {
-            const box = showFloatingBanner({ text: "Verifying updated scores" });
-            try {
-              await verifyUIScores2(courseId2, context.averages, context.outcomeId, box);
-              box.setText(`All ${context.averages.length} scores verified!`);
-            } catch (e) {
-              logger.warn("Verification on resume failed:", e);
-              box.setText("Verification failed. You can try updating again.");
-            }
-            return;
-          }
-        }
-        const text = localStorage.getItem(k("bannerLast", getCourseId())) || "Working";
-        showFloatingBanner({ text });
-      },
-      type: "secondary"
-    });
-    pill.style.fontSize = "11px";
-    pill.style.padding = "4px 8px";
-    pill.style.marginBottom = "4px";
-    pill.style.marginLeft = "0";
-    buttonWrapper.insertBefore(pill, buttonWrapper.firstChild);
-  }
-  var init_uiHelpers = __esm({
-    "src/utils/uiHelpers.js"() {
-      init_canvas();
-      init_keys();
-      init_banner();
-      init_buttons();
-      init_logger();
-      init_stateMachine();
-    }
-  });
-
-  // src/ui/banner.js
-  function showFloatingBanner({
-    text = "",
-    duration = null,
-    // null = stays until removed; number = auto-hide after ms
-    top = "20px",
-    right = "20px",
-    center = false,
-    backgroundColor = BRAND_COLOR,
-    textColor = "#ffffff",
-    allowMultiple = false,
-    // keep existing banners?
-    ariaLive = "polite"
-    // "polite" | "assertive" | "off"
-  } = {}) {
-    if (!allowMultiple) {
-      document.querySelectorAll(".floating-banner").forEach((b) => b.remove());
-    }
-    const baseElement = document.querySelector(".ic-Layout-contentMain") || document.querySelector(".ic-app-header__menu-list-item__link") || document.body;
-    const styles = getComputedStyle(baseElement);
-    const fontFamily = styles.fontFamily;
-    const fontSize = styles.fontSize;
-    const fontWeight = styles.fontWeight;
-    const banner = document.createElement("div");
-    banner.className = "floating-banner";
-    banner.setAttribute("role", "status");
-    if (ariaLive && ariaLive !== "off") banner.setAttribute("aria-live", ariaLive);
-    Object.assign(banner.style, {
-      position: "fixed",
-      top,
-      background: backgroundColor,
-      padding: "10px 20px",
-      borderRadius: "8px",
-      boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
-      zIndex: "9999",
-      fontSize,
-      color: textColor,
-      fontFamily,
-      fontWeight,
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "12px",
-      maxWidth: "min(90vw, 720px)",
-      lineHeight: "1.35",
-      wordBreak: "break-word"
-    });
-    if (center) {
-      banner.style.left = "50%";
-      banner.style.transform = "translateX(-50%)";
-    } else {
-      banner.style.right = right;
-    }
-    const msg = document.createElement("span");
-    msg.className = "floating-banner__text";
-    banner.appendChild(msg);
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.setAttribute("aria-label", "Dismiss message");
-    closeBtn.textContent = "\xD7";
-    Object.assign(closeBtn.style, {
-      cursor: "pointer",
-      fontWeight: "bold",
-      border: "none",
-      background: "transparent",
-      color: "inherit",
-      fontSize,
-      lineHeight: "1"
-    });
-    closeBtn.onclick = () => destroy();
-    banner.appendChild(closeBtn);
-    document.body.appendChild(banner);
-    let lockedUntil = 0;
-    let pending = null;
-    let holdTimer = null;
-    let autoTimer = null;
-    const now = () => Date.now();
-    const isLocked = () => now() < lockedUntil;
-    const courseId = getCourseId();
-    const apply = (textValue) => {
-      msg.textContent = textValue;
-      if (courseId) localStorage.setItem(k("bannerLast", courseId), textValue);
-    };
-    const unlockAndFlush = () => {
-      lockedUntil = 0;
-      if (pending != null) {
-        apply(pending);
-        pending = null;
-      }
-    };
-    banner.setText = (newText) => {
-      if (isLocked()) {
-        pending = newText;
-      } else {
-        apply(newText);
-      }
-    };
-    banner.hold = (newText, ms = 3e3) => {
-      const now2 = Date.now();
-      if (now2 < lockedUntil) {
-        pending = newText;
-        return;
-      }
-      lockedUntil = now2 + ms;
-      apply(newText);
-      if (holdTimer) clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => {
-        lockedUntil = 0;
-        if (pending != null) {
-          apply(pending);
-          pending = null;
-        }
-      }, ms);
-    };
-    banner.soft = (newText) => {
-      if (!isLocked()) apply(newText);
-    };
-    function destroy() {
-      if (holdTimer) clearTimeout(holdTimer);
-      if (autoTimer) clearTimeout(autoTimer);
-      banner.style.transition = "opacity 150ms";
-      banner.style.opacity = "0";
-      setTimeout(() => banner.remove(), 160);
-    }
-    banner.removeBanner = destroy;
-    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
-    if (typeof duration === "number" && isFinite(duration) && duration >= 0) {
-      autoTimer = setTimeout(destroy, duration);
-    }
-    closeBtn.onclick = () => {
-      destroy();
-      ensureStatusPill(courseId);
-    };
-    duration === "hold" ? banner.hold(text, 3e3) : banner.setText(text);
-    return banner;
-  }
-  var BRAND_COLOR;
-  var init_banner = __esm({
-    "src/ui/banner.js"() {
-      init_canvas();
-      init_keys();
-      init_uiHelpers();
-      BRAND_COLOR = getComputedStyle(document.documentElement).getPropertyValue("--ic-brand-primary").trim() || "#0c7d9d";
-    }
-  });
-
   // src/main.js
   init_logger();
 
   // src/gradebook/ui/buttonInjection.js
   init_buttons();
-  init_banner();
   init_canvas();
   init_config();
   init_errorHandler();
   init_logger();
-  init_stateMachine();
 
   // src/gradebook/updateFlowOrchestrator.js
   init_stateMachine();
@@ -1740,7 +1651,110 @@
     return avgAssignment ? avgAssignment.id : null;
   }
 
+  // src/services/gradeOverrideVerification.js
+  init_canvasApiClient();
+  init_config();
+  init_logger();
+  async function enableCourseOverride(courseId, apiClient) {
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override is disabled in config, skipping");
+      return false;
+    }
+    try {
+      logger.debug("Enabling final grade override for course");
+      await apiClient.put(
+        `/api/v1/courses/${courseId}/settings`,
+        {
+          allow_final_grade_override: true
+        },
+        {},
+        "enableCourseOverride"
+      );
+      logger.info("Final grade override enabled for course");
+      return true;
+    } catch (error) {
+      logger.error("Failed to enable final grade override:", error);
+      throw error;
+    }
+  }
+  async function fetchOverrideGrades(courseId, apiClient) {
+    var _a;
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override is disabled in config, skipping fetch");
+      return /* @__PURE__ */ new Map();
+    }
+    try {
+      const response = await apiClient.get(
+        `/courses/${courseId}/gradebook/final_grade_overrides`,
+        {},
+        "fetchOverrideGrades"
+      );
+      const overrideMap = /* @__PURE__ */ new Map();
+      const overrides = response.final_grade_overrides || {};
+      for (const [enrollmentId, data] of Object.entries(overrides)) {
+        const percentage = (_a = data == null ? void 0 : data.course_grade) == null ? void 0 : _a.percentage;
+        if (percentage !== null && percentage !== void 0) {
+          overrideMap.set(enrollmentId, percentage);
+        }
+      }
+      logger.debug(`Fetched ${overrideMap.size} override grades`);
+      return overrideMap;
+    } catch (error) {
+      logger.error("Failed to fetch override grades:", error);
+      throw error;
+    }
+  }
+  async function verifyOverrideScores(courseId, averages, enrollmentMap, apiClient, tolerance = 0.01) {
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override is disabled in config, skipping verification");
+      return [];
+    }
+    try {
+      const overrideGrades = await fetchOverrideGrades(courseId, apiClient);
+      const mismatches = [];
+      for (const { userId, average } of averages) {
+        const enrollmentId = enrollmentMap.get(String(userId));
+        if (!enrollmentId) {
+          logger.warn(`No enrollment ID found for user ${userId}`);
+          continue;
+        }
+        const expectedPercentage = OVERRIDE_SCALE(average);
+        const actualPercentage = overrideGrades.get(String(enrollmentId));
+        if (actualPercentage === null || actualPercentage === void 0) {
+          mismatches.push({
+            userId,
+            enrollmentId,
+            expected: expectedPercentage,
+            actual: null,
+            reason: "No override grade found"
+          });
+          continue;
+        }
+        const diff = Math.abs(actualPercentage - expectedPercentage);
+        if (diff > tolerance) {
+          mismatches.push({
+            userId,
+            enrollmentId,
+            expected: expectedPercentage,
+            actual: actualPercentage,
+            diff
+          });
+        }
+      }
+      if (mismatches.length > 0) {
+        logger.warn(`Found ${mismatches.length} override score mismatches:`, mismatches);
+      } else {
+        logger.info("All override scores match expected values");
+      }
+      return mismatches;
+    } catch (error) {
+      logger.error("Failed to verify override scores:", error);
+      throw error;
+    }
+  }
+
   // src/gradebook/stateHandlers.js
+  init_gradeOverride();
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
@@ -1786,6 +1800,11 @@ Would you like to create it?`);
       return STATES.CREATING_RUBRIC;
     }
     stateMachine.updateContext({ rubricId, rubricCriterionId });
+    try {
+      await enableCourseOverride(courseId, apiClient);
+    } catch (error) {
+      logger.warn("Failed to enable course override, continuing anyway:", error);
+    }
     return STATES.CALCULATING;
   }
   async function handleCreatingOutcome(stateMachine) {
@@ -1862,8 +1881,20 @@ Would you like to create it?`);
   async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
-    logger.debug("Starting verification...");
+    logger.debug("Starting outcome score verification...");
     await verifyUIScores(courseId, averages, outcomeId, banner, apiClient);
+    try {
+      logger.debug("Starting override score verification...");
+      const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+      const overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+      if (overrideMismatches.length > 0) {
+        logger.warn(`Found ${overrideMismatches.length} override score mismatches - these may resolve on retry`);
+      } else {
+        logger.info("All override scores verified successfully");
+      }
+    } catch (error) {
+      logger.warn("Override verification failed, continuing anyway:", error);
+    }
     logger.debug(`handleVerifying complete, transitioning to COMPLETE`);
     return STATES.COMPLETE;
   }
@@ -1888,10 +1919,10 @@ You may need to refresh the page to see the new scores.`);
   }
   async function handleError2(stateMachine) {
     const { error, banner } = stateMachine.getContext();
-    logger.error("Update error:", error);
+    logger.error("Update ended prematurely:", error);
     if (banner) {
-      banner.setText(`Error: ${error.message}`);
-      setTimeout(() => banner.remove(), 3e3);
+      banner.setText(`Update ended prematurely: ${error.message}. You can re-run the update to ensure all scores are correctly set.`);
+      setTimeout(() => banner.remove(), 5e3);
     }
     return STATES.IDLE;
   }
@@ -1976,19 +2007,19 @@ You may need to refresh the page to see the new scores.`);
 
   // src/utils/stateManagement.js
   init_canvas();
-  init_banner();
-  init_canvasApiClient();
-  init_gradeSubmission();
-  init_verification();
-  init_uiHelpers();
-  init_errorHandler();
   init_logger();
-  init_stateMachine();
-  init_stateMachine();
   function cleanUpLocalStorage() {
     const courseId = getCourseId();
-    const stateMachine = new UpdateFlowStateMachine();
-    stateMachine.clearLocalStorage(courseId);
+    if (!courseId) return;
+    try {
+      const legacyKey = `updateFlow_state_${courseId}`;
+      if (localStorage.getItem(legacyKey)) {
+        localStorage.removeItem(legacyKey);
+        logger.debug(`Cleaned up legacy state machine data for course ${courseId}`);
+      }
+    } catch (error) {
+      logger.error("Failed to clean up localStorage:", error);
+    }
   }
 
   // src/gradebook/updateFlowOrchestrator.js
@@ -2000,19 +2031,13 @@ You may need to refresh the page to see the new scores.`);
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-    if (restored) {
-      logger.info("Resuming update flow from saved state:", stateMachine.getCurrentState());
-    }
     const banner = showFloatingBanner({
       text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
     });
     stateMachine.updateContext({ courseId, banner, button });
     alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.");
     try {
-      if (!restored) {
-        stateMachine.transition(STATES.CHECKING_SETUP);
-      }
+      stateMachine.transition(STATES.CHECKING_SETUP);
       while (stateMachine.getCurrentState() !== STATES.IDLE) {
         const currentState = stateMachine.getCurrentState();
         if (currentState === STATES.IDLE || currentState === STATES.ERROR) {
@@ -2027,8 +2052,6 @@ You may need to refresh the page to see the new scores.`);
         if (nextState !== currentState) {
           stateMachine.transition(nextState);
         }
-        stateMachine.saveToLocalStorage(courseId);
-        logger.debug(`State saved to localStorage: ${stateMachine.getCurrentState()}`);
         updateDebugUI(stateMachine);
       }
       const buttonWrapper = (_a = document.querySelector("#update-scores-button")) == null ? void 0 : _a.parentElement;
@@ -2038,7 +2061,6 @@ You may need to refresh the page to see the new scores.`);
     } catch (error) {
       stateMachine.updateContext({ error });
       stateMachine.transition(STATES.ERROR);
-      stateMachine.saveToLocalStorage(courseId);
       if (error instanceof UserCancelledError) {
         const userMessage = getUserFriendlyMessage(error);
         alert(`Update cancelled: ${userMessage}`);
@@ -2049,11 +2071,9 @@ You may need to refresh the page to see the new scores.`);
           banner.remove();
         }, 3e3);
       }
-      cleanUpLocalStorage();
       resetButtonToNormal(button);
       removeDebugUI();
     } finally {
-      stateMachine.clearLocalStorage(courseId);
       cleanUpLocalStorage();
     }
   }
@@ -2084,7 +2104,6 @@ You may need to refresh the page to see the new scores.`);
       const buttonContainer = createButtonColumnContainer();
       buttonContainer.appendChild(buttonWrapper);
       toolbar.appendChild(buttonContainer);
-      checkForResumableState(courseId, updateAveragesButton);
     });
   }
   function resetButtonToNormal(button) {
@@ -2098,25 +2117,6 @@ You may need to refresh the page to see the new scores.`);
     const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
     button.style.backgroundColor = primaryButtonColor;
     logger.debug("Button reset to normal state");
-  }
-  function checkForResumableState(courseId, button) {
-    const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-    if (restored) {
-      const currentState = stateMachine.getCurrentState();
-      const stateTimestamp = stateMachine.getContext().timestamp || (/* @__PURE__ */ new Date()).toISOString();
-      const minutesAgo = Math.round((Date.now() - new Date(stateTimestamp).getTime()) / 6e4);
-      button.textContent = `Resume Update`;
-      button.style.backgroundColor = "#ff9800";
-      button.title = `Resume from ${currentState} (${minutesAgo} min ago)`;
-      const banner = showFloatingBanner({
-        text: `Previous update interrupted at ${currentState} (${minutesAgo} min ago). Click "Resume Update" to continue.`
-      });
-      setTimeout(() => {
-        banner.remove();
-      }, 1e4);
-      logger.info(`Resumable state found: ${currentState} from ${minutesAgo} minutes ago`);
-    }
   }
   function waitForGradebookAndToolbar(callback) {
     let attempts = 0;
@@ -2139,8 +2139,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-04 2:14:35 PM (dev, 98b10b3)");
-    exposeVersion("dev", "2026-01-04 2:14:35 PM (dev, 98b10b3)");
+    logBanner("dev", "2026-01-05 8:52:03 AM (dev, 6fe6e14)");
+    exposeVersion("dev", "2026-01-05 8:52:03 AM (dev, 6fe6e14)");
     if (true) {
       logger.info("Running in DEV mode");
     }

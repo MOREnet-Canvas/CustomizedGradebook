@@ -12,7 +12,6 @@ import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 
     if (window.location.pathname.includes("/gradebook")) {
         injectButtons();
-        //resumeIfNeeded();
     }
 
 })();

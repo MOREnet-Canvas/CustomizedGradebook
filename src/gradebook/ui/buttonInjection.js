@@ -1,18 +1,16 @@
 // src/gradebook/ui/buttonInjection.js
 /**
  * Button Injection UI
- * 
+ *
  * Handles injecting the "Update Average" button into Canvas gradebook toolbar
- * and managing button state (normal vs resume)
+ * and managing button state
  */
 
 import { makeButton, createButtonColumnContainer } from "../../ui/buttons.js";
-import { showFloatingBanner } from "../../ui/banner.js";
 import { getCourseId } from "../../utils/canvas.js";
 import { UPDATE_AVG_BUTTON_LABEL } from "../../config.js";
 import { handleError } from "../../utils/errorHandler.js";
 import { logger } from "../../utils/logger.js";
-import { UpdateFlowStateMachine } from "../stateMachine.js";
 import { startUpdateFlow } from "../updateFlowOrchestrator.js";
 import { renderLastUpdateNotice } from "../../utils/uiHelpers.js";
 
@@ -51,9 +49,6 @@ export function injectButtons() {
         const buttonContainer = createButtonColumnContainer();
         buttonContainer.appendChild(buttonWrapper);
         toolbar.appendChild(buttonContainer);
-
-        // Check for resumable state and update UI accordingly
-        checkForResumableState(courseId, updateAveragesButton);
     });
 }
 
@@ -76,39 +71,6 @@ export function resetButtonToNormal(button) {
     button.style.backgroundColor = primaryButtonColor;
 
     logger.debug('Button reset to normal state');
-}
-
-/**
- * Check if there's a resumable state in localStorage and update UI accordingly
- * @param {string} courseId - Canvas course ID
- * @param {HTMLButtonElement} button - Button element to update
- */
-function checkForResumableState(courseId, button) {
-    const stateMachine = new UpdateFlowStateMachine();
-    const restored = stateMachine.loadFromLocalStorage(courseId);
-
-    if (restored) {
-        const currentState = stateMachine.getCurrentState();
-        const stateTimestamp = stateMachine.getContext().timestamp || new Date().toISOString();
-        const minutesAgo = Math.round((Date.now() - new Date(stateTimestamp).getTime()) / 60000);
-
-        // Update button text to indicate resumable state
-        button.textContent = `Resume Update`;
-        button.style.backgroundColor = '#ff9800'; // Orange color to indicate resume
-        button.title = `Resume from ${currentState} (${minutesAgo} min ago)`;
-
-        // Show a banner notification
-        const banner = showFloatingBanner({
-            text: `Previous update interrupted at ${currentState} (${minutesAgo} min ago). Click "Resume Update" to continue.`
-        });
-
-        // Auto-dismiss banner after 10 seconds
-        setTimeout(() => {
-            banner.remove();
-        }, 10000);
-
-        logger.info(`Resumable state found: ${currentState} from ${minutesAgo} minutes ago`);
-    }
 }
 
 /**
