@@ -683,17 +683,135 @@
     return await safeJsonParse(response, context);
   };
 
+  // src/services/gradeOverrideVerification.js
+  async function enableCourseOverride(courseId, apiClient) {
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override is disabled in config, skipping");
+      return false;
+    }
+    try {
+      logger.debug("Enabling final grade override for course");
+      await apiClient.put(
+        `/api/v1/courses/${courseId}/settings`,
+        {
+          allow_final_grade_override: true
+        },
+        {},
+        "enableCourseOverride"
+      );
+      logger.info("Final grade override enabled for course");
+      return true;
+    } catch (error) {
+      logger.error("Failed to enable final grade override:", error);
+      throw error;
+    }
+  }
+  async function fetchOverrideGrades(courseId, apiClient) {
+    var _a;
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override is disabled in config, skipping fetch");
+      return /* @__PURE__ */ new Map();
+    }
+    try {
+      const response = await apiClient.get(
+        `/courses/${courseId}/gradebook/final_grade_overrides`,
+        {},
+        "fetchOverrideGrades"
+      );
+      const overrideMap = /* @__PURE__ */ new Map();
+      const overrides = response.final_grade_overrides || {};
+      for (const [userId, data] of Object.entries(overrides)) {
+        const percentage = (_a = data == null ? void 0 : data.course_grade) == null ? void 0 : _a.percentage;
+        if (percentage !== null && percentage !== void 0) {
+          overrideMap.set(userId, percentage);
+          logger.trace(`Override grade for user ${userId}: ${percentage}%`);
+        }
+      }
+      logger.debug(`Fetched ${overrideMap.size} override grades from Canvas API`);
+      return overrideMap;
+    } catch (error) {
+      logger.error("Failed to fetch override grades:", error);
+      throw error;
+    }
+  }
+  async function verifyOverrideScores(courseId, averages, enrollmentMap, apiClient, tolerance = 0.01) {
+    if (!ENABLE_GRADE_OVERRIDE) {
+      logger.debug("Grade override is disabled in config, skipping verification");
+      return [];
+    }
+    try {
+      const overrideGrades = await fetchOverrideGrades(courseId, apiClient);
+      const mismatches = [];
+      let matchCount = 0;
+      logger.debug(`Verifying ${averages.length} students' override grades...`);
+      for (const { userId, average } of averages) {
+        const expectedPercentage = OVERRIDE_SCALE(average);
+        const actualPercentage = overrideGrades.get(String(userId));
+        const enrollmentId = enrollmentMap.get(String(userId));
+        logger.trace(`User ${userId}: expected=${expectedPercentage}%, actual=${actualPercentage}%`);
+        if (actualPercentage === null || actualPercentage === void 0) {
+          mismatches.push({
+            userId,
+            enrollmentId,
+            expected: expectedPercentage,
+            actual: null,
+            reason: "No override grade found"
+          });
+          logger.trace(`  \u274C No override grade found for user ${userId}`);
+          continue;
+        }
+        const diff = Math.abs(actualPercentage - expectedPercentage);
+        if (diff > tolerance) {
+          mismatches.push({
+            userId,
+            enrollmentId,
+            expected: expectedPercentage,
+            actual: actualPercentage,
+            diff
+          });
+          logger.trace(`  \u274C Mismatch: expected ${expectedPercentage}%, got ${actualPercentage}% (diff: ${diff.toFixed(2)}%)`);
+        } else {
+          matchCount++;
+          logger.trace(`  \u2713 Match: ${actualPercentage}%`);
+        }
+      }
+      logger.debug(`Override verification complete: ${matchCount} matches, ${mismatches.length} mismatches`);
+      if (mismatches.length > 0) {
+        logger.debug(`Mismatches found:`, mismatches.map((m) => ({
+          userId: m.userId,
+          expected: m.expected,
+          actual: m.actual,
+          diff: m.diff
+        })));
+      }
+      return mismatches;
+    } catch (error) {
+      logger.error("Failed to verify override scores:", error);
+      throw error;
+    }
+  }
+
   // src/services/gradeCalculator.js
-  function calculateStudentAverages(data, outcomeId) {
+  async function calculateStudentAverages(data, outcomeId, courseId, apiClient) {
     var _a, _b, _c;
     const averages = [];
     logger.info("Calculating student averages...");
     const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
     const outcomeMap = {};
     ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => outcomeMap[o.id] = o.title);
+    let overrideGrades = /* @__PURE__ */ new Map();
+    if (ENABLE_GRADE_OVERRIDE && courseId && apiClient) {
+      try {
+        logger.debug("Fetching current override grades for initial check...");
+        overrideGrades = await fetchOverrideGrades(courseId, apiClient);
+        logger.debug(`Fetched ${overrideGrades.size} override grades for comparison`);
+      } catch (error) {
+        logger.warn("Failed to fetch override grades for initial check, continuing without override checking:", error);
+      }
+    }
     function getCurrentOutcomeScore(scores) {
       var _a2;
-      logger.debug("Scores: ", scores);
+      logger.trace("Scores: ", scores);
       const match = scores.find((s) => {
         var _a3;
         return String((_a3 = s.links) == null ? void 0 : _a3.outcome) === String(outcomeId);
@@ -721,13 +839,41 @@
       newAverage = parseFloat(newAverage.toFixed(2));
       logger.trace(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
       logger.trace(`Old average: ${oldAverage} New average: ${newAverage}`);
-      if (oldAverage === newAverage) {
-        logger.trace("old average matches new average");
-        continue;
+      const outcomeNeedsUpdate = oldAverage !== newAverage;
+      let overrideNeedsUpdate = false;
+      if (ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
+        const expectedOverride = OVERRIDE_SCALE(newAverage);
+        const actualOverride = overrideGrades.get(String(userId));
+        if (actualOverride === null || actualOverride === void 0) {
+          overrideNeedsUpdate = true;
+          logger.trace(`  Override: missing (expected ${expectedOverride}%) - needs update`);
+        } else {
+          const diff = Math.abs(actualOverride - expectedOverride);
+          if (diff > 0.01) {
+            overrideNeedsUpdate = true;
+            logger.trace(`  Override: mismatch (expected ${expectedOverride}%, got ${actualOverride}%) - needs update`);
+          } else {
+            logger.trace(`  Override: matches (${actualOverride}%)`);
+          }
+        }
       }
-      averages.push({ userId, average: newAverage });
+      if (outcomeNeedsUpdate || overrideNeedsUpdate) {
+        if (outcomeNeedsUpdate && overrideNeedsUpdate) {
+          logger.trace(`  \u2713 Including user ${userId}: both outcome and override need updates`);
+        } else if (outcomeNeedsUpdate) {
+          logger.trace(`  \u2713 Including user ${userId}: outcome needs update`);
+        } else {
+          logger.trace(`  \u2713 Including user ${userId}: override needs update`);
+        }
+        averages.push({ userId, average: newAverage });
+      } else {
+        logger.trace(`  \u2717 Skipping user ${userId}: no updates needed`);
+      }
     }
-    logger.debug("averages after calculations:", averages);
+    logger.debug(`Calculation complete: ${averages.length} students need updates`);
+    if (ENABLE_GRADE_OVERRIDE && overrideGrades.size > 0) {
+      logger.debug(`  (checked both outcome scores and override grades)`);
+    }
     return averages;
   }
 
@@ -1279,106 +1425,6 @@
     return avgAssignment ? avgAssignment.id : null;
   }
 
-  // src/services/gradeOverrideVerification.js
-  async function enableCourseOverride(courseId, apiClient) {
-    if (!ENABLE_GRADE_OVERRIDE) {
-      logger.debug("Grade override is disabled in config, skipping");
-      return false;
-    }
-    try {
-      logger.debug("Enabling final grade override for course");
-      await apiClient.put(
-        `/api/v1/courses/${courseId}/settings`,
-        {
-          allow_final_grade_override: true
-        },
-        {},
-        "enableCourseOverride"
-      );
-      logger.info("Final grade override enabled for course");
-      return true;
-    } catch (error) {
-      logger.error("Failed to enable final grade override:", error);
-      throw error;
-    }
-  }
-  async function fetchOverrideGrades(courseId, apiClient) {
-    var _a;
-    if (!ENABLE_GRADE_OVERRIDE) {
-      logger.debug("Grade override is disabled in config, skipping fetch");
-      return /* @__PURE__ */ new Map();
-    }
-    try {
-      const response = await apiClient.get(
-        `/courses/${courseId}/gradebook/final_grade_overrides`,
-        {},
-        "fetchOverrideGrades"
-      );
-      const overrideMap = /* @__PURE__ */ new Map();
-      const overrides = response.final_grade_overrides || {};
-      for (const [enrollmentId, data] of Object.entries(overrides)) {
-        const percentage = (_a = data == null ? void 0 : data.course_grade) == null ? void 0 : _a.percentage;
-        if (percentage !== null && percentage !== void 0) {
-          overrideMap.set(enrollmentId, percentage);
-        }
-      }
-      logger.debug(`Fetched ${overrideMap.size} override grades`);
-      logger.debug("overrides:", overrides);
-      return overrideMap;
-    } catch (error) {
-      logger.error("Failed to fetch override grades:", error);
-      throw error;
-    }
-  }
-  async function verifyOverrideScores(courseId, averages, enrollmentMap, apiClient, tolerance = 0.01) {
-    if (!ENABLE_GRADE_OVERRIDE) {
-      logger.debug("Grade override is disabled in config, skipping verification");
-      return [];
-    }
-    try {
-      const overrideGrades = await fetchOverrideGrades(courseId, apiClient);
-      const mismatches = [];
-      for (const { userId, average } of averages) {
-        const enrollmentId = enrollmentMap.get(String(userId));
-        if (!enrollmentId) {
-          logger.warn(`No enrollment ID found for user ${userId}`);
-          continue;
-        }
-        const expectedPercentage = OVERRIDE_SCALE(average);
-        const actualPercentage = overrideGrades.get(String(enrollmentId));
-        if (actualPercentage === null || actualPercentage === void 0) {
-          mismatches.push({
-            userId,
-            enrollmentId,
-            expected: expectedPercentage,
-            actual: null,
-            reason: "No override grade found"
-          });
-          continue;
-        }
-        const diff = Math.abs(actualPercentage - expectedPercentage);
-        if (diff > tolerance) {
-          mismatches.push({
-            userId,
-            enrollmentId,
-            expected: expectedPercentage,
-            actual: actualPercentage,
-            diff
-          });
-        }
-      }
-      if (mismatches.length > 0) {
-        logger.warn(`Found ${mismatches.length} override score mismatches:`, mismatches);
-      } else {
-        logger.info("All override scores match expected values");
-      }
-      return mismatches;
-    } catch (error) {
-      logger.error("Failed to verify override scores:", error);
-      throw error;
-    }
-  }
-
   // src/gradebook/stateHandlers.js
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
@@ -1457,8 +1503,9 @@ Would you like to create it?`);
   }
   async function handleCalculating(stateMachine) {
     const { rollupData, outcomeId, courseId, banner } = stateMachine.getContext();
+    const apiClient = new CanvasApiClient();
     banner.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
-    const averages = calculateStudentAverages(rollupData, outcomeId);
+    const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
     const numberOfUpdates = averages.length;
     stateMachine.updateContext({
       averages,
@@ -1540,15 +1587,30 @@ Would you like to create it?`);
       }
     }
     logger.info(`Grade override submission complete: ${successCount} succeeded, ${failCount} failed`);
+    const maxRetries = 3;
+    const retryDelayMs = 2e3;
+    let overrideMismatches = [];
     try {
-      banner.soft("Verifying grade overrides...");
-      logger.debug("Starting override score verification...");
       const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
-      const overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
-      if (overrideMismatches.length > 0) {
-        logger.warn(`Found ${overrideMismatches.length} override score mismatches - these may resolve on retry`);
-      } else {
-        logger.info("All override scores verified successfully");
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        banner.soft(`Verifying grade overrides... (attempt ${attempt}/${maxRetries})`);
+        logger.debug(`Override verification attempt ${attempt}/${maxRetries}...`);
+        overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+        if (overrideMismatches.length === 0) {
+          logger.info(`All override scores verified successfully on attempt ${attempt}`);
+          break;
+        }
+        if (attempt < maxRetries) {
+          logger.warn(`Found ${overrideMismatches.length} override score mismatches on attempt ${attempt}, retrying in ${retryDelayMs / 1e3}s...`);
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        } else {
+          logger.warn(`Found ${overrideMismatches.length} override score mismatches after ${maxRetries} attempts`);
+          logger.warn("Final mismatches:", overrideMismatches.map((m) => ({
+            userId: m.userId,
+            expected: m.expected,
+            actual: m.actual
+          })));
+        }
       }
     } catch (error) {
       logger.warn("Override verification failed, continuing anyway:", error);
@@ -1923,8 +1985,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-05 3:03:44 PM (dev, 09823d0)");
-    exposeVersion("dev", "2026-01-05 3:03:44 PM (dev, 09823d0)");
+    logBanner("dev", "2026-01-05 3:47:58 PM (dev, b52a977)");
+    exposeVersion("dev", "2026-01-05 3:47:58 PM (dev, b52a977)");
     if (true) {
       logger.info("Running in DEV mode");
     }
