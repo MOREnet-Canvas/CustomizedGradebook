@@ -39,6 +39,7 @@
 
   // src/utils/logger.js
   var LOG_LEVELS = {
+    TRACE: -1,
     DEBUG: 0,
     INFO: 1,
     WARN: 2,
@@ -49,7 +50,9 @@
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const debugParam = urlParams.get("debug");
-      if (debugParam === "true") {
+      if (debugParam === "trace") {
+        logLevel = LOG_LEVELS.TRACE;
+      } else if (debugParam === "true") {
         logLevel = LOG_LEVELS.DEBUG;
       } else if (debugParam === "false") {
         logLevel = LOG_LEVELS.INFO;
@@ -61,6 +64,16 @@
   }
   var currentLogLevel = determineLogLevel();
   var logger = {
+    /**
+     * Log trace messages (only shown with ?debug=trace)
+     * Used for very detailed debugging in high-frequency operations like loops
+     * @param {...any} args - Arguments to log
+     */
+    trace(...args) {
+      if (currentLogLevel <= LOG_LEVELS.TRACE) {
+        console.log("%c[TRACE]", "color: #888888", ...args);
+      }
+    },
     /**
      * Log debug messages (only shown in dev mode or with ?debug=true)
      * @param {...any} args - Arguments to log
@@ -98,6 +111,13 @@
       }
     },
     /**
+     * Check if trace logging is enabled
+     * @returns {boolean} True if trace logging is enabled
+     */
+    isTraceEnabled() {
+      return currentLogLevel <= LOG_LEVELS.TRACE;
+    },
+    /**
      * Check if debug logging is enabled
      * @returns {boolean} True if debug logging is enabled
      */
@@ -119,7 +139,9 @@
     );
     console.log(`Environment: ${envName}`);
     console.log(`Build Version: ${buildVersion}`);
-    if (logger.isDebugEnabled()) {
+    if (logger.isTraceEnabled()) {
+      console.log("%cTrace logging: ENABLED (very verbose)", "color:#888888; font-weight:bold;");
+    } else if (logger.isDebugEnabled()) {
       console.log("%cDebug logging: ENABLED", "color:#FF9800; font-weight:bold;");
     } else {
       console.log("Debug logging: disabled");
@@ -129,6 +151,7 @@
     window.CG = {
       env: envName,
       version: buildVersion,
+      traceEnabled: logger.isTraceEnabled(),
       debugEnabled: logger.isDebugEnabled(),
       logLevel: currentLogLevel
     };
@@ -696,10 +719,10 @@
       const total = relevantScores.reduce((sum, s) => sum + s.score, 0);
       let newAverage = total / relevantScores.length;
       newAverage = parseFloat(newAverage.toFixed(2));
-      logger.debug(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
-      logger.debug(`Old average: ${oldAverage} New average: ${newAverage}`);
+      logger.trace(`User ${userId}  total: ${total}, count: ${relevantScores.length}, average: ${newAverage}`);
+      logger.trace(`Old average: ${oldAverage} New average: ${newAverage}`);
       if (oldAverage === newAverage) {
-        logger.debug("old average matches new average");
+        logger.trace("old average matches new average");
         continue;
       }
       averages.push({ userId, average: newAverage });
@@ -838,7 +861,7 @@
     const gradeData = {};
     logger.debug("averages:", averages);
     for (const { userId, average } of averages) {
-      logger.debug("userId:", userId, "score:", average);
+      logger.trace("userId:", userId, "score:", average);
       gradeData[userId] = {
         posted_grade: average,
         text_comment: "Score: " + average + "  Updated: " + timeStamp,
@@ -1300,6 +1323,7 @@
         }
       }
       logger.debug(`Fetched ${overrideMap.size} override grades`);
+      logger.debug("overrides:", overrides);
       return overrideMap;
     } catch (error) {
       logger.error("Failed to fetch override grades:", error);
@@ -1508,7 +1532,7 @@ Would you like to create it?`);
         }
         const override = OVERRIDE_SCALE(average);
         await setOverrideScoreGQL(enrollmentId, override, apiClient);
-        logger.debug(`[override] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
+        logger.trace(`[override] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
         successCount++;
       } catch (e) {
         logger.warn(`[override] Failed for user ${userId}:`, (e == null ? void 0 : e.message) || e);
@@ -1899,8 +1923,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-05 11:06:43 AM (dev, 7e81e09)");
-    exposeVersion("dev", "2026-01-05 11:06:43 AM (dev, 7e81e09)");
+    logBanner("dev", "2026-01-05 3:03:44 PM (dev, 09823d0)");
+    exposeVersion("dev", "2026-01-05 3:03:44 PM (dev, 09823d0)");
     if (true) {
       logger.info("Running in DEV mode");
     }

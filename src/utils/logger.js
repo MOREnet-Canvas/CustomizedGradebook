@@ -4,9 +4,10 @@
  *
  * Provides a centralized logging system with multiple log levels.
  * Log level is automatically determined by build environment (ENV_DEV/ENV_PROD)
- * and can be overridden via URL parameter (?debug=true or ?debug=false).
+ * and can be overridden via URL parameter (?debug=true, ?debug=trace, or ?debug=false).
  *
  * Log Levels:
+ * - TRACE (-1): Very detailed debugging for high-frequency operations (only with ?debug=trace)
  * - DEBUG (0): Detailed debugging information (only in dev mode or with ?debug=true)
  * - INFO (1): Important operational messages (always shown)
  * - WARN (2): Warning messages (always shown)
@@ -16,6 +17,7 @@
  * ```javascript
  * import { logger } from "./utils/logger.js";
  *
+ * logger.trace("Very detailed info in loops", data); // Only with ?debug=trace
  * logger.debug("Detailed info", data);
  * logger.info("Important message");
  * logger.warn("Warning message");
@@ -27,6 +29,7 @@
  * Log level constants
  */
 const LOG_LEVELS = {
+    TRACE: -1,
     DEBUG: 0,
     INFO: 1,
     WARN: 2,
@@ -41,12 +44,14 @@ function determineLogLevel() {
     // Default: DEBUG in dev mode, INFO in production
     let logLevel = ENV_DEV ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
 
-    // Allow URL parameter override: ?debug=true or ?debug=false
+    // Allow URL parameter override: ?debug=true, ?debug=trace, or ?debug=false
     try {
         const urlParams = new URLSearchParams(window.location.search);
         const debugParam = urlParams.get('debug');
 
-        if (debugParam === 'true') {
+        if (debugParam === 'trace') {
+            logLevel = LOG_LEVELS.TRACE;
+        } else if (debugParam === 'true') {
             logLevel = LOG_LEVELS.DEBUG;
         } else if (debugParam === 'false') {
             logLevel = LOG_LEVELS.INFO;
@@ -66,6 +71,17 @@ const currentLogLevel = determineLogLevel();
  * Logger object with methods for each log level
  */
 export const logger = {
+    /**
+     * Log trace messages (only shown with ?debug=trace)
+     * Used for very detailed debugging in high-frequency operations like loops
+     * @param {...any} args - Arguments to log
+     */
+    trace(...args) {
+        if (currentLogLevel <= LOG_LEVELS.TRACE) {
+            console.log("%c[TRACE]", "color: #888888", ...args);
+        }
+    },
+
     /**
      * Log debug messages (only shown in dev mode or with ?debug=true)
      * @param {...any} args - Arguments to log
@@ -107,6 +123,14 @@ export const logger = {
     },
 
     /**
+     * Check if trace logging is enabled
+     * @returns {boolean} True if trace logging is enabled
+     */
+    isTraceEnabled() {
+        return currentLogLevel <= LOG_LEVELS.TRACE;
+    },
+
+    /**
      * Check if debug logging is enabled
      * @returns {boolean} True if debug logging is enabled
      */
@@ -145,7 +169,9 @@ export function logBanner(envName, buildVersion) {
     console.log(`Build Version: ${buildVersion}`);
 
     // Show debug mode status
-    if (logger.isDebugEnabled()) {
+    if (logger.isTraceEnabled()) {
+        console.log("%cTrace logging: ENABLED (very verbose)", "color:#888888; font-weight:bold;");
+    } else if (logger.isDebugEnabled()) {
         console.log("%cDebug logging: ENABLED", "color:#FF9800; font-weight:bold;");
     } else {
         console.log("Debug logging: disabled");
@@ -161,6 +187,7 @@ export function exposeVersion(envName, buildVersion) {
     window.CG = {
         env: envName,
         version: buildVersion,
+        traceEnabled: logger.isTraceEnabled(),
         debugEnabled: logger.isDebugEnabled(),
         logLevel: currentLogLevel
     };

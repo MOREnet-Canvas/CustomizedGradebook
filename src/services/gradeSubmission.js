@@ -87,7 +87,7 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
     const gradeData = {};
     logger.debug("averages:", averages);
     for (const { userId, average } of averages) {
-        logger.debug("userId:", userId, "score:", average);
+        logger.trace("userId:", userId, "score:", average);
         gradeData[userId] = {
             posted_grade: average,
             text_comment: "Score: " + average + "  Updated: " + timeStamp,
