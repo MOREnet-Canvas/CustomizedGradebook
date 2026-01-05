@@ -2,6 +2,15 @@
 export const ENABLE_STUDENT_GRADE_CUSTOMIZATION = true;
 export const REMOVE_ASSIGNMENT_TAB = false;
 export const PER_STUDENT_UPDATE_THRESHOLD = 25;
+
+// Grading mode configuration
+// ENABLE_OUTCOME_UPDATES: Controls whether outcome scores (and assignments/rubrics) are updated
+// ENABLE_GRADE_OVERRIDE: Controls whether final grade overrides are updated
+// Supported modes:
+//   - Outcome only: ENABLE_OUTCOME_UPDATES=true, ENABLE_GRADE_OVERRIDE=false
+//   - Override only: ENABLE_OUTCOME_UPDATES=false, ENABLE_GRADE_OVERRIDE=true
+//   - Both (default): ENABLE_OUTCOME_UPDATES=true, ENABLE_GRADE_OVERRIDE=true
+export const ENABLE_OUTCOME_UPDATES = true;
 export const ENABLE_GRADE_OVERRIDE = true;
 
 export const OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2)); // 0–4 -> 0–100

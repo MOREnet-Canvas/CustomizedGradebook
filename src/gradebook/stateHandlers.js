@@ -16,6 +16,7 @@ import {
     AVG_ASSIGNMENT_NAME,
     AVG_RUBRIC_NAME,
     PER_STUDENT_UPDATE_THRESHOLD,
+    ENABLE_OUTCOME_UPDATES,
     ENABLE_GRADE_OVERRIDE,
     OVERRIDE_SCALE
 } from "../config.js";
@@ -49,71 +50,88 @@ export async function handleCheckingSetup(stateMachine) {
     const apiClient = new CanvasApiClient();
 
     banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
+    logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
 
-    // Fetch rollup data
+    // Fetch rollup data (needed for both outcome and override modes)
     const data = await getRollup(courseId, apiClient);
     stateMachine.updateContext({ rollupData: data });
 
-    // Check for outcome
-    const outcomeObj = getOutcomeObjectByName(data);
-    const outcomeId = outcomeObj?.id;
+    // Only check/create outcome, assignment, and rubric if outcome updates are enabled
+    if (ENABLE_OUTCOME_UPDATES) {
+        // Check for outcome
+        const outcomeObj = getOutcomeObjectByName(data);
+        const outcomeId = outcomeObj?.id;
 
-    if (!outcomeId) {
-        const confirmCreate = confirm(`Outcome "${AVG_OUTCOME_NAME}" not found.\nWould you like to create it?`);
-        if (!confirmCreate) throw new UserCancelledError("User declined to create missing outcome.");
-        return STATES.CREATING_OUTCOME;
-    }
+        if (!outcomeId) {
+            const confirmCreate = confirm(`Outcome "${AVG_OUTCOME_NAME}" not found.\nWould you like to create it?`);
+            if (!confirmCreate) throw new UserCancelledError("User declined to create missing outcome.");
+            return STATES.CREATING_OUTCOME;
+        }
 
-    stateMachine.updateContext({ outcomeId });
+        stateMachine.updateContext({ outcomeId });
 
-    // Check for assignment
-    let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
+        // Check for assignment
+        let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
 
-    // Fallback: try to find by name
-    if (!assignmentObj) {
-        const assignmentIdFromName = await getAssignmentId(courseId);
-        if (assignmentIdFromName) {
-            assignmentObj = await apiClient.get(
-                `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
-                {},
-                "getAssignment:fallback"
-            );
-            logger.debug("Fallback assignment found by name:", assignmentObj);
+        // Fallback: try to find by name
+        if (!assignmentObj) {
+            const assignmentIdFromName = await getAssignmentId(courseId);
+            if (assignmentIdFromName) {
+                assignmentObj = await apiClient.get(
+                    `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
+                    {},
+                    "getAssignment:fallback"
+                );
+                logger.debug("Fallback assignment found by name:", assignmentObj);
+            }
+        }
+
+        const assignmentId = assignmentObj?.id;
+
+        if (!assignmentId) {
+            const confirmCreate = confirm(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.\nWould you like to create it?`);
+            if (!confirmCreate) throw new UserCancelledError("User declined to create missing assignment.");
+            return STATES.CREATING_ASSIGNMENT;
+        }
+
+        stateMachine.updateContext({ assignmentId });
+
+        // Check for rubric
+        const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
+        const rubricId = result?.rubricId;
+        const rubricCriterionId = result?.criterionId;
+
+        if (!rubricId) {
+            const confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.\nWould you like to create it?`);
+            if (!confirmCreate) throw new UserCancelledError("User declined to create missing rubric.");
+            return STATES.CREATING_RUBRIC;
+        }
+
+        stateMachine.updateContext({ rubricId, rubricCriterionId });
+    } else {
+        logger.debug('Outcome updates disabled, skipping outcome/assignment/rubric checks');
+        // Set dummy values so downstream code doesn't break
+        // In override-only mode, we still need outcomeId for calculating averages
+        const outcomeObj = getOutcomeObjectByName(data);
+        const outcomeId = outcomeObj?.id;
+        if (outcomeId) {
+            stateMachine.updateContext({ outcomeId });
+        } else {
+            logger.warn('No outcome found for calculating averages - this may cause issues');
         }
     }
 
-    const assignmentId = assignmentObj?.id;
-
-    if (!assignmentId) {
-        const confirmCreate = confirm(`Assignment "${AVG_ASSIGNMENT_NAME}" not found.\nWould you like to create it?`);
-        if (!confirmCreate) throw new UserCancelledError("User declined to create missing assignment.");
-        return STATES.CREATING_ASSIGNMENT;
-    }
-
-    stateMachine.updateContext({ assignmentId });
-
-    // Check for rubric
-    const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
-    const rubricId = result?.rubricId;
-    const rubricCriterionId = result?.criterionId;
-
-    if (!rubricId) {
-        const confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.\nWould you like to create it?`);
-        if (!confirmCreate) throw new UserCancelledError("User declined to create missing rubric.");
-        return STATES.CREATING_RUBRIC;
-    }
-
-    stateMachine.updateContext({ rubricId, rubricCriterionId });
-
     // Enable final grade override if configured
-    try {
-        await enableCourseOverride(courseId, apiClient);
-    } catch (error) {
-        logger.warn('Failed to enable course override, continuing anyway:', error);
-        // Don't fail the entire flow if override setup fails
+    if (ENABLE_GRADE_OVERRIDE) {
+        try {
+            await enableCourseOverride(courseId, apiClient);
+        } catch (error) {
+            logger.warn('Failed to enable course override, continuing anyway:', error);
+            // Don't fail the entire flow if override setup fails
+        }
     }
 
-    // All resources exist, move to calculating
+    // All resources exist (or not needed), move to calculating
     return STATES.CALCULATING;
 }
 
@@ -201,6 +219,12 @@ export async function handleUpdatingGrades(stateMachine) {
     const { averages, courseId, assignmentId, rubricCriterionId, numberOfUpdates, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
+    // Check if outcome updates are enabled
+    if (!ENABLE_OUTCOME_UPDATES) {
+        logger.debug('Outcome updates disabled, skipping UPDATING_GRADES state');
+        return STATES.VERIFYING;
+    }
+
     // Decide update mode
     const usePerStudent = numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD;
     const updateMode = usePerStudent ? 'per-student' : 'bulk';
@@ -255,6 +279,12 @@ export async function handlePollingProgress(stateMachine) {
 export async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
+
+    // Check if outcome updates are enabled
+    if (!ENABLE_OUTCOME_UPDATES) {
+        logger.debug('Outcome updates disabled, skipping VERIFYING state');
+        return STATES.VERIFYING_OVERRIDES;
+    }
 
     logger.debug('Starting outcome score verification...');
     await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
