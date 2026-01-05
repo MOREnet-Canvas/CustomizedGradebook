@@ -128,21 +128,22 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
  * Polls the Canvas progress API until the operation completes, fails, or times out
  * @param {Object} box - Floating banner UI object with setText/soft methods
  * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @param {UpdateFlowStateMachine} stateMachine - State machine instance for elapsed time tracking
  * @param {number} timeout - Maximum time to wait in milliseconds (default: 20 minutes)
  * @param {number} interval - Polling interval in milliseconds (default: 2 seconds)
  * @returns {Promise<void>}
  * @throws {Error} If bulk update fails or times out
  */
-export async function waitForBulkGrading(box, apiClient, timeout = 1200000, interval = 2000) {
+export async function waitForBulkGrading(box, apiClient, stateMachine, timeout = 1200000, interval = 2000) {
     const loopStartTime = Date.now();
     let state = "beginning upload";
     const courseId = getCourseId();
     const progressId = localStorage.getItem(`progressId_${courseId}`);
-    startElapsedTimer(courseId, box); // makes elapsed time tick each second
+    startElapsedTimer(stateMachine, box); // makes elapsed time tick each second
 
     while (Date.now() - loopStartTime < timeout) {
         const progress = await apiClient.get(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
-        let elapsed = getElapsedTimeSinceStart();
+        let elapsed = getElapsedTimeSinceStart(stateMachine);
 
         state = progress.workflow_state;
 

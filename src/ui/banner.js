@@ -1,7 +1,6 @@
 // src/ui/banner.js
 import { getCourseId } from "../utils/canvas.js";
 import { k } from "../utils/keys.js";
-import { ensureStatusPill } from "../utils/uiHelpers.js";
 
 const BRAND_COLOR =
     getComputedStyle(document.documentElement)
@@ -172,9 +171,7 @@ export function showFloatingBanner({
     }
 
     closeBtn.onclick = () => {
-        // Note: bannerDismissed was removed as dead code (never read)
         destroy();
-        ensureStatusPill(courseId);
     };
 
     // Save banner text for status pill restoration

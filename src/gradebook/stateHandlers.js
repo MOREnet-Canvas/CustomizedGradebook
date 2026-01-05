@@ -239,7 +239,7 @@ export async function handlePollingProgress(stateMachine) {
 
     logger.debug('Starting bulk update polling...');
     // waitForBulkGrading handles the polling internally
-    await waitForBulkGrading(banner, apiClient);
+    await waitForBulkGrading(banner, apiClient, stateMachine);
 
     logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
@@ -254,7 +254,7 @@ export async function handleVerifying(stateMachine) {
     const apiClient = new CanvasApiClient();
 
     logger.debug('Starting outcome score verification...');
-    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient);
+    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
 
     // Verify override scores if enabled
     try {
@@ -284,7 +284,7 @@ export async function handleVerifying(stateMachine) {
 export async function handleComplete(stateMachine) {
     const { numberOfUpdates, banner, courseId, zeroUpdates } = stateMachine.getContext();
 
-    const elapsedTime = getElapsedTimeSinceStart();
+    const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
 
     // Handle zero updates case (no changes needed)
