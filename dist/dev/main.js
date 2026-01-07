@@ -217,17 +217,32 @@
   }
 
   // src/config.js
-  var PER_STUDENT_UPDATE_THRESHOLD = 25;
-  var ENABLE_OUTCOME_UPDATES = true;
-  var ENABLE_GRADE_OVERRIDE = true;
-  var OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2));
-  var UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
-  var AVG_OUTCOME_NAME = "Current Score";
-  var AVG_ASSIGNMENT_NAME = "Current Score Assignment";
-  var AVG_RUBRIC_NAME = "Current Score Rubric";
-  var DEFAULT_MAX_POINTS = 4;
-  var DEFAULT_MASTERY_THRESHOLD = 3;
-  var OUTCOME_AND_RUBRIC_RATINGS = [
+  var _a, _b;
+  var ENABLE_STUDENT_GRADE_CUSTOMIZATION = (_b = (_a = window.CG_CONFIG) == null ? void 0 : _a.ENABLE_STUDENT_GRADE_CUSTOMIZATION) != null ? _b : true;
+  var _a2, _b2;
+  var REMOVE_ASSIGNMENT_TAB = (_b2 = (_a2 = window.CG_CONFIG) == null ? void 0 : _a2.REMOVE_ASSIGNMENT_TAB) != null ? _b2 : false;
+  var _a3, _b3;
+  var PER_STUDENT_UPDATE_THRESHOLD = (_b3 = (_a3 = window.CG_CONFIG) == null ? void 0 : _a3.PER_STUDENT_UPDATE_THRESHOLD) != null ? _b3 : 25;
+  var _a4, _b4;
+  var ENABLE_OUTCOME_UPDATES = (_b4 = (_a4 = window.CG_CONFIG) == null ? void 0 : _a4.ENABLE_OUTCOME_UPDATES) != null ? _b4 : true;
+  var _a5, _b5;
+  var ENABLE_GRADE_OVERRIDE = (_b5 = (_a5 = window.CG_CONFIG) == null ? void 0 : _a5.ENABLE_GRADE_OVERRIDE) != null ? _b5 : true;
+  var defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));
+  var _a6, _b6;
+  var OVERRIDE_SCALE = (_b6 = (_a6 = window.CG_CONFIG) == null ? void 0 : _a6.OVERRIDE_SCALE) != null ? _b6 : defaultOverrideScale;
+  var _a7, _b7;
+  var UPDATE_AVG_BUTTON_LABEL = (_b7 = (_a7 = window.CG_CONFIG) == null ? void 0 : _a7.UPDATE_AVG_BUTTON_LABEL) != null ? _b7 : "Update Current Score";
+  var _a8, _b8;
+  var AVG_OUTCOME_NAME = (_b8 = (_a8 = window.CG_CONFIG) == null ? void 0 : _a8.AVG_OUTCOME_NAME) != null ? _b8 : "Current Score";
+  var _a9, _b9;
+  var AVG_ASSIGNMENT_NAME = (_b9 = (_a9 = window.CG_CONFIG) == null ? void 0 : _a9.AVG_ASSIGNMENT_NAME) != null ? _b9 : "Current Score Assignment";
+  var _a10, _b10;
+  var AVG_RUBRIC_NAME = (_b10 = (_a10 = window.CG_CONFIG) == null ? void 0 : _a10.AVG_RUBRIC_NAME) != null ? _b10 : "Current Score Rubric";
+  var _a11, _b11;
+  var DEFAULT_MAX_POINTS = (_b11 = (_a11 = window.CG_CONFIG) == null ? void 0 : _a11.DEFAULT_MAX_POINTS) != null ? _b11 : 4;
+  var _a12, _b12;
+  var DEFAULT_MASTERY_THRESHOLD = (_b12 = (_a12 = window.CG_CONFIG) == null ? void 0 : _a12.DEFAULT_MASTERY_THRESHOLD) != null ? _b12 : 3;
+  var defaultRatings = [
     { description: "Exemplary", points: 4 },
     { description: "Beyond Target", points: 3.5 },
     { description: "Target", points: 3 },
@@ -238,13 +253,17 @@
     { description: "Needs Full Support", points: 0.5 },
     { description: "No Evidence", points: 0 }
   ];
-  var EXCLUDED_OUTCOME_KEYWORDS = ["Homework Completion"];
+  var _a13, _b13;
+  var OUTCOME_AND_RUBRIC_RATINGS = (_b13 = (_a13 = window.CG_CONFIG) == null ? void 0 : _a13.OUTCOME_AND_RUBRIC_RATINGS) != null ? _b13 : defaultRatings;
+  var defaultExcludedKeywords = [];
+  var _a14, _b14;
+  var EXCLUDED_OUTCOME_KEYWORDS = (_b14 = (_a14 = window.CG_CONFIG) == null ? void 0 : _a14.EXCLUDED_OUTCOME_KEYWORDS) != null ? _b14 : defaultExcludedKeywords;
 
   // src/utils/canvas.js
   function getCourseId() {
-    var _a, _b;
+    var _a15, _b15;
     const envCourseId = ENV == null ? void 0 : ENV.COURSE_ID;
-    const pathCourseId = (_b = (_a = window.location.pathname.match(/courses\/(\d+)/)) == null ? void 0 : _a[1]) != null ? _b : null;
+    const pathCourseId = (_b15 = (_a15 = window.location.pathname.match(/courses\/(\d+)/)) == null ? void 0 : _a15[1]) != null ? _b15 : null;
     const courseId = envCourseId || pathCourseId;
     if (!courseId) {
       logger.error("Course ID not found on page.");
@@ -481,10 +500,10 @@
      * @throws {Error} If transition is invalid
      */
     transition(toState, contextUpdates = {}) {
-      var _a;
+      var _a15;
       if (!this.canTransition(toState)) {
         throw new Error(
-          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a.join(", ")) || "none"}`
+          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a15 = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a15.join(", ")) || "none"}`
         );
       }
       const fromState = this.currentState;
@@ -670,7 +689,7 @@
         body = data;
       }
     }
-    const _a = options, { headers: _optionsHeaders } = _a, restOptions = __objRest(_a, ["headers"]);
+    const _a15 = options, { headers: _optionsHeaders } = _a15, restOptions = __objRest(_a15, ["headers"]);
     const response = await safeFetch(
       url,
       __spreadValues({
@@ -708,7 +727,7 @@
     }
   }
   async function fetchOverrideGrades(courseId, apiClient) {
-    var _a;
+    var _a15;
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping fetch");
       return /* @__PURE__ */ new Map();
@@ -722,7 +741,7 @@
       const overrideMap = /* @__PURE__ */ new Map();
       const overrides = response.final_grade_overrides || {};
       for (const [userId, data] of Object.entries(overrides)) {
-        const percentage = (_a = data == null ? void 0 : data.course_grade) == null ? void 0 : _a.percentage;
+        const percentage = (_a15 = data == null ? void 0 : data.course_grade) == null ? void 0 : _a15.percentage;
         if (percentage !== null && percentage !== void 0) {
           overrideMap.set(userId, percentage);
           logger.trace(`Override grade for user ${userId}: ${percentage}%`);
@@ -794,25 +813,25 @@
 
   // src/services/gradeCalculator.js
   function buildOutcomeMap(data) {
-    var _a, _b;
+    var _a15, _b15;
     const map = {};
-    ((_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : []).forEach((o) => {
+    ((_b15 = (_a15 = data == null ? void 0 : data.linked) == null ? void 0 : _a15.outcomes) != null ? _b15 : []).forEach((o) => {
       map[String(o.id)] = o.title;
     });
     return map;
   }
   function getCurrentOutcomeScore(scores, outcomeId) {
-    var _a;
+    var _a15;
     const match = scores.find((s) => {
-      var _a2;
-      return String((_a2 = s.links) == null ? void 0 : _a2.outcome) === String(outcomeId);
+      var _a16;
+      return String((_a16 = s.links) == null ? void 0 : _a16.outcome) === String(outcomeId);
     });
-    return (_a = match == null ? void 0 : match.score) != null ? _a : null;
+    return (_a15 = match == null ? void 0 : match.score) != null ? _a15 : null;
   }
   function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywords) {
     return scores.filter((s) => {
-      var _a;
-      const id = String((_a = s.links) == null ? void 0 : _a.outcome);
+      var _a15;
+      const id = String((_a15 = s.links) == null ? void 0 : _a15.outcome);
       const title = (outcomeMap[id] || "").toLowerCase();
       return typeof s.score === "number" && !excludedOutcomeIds.has(id) && !excludedKeywords.some((keyword) => title.includes(keyword.toLowerCase()));
     });
@@ -862,7 +881,7 @@
     }
   }
   async function calculateStudentAverages(data, outcomeId, courseId, apiClient) {
-    var _a, _b, _c, _d;
+    var _a15, _b15, _c, _d;
     logger.info("Calculating student averages...");
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     const outcomeMap = buildOutcomeMap(data);
@@ -878,8 +897,8 @@
       }
     }
     const results = [];
-    for (const rollup of (_a = data == null ? void 0 : data.rollups) != null ? _a : []) {
-      const userId = (_b = rollup.links) == null ? void 0 : _b.user;
+    for (const rollup of (_a15 = data == null ? void 0 : data.rollups) != null ? _a15 : []) {
+      const userId = (_b15 = rollup.links) == null ? void 0 : _b15.user;
       if (!userId) continue;
       const oldAverage = getCurrentOutcomeScore((_c = rollup.scores) != null ? _c : [], outcomeId);
       const relevantScores = getRelevantScores(
@@ -968,7 +987,7 @@
   // src/services/gradeOverride.js
   var __enrollmentMapCache = /* @__PURE__ */ new Map();
   async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) {
-    var _a, _b, _c, _d, _e;
+    var _a15, _b15, _c, _d, _e;
     const query = `
     mutation SetOverride($enrollmentId: ID!, $overrideScore: Float!) {
       setOverrideScore(input: { enrollmentId: $enrollmentId, overrideScore: $overrideScore }) {
@@ -989,7 +1008,7 @@
       logError(error, "setOverrideScoreGQL", { enrollmentId, overrideScore });
       throw error;
     }
-    return (_e = (_d = (_c = (_b = (_a = json.data) == null ? void 0 : _a.setOverrideScore) == null ? void 0 : _b.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
+    return (_e = (_d = (_c = (_b15 = (_a15 = json.data) == null ? void 0 : _a15.setOverrideScore) == null ? void 0 : _b15.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
   }
   async function getAllEnrollmentIds(courseId, apiClient) {
     const courseKey = String(courseId);
@@ -1215,10 +1234,10 @@
       retryCounts.map((r) => [r.userId, r.attempts])
     );
     const rows = Array.from(allUserIds).map((userId) => {
-      var _a, _b;
-      const attempts = (_a = retryCountsById[userId]) != null ? _a : "";
+      var _a15, _b15;
+      const attempts = (_a15 = retryCountsById[userId]) != null ? _a15 : "";
       const failed = failedById[userId];
-      const average = (_b = failed == null ? void 0 : failed.average) != null ? _b : "";
+      const average = (_b15 = failed == null ? void 0 : failed.average) != null ? _b15 : "";
       const status = failed ? "UPDATE FAILED" : "";
       const error = (failed == null ? void 0 : failed.error) ? `"${failed.error.replace(/"/g, '""')}"` : "";
       return `${userId},${average},${attempts},${status},${error}`;
@@ -1291,11 +1310,11 @@
     return rollupData;
   }
   function getOutcomeObjectByName(data) {
-    var _a, _b;
+    var _a15, _b15;
     const outcomeTitle = AVG_OUTCOME_NAME;
     logger.debug("Outcome Title:", outcomeTitle);
     logger.debug("data:", data);
-    const outcomes = (_b = (_a = data == null ? void 0 : data.linked) == null ? void 0 : _a.outcomes) != null ? _b : [];
+    const outcomes = (_b15 = (_a15 = data == null ? void 0 : data.linked) == null ? void 0 : _a15.outcomes) != null ? _b15 : [];
     logger.debug("outcomes: ", outcomes);
     if (outcomes.length === 0) {
       logger.warn("No outcomes found in rollup data.");
@@ -1358,8 +1377,8 @@
 
   // src/services/assignmentService.js
   async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient) {
-    var _a;
-    const alignments = (_a = outcomeObject.alignments) != null ? _a : [];
+    var _a15;
+    const alignments = (_a15 = outcomeObject.alignments) != null ? _a15 : [];
     for (const alignment of alignments) {
       if (!alignment.startsWith("assignment_")) continue;
       const assignmentId = alignment.split("_")[1];
@@ -1945,7 +1964,7 @@ You may need to refresh the page to see the new scores.`);
 
   // src/gradebook/updateFlowOrchestrator.js
   async function startUpdateFlow(button = null) {
-    var _a;
+    var _a15;
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
@@ -1972,7 +1991,7 @@ You may need to refresh the page to see the new scores.`);
         }
         updateDebugUI(stateMachine);
       }
-      const buttonWrapper = (_a = document.querySelector("#update-scores-button")) == null ? void 0 : _a.parentElement;
+      const buttonWrapper = (_a15 = document.querySelector("#update-scores-button")) == null ? void 0 : _a15.parentElement;
       if (buttonWrapper) renderLastUpdateNotice(buttonWrapper, courseId);
       resetButtonToNormal(button);
       removeDebugUI();
@@ -2056,8 +2075,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/main.js
   (function init() {
-    logBanner("dev", "2026-01-05 4:41:16 PM (dev, f27ff94)");
-    exposeVersion("dev", "2026-01-05 4:41:16 PM (dev, f27ff94)");
+    logBanner("dev", "2026-01-07 3:56:01 PM (dev, 0870d58)");
+    exposeVersion("dev", "2026-01-07 3:56:01 PM (dev, 0870d58)");
     if (true) {
       logger.info("Running in DEV mode");
     }
