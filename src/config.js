@@ -1,7 +1,43 @@
 // src/config.js
-export const ENABLE_STUDENT_GRADE_CUSTOMIZATION = true;
-export const REMOVE_ASSIGNMENT_TAB = false;
-export const PER_STUDENT_UPDATE_THRESHOLD = 25;
+/**
+ * ============================================================================
+ * CustomizedGradebook - Configuration
+ * ============================================================================
+ *
+ * This file provides configuration constants for the CustomizedGradebook.
+ *
+ * RUNTIME OVERRIDE SUPPORT:
+ * -------------------------
+ * All constants can be overridden at runtime via window.CG_CONFIG, which is
+ * set by the loader files (upload_dev.js or upload_production.js).
+ *
+ * This allows users to customize configuration by editing only the loader
+ * files without needing to rebuild the bundle. The values in this file serve
+ * as fallback defaults when window.CG_CONFIG is not set or doesn't contain
+ * a specific constant.
+ *
+ * EXECUTION ORDER:
+ * ----------------
+ * 1. Loader file (upload_dev.js or upload_production.js) runs first
+ * 2. Loader sets window.CG_CONFIG with user-customized values
+ * 3. Loader injects the main bundle script
+ * 4. Main bundle loads and this config.js module is imported
+ * 5. Constants read from window.CG_CONFIG (if set) or use defaults below
+ *
+ * CUSTOMIZATION WORKFLOW:
+ * -----------------------
+ * To customize configuration:
+ * 1. Edit window.CG_CONFIG in upload_dev.js or upload_production.js
+ * 2. Inject the updated loader into Canvas (no rebuild needed)
+ * 3. The main bundle will automatically use the customized values
+ *
+ * ============================================================================
+ */
+
+// Feature flags
+export const ENABLE_STUDENT_GRADE_CUSTOMIZATION = window.CG_CONFIG?.ENABLE_STUDENT_GRADE_CUSTOMIZATION ?? true;
+export const REMOVE_ASSIGNMENT_TAB = window.CG_CONFIG?.REMOVE_ASSIGNMENT_TAB ?? false;
+export const PER_STUDENT_UPDATE_THRESHOLD = window.CG_CONFIG?.PER_STUDENT_UPDATE_THRESHOLD ?? 25;
 
 // Grading mode configuration
 // ENABLE_OUTCOME_UPDATES: Controls whether outcome scores (and assignments/rubrics) are updated
@@ -10,19 +46,27 @@ export const PER_STUDENT_UPDATE_THRESHOLD = 25;
 //   - Outcome only: ENABLE_OUTCOME_UPDATES=true, ENABLE_GRADE_OVERRIDE=false
 //   - Override only: ENABLE_OUTCOME_UPDATES=false, ENABLE_GRADE_OVERRIDE=true
 //   - Both (default): ENABLE_OUTCOME_UPDATES=true, ENABLE_GRADE_OVERRIDE=true
-export const ENABLE_OUTCOME_UPDATES = true;
-export const ENABLE_GRADE_OVERRIDE = true;
+export const ENABLE_OUTCOME_UPDATES = window.CG_CONFIG?.ENABLE_OUTCOME_UPDATES ?? true;
+export const ENABLE_GRADE_OVERRIDE = window.CG_CONFIG?.ENABLE_GRADE_OVERRIDE ?? true;
 
-export const OVERRIDE_SCALE = (avg) => Number((avg * 25).toFixed(2)); // 0–4 -> 0–100
+// Grade scaling function (0-4 scale to 0-100 scale)
+// Default: multiply by 25 to convert 0-4 range to 0-100 range
+const defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));
+export const OVERRIDE_SCALE = window.CG_CONFIG?.OVERRIDE_SCALE ?? defaultOverrideScale;
 
-export const UPDATE_AVG_BUTTON_LABEL = "Update Current Score";
-export const AVG_OUTCOME_NAME = "Current Score";
-export const AVG_ASSIGNMENT_NAME = "Current Score Assignment";
-export const AVG_RUBRIC_NAME = "Current Score Rubric";
-export const DEFAULT_MAX_POINTS = 4;
-export const DEFAULT_MASTERY_THRESHOLD = 3;
+// UI labels and resource names
+export const UPDATE_AVG_BUTTON_LABEL = window.CG_CONFIG?.UPDATE_AVG_BUTTON_LABEL ?? "Update Current Score";
+export const AVG_OUTCOME_NAME = window.CG_CONFIG?.AVG_OUTCOME_NAME ?? "Current Score";
+export const AVG_ASSIGNMENT_NAME = window.CG_CONFIG?.AVG_ASSIGNMENT_NAME ?? "Current Score Assignment";
+export const AVG_RUBRIC_NAME = window.CG_CONFIG?.AVG_RUBRIC_NAME ?? "Current Score Rubric";
 
-export const OUTCOME_AND_RUBRIC_RATINGS = [
+// Outcome configuration
+export const DEFAULT_MAX_POINTS = window.CG_CONFIG?.DEFAULT_MAX_POINTS ?? 4;
+export const DEFAULT_MASTERY_THRESHOLD = window.CG_CONFIG?.DEFAULT_MASTERY_THRESHOLD ?? 3;
+
+// Rating scale for outcomes and rubrics
+// Default: 9-level scale from 0 (No Evidence) to 4 (Exemplary)
+const defaultRatings = [
     { description: "Exemplary", points: 4 },
     { description: "Beyond Target", points: 3.5 },
     { description: "Target", points: 3 },
@@ -33,5 +77,8 @@ export const OUTCOME_AND_RUBRIC_RATINGS = [
     { description: "Needs Full Support", points: 0.5 },
     { description: "No Evidence", points: 0 }
 ];
+export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_RATINGS ?? defaultRatings;
 
-export const EXCLUDED_OUTCOME_KEYWORDS = ["Homework Completion"];
+// Outcome filtering
+const defaultExcludedKeywords = [];
+export const EXCLUDED_OUTCOME_KEYWORDS = window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS ?? defaultExcludedKeywords;

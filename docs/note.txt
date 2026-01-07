@@ -14,4 +14,5 @@ TODO: Make sure there isn't an option for notifying students of updates in the a
 TODO: GREY OUT BUTTON IF PROCESS IS ALREADY RUNNING
 TODO: ADD SPINNER INSTEAD OF TIMER
 TODO: option to zero out points possible toggle.
+TODO: Make sure option to turn off outcome updates works completely
 
