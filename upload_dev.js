@@ -18,7 +18,7 @@
         REMOVE_ASSIGNMENT_TAB: false,
 
         // Grading mode configuration
-        ENABLE_OUTCOME_UPDATES: true,
+        ENABLE_OUTCOME_UPDATES: false,
         ENABLE_GRADE_OVERRIDE: true,
 
 
@@ -46,7 +46,7 @@
         ],
 
         // Outcome filtering
-        EXCLUDED_OUTCOME_KEYWORDS: []
+        EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
     };
 
     console.log("[CG] Configuration loaded:", window.CG_CONFIG);

@@ -215,7 +215,13 @@ export async function postPerStudentGrades(averages, courseId, assignmentId, rub
     // Log grading mode
     logger.debug(`Per-student grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
 
-    box.setText(`Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...`);
+    // Set banner message based on grading mode
+    const updateMessage = ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE
+        ? `Updating "${AVG_OUTCOME_NAME}" and grade overrides for ${numberOfUpdates} students...`
+        : ENABLE_OUTCOME_UPDATES
+            ? `Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...`
+            : `Updating grade overrides for ${numberOfUpdates} students...`;
+    box.setText(updateMessage);
 
     const failedUpdates = [];
     const retryCounts = {};  // userId -> number of attempts

@@ -48,7 +48,7 @@
         EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
     };
 
-    console.log("[CG] Configuration loaded:", window.CG_CONFIG);
+    // console.log("[CG] Configuration loaded:", window.CG_CONFIG);
 
     // ========================================================================
     // SCRIPT LOADER

@@ -49,7 +49,11 @@ export async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
+    // Set banner message based on grading mode
+    const setupMessage = ENABLE_OUTCOME_UPDATES
+        ? `Checking setup for "${AVG_OUTCOME_NAME}"...`
+        : 'Checking setup for grade overrides...';
+    banner.setText(setupMessage);
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
 
     // Fetch rollup data (needed for both outcome and override modes)
@@ -110,14 +114,15 @@ export async function handleCheckingSetup(stateMachine) {
         stateMachine.updateContext({ rubricId, rubricCriterionId });
     } else {
         logger.debug('Outcome updates disabled, skipping outcome/assignment/rubric checks');
-        // Set dummy values so downstream code doesn't break
-        // In override-only mode, we still need outcomeId for calculating averages
+        // In override-only mode, we still try to find outcomeId for calculating averages
+        // (to exclude it from the calculation), but it's optional
         const outcomeObj = getOutcomeObjectByName(data);
         const outcomeId = outcomeObj?.id;
         if (outcomeId) {
             stateMachine.updateContext({ outcomeId });
+            logger.debug(`Found outcomeId ${outcomeId} for exclusion from average calculation`);
         } else {
-            logger.warn('No outcome found for calculating averages - this may cause issues');
+            logger.debug('No outcome found - will calculate averages without excluding any outcome');
         }
     }
 
@@ -187,7 +192,11 @@ export async function handleCalculating(stateMachine) {
     const { rollupData, outcomeId, courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    banner.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
+    // Set banner message based on grading mode
+    const calculatingMessage = ENABLE_OUTCOME_UPDATES
+        ? `Calculating "${AVG_OUTCOME_NAME}" scores...`
+        : 'Calculating student averages for grade overrides...';
+    banner.setText(calculatingMessage);
 
     const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
     const numberOfUpdates = averages.length;
@@ -387,10 +396,17 @@ export async function handleComplete(stateMachine) {
     const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
 
+    // Determine what was updated based on grading mode
+    const updateTarget = ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE
+        ? `${AVG_OUTCOME_NAME} and grade overrides`
+        : ENABLE_OUTCOME_UPDATES
+            ? AVG_OUTCOME_NAME
+            : 'grade overrides';
+
     // Handle zero updates case (no changes needed)
     if (zeroUpdates || numberOfUpdates === 0) {
-        banner.setText(`No changes to ${AVG_OUTCOME_NAME} found.`);
-        alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
+        banner.setText(`No changes to ${updateTarget} found.`);
+        alert(`No changes to ${updateTarget} have been found. No updates performed.`);
 
         // Remove banner after a short delay
         setTimeout(() => {
@@ -401,13 +417,13 @@ export async function handleComplete(stateMachine) {
     }
 
     // Normal completion with updates
-    banner.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
+    banner.setText(`${numberOfUpdates} student ${updateTarget} updated successfully! (elapsed time: ${elapsedTime}s)`);
 
     // Save completion data
     localStorage.setItem(`duration_${courseId}`, elapsedTime);
     localStorage.setItem(`lastUpdateAt_${courseId}`, new Date().toISOString());
 
-    alert(`All "${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s)\nYou may need to refresh the page to see the new scores.`);
+    alert(`All ${updateTarget} have been updated. (elapsed time: ${elapsedTime}s)\nYou may need to refresh the page to see the new scores.`);
 
     return STATES.IDLE;
 }
