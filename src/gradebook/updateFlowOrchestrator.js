@@ -11,16 +11,16 @@ import { STATE_HANDLERS } from "./stateHandlers.js";
 import { showFloatingBanner } from "../ui/banner.js";
 import { updateDebugUI, removeDebugUI } from "./ui/debugPanel.js";
 import { resetButtonToNormal } from "./ui/buttonInjection.js";
-import { 
-    handleError, 
-    getUserFriendlyMessage, 
-    UserCancelledError, 
-    ValidationError 
+import {
+    handleError,
+    getUserFriendlyMessage,
+    UserCancelledError,
+    ValidationError
 } from "../utils/errorHandler.js";
 import { getCourseId } from "../utils/canvas.js";
 import { cleanUpLocalStorage } from "../utils/stateManagement.js";
 import { renderLastUpdateNotice } from "../utils/uiHelpers.js";
-import { AVG_OUTCOME_NAME } from "../config.js";
+import { AVG_OUTCOME_NAME, ENABLE_OUTCOME_UPDATES, ENABLE_GRADE_OVERRIDE } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -34,9 +34,16 @@ export async function startUpdateFlow(button = null) {
     // Create state machine
     const stateMachine = new UpdateFlowStateMachine();
 
+    // Determine initial banner message based on grading mode
+    const initialMessage = ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE
+        ? `Preparing to update "${AVG_OUTCOME_NAME}" and grade overrides: checking setup...`
+        : ENABLE_OUTCOME_UPDATES
+            ? `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
+            : 'Preparing to update grade overrides: checking setup...';
+
     // Create banner
     const banner = showFloatingBanner({
-        text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
+        text: initialMessage
     });
 
     // Initialize context (include button reference for debug UI)

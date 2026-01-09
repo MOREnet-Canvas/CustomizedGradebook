@@ -8,6 +8,10 @@ then push
 
 For checking version in DevTools: CG.version
 
+Dashboard Card Grades
+zero points assignment toggle
+grade box enableing
+rubric / gradebox scoring
 
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
@@ -15,4 +19,10 @@ TODO: GREY OUT BUTTON IF PROCESS IS ALREADY RUNNING
 TODO: ADD SPINNER INSTEAD OF TIMER
 TODO: option to zero out points possible toggle.
 TODO: Make sure option to turn off outcome updates works completely
+ - not creating outcome
+ - not creating assignment
+ - not creating rubric
+ - not updating outcome or assignment grades but still updating overrides using same calculation
+ - not verifying outcome scores
+ - all banner messages reflect this mode
 
