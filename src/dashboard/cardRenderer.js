@@ -393,14 +393,14 @@ export function renderGradeOnCard(cardElement, gradeData) {
     // Append badge to hero container
     heroContainer.appendChild(badge);
 
-    if (logger.isDebugEnabled()) {
+    if (logger.isTraceEnabled()) {
         const displayInfo = gradeData.letterGrade
             ? `${gradeData.score}% (${gradeData.letterGrade})`
             : `${gradeData.score}`;
-        logger.debug(`Grade badge rendered (${displayInfo}, source: ${gradeData.source})`);
-        logger.debug(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
+        logger.trace(`Grade badge rendered (${displayInfo}, source: ${gradeData.source})`);
+        logger.trace(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
     } else {
-        logger.trace(`Grade badge rendered on card (source: ${gradeData.source})`);
+        logger.debug(`Grade badge rendered on card (source: ${gradeData.source})`);
     }
 }
 
