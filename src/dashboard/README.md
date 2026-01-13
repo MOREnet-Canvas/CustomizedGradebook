@@ -158,9 +158,20 @@ export async function getCourseGrade(courseId, apiClient) {
 // Check if module is loaded
 console.log(window.CG);
 
-// Manually trigger grade display
-// (Only works if on dashboard page)
+// Run diagnostic to check dashboard card detection
+window.CG.diagnosticDashboard();
+
+// Enable debug logging (add to URL)
+// ?debug=true
 ```
+
+### Troubleshooting
+
+If you encounter issues, see [DEBUGGING.md](./DEBUGGING.md) for:
+- Common error messages and solutions
+- Diagnostic commands
+- How to inspect Canvas dashboard structure
+- API testing procedures
 
 ## Logging
 

@@ -2136,20 +2136,31 @@ You may need to refresh the page to see the new scores.`);
         {},
         "fetchEnrollment"
       );
-      const studentEnrollment = enrollments.find((e) => e.type === "StudentEnrollment");
+      logger.debug(`Enrollment response for course ${courseId}:`, enrollments);
+      const studentEnrollment = enrollments.find(
+        (e) => e.type === "StudentEnrollment" || e.type === "student" || e.role === "StudentEnrollment"
+      );
       if (!studentEnrollment) {
         logger.debug(`No student enrollment found for course ${courseId}`);
+        if (logger.isDebugEnabled() && enrollments.length > 0) {
+          logger.debug(`Available enrollment types:`, enrollments.map((e) => e.type || e.role));
+        }
         return null;
       }
+      logger.debug(`Student enrollment for course ${courseId}:`, studentEnrollment);
       const score = (_c = (_b15 = (_a15 = studentEnrollment.computed_current_score) != null ? _a15 : studentEnrollment.calculated_current_score) != null ? _b15 : studentEnrollment.computed_final_score) != null ? _c : studentEnrollment.calculated_final_score;
       if (score === null || score === void 0) {
         logger.debug(`No enrollment score found for course ${courseId}`);
+        logger.debug(`Enrollment object:`, studentEnrollment);
         return null;
       }
       logger.debug(`Enrollment score for course ${courseId}: ${score}%`);
       return score;
     } catch (error) {
       logger.warn(`Failed to fetch enrollment score for course ${courseId}:`, error.message);
+      if (logger.isDebugEnabled()) {
+        logger.warn(`Full error:`, error);
+      }
       return null;
     }
   }
@@ -2176,12 +2187,40 @@ You may need to refresh the page to see the new scores.`);
   // src/dashboard/cardRenderer.js
   var GRADE_CLASS_PREFIX = "cg-dashboard-grade";
   function findCourseCard(courseId) {
-    const card = document.querySelector(`[data-course-id="${courseId}"]`);
-    if (!card) {
-      logger.trace(`Dashboard card not found for course ${courseId}`);
-      return null;
+    let card = document.querySelector(`[data-course-id="${courseId}"]`);
+    if (card) {
+      logger.trace(`Found card for course ${courseId} using data-course-id`);
+      return card;
     }
-    return card;
+    const courseUrl = `/courses/${courseId}`;
+    const links = document.querySelectorAll(`a[href*="${courseUrl}"]`);
+    for (const link of links) {
+      const cardContainer = link.closest(".ic-DashboardCard") || link.closest('[class*="DashboardCard"]') || link.closest('[class*="CourseCard"]') || link.closest(".course-list-item") || link.closest(".dashboard-card");
+      if (cardContainer) {
+        const cardLink = cardContainer.querySelector(`a[href*="${courseUrl}"]`);
+        if (cardLink) {
+          logger.trace(`Found card for course ${courseId} using href strategy`);
+          return cardContainer;
+        }
+      }
+    }
+    for (const link of links) {
+      if (link.closest(".ic-app-header") || link.closest('[role="navigation"]') || link.closest(".menu")) {
+        continue;
+      }
+      let parent = link;
+      for (let i = 0; i < 5; i++) {
+        parent = parent.parentElement;
+        if (!parent) break;
+        const hasCardClass = parent.className && (parent.className.includes("Card") || parent.className.includes("card") || parent.className.includes("course"));
+        if (hasCardClass) {
+          logger.trace(`Found card for course ${courseId} using parent traversal`);
+          return parent;
+        }
+      }
+    }
+    logger.trace(`Dashboard card not found for course ${courseId}`);
+    return null;
   }
   function createGradeBadge(gradeValue, gradeSource) {
     const badge = document.createElement("div");
@@ -2274,11 +2313,23 @@ You may need to refresh the page to see the new scores.`);
         {},
         "fetchActiveCourses"
       );
+      logger.debug(`Raw courses response:`, courses);
+      logger.debug(`Number of courses returned: ${(courses == null ? void 0 : courses.length) || 0}`);
+      if (courses && courses.length > 0) {
+        logger.debug(`First course structure:`, courses[0]);
+        logger.debug(`First course enrollments:`, courses[0].enrollments);
+      }
       const studentCourses = courses.filter((course) => {
         const enrollments = course.enrollments || [];
-        return enrollments.some((e) => e.type === "StudentEnrollment");
+        const hasStudentEnrollment = enrollments.some(
+          (e) => e.type === "student" || e.type === "StudentEnrollment" || e.role === "StudentEnrollment"
+        );
+        if (logger.isDebugEnabled() && enrollments.length > 0) {
+          logger.debug(`Course ${course.id} (${course.name}): enrollments =`, enrollments.map((e) => e.type));
+        }
+        return hasStudentEnrollment;
       });
-      logger.debug(`Found ${studentCourses.length} active student courses`);
+      logger.info(`Found ${studentCourses.length} active student courses out of ${courses.length} total courses`);
       return studentCourses.map((c) => ({ id: String(c.id), name: c.name }));
     } catch (error) {
       logger.error("Failed to fetch active courses:", error);
@@ -2320,18 +2371,68 @@ You may need to refresh the page to see the new scores.`);
       logger.error("Failed to update dashboard grades:", error);
     }
   }
+  function getDashboardCardSelectors() {
+    return [
+      "[data-course-id]",
+      // Older Canvas versions
+      ".ic-DashboardCard",
+      // Common Canvas class
+      '[class*="DashboardCard"]',
+      // Any class containing DashboardCard
+      ".course-list-item",
+      // Alternative Canvas layout
+      '[class*="CourseCard"]',
+      // Modern Canvas
+      'div[id^="dashboard_card_"]',
+      // ID-based cards
+      ".dashboard-card"
+      // Lowercase variant
+    ];
+  }
+  function findDashboardCards() {
+    const selectors = getDashboardCardSelectors();
+    for (const selector of selectors) {
+      const cards = document.querySelectorAll(selector);
+      if (cards.length > 0) {
+        logger.debug(`Found ${cards.length} dashboard cards using selector: ${selector}`);
+        return cards;
+      }
+    }
+    const courseLinks = document.querySelectorAll('a[href*="/courses/"]');
+    if (courseLinks.length > 0) {
+      logger.debug(`Found ${courseLinks.length} course links as fallback`);
+      const dashboardLinks = Array.from(courseLinks).filter((link) => {
+        const isDashboardArea = !link.closest(".ic-app-header") && !link.closest('[role="navigation"]') && !link.closest(".menu");
+        return isDashboardArea;
+      });
+      if (dashboardLinks.length > 0) {
+        logger.debug(`Found ${dashboardLinks.length} dashboard course links`);
+        return dashboardLinks;
+      }
+    }
+    logger.debug("No dashboard cards found with any selector");
+    return null;
+  }
   function waitForDashboardCards(maxWaitMs = 5e3) {
     return new Promise((resolve) => {
       const startTime = Date.now();
       const checkCards = () => {
-        const cards = document.querySelectorAll("[data-course-id]");
-        if (cards.length > 0) {
-          logger.debug(`Dashboard cards found: ${cards.length}`);
+        const cards = findDashboardCards();
+        if (cards && cards.length > 0) {
+          logger.info(`Dashboard cards found: ${cards.length}`);
+          if (logger.isDebugEnabled() && cards[0]) {
+            logger.debug("First card element:", cards[0]);
+            logger.debug("First card classes:", cards[0].className);
+            logger.debug("First card attributes:", Array.from(cards[0].attributes).map((a) => `${a.name}="${a.value}"`));
+          }
           resolve(true);
           return;
         }
         if (Date.now() - startTime > maxWaitMs) {
           logger.warn("Timeout waiting for dashboard cards");
+          logger.warn("Tried selectors:", getDashboardCardSelectors());
+          logger.warn("Current URL:", window.location.href);
+          logger.warn("Dashboard container exists:", !!document.querySelector("#dashboard"));
           resolve(false);
           return;
         }
@@ -2340,6 +2441,22 @@ You may need to refresh the page to see the new scores.`);
       checkCards();
     });
   }
+  function looksLikeDashboardCard(node) {
+    var _a15, _b15;
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const element = node;
+    if ((_a15 = element.hasAttribute) == null ? void 0 : _a15.call(element, "data-course-id")) return true;
+    const className = element.className || "";
+    if (typeof className === "string") {
+      if (className.includes("DashboardCard") || className.includes("CourseCard") || className.includes("course-list-item") || className.includes("dashboard-card")) {
+        return true;
+      }
+    }
+    if ((_b15 = element.querySelector) == null ? void 0 : _b15.call(element, 'a[href*="/courses/"]')) {
+      return true;
+    }
+    return false;
+  }
   function setupDashboardObserver() {
     if (dashboardObserver) {
       dashboardObserver.disconnect();
@@ -2347,21 +2464,52 @@ You may need to refresh the page to see the new scores.`);
     dashboardObserver = new MutationObserver((mutations) => {
       const cardsAdded = mutations.some((mutation) => {
         return Array.from(mutation.addedNodes).some((node) => {
-          var _a15, _b15;
-          return node.nodeType === Node.ELEMENT_NODE && (((_a15 = node.hasAttribute) == null ? void 0 : _a15.call(node, "data-course-id")) || ((_b15 = node.querySelector) == null ? void 0 : _b15.call(node, "[data-course-id]")));
+          var _a15;
+          return looksLikeDashboardCard(node) || ((_a15 = node.querySelector) == null ? void 0 : _a15.call(node, getDashboardCardSelectors().join(",")));
         });
       });
       if (cardsAdded) {
-        logger.debug("Dashboard cards detected, updating grades");
+        logger.debug("Dashboard cards detected via MutationObserver, updating grades");
         updateAllCourseCards();
       }
     });
-    const dashboardContainer = document.querySelector("#dashboard") || document.body;
+    const dashboardContainer = document.querySelector("#dashboard") || document.querySelector("#content") || document.body;
     dashboardObserver.observe(dashboardContainer, {
       childList: true,
       subtree: true
     });
-    logger.debug("Dashboard observer setup complete");
+    logger.debug("Dashboard observer setup complete, observing:", dashboardContainer.id || dashboardContainer.tagName);
+  }
+  function diagnosticDashboardCards() {
+    console.log("=== Dashboard Card Diagnostic ===");
+    console.log("Current URL:", window.location.href);
+    console.log("Is dashboard page:", window.location.pathname === "/" || window.location.pathname.startsWith("/dashboard"));
+    const selectors = getDashboardCardSelectors();
+    console.log("Trying selectors:", selectors);
+    selectors.forEach((selector) => {
+      try {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          console.log(`\u2713 Found ${elements.length} elements with selector: ${selector}`);
+          console.log("  First element:", elements[0]);
+        } else {
+          console.log(`\u2717 No elements found with selector: ${selector}`);
+        }
+      } catch (e) {
+        console.log(`\u2717 Error with selector ${selector}:`, e.message);
+      }
+    });
+    const courseLinks = document.querySelectorAll('a[href*="/courses/"]');
+    console.log(`Found ${courseLinks.length} total course links`);
+    const dashboardLinks = Array.from(courseLinks).filter((link) => {
+      return !link.closest(".ic-app-header") && !link.closest('[role="navigation"]') && !link.closest(".menu");
+    });
+    console.log(`Found ${dashboardLinks.length} dashboard course links`);
+    if (dashboardLinks.length > 0) {
+      console.log("First dashboard link:", dashboardLinks[0]);
+      console.log("First dashboard link parent:", dashboardLinks[0].parentElement);
+    }
+    console.log("=== End Diagnostic ===");
   }
   async function initDashboardGradeDisplay() {
     if (initialized) {
@@ -2370,9 +2518,13 @@ You may need to refresh the page to see the new scores.`);
     }
     initialized = true;
     logger.info("Initializing dashboard grade display");
+    if (!window.CG) window.CG = {};
+    window.CG.diagnosticDashboard = diagnosticDashboardCards;
+    logger.info("Diagnostic function available: window.CG.diagnosticDashboard()");
     const cardsFound = await waitForDashboardCards();
     if (!cardsFound) {
       logger.warn("Dashboard cards not found, grade display may not work");
+      logger.warn("Run window.CG.diagnosticDashboard() in console for more info");
     }
     await updateAllCourseCards();
     setupDashboardObserver();
@@ -2384,8 +2536,8 @@ You may need to refresh the page to see the new scores.`);
     return path === "/" || path === "/dashboard" || path.startsWith("/dashboard/");
   }
   (function init() {
-    logBanner("dev", "2026-01-13 8:55:29 AM (dev, 34aee9c)");
-    exposeVersion("dev", "2026-01-13 8:55:29 AM (dev, 34aee9c)");
+    logBanner("dev", "2026-01-13 9:12:27 AM (dev, a3f4add)");
+    exposeVersion("dev", "2026-01-13 9:12:27 AM (dev, a3f4add)");
     if (true) {
       logger.info("Running in DEV mode");
     }

@@ -116,30 +116,46 @@ async function fetchEnrollmentScore(courseId, apiClient) {
             {},
             'fetchEnrollment'
         );
-        
-        // Find student enrollment
-        const studentEnrollment = enrollments.find(e => e.type === 'StudentEnrollment');
+
+        logger.debug(`Enrollment response for course ${courseId}:`, enrollments);
+
+        // Find student enrollment - try both "StudentEnrollment" and "student"
+        const studentEnrollment = enrollments.find(e =>
+            e.type === 'StudentEnrollment' ||
+            e.type === 'student' ||
+            e.role === 'StudentEnrollment'
+        );
+
         if (!studentEnrollment) {
             logger.debug(`No student enrollment found for course ${courseId}`);
+            if (logger.isDebugEnabled() && enrollments.length > 0) {
+                logger.debug(`Available enrollment types:`, enrollments.map(e => e.type || e.role));
+            }
             return null;
         }
-        
+
+        logger.debug(`Student enrollment for course ${courseId}:`, studentEnrollment);
+
         // Extract score (prefer computed over calculated, prefer current over final)
-        const score = studentEnrollment.computed_current_score 
+        const score = studentEnrollment.computed_current_score
             ?? studentEnrollment.calculated_current_score
             ?? studentEnrollment.computed_final_score
             ?? studentEnrollment.calculated_final_score;
-        
+
         if (score === null || score === undefined) {
             logger.debug(`No enrollment score found for course ${courseId}`);
+            logger.debug(`Enrollment object:`, studentEnrollment);
             return null;
         }
-        
+
         logger.debug(`Enrollment score for course ${courseId}: ${score}%`);
         return score;
-        
+
     } catch (error) {
         logger.warn(`Failed to fetch enrollment score for course ${courseId}:`, error.message);
+        if (logger.isDebugEnabled()) {
+            logger.warn(`Full error:`, error);
+        }
         return null;
     }
 }
