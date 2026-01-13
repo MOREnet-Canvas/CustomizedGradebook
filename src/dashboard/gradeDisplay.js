@@ -34,9 +34,9 @@ let dashboardObserver = null;
  */
 async function fetchActiveCourses(apiClient) {
     try {
-        // Use the exact API call that was verified to work
+        // Fetch active courses
         const courses = await apiClient.get(
-            '/api/v1/courses?enrollment_state=active&include[]=total_scores',
+            '/api/v1/courses?enrollment_state=active',
             {},
             'fetchActiveCourses'
         );
