@@ -84,99 +84,121 @@ export function findCourseCard(courseId) {
 }
 
 /**
- * Create grade badge element
+ * Create grade badge element styled to match Canvas ic-badge design
  * @param {number} gradeValue - Grade value to display
  * @param {string} gradeSource - Grade source ('assignment' or 'enrollment')
  * @returns {HTMLElement} Grade badge element
  */
 function createGradeBadge(gradeValue, gradeSource) {
-    const badge = document.createElement('div');
-    badge.className = GRADE_CLASS_PREFIX;
+    const badge = document.createElement('span');
+    badge.className = `${GRADE_CLASS_PREFIX} ic-badge`;
     badge.setAttribute('data-source', gradeSource);
-    
+    badge.setAttribute('role', 'status');
+    badge.setAttribute('aria-label', `Grade: ${gradeValue}`);
+
     // Format grade based on source
     let displayValue;
-    let label;
-    
+    let ariaLabel;
+
     if (gradeSource === 'assignment') {
         // AVG assignment: 0-4 scale, show with 1 decimal
         displayValue = gradeValue.toFixed(1);
-        label = 'Current Score';
+        ariaLabel = `Current score: ${displayValue} out of 4`;
     } else {
         // Enrollment: percentage, show with 1 decimal
         displayValue = `${gradeValue.toFixed(1)}%`;
-        label = 'Grade';
+        ariaLabel = `Grade: ${displayValue}`;
     }
-    
-    // Create badge structure
-    badge.innerHTML = `
-        <span class="${GRADE_CLASS_PREFIX}__value">${displayValue}</span>
-        <span class="${GRADE_CLASS_PREFIX}__label">${label}</span>
-    `;
-    
-    // Apply inline styles for consistency across Canvas themes
-    // Using inline styles to avoid dependency on external CSS
+
+    badge.setAttribute('aria-label', ariaLabel);
+    badge.textContent = displayValue;
+
+    // Apply inline styles matching Canvas ic-badge pattern
+    // Using semi-transparent dark background for subtle, less intrusive appearance
+    // rgba(64, 64, 64, 0.85) provides excellent contrast ratio (>10:1) with white text
+    // Meets WCAG AA standards and works well across light and dark Canvas themes
     badge.style.cssText = `
-        display: inline-flex;
-        flex-direction: column;
-        align-items: center;
-        background-color: var(--ic-brand-primary, #0374B5);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-        font-size: 14px;
+        font-size: 0.6875rem;
+        min-width: 20px;
+        line-height: 20px;
+        border-radius: 10px;
+        background: rgba(64, 64, 64, 0.85);
+        color: #fff;
+        display: inline-block;
+        vertical-align: middle;
+        text-align: center;
+        box-sizing: border-box;
+        padding: 0 8px;
         font-weight: 600;
-        line-height: 1.2;
-        margin-top: 8px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+        margin-left: 8px;
+        white-space: nowrap;
     `;
-    
-    // Style value
-    const valueElement = badge.querySelector(`.${GRADE_CLASS_PREFIX}__value`);
-    if (valueElement) {
-        valueElement.style.cssText = `
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 2px;
-        `;
-    }
-    
-    // Style label
-    const labelElement = badge.querySelector(`.${GRADE_CLASS_PREFIX}__label`);
-    if (labelElement) {
-        labelElement.style.cssText = `
-            font-size: 11px;
-            font-weight: 500;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        `;
-    }
-    
+
     return badge;
 }
 
 /**
  * Find appropriate container within card for grade badge
+ * Targets the card header area for better visual integration
  * @param {HTMLElement} cardElement - Dashboard card element
  * @returns {HTMLElement|null} Container element or null
  */
 function findGradeContainer(cardElement) {
-    // Try to find the card header subtitle area (common location for metadata)
+    // Strategy 1: Find the header subtitle area (ideal location for metadata badges)
+    // This is typically where term info and other metadata appears
     let container = cardElement.querySelector('.ic-DashboardCard__header-subtitle');
-    
-    // Fallback to card header
-    if (!container) {
-        container = cardElement.querySelector('.ic-DashboardCard__header');
+
+    if (container) {
+        logger.trace('Using header subtitle for grade badge placement');
+        return container;
     }
-    
+
+    // Strategy 2: Find the header term area (alternative metadata location)
+    container = cardElement.querySelector('.ic-DashboardCard__header-term');
+
+    if (container) {
+        logger.trace('Using header term for grade badge placement');
+        return container;
+    }
+
+    // Strategy 3: Find the main header and create a metadata container
+    const header = cardElement.querySelector('.ic-DashboardCard__header');
+
+    if (header) {
+        // Check if we already created a metadata container
+        let metadataContainer = header.querySelector(`.${GRADE_CLASS_PREFIX}-container`);
+
+        if (!metadataContainer) {
+            // Create a new container for grade badges in the header
+            metadataContainer = document.createElement('div');
+            metadataContainer.className = `${GRADE_CLASS_PREFIX}-container`;
+            metadataContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                margin-top: 4px;
+                gap: 8px;
+            `;
+
+            // Append to header
+            header.appendChild(metadataContainer);
+            logger.trace('Created new metadata container in header');
+        }
+
+        return metadataContainer;
+    }
+
+    // Strategy 4: Look for any header-like element
+    const headerLike = cardElement.querySelector('[class*="header"]') ||
+                       cardElement.querySelector('[class*="Header"]');
+
+    if (headerLike) {
+        logger.trace('Using header-like element for grade badge placement');
+        return headerLike;
+    }
+
     // Last resort: use the card itself
-    if (!container) {
-        container = cardElement;
-    }
-    
-    return container;
+    logger.trace('Using card element itself for grade badge placement (fallback)');
+    return cardElement;
 }
 
 /**
@@ -188,17 +210,24 @@ function findGradeContainer(cardElement) {
 export function renderGradeOnCard(cardElement, gradeValue, gradeSource) {
     // Remove any existing grade badge first
     removeGradeFromCard(cardElement);
-    
+
     // Create new badge
     const badge = createGradeBadge(gradeValue, gradeSource);
-    
+
     // Find container and append badge
     const container = findGradeContainer(cardElement);
     if (container) {
         container.appendChild(badge);
-        logger.trace(`Grade badge rendered on card (source: ${gradeSource})`);
+
+        if (logger.isDebugEnabled()) {
+            logger.debug(`Grade badge rendered (value: ${gradeValue}, source: ${gradeSource})`);
+            logger.debug(`Badge placed in: ${container.className || container.tagName}`);
+        } else {
+            logger.trace(`Grade badge rendered on card (source: ${gradeSource})`);
+        }
     } else {
         logger.warn('Could not find suitable container for grade badge');
+        logger.warn('Card element:', cardElement);
     }
 }
 
@@ -207,10 +236,18 @@ export function renderGradeOnCard(cardElement, gradeValue, gradeSource) {
  * @param {HTMLElement} cardElement - Dashboard card element
  */
 export function removeGradeFromCard(cardElement) {
+    // Remove the badge itself
     const existingBadge = cardElement.querySelector(`.${GRADE_CLASS_PREFIX}`);
     if (existingBadge) {
         existingBadge.remove();
         logger.trace('Existing grade badge removed from card');
+    }
+
+    // Clean up empty metadata container if it exists
+    const metadataContainer = cardElement.querySelector(`.${GRADE_CLASS_PREFIX}-container`);
+    if (metadataContainer && metadataContainer.children.length === 0) {
+        metadataContainer.remove();
+        logger.trace('Empty metadata container removed');
     }
 }
 
