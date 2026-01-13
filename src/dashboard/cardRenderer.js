@@ -15,19 +15,72 @@ const GRADE_CLASS_PREFIX = 'cg-dashboard-grade';
 
 /**
  * Find dashboard card element for a course
+ * Uses multiple strategies to locate the card
  * @param {string} courseId - Course ID
  * @returns {HTMLElement|null} Card element or null if not found
  */
 export function findCourseCard(courseId) {
-    // Canvas dashboard cards have data-course-id attribute
-    const card = document.querySelector(`[data-course-id="${courseId}"]`);
-    
-    if (!card) {
-        logger.trace(`Dashboard card not found for course ${courseId}`);
-        return null;
+    // Strategy 1: Try data-course-id attribute (older Canvas)
+    let card = document.querySelector(`[data-course-id="${courseId}"]`);
+    if (card) {
+        logger.trace(`Found card for course ${courseId} using data-course-id`);
+        return card;
     }
-    
-    return card;
+
+    // Strategy 2: Try finding by href to course
+    const courseUrl = `/courses/${courseId}`;
+    const links = document.querySelectorAll(`a[href*="${courseUrl}"]`);
+
+    for (const link of links) {
+        // Find the closest card-like container
+        const cardContainer = link.closest('.ic-DashboardCard') ||
+                            link.closest('[class*="DashboardCard"]') ||
+                            link.closest('[class*="CourseCard"]') ||
+                            link.closest('.course-list-item') ||
+                            link.closest('.dashboard-card');
+
+        if (cardContainer) {
+            // Verify this is actually for the right course
+            const cardLink = cardContainer.querySelector(`a[href*="${courseUrl}"]`);
+            if (cardLink) {
+                logger.trace(`Found card for course ${courseId} using href strategy`);
+                return cardContainer;
+            }
+        }
+    }
+
+    // Strategy 3: Look for course link and use its parent structure
+    for (const link of links) {
+        // Skip navigation links
+        if (link.closest('.ic-app-header') ||
+            link.closest('[role="navigation"]') ||
+            link.closest('.menu')) {
+            continue;
+        }
+
+        // The link itself or a close parent might be the card
+        // Try a few levels up
+        let parent = link;
+        for (let i = 0; i < 5; i++) {
+            parent = parent.parentElement;
+            if (!parent) break;
+
+            // Check if this looks like a card container
+            const hasCardClass = parent.className && (
+                parent.className.includes('Card') ||
+                parent.className.includes('card') ||
+                parent.className.includes('course')
+            );
+
+            if (hasCardClass) {
+                logger.trace(`Found card for course ${courseId} using parent traversal`);
+                return parent;
+            }
+        }
+    }
+
+    logger.trace(`Dashboard card not found for course ${courseId}`);
+    return null;
 }
 
 /**
