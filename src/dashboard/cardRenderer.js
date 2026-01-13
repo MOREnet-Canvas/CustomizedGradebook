@@ -105,9 +105,15 @@ function createGradeBadge(gradeData, heroElement = null) {
     let ariaLabel;
 
     if (source === 'assignment') {
-        // AVG assignment: 0-4 scale, show with 1 decimal
-        displayValue = score.toFixed(1);
-        ariaLabel = `Current score: ${displayValue} out of 4`;
+        // AVG assignment: 0-4 scale, show with 1 decimal and letter grade if available
+        const scoreStr = score.toFixed(1);
+        if (letterGrade) {
+            displayValue = `${scoreStr} (${letterGrade})`;
+            ariaLabel = `Current score: ${scoreStr} out of 4, ${letterGrade}`;
+        } else {
+            displayValue = scoreStr;
+            ariaLabel = `Current score: ${scoreStr} out of 4`;
+        }
     } else {
         // Enrollment: show percentage and letter grade if available
         const percentageStr = `${score.toFixed(1)}%`;
@@ -138,12 +144,12 @@ function createGradeBadge(gradeData, heroElement = null) {
     }
 
     // Apply inline styles with frosted-glass effect
-    // Positioned to overlay on hero section
+    // Positioned to overlay on hero section (lower-right corner)
     badge.style.cssText = `
         position: absolute;
-        top: 8px;
+        bottom: 8px;
         right: 8px;
-        font-size: 0.75rem;
+        font-size: 0.875rem;
         line-height: 1.4;
         border-radius: 8px;
         background: ${badgeBackground};
