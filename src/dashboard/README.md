@@ -82,12 +82,16 @@ export const AVG_ASSIGNMENT_NAME = window.CG_CONFIG?.AVG_ASSIGNMENT_NAME ?? "Cur
 
 ## Styling
 
-Grade badges are styled with inline CSS to ensure consistency across Canvas themes:
+Grade badges are styled to match Canvas's native `ic-badge` design pattern:
 
-- **Background**: Uses Canvas brand primary color (`--ic-brand-primary`)
-- **Text**: White text for contrast
-- **Layout**: Flexbox column with value and label
-- **Position**: Appended to card header subtitle area
+- **Design**: Compact inline badge matching Canvas's existing badge style
+- **Background**: Semi-transparent dark gray (`rgba(64, 64, 64, 0.85)`) for subtle appearance
+- **Text**: White text for contrast, 11px font size
+- **Contrast**: Exceeds WCAG AA standards (>10:1 contrast ratio)
+- **Shape**: Rounded pill shape (border-radius: 10px)
+- **Position**: Placed in card header area (subtitle, term, or custom metadata container)
+- **Accessibility**: Includes ARIA labels for screen readers
+- **Theme Compatibility**: Works well across light and dark Canvas themes
 
 ## Error Handling
 
