@@ -15,6 +15,31 @@ import { OUTCOME_AND_RUBRIC_RATINGS, DEFAULT_MAX_POINTS } from '../config.js';
 const GRADE_CLASS_PREFIX = 'cg-dashboard-grade';
 
 /**
+ * Selectors for finding dashboard card elements
+ * Ordered by specificity and reliability
+ */
+const CARD_SELECTORS = [
+    '.ic-DashboardCard',
+    '[class*="DashboardCard"]',
+    '[class*="CourseCard"]',
+    '.course-list-item',
+    '.dashboard-card'
+];
+
+/**
+ * Selectors for finding hero/header containers within cards
+ * Ordered by preference for badge placement
+ */
+const HERO_SELECTORS = [
+    '.ic-DashboardCard__header_hero',
+    '[class*="hero"]',
+    '[class*="Hero"]',
+    '.ic-DashboardCard__header',
+    '[class*="header"]',
+    '[class*="Header"]'
+];
+
+/**
  * Find dashboard card element for a course
  * Uses multiple strategies to locate the card
  * @param {string} courseId - Course ID
@@ -28,24 +53,22 @@ export function findCourseCard(courseId) {
         return card;
     }
 
-    // Strategy 2: Try finding by href to course
+    // Strategy 2: Try finding by href to course using selector array
     const courseUrl = `/courses/${courseId}`;
     const links = document.querySelectorAll(`a[href*="${courseUrl}"]`);
 
     for (const link of links) {
-        // Find the closest card-like container
-        const cardContainer = link.closest('.ic-DashboardCard') ||
-                            link.closest('[class*="DashboardCard"]') ||
-                            link.closest('[class*="CourseCard"]') ||
-                            link.closest('.course-list-item') ||
-                            link.closest('.dashboard-card');
+        // Try each card selector to find the closest card-like container
+        for (const selector of CARD_SELECTORS) {
+            const cardContainer = link.closest(selector);
 
-        if (cardContainer) {
-            // Verify this is actually for the right course
-            const cardLink = cardContainer.querySelector(`a[href*="${courseUrl}"]`);
-            if (cardLink) {
-                logger.trace(`Found card for course ${courseId} using href strategy`);
-                return cardContainer;
+            if (cardContainer) {
+                // Verify this is actually for the right course
+                const cardLink = cardContainer.querySelector(`a[href*="${courseUrl}"]`);
+                if (cardLink) {
+                    logger.trace(`Found card for course ${courseId} using href strategy with selector: ${selector}`);
+                    return cardContainer;
+                }
             }
         }
     }
@@ -297,63 +320,20 @@ function parseColor(colorString) {
  * @returns {HTMLElement|null} Hero container element or null
  */
 function findGradeContainer(cardElement) {
-    // Strategy 1: Find the hero section (primary target for badge overlay)
-    // This is the colored header area at the top of each card
-    let hero = cardElement.querySelector('.ic-DashboardCard__header_hero');
+    // Try each hero/header selector in order of preference
+    for (const selector of HERO_SELECTORS) {
+        const container = cardElement.querySelector(selector);
 
-    if (hero) {
-        // Ensure hero has position: relative for absolute positioning of badge
-        const heroStyles = window.getComputedStyle(hero);
-        if (heroStyles.position === 'static') {
-            hero.style.position = 'relative';
+        if (container) {
+            // Ensure container has position: relative for absolute positioning of badge
+            const styles = window.getComputedStyle(container);
+            if (styles.position === 'static') {
+                container.style.position = 'relative';
+            }
+
+            logger.trace(`Using container for grade badge placement: ${selector}`);
+            return container;
         }
-
-        logger.trace('Using header hero for grade badge placement');
-        return hero;
-    }
-
-    // Strategy 2: Look for alternative hero class names
-    hero = cardElement.querySelector('[class*="hero"]') ||
-           cardElement.querySelector('[class*="Hero"]');
-
-    if (hero) {
-        // Ensure hero has position: relative
-        const heroStyles = window.getComputedStyle(hero);
-        if (heroStyles.position === 'static') {
-            hero.style.position = 'relative';
-        }
-
-        logger.trace('Using hero-like element for grade badge placement');
-        return hero;
-    }
-
-    // Strategy 3: Find the main header and use it as fallback
-    const header = cardElement.querySelector('.ic-DashboardCard__header');
-
-    if (header) {
-        // Ensure header has position: relative
-        const headerStyles = window.getComputedStyle(header);
-        if (headerStyles.position === 'static') {
-            header.style.position = 'relative';
-        }
-
-        logger.trace('Using card header for grade badge placement (fallback)');
-        return header;
-    }
-
-    // Strategy 4: Look for any header-like element
-    const headerLike = cardElement.querySelector('[class*="header"]') ||
-                       cardElement.querySelector('[class*="Header"]');
-
-    if (headerLike) {
-        // Ensure it has position: relative
-        const styles = window.getComputedStyle(headerLike);
-        if (styles.position === 'static') {
-            headerLike.style.position = 'relative';
-        }
-
-        logger.trace('Using header-like element for grade badge placement');
-        return headerLike;
     }
 
     // Last resort: use the card itself
