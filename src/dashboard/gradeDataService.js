@@ -111,11 +111,21 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
             );
 
             if (studentEnrollment) {
-                letterGrade = studentEnrollment.computed_current_grade
-                    ?? studentEnrollment.calculated_current_grade
-                    ?? studentEnrollment.computed_final_grade
-                    ?? studentEnrollment.calculated_final_grade
-                    ?? null;
+                // Check nested grades object first (most common structure)
+                if (studentEnrollment.grades) {
+                    letterGrade = studentEnrollment.grades.current_grade
+                        ?? studentEnrollment.grades.final_grade
+                        ?? null;
+                }
+
+                // Fallback to top-level fields
+                if (letterGrade === null) {
+                    letterGrade = studentEnrollment.computed_current_grade
+                        ?? studentEnrollment.calculated_current_grade
+                        ?? studentEnrollment.computed_final_grade
+                        ?? studentEnrollment.calculated_final_grade
+                        ?? null;
+                }
             }
         } catch (error) {
             logger.debug(`Could not fetch letter grade for AVG assignment in course ${courseId}:`, error.message);
@@ -165,24 +175,43 @@ async function fetchEnrollmentScore(courseId, apiClient) {
 
         logger.debug(`Student enrollment for course ${courseId}:`, studentEnrollment);
 
-        // Extract score (prefer computed over calculated, prefer current over final)
-        const score = studentEnrollment.computed_current_score
-            ?? studentEnrollment.calculated_current_score
-            ?? studentEnrollment.computed_final_score
-            ?? studentEnrollment.calculated_final_score;
+        // Extract score - Canvas API can return grades in two different structures:
+        // 1. Nested in 'grades' object: grades.current_score, grades.final_score
+        // 2. Top-level fields: computed_current_score, calculated_current_score, etc.
+        let score = null;
+        let letterGrade = null;
+
+        // Try nested grades object first (most common structure)
+        if (studentEnrollment.grades) {
+            score = studentEnrollment.grades.current_score
+                ?? studentEnrollment.grades.final_score;
+
+            letterGrade = studentEnrollment.grades.current_grade
+                ?? studentEnrollment.grades.final_grade
+                ?? null;
+        }
+
+        // Fallback to top-level fields (alternative API response structure)
+        if (score === null || score === undefined) {
+            score = studentEnrollment.computed_current_score
+                ?? studentEnrollment.calculated_current_score
+                ?? studentEnrollment.computed_final_score
+                ?? studentEnrollment.calculated_final_score;
+        }
+
+        if (letterGrade === null && score !== null) {
+            letterGrade = studentEnrollment.computed_current_grade
+                ?? studentEnrollment.calculated_current_grade
+                ?? studentEnrollment.computed_final_grade
+                ?? studentEnrollment.calculated_final_grade
+                ?? null;
+        }
 
         if (score === null || score === undefined) {
             logger.debug(`No enrollment score found for course ${courseId}`);
             logger.debug(`Enrollment object:`, studentEnrollment);
             return null;
         }
-
-        // Extract letter grade (prefer computed over calculated, prefer current over final)
-        const letterGrade = studentEnrollment.computed_current_grade
-            ?? studentEnrollment.calculated_current_grade
-            ?? studentEnrollment.computed_final_grade
-            ?? studentEnrollment.calculated_final_grade
-            ?? null;
 
         logger.debug(`Enrollment data for course ${courseId}: ${score}% (${letterGrade || 'no letter grade'})`);
 
