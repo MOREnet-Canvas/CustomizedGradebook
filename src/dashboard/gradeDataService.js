@@ -146,6 +146,11 @@ export function preCacheEnrollmentGrades(courses) {
 
 /**
  * Fetch AVG assignment score and letter grade for a course
+ *
+ * Performance optimization: Letter grade is retrieved from pre-cached enrollment data
+ * instead of making a redundant enrollment API call. This function only makes
+ * assignment-related API calls (search + submission).
+ *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
  * @returns {Promise<{score: number, letterGrade: string|null}|null>} Assignment data or null if not found
@@ -180,41 +185,15 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
             return null;
         }
 
-        // Also fetch letter grade from enrollment data to display alongside the score
+        // Retrieve letter grade from pre-cached enrollment data (no API call needed)
+        // The enrollment data was pre-cached during initial dashboard load
         let letterGrade = null;
-        try {
-            const enrollments = await apiClient.get(
-                `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
-                {},
-                'fetchEnrollmentForLetterGrade'
-            );
-
-            const studentEnrollment = enrollments.find(e =>
-                e.type === 'StudentEnrollment' ||
-                e.type === 'student' ||
-                e.role === 'StudentEnrollment'
-            );
-
-            if (studentEnrollment) {
-                // Check nested grades object first (most common structure)
-                if (studentEnrollment.grades) {
-                    letterGrade = (studentEnrollment.grades.current_grade
-                        ?? studentEnrollment.grades.final_grade
-                        ?? null)?.trim() ?? null;
-                }
-
-                // Fallback to top-level fields
-                if (letterGrade === null) {
-                    letterGrade = (studentEnrollment.computed_current_grade
-                        ?? studentEnrollment.calculated_current_grade
-                        ?? studentEnrollment.computed_final_grade
-                        ?? studentEnrollment.calculated_final_grade
-                        ?? null)?.trim() ?? null;
-                }
-            }
-        } catch (error) {
-            logger.trace(`Could not fetch letter grade for AVG assignment in course ${courseId}:`, error.message);
-            // Continue without letter grade
+        const cached = getCachedGrade(courseId);
+        if (cached && cached.source === GRADE_SOURCE.ENROLLMENT) {
+            letterGrade = cached.letterGrade;
+            logger.trace(`Retrieved letter grade from pre-cached enrollment data for course ${courseId}: ${letterGrade || 'no letter grade'}`);
+        } else {
+            logger.trace(`No pre-cached enrollment data available for letter grade in course ${courseId}`);
         }
 
         logger.trace(`AVG assignment data for course ${courseId}: ${score} (${letterGrade || 'no letter grade'})`);
