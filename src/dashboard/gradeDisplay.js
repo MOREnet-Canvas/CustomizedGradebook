@@ -41,13 +41,13 @@ async function fetchActiveCourses(apiClient) {
             'fetchActiveCourses'
         );
 
-        logger.debug(`Raw courses response:`, courses);
-        logger.debug(`Number of courses returned: ${courses?.length || 0}`);
+        logger.trace(`Raw courses response:`, courses);
+        logger.trace(`Number of courses returned: ${courses?.length || 0}`);
 
         // Log first course structure for debugging
         if (courses && courses.length > 0) {
-            logger.debug(`First course structure:`, courses[0]);
-            logger.debug(`First course enrollments:`, courses[0].enrollments);
+            logger.trace(`First course structure:`, courses[0]);
+            logger.trace(`First course enrollments:`, courses[0].enrollments);
         }
 
         // Filter to only student enrollments
@@ -60,8 +60,8 @@ async function fetchActiveCourses(apiClient) {
                 e.role === 'StudentEnrollment'
             );
 
-            if (logger.isDebugEnabled() && enrollments.length > 0) {
-                logger.debug(`Course ${course.id} (${course.name}): enrollments =`, enrollments.map(e => e.type));
+            if (logger.isTraceEnabled() && enrollments.length > 0) {
+                logger.trace(`Course ${course.id} (${course.name}): enrollments =`, enrollments.map(e => e.type));
             }
 
             return hasStudentEnrollment;
@@ -103,7 +103,7 @@ async function updateCourseCard(courseId, apiClient) {
         const displayInfo = gradeData.letterGrade
             ? `${gradeData.score}% (${gradeData.letterGrade})`
             : `${gradeData.score}`;
-        logger.debug(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${gradeData.source})`);
+        logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${gradeData.source})`);
 
     } catch (error) {
         // Fail silently for individual courses - don't break the entire dashboard
@@ -167,7 +167,7 @@ function findDashboardCards() {
     for (const selector of selectors) {
         const cards = document.querySelectorAll(selector);
         if (cards.length > 0) {
-            logger.debug(`Found ${cards.length} dashboard cards using selector: ${selector}`);
+            logger.trace(`Found ${cards.length} dashboard cards using selector: ${selector}`);
             return cards;
         }
     }
@@ -175,7 +175,7 @@ function findDashboardCards() {
     // Last resort: look for any links to /courses/ on the dashboard
     const courseLinks = document.querySelectorAll('a[href*="/courses/"]');
     if (courseLinks.length > 0) {
-        logger.debug(`Found ${courseLinks.length} course links as fallback`);
+        logger.trace(`Found ${courseLinks.length} course links as fallback`);
         // Filter to only dashboard area (not global navigation)
         const dashboardLinks = Array.from(courseLinks).filter(link => {
             const isDashboardArea = !link.closest('.ic-app-header') &&
@@ -185,12 +185,12 @@ function findDashboardCards() {
         });
 
         if (dashboardLinks.length > 0) {
-            logger.debug(`Found ${dashboardLinks.length} dashboard course links`);
+            logger.trace(`Found ${dashboardLinks.length} dashboard course links`);
             return dashboardLinks;
         }
     }
 
-    logger.debug('No dashboard cards found with any selector');
+    logger.trace('No dashboard cards found with any selector');
     return null;
 }
 
@@ -209,10 +209,10 @@ function waitForDashboardCards(maxWaitMs = 5000) {
                 logger.info(`Dashboard cards found: ${cards.length}`);
 
                 // Log the structure of the first card for debugging
-                if (logger.isDebugEnabled() && cards[0]) {
-                    logger.debug('First card element:', cards[0]);
-                    logger.debug('First card classes:', cards[0].className);
-                    logger.debug('First card attributes:', Array.from(cards[0].attributes).map(a => `${a.name}="${a.value}"`));
+                if (logger.isTraceEnabled() && cards[0]) {
+                    logger.trace('First card element:', cards[0]);
+                    logger.trace('First card classes:', cards[0].className);
+                    logger.trace('First card attributes:', Array.from(cards[0].attributes).map(a => `${a.name}="${a.value}"`));
                 }
 
                 resolve(true);
@@ -289,7 +289,7 @@ function setupDashboardObserver() {
         });
 
         if (cardsAdded) {
-            logger.debug('Dashboard cards detected via MutationObserver, updating grades');
+            logger.trace('Dashboard cards detected via MutationObserver, updating grades');
             updateAllCourseCards();
         }
     });
@@ -304,7 +304,7 @@ function setupDashboardObserver() {
         subtree: true
     });
 
-    logger.debug('Dashboard observer setup complete, observing:', dashboardContainer.id || dashboardContainer.tagName);
+    logger.trace('Dashboard observer setup complete, observing:', dashboardContainer.id || dashboardContainer.tagName);
 }
 
 /**
@@ -357,7 +357,7 @@ function diagnosticDashboardCards() {
  */
 export async function initDashboardGradeDisplay() {
     if (initialized) {
-        logger.debug('Dashboard grade display already initialized');
+        logger.trace('Dashboard grade display already initialized');
         return;
     }
 
@@ -393,6 +393,6 @@ export function cleanupDashboardGradeDisplay() {
         dashboardObserver = null;
     }
     initialized = false;
-    logger.debug('Dashboard grade display cleaned up');
+    logger.trace('Dashboard grade display cleaned up');
 }
 

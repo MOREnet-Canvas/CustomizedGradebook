@@ -77,7 +77,7 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
         // Find exact match
         const avgAssignment = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
         if (!avgAssignment) {
-            logger.debug(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
+            logger.trace(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
             return null;
         }
 
@@ -91,7 +91,7 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
         // Extract score
         const score = submission?.score;
         if (score === null || score === undefined) {
-            logger.debug(`No score found for AVG assignment in course ${courseId}`);
+            logger.trace(`No score found for AVG assignment in course ${courseId}`);
             return null;
         }
 
@@ -128,11 +128,11 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
                 }
             }
         } catch (error) {
-            logger.debug(`Could not fetch letter grade for AVG assignment in course ${courseId}:`, error.message);
+            logger.trace(`Could not fetch letter grade for AVG assignment in course ${courseId}:`, error.message);
             // Continue without letter grade
         }
 
-        logger.debug(`AVG assignment data for course ${courseId}: ${score} (${letterGrade || 'no letter grade'})`);
+        logger.trace(`AVG assignment data for course ${courseId}: ${score} (${letterGrade || 'no letter grade'})`);
         return { score, letterGrade };
 
     } catch (error) {
@@ -156,7 +156,7 @@ async function fetchEnrollmentScore(courseId, apiClient) {
             'fetchEnrollment'
         );
 
-        logger.debug(`Enrollment response for course ${courseId}:`, enrollments);
+        logger.trace(`Enrollment response for course ${courseId}:`, enrollments);
 
         // Find student enrollment - try both "StudentEnrollment" and "student"
         const studentEnrollment = enrollments.find(e =>
@@ -166,14 +166,14 @@ async function fetchEnrollmentScore(courseId, apiClient) {
         );
 
         if (!studentEnrollment) {
-            logger.debug(`No student enrollment found for course ${courseId}`);
-            if (logger.isDebugEnabled() && enrollments.length > 0) {
-                logger.debug(`Available enrollment types:`, enrollments.map(e => e.type || e.role));
+            logger.trace(`No student enrollment found for course ${courseId}`);
+            if (logger.isTraceEnabled() && enrollments.length > 0) {
+                logger.trace(`Available enrollment types:`, enrollments.map(e => e.type || e.role));
             }
             return null;
         }
 
-        logger.debug(`Student enrollment for course ${courseId}:`, studentEnrollment);
+        logger.trace(`Student enrollment for course ${courseId}:`, studentEnrollment);
 
         // Extract score - Canvas API can return grades in two different structures:
         // 1. Nested in 'grades' object: grades.current_score, grades.final_score
@@ -208,12 +208,12 @@ async function fetchEnrollmentScore(courseId, apiClient) {
         }
 
         if (score === null || score === undefined) {
-            logger.debug(`No enrollment score found for course ${courseId}`);
-            logger.debug(`Enrollment object:`, studentEnrollment);
+            logger.trace(`No enrollment score found for course ${courseId}`);
+            logger.trace(`Enrollment object:`, studentEnrollment);
             return null;
         }
 
-        logger.debug(`Enrollment data for course ${courseId}: ${score}% (${letterGrade || 'no letter grade'})`);
+        logger.trace(`Enrollment data for course ${courseId}: ${score}% (${letterGrade || 'no letter grade'})`);
 
         return {
             score,
@@ -279,7 +279,7 @@ export async function getCourseGrade(courseId, apiClient) {
     logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade not found`);
 
     // No grade available
-    logger.debug(`[Grade Source Debug] Course ${courseId}: No grade available from any source`);
+    logger.trace(`[Grade Source Debug] Course ${courseId}: No grade available from any source`);
     return null;
 }
 
