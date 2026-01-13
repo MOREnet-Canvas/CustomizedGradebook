@@ -28,6 +28,15 @@ let initialized = false;
 let dashboardObserver = null;
 
 /**
+ * Configuration for concurrent processing
+ * Concurrency level balances performance with Canvas API rate limits
+ * - Too low: Sequential bottleneck, slow performance
+ * - Too high: May hit Canvas API rate limits (typically 3000 requests/hour)
+ * - Recommended: 3-5 for optimal balance
+ */
+const CONCURRENT_WORKERS = 3;
+
+/**
  * Fetch active courses with enrollment grade data
  * Uses include[]=total_scores to get grades in a single API call
  * @param {CanvasApiClient} apiClient - Canvas API client
@@ -140,10 +149,17 @@ async function updateCourseCard(courseId, apiClient) {
 }
 
 /**
- * Update all course cards with grades
+ * Update all course cards with grades using concurrent processing
+ *
+ * Performance optimization: Uses a worker queue pattern to process multiple courses
+ * concurrently while respecting Canvas API rate limits. This significantly reduces
+ * total processing time compared to sequential processing.
+ *
+ * Concurrency level is set to 3 to balance performance and API rate limits.
  */
 async function updateAllCourseCards() {
     try {
+        const startTime = performance.now();
         const apiClient = new CanvasApiClient();
 
         // Fetch active courses with enrollment data (single API call)
@@ -159,13 +175,59 @@ async function updateAllCourseCards() {
         // This eliminates redundant enrollment API calls during grade fetching
         preCacheEnrollmentGrades(courses);
 
-        // Update each course card
-        // Process sequentially to avoid overwhelming the API
-        for (const course of courses) {
-            await updateCourseCard(course.id, apiClient);
+        // Update course cards concurrently using worker queue pattern
+        // Concurrency level balances performance with Canvas API rate limits
+        const concurrency = CONCURRENT_WORKERS;
+        const queue = courses.map(c => c.id);
+        let processedCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
+
+        // Worker function: processes courses from the queue
+        async function worker() {
+            while (queue.length > 0) {
+                const courseId = queue.shift();
+                if (!courseId) break;
+
+                try {
+                    await updateCourseCard(courseId, apiClient);
+                    processedCount++;
+                    successCount++;
+
+                    // Log progress every 5 courses
+                    if (processedCount % 5 === 0) {
+                        logger.debug(`Progress: ${processedCount}/${courses.length} courses processed`);
+                    }
+                } catch (error) {
+                    processedCount++;
+                    errorCount++;
+                    logger.warn(`Worker failed to process course ${courseId}:`, error.message);
+                }
+            }
         }
 
-        logger.info('Dashboard grade display update complete');
+        // Launch concurrent workers
+        const processingStartTime = performance.now();
+        logger.debug(`Starting ${concurrency} concurrent workers for ${courses.length} courses`);
+
+        await Promise.all(
+            Array.from({ length: concurrency }, () => worker())
+        );
+
+        // Performance measurement: Calculate and log results
+        const processingTime = performance.now() - processingStartTime;
+        const totalTime = performance.now() - startTime;
+        const avgTimePerCourse = processingTime / courses.length;
+
+        logger.info(`Dashboard grade display update complete`);
+        logger.info(`Performance: ${courses.length} courses processed in ${totalTime.toFixed(0)}ms total (${processingTime.toFixed(0)}ms processing)`);
+        logger.info(`Success: ${successCount}/${courses.length} courses, ${errorCount} errors`);
+        logger.info(`Average: ${avgTimePerCourse.toFixed(0)}ms per course with ${concurrency} concurrent workers`);
+
+        // Calculate theoretical sequential time for comparison
+        const estimatedSequentialTime = avgTimePerCourse * courses.length;
+        const speedup = estimatedSequentialTime / processingTime;
+        logger.debug(`Estimated speedup: ${speedup.toFixed(1)}x faster than sequential processing`);
 
     } catch (error) {
         logger.error('Failed to update dashboard grades:', error);
@@ -396,10 +458,12 @@ export async function initDashboardGradeDisplay() {
     initialized = true;
     logger.info('Initializing dashboard grade display');
 
-    // Expose diagnostic function
+    // Expose diagnostic and testing functions
     if (!window.CG) window.CG = {};
     window.CG.diagnosticDashboard = diagnosticDashboardCards;
+    window.CG.testConcurrentPerformance = testConcurrentPerformance;
     logger.info('Diagnostic function available: window.CG.diagnosticDashboard()');
+    logger.info('Performance test available: window.CG.testConcurrentPerformance()');
 
     // Wait for dashboard cards to load
     const cardsFound = await waitForDashboardCards();
@@ -426,5 +490,114 @@ export function cleanupDashboardGradeDisplay() {
     }
     initialized = false;
     logger.trace('Dashboard grade display cleaned up');
+}
+
+/**
+ * Performance testing utility: Compare sequential vs concurrent processing
+ *
+ * This function is exposed for testing and benchmarking purposes.
+ * It measures the performance difference between sequential and concurrent processing.
+ *
+ * Usage in browser console:
+ *   await window.CG.testConcurrentPerformance()
+ *
+ * @returns {Promise<Object>} Performance comparison results
+ */
+export async function testConcurrentPerformance() {
+    try {
+        logger.info('=== Performance Test: Sequential vs Concurrent Processing ===');
+
+        const apiClient = new CanvasApiClient();
+
+        // Fetch courses
+        const courses = await fetchActiveCourses(apiClient);
+        if (courses.length === 0) {
+            logger.warn('No courses found for performance testing');
+            return { error: 'No courses found' };
+        }
+
+        logger.info(`Testing with ${courses.length} courses`);
+
+        // Pre-cache enrollment data
+        preCacheEnrollmentGrades(courses);
+
+        // Test 1: Sequential processing (baseline)
+        logger.info('Test 1: Sequential processing...');
+        const sequentialStart = performance.now();
+
+        for (const course of courses) {
+            try {
+                await getCourseGrade(course.id, apiClient);
+            } catch (error) {
+                logger.trace(`Sequential test error for course ${course.id}:`, error.message);
+            }
+        }
+
+        const sequentialTime = performance.now() - sequentialStart;
+        logger.info(`Sequential: ${sequentialTime.toFixed(0)}ms total, ${(sequentialTime / courses.length).toFixed(0)}ms per course`);
+
+        // Clear cache for fair comparison
+        const { clearGradeCache } = await import('./gradeDataService.js');
+        clearGradeCache();
+        preCacheEnrollmentGrades(courses);
+
+        // Test 2: Concurrent processing (optimized)
+        logger.info('Test 2: Concurrent processing...');
+        const concurrentStart = performance.now();
+
+        const concurrency = CONCURRENT_WORKERS;
+        const queue = courses.map(c => c.id);
+
+        async function worker() {
+            while (queue.length > 0) {
+                const courseId = queue.shift();
+                if (!courseId) break;
+
+                try {
+                    await getCourseGrade(courseId, apiClient);
+                } catch (error) {
+                    logger.trace(`Concurrent test error for course ${courseId}:`, error.message);
+                }
+            }
+        }
+
+        await Promise.all(
+            Array.from({ length: concurrency }, () => worker())
+        );
+
+        const concurrentTime = performance.now() - concurrentStart;
+        logger.info(`Concurrent: ${concurrentTime.toFixed(0)}ms total, ${(concurrentTime / courses.length).toFixed(0)}ms per course`);
+
+        // Calculate results
+        const speedup = sequentialTime / concurrentTime;
+        const improvement = ((sequentialTime - concurrentTime) / sequentialTime * 100);
+
+        const results = {
+            courses: courses.length,
+            concurrency: concurrency,
+            sequential: {
+                total: Math.round(sequentialTime),
+                perCourse: Math.round(sequentialTime / courses.length)
+            },
+            concurrent: {
+                total: Math.round(concurrentTime),
+                perCourse: Math.round(concurrentTime / courses.length)
+            },
+            speedup: speedup.toFixed(2),
+            improvement: improvement.toFixed(1) + '%',
+            timeSaved: Math.round(sequentialTime - concurrentTime) + 'ms'
+        };
+
+        logger.info('=== Performance Test Results ===');
+        logger.info(`Speedup: ${results.speedup}x faster (${results.improvement} improvement)`);
+        logger.info(`Time saved: ${results.timeSaved}`);
+        logger.info('Full results:', results);
+
+        return results;
+
+    } catch (error) {
+        logger.error('Performance test failed:', error);
+        return { error: error.message };
+    }
 }
 
