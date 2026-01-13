@@ -60,10 +60,10 @@ function cacheGrade(courseId, score, letterGrade, source) {
 }
 
 /**
- * Fetch AVG assignment score for a course
+ * Fetch AVG assignment score and letter grade for a course
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<number|null>} Assignment score (0-4 scale) or null if not found
+ * @returns {Promise<{score: number, letterGrade: string|null}|null>} Assignment data or null if not found
  */
 async function fetchAvgAssignmentScore(courseId, apiClient) {
     try {
@@ -73,31 +73,58 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
             {},
             'fetchAvgAssignment'
         );
-        
+
         // Find exact match
         const avgAssignment = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
         if (!avgAssignment) {
             logger.debug(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
             return null;
         }
-        
+
         // Fetch student's submission for this assignment
         const submission = await apiClient.get(
             `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/self`,
             {},
             'fetchAvgSubmission'
         );
-        
+
         // Extract score
         const score = submission?.score;
         if (score === null || score === undefined) {
             logger.debug(`No score found for AVG assignment in course ${courseId}`);
             return null;
         }
-        
-        logger.debug(`AVG assignment score for course ${courseId}: ${score}`);
-        return score;
-        
+
+        // Also fetch letter grade from enrollment data to display alongside the score
+        let letterGrade = null;
+        try {
+            const enrollments = await apiClient.get(
+                `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
+                {},
+                'fetchEnrollmentForLetterGrade'
+            );
+
+            const studentEnrollment = enrollments.find(e =>
+                e.type === 'StudentEnrollment' ||
+                e.type === 'student' ||
+                e.role === 'StudentEnrollment'
+            );
+
+            if (studentEnrollment) {
+                letterGrade = studentEnrollment.computed_current_grade
+                    ?? studentEnrollment.calculated_current_grade
+                    ?? studentEnrollment.computed_final_grade
+                    ?? studentEnrollment.calculated_final_grade
+                    ?? null;
+            }
+        } catch (error) {
+            logger.debug(`Could not fetch letter grade for AVG assignment in course ${courseId}:`, error.message);
+            // Continue without letter grade
+        }
+
+        logger.debug(`AVG assignment data for course ${courseId}: ${score} (${letterGrade || 'no letter grade'})`);
+        return { score, letterGrade };
+
     } catch (error) {
         logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
         return null;
@@ -192,11 +219,11 @@ export async function getCourseGrade(courseId, apiClient) {
     }
 
     // Try AVG assignment first (primary source)
-    const avgScore = await fetchAvgAssignmentScore(courseId, apiClient);
-    if (avgScore !== null) {
-        // AVG assignment doesn't have letter grades, only 0-4 scale
-        cacheGrade(courseId, avgScore, null, 'assignment');
-        return { score: avgScore, letterGrade: null, source: 'assignment' };
+    const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
+    if (avgData !== null) {
+        // AVG assignment returns 0-4 scale score with letter grade from enrollment
+        cacheGrade(courseId, avgData.score, avgData.letterGrade, 'assignment');
+        return { score: avgData.score, letterGrade: avgData.letterGrade, source: 'assignment' };
     }
 
     // Fallback to enrollment score
