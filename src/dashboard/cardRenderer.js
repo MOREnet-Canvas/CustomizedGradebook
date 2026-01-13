@@ -8,6 +8,7 @@
 
 import { logger } from '../utils/logger.js';
 import { OUTCOME_AND_RUBRIC_RATINGS, DEFAULT_MAX_POINTS } from '../config.js';
+import { GRADE_SOURCE } from './gradeDataService.js';
 
 /**
  * CSS class prefix for grade elements
@@ -143,29 +144,23 @@ function percentageToPoints(percentageScore) {
 }
 
 /**
- * Create grade badge element with hero-integrated styling
+ * Format grade data for display
+ * Pure function - no side effects, easy to test
  * @param {Object} gradeData - Grade data object
  * @param {number} gradeData.score - Numeric score value
  * @param {string|null} gradeData.letterGrade - Letter grade (if available)
- * @param {string} gradeData.source - Grade source ('assignment' or 'enrollment')
- * @param {HTMLElement} heroElement - Hero element for color extraction (optional)
- * @returns {HTMLElement} Grade badge element
+ * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
+ * @returns {{displayValue: string, ariaLabel: string}} Formatted display strings
  */
-function createGradeBadge(gradeData, heroElement = null) {
+function formatGradeDisplay(gradeData) {
     const { score, letterGrade, source } = gradeData;
 
-    logger.trace(`[Grade Conversion Debug] Received grade data: source=${source}, score=${score}, letterGrade=${letterGrade}`);
+    logger.trace(`[Grade Conversion Debug] Formatting grade data: source=${source}, score=${score}, letterGrade=${letterGrade}`);
 
-    const badge = document.createElement('div');
-    badge.className = `${GRADE_CLASS_PREFIX}`;
-    badge.setAttribute('data-source', source);
-    badge.setAttribute('role', 'status');
-
-    // Format grade display based on source
     let displayValue;
     let ariaLabel;
 
-    if (source === 'assignment') {
+    if (source === GRADE_SOURCE.ASSIGNMENT) {
         // AVG assignment: 0-4 scale, show with 2 decimals and letter grade if available
         const scoreStr = score.toFixed(2);
         if (letterGrade) {
@@ -176,7 +171,7 @@ function createGradeBadge(gradeData, heroElement = null) {
             ariaLabel = `Grade: ${scoreStr}`;
         }
         logger.trace(`[Grade Conversion Debug] Assignment grade: display=${displayValue}`);
-    } else if (source === 'enrollment') {
+    } else if (source === GRADE_SOURCE.ENROLLMENT) {
         // Enrollment grade: convert to point value if letter grade matches rating scale
         // Otherwise fall back to percentage display
         const isValidGrade = isValidLetterGrade(letterGrade);
@@ -216,6 +211,29 @@ function createGradeBadge(gradeData, heroElement = null) {
         }
     }
 
+    return { displayValue, ariaLabel };
+}
+
+/**
+ * Create grade badge element with hero-integrated styling
+ * @param {Object} gradeData - Grade data object
+ * @param {number} gradeData.score - Numeric score value
+ * @param {string|null} gradeData.letterGrade - Letter grade (if available)
+ * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
+ * @param {HTMLElement} heroElement - Hero element for color extraction (optional)
+ * @returns {HTMLElement} Grade badge element
+ */
+function createGradeBadge(gradeData, heroElement = null) {
+    const { source } = gradeData;
+
+    // Format the grade display (pure function)
+    const { displayValue, ariaLabel } = formatGradeDisplay(gradeData);
+
+    // Create DOM element
+    const badge = document.createElement('div');
+    badge.className = `${GRADE_CLASS_PREFIX}`;
+    badge.setAttribute('data-source', source);
+    badge.setAttribute('role', 'status');
     badge.setAttribute('aria-label', ariaLabel);
     badge.textContent = displayValue;
 

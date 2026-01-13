@@ -15,15 +15,26 @@ import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 /**
- * Cache for course grades (session-based)
- * Key: courseId, Value: { score: number, letterGrade: string|null, source: string, timestamp: number }
+ * Grade source types
+ * @readonly
+ * @enum {string}
  */
-const gradeCache = new Map();
+export const GRADE_SOURCE = Object.freeze({
+    ASSIGNMENT: 'assignment',
+    ENROLLMENT: 'enrollment'
+});
 
 /**
  * Cache TTL in milliseconds (5 minutes)
+ * Centralized configuration for easy adjustment
  */
 const CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Cache for course grades (session-based)
+ * Key: courseId, Value: { value: { score, letterGrade, source }, expiresAt: timestamp }
+ */
+const gradeCache = new Map();
 
 /**
  * Get cached grade if available and not expired
@@ -33,30 +44,42 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 function getCachedGrade(courseId) {
     const cached = gradeCache.get(courseId);
     if (!cached) return null;
-    
-    const age = Date.now() - cached.timestamp;
-    if (age > CACHE_TTL_MS) {
+
+    // Check if cache entry has expired
+    if (Date.now() > cached.expiresAt) {
         gradeCache.delete(courseId);
+        logger.trace(`Cache expired for course ${courseId}`);
         return null;
     }
-    
-    return cached;
+
+    logger.trace(`Cache hit for course ${courseId}, expires in ${Math.round((cached.expiresAt - Date.now()) / 1000)}s`);
+    return cached.value;
 }
 
 /**
- * Cache grade data
+ * Cache grade data with explicit expiration timestamp
  * @param {string} courseId - Course ID
  * @param {number} score - Grade score value
  * @param {string|null} letterGrade - Letter grade (if available)
- * @param {string} source - Grade source ('assignment' or 'enrollment')
+ * @param {string} source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
  */
 function cacheGrade(courseId, score, letterGrade, source) {
+    const expiresAt = Date.now() + CACHE_TTL_MS;
     gradeCache.set(courseId, {
-        score,
-        letterGrade,
-        source,
-        timestamp: Date.now()
+        value: { score, letterGrade, source },
+        expiresAt
     });
+    logger.trace(`Cached grade for course ${courseId}, expires at ${new Date(expiresAt).toISOString()}`);
+}
+
+/**
+ * Clear all cached grades
+ * Useful for debugging and SPA navigation cleanup
+ */
+export function clearGradeCache() {
+    const size = gradeCache.size;
+    gradeCache.clear();
+    logger.debug(`Grade cache cleared (${size} entries removed)`);
 }
 
 /**
@@ -113,18 +136,18 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
             if (studentEnrollment) {
                 // Check nested grades object first (most common structure)
                 if (studentEnrollment.grades) {
-                    letterGrade = studentEnrollment.grades.current_grade
+                    letterGrade = (studentEnrollment.grades.current_grade
                         ?? studentEnrollment.grades.final_grade
-                        ?? null;
+                        ?? null)?.trim() ?? null;
                 }
 
                 // Fallback to top-level fields
                 if (letterGrade === null) {
-                    letterGrade = studentEnrollment.computed_current_grade
+                    letterGrade = (studentEnrollment.computed_current_grade
                         ?? studentEnrollment.calculated_current_grade
                         ?? studentEnrollment.computed_final_grade
                         ?? studentEnrollment.calculated_final_grade
-                        ?? null;
+                        ?? null)?.trim() ?? null;
                 }
             }
         } catch (error) {
@@ -186,9 +209,9 @@ async function fetchEnrollmentScore(courseId, apiClient) {
             score = studentEnrollment.grades.current_score
                 ?? studentEnrollment.grades.final_score;
 
-            letterGrade = studentEnrollment.grades.current_grade
+            letterGrade = (studentEnrollment.grades.current_grade
                 ?? studentEnrollment.grades.final_grade
-                ?? null;
+                ?? null)?.trim() ?? null;
         }
 
         // Fallback to top-level fields (alternative API response structure)
@@ -200,11 +223,11 @@ async function fetchEnrollmentScore(courseId, apiClient) {
         }
 
         if (letterGrade === null && score !== null) {
-            letterGrade = studentEnrollment.computed_current_grade
+            letterGrade = (studentEnrollment.computed_current_grade
                 ?? studentEnrollment.calculated_current_grade
                 ?? studentEnrollment.computed_final_grade
                 ?? studentEnrollment.calculated_final_grade
-                ?? null;
+                ?? null)?.trim() ?? null;
         }
 
         if (score === null || score === undefined) {
@@ -259,8 +282,8 @@ export async function getCourseGrade(courseId, apiClient) {
     if (avgData !== null) {
         logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${avgData.letterGrade}`);
         // AVG assignment returns 0-4 scale score with letter grade from enrollment
-        cacheGrade(courseId, avgData.score, avgData.letterGrade, 'assignment');
-        return { score: avgData.score, letterGrade: avgData.letterGrade, source: 'assignment' };
+        cacheGrade(courseId, avgData.score, avgData.letterGrade, GRADE_SOURCE.ASSIGNMENT);
+        return { score: avgData.score, letterGrade: avgData.letterGrade, source: GRADE_SOURCE.ASSIGNMENT };
     }
     logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment not found, checking priority 2...`);
 
@@ -269,11 +292,11 @@ export async function getCourseGrade(courseId, apiClient) {
     const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
     if (enrollmentData !== null) {
         logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
-        cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, 'enrollment');
+        cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, GRADE_SOURCE.ENROLLMENT);
         return {
             score: enrollmentData.score,
             letterGrade: enrollmentData.letterGrade,
-            source: 'enrollment'
+            source: GRADE_SOURCE.ENROLLMENT
         };
     }
     logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade not found`);
