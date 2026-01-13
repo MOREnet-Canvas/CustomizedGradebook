@@ -14,7 +14,7 @@
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getCourseGrade } from './gradeDataService.js';
+import { getCourseGrade, preCacheEnrollmentGrades } from './gradeDataService.js';
 import { findCourseCard, renderGradeOnCard } from './cardRenderer.js';
 
 /**
@@ -28,15 +28,17 @@ let initialized = false;
 let dashboardObserver = null;
 
 /**
- * Fetch active courses using the working API approach
+ * Fetch active courses with enrollment grade data
+ * Uses include[]=total_scores to get grades in a single API call
  * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<Array<{id: string, name: string}>>} Array of active courses
+ * @returns {Promise<Array<{id: string, name: string, enrollmentData: Object}>>} Array of active courses with enrollment data
  */
 async function fetchActiveCourses(apiClient) {
     try {
-        // Fetch active courses
+        // Fetch active courses with total_scores to get enrollment grades in one call
+        // This eliminates the need for individual enrollment API calls per course
         const courses = await apiClient.get(
-            '/api/v1/courses?enrollment_state=active',
+            '/api/v1/courses?enrollment_state=active&include[]=total_scores',
             {},
             'fetchActiveCourses'
         );
@@ -50,7 +52,7 @@ async function fetchActiveCourses(apiClient) {
             logger.trace(`First course enrollments:`, courses[0].enrollments);
         }
 
-        // Filter to only student enrollments
+        // Filter to only student enrollments and extract enrollment data
         // Canvas enrollment type is "student" (lowercase), not "StudentEnrollment"
         const studentCourses = courses.filter(course => {
             const enrollments = course.enrollments || [];
@@ -67,8 +69,34 @@ async function fetchActiveCourses(apiClient) {
             return hasStudentEnrollment;
         });
 
-        logger.info(`Found ${studentCourses.length} active student courses out of ${courses.length} total courses`);
-        return studentCourses.map(c => ({ id: String(c.id), name: c.name }));
+        // Extract enrollment data for each course
+        const coursesWithEnrollmentData = studentCourses.map(course => {
+            const enrollments = course.enrollments || [];
+            const studentEnrollment = enrollments.find(e =>
+                e.type === 'student' ||
+                e.type === 'StudentEnrollment' ||
+                e.role === 'StudentEnrollment'
+            );
+
+            return {
+                id: String(course.id),
+                name: course.name,
+                enrollmentData: studentEnrollment || null
+            };
+        });
+
+        logger.info(`Found ${coursesWithEnrollmentData.length} active student courses out of ${courses.length} total courses`);
+
+        // Log enrollment data for debugging
+        if (logger.isTraceEnabled() && coursesWithEnrollmentData.length > 0) {
+            const firstCourse = coursesWithEnrollmentData[0];
+            logger.trace(`First course enrollment data:`, firstCourse.enrollmentData);
+            if (firstCourse.enrollmentData?.grades) {
+                logger.trace(`First course grades object:`, firstCourse.enrollmentData.grades);
+            }
+        }
+
+        return coursesWithEnrollmentData;
 
     } catch (error) {
         logger.error('Failed to fetch active courses:', error);
@@ -117,24 +145,28 @@ async function updateCourseCard(courseId, apiClient) {
 async function updateAllCourseCards() {
     try {
         const apiClient = new CanvasApiClient();
-        
-        // Fetch active courses
+
+        // Fetch active courses with enrollment data (single API call)
         const courses = await fetchActiveCourses(apiClient);
         if (courses.length === 0) {
             logger.info('No active student courses found');
             return;
         }
-        
+
         logger.info(`Updating grades for ${courses.length} courses`);
-        
+
+        // Pre-populate grade cache with enrollment data from courses response
+        // This eliminates redundant enrollment API calls during grade fetching
+        preCacheEnrollmentGrades(courses);
+
         // Update each course card
         // Process sequentially to avoid overwhelming the API
         for (const course of courses) {
             await updateCourseCard(course.id, apiClient);
         }
-        
+
         logger.info('Dashboard grade display update complete');
-        
+
     } catch (error) {
         logger.error('Failed to update dashboard grades:', error);
     }
