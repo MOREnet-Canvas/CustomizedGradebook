@@ -16,7 +16,7 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 /**
  * Cache for course grades (session-based)
- * Key: courseId, Value: { value: number, source: string, timestamp: number }
+ * Key: courseId, Value: { score: number, letterGrade: string|null, source: string, timestamp: number }
  */
 const gradeCache = new Map();
 
@@ -46,12 +46,14 @@ function getCachedGrade(courseId) {
 /**
  * Cache grade data
  * @param {string} courseId - Course ID
- * @param {number} value - Grade value
+ * @param {number} score - Grade score value
+ * @param {string|null} letterGrade - Letter grade (if available)
  * @param {string} source - Grade source ('assignment' or 'enrollment')
  */
-function cacheGrade(courseId, value, source) {
+function cacheGrade(courseId, score, letterGrade, source) {
     gradeCache.set(courseId, {
-        value,
+        score,
+        letterGrade,
         source,
         timestamp: Date.now()
     });
@@ -103,10 +105,10 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
 }
 
 /**
- * Fetch total course score from enrollments
+ * Fetch total course score and letter grade from enrollments
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<number|null>} Course score percentage (0-100) or null if not found
+ * @returns {Promise<{score: number, letterGrade: string}|null>} Grade data or null if not found
  */
 async function fetchEnrollmentScore(courseId, apiClient) {
     try {
@@ -148,8 +150,19 @@ async function fetchEnrollmentScore(courseId, apiClient) {
             return null;
         }
 
-        logger.debug(`Enrollment score for course ${courseId}: ${score}%`);
-        return score;
+        // Extract letter grade (prefer computed over calculated, prefer current over final)
+        const letterGrade = studentEnrollment.computed_current_grade
+            ?? studentEnrollment.calculated_current_grade
+            ?? studentEnrollment.computed_final_grade
+            ?? studentEnrollment.calculated_final_grade
+            ?? null;
+
+        logger.debug(`Enrollment data for course ${courseId}: ${score}% (${letterGrade || 'no letter grade'})`);
+
+        return {
+            score,
+            letterGrade
+        };
 
     } catch (error) {
         logger.warn(`Failed to fetch enrollment score for course ${courseId}:`, error.message);
@@ -164,30 +177,39 @@ async function fetchEnrollmentScore(courseId, apiClient) {
  * Get course grade with fallback hierarchy
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<{value: number, source: string}|null>} Grade data or null
+ * @returns {Promise<{score: number, letterGrade: string|null, source: string}|null>} Grade data or null
  */
 export async function getCourseGrade(courseId, apiClient) {
     // Check cache first
     const cached = getCachedGrade(courseId);
     if (cached) {
         logger.trace(`Using cached grade for course ${courseId}`);
-        return { value: cached.value, source: cached.source };
+        return {
+            score: cached.score,
+            letterGrade: cached.letterGrade,
+            source: cached.source
+        };
     }
-    
+
     // Try AVG assignment first (primary source)
     const avgScore = await fetchAvgAssignmentScore(courseId, apiClient);
     if (avgScore !== null) {
-        cacheGrade(courseId, avgScore, 'assignment');
-        return { value: avgScore, source: 'assignment' };
+        // AVG assignment doesn't have letter grades, only 0-4 scale
+        cacheGrade(courseId, avgScore, null, 'assignment');
+        return { score: avgScore, letterGrade: null, source: 'assignment' };
     }
-    
+
     // Fallback to enrollment score
-    const enrollmentScore = await fetchEnrollmentScore(courseId, apiClient);
-    if (enrollmentScore !== null) {
-        cacheGrade(courseId, enrollmentScore, 'enrollment');
-        return { value: enrollmentScore, source: 'enrollment' };
+    const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
+    if (enrollmentData !== null) {
+        cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, 'enrollment');
+        return {
+            score: enrollmentData.score,
+            letterGrade: enrollmentData.letterGrade,
+            source: 'enrollment'
+        };
     }
-    
+
     // No grade available
     logger.debug(`No grade available for course ${courseId}`);
     return null;

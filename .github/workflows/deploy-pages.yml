@@ -27,11 +27,17 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (timed)
+        run: |
+          date
+          time npm ci
+          date
 
-      - name: Build dev bundle
-        run: npm run build:dev
+      - name: Build dev bundle (timed)
+        run: |
+          date
+          time npm run build:dev
+          date
 
       # - name: Build prod bundle
       #   run: npm run build:prod
