@@ -1,12 +1,13 @@
 // src/dashboard/gradeDataService.js
 /**
  * Grade Data Service
- * 
+ *
  * Fetches grade data for dashboard display using Canvas APIs.
  * Implements a fallback hierarchy:
- * 1. Primary: AVG_ASSIGNMENT_NAME assignment score (if exists)
- * 2. Fallback: Total course score from enrollments API
- * 
+ * 1. Primary: Override grade (override_score/override_grade from enrollment)
+ * 2. Secondary: AVG_ASSIGNMENT_NAME assignment score (0-4 scale)
+ * 3. Fallback: Total course score from enrollments API (grades.current_score/current_grade)
+ *
  * This service is designed to be flexible for future changes in grading approaches.
  */
 
@@ -48,7 +49,7 @@ function getCachedGrade(courseId) {
  * @param {string} courseId - Course ID
  * @param {number} score - Grade score value
  * @param {string|null} letterGrade - Letter grade (if available)
- * @param {string} source - Grade source ('assignment' or 'enrollment')
+ * @param {string} source - Grade source ('override', 'assignment', or 'enrollment')
  */
 function cacheGrade(courseId, score, letterGrade, source) {
     gradeCache.set(courseId, {
@@ -57,6 +58,62 @@ function cacheGrade(courseId, score, letterGrade, source) {
         source,
         timestamp: Date.now()
     });
+}
+
+/**
+ * Fetch override grade from enrollment data
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client
+ * @returns {Promise<{score: number, letterGrade: string|null}|null>} Override grade data or null if not found
+ */
+async function fetchOverrideGrade(courseId, apiClient) {
+    try {
+        // Fetch enrollments to check for override grades
+        const enrollments = await apiClient.get(
+            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
+            {},
+            'fetchOverrideGrade'
+        );
+
+        logger.debug(`Checking for override grade in course ${courseId}`);
+
+        // Find student enrollment
+        const studentEnrollment = enrollments.find(e =>
+            e.type === 'StudentEnrollment' ||
+            e.type === 'student' ||
+            e.role === 'StudentEnrollment'
+        );
+
+        if (!studentEnrollment) {
+            logger.debug(`No student enrollment found for override check in course ${courseId}`);
+            return null;
+        }
+
+        // Check for override_score at top level of enrollment object
+        const overrideScore = studentEnrollment.override_score;
+
+        if (overrideScore === null || overrideScore === undefined) {
+            logger.debug(`No override score found for course ${courseId}`);
+            return null;
+        }
+
+        // Extract override letter grade if available
+        const overrideGrade = studentEnrollment.override_grade ?? null;
+
+        logger.debug(`Override grade found for course ${courseId}: ${overrideScore}% (${overrideGrade || 'no letter grade'})`);
+
+        return {
+            score: overrideScore,
+            letterGrade: overrideGrade
+        };
+
+    } catch (error) {
+        logger.warn(`Failed to fetch override grade for course ${courseId}:`, error.message);
+        if (logger.isDebugEnabled()) {
+            logger.warn(`Full error:`, error);
+        }
+        return null;
+    }
 }
 
 /**
@@ -231,6 +288,11 @@ async function fetchEnrollmentScore(courseId, apiClient) {
 
 /**
  * Get course grade with fallback hierarchy
+ * Priority order:
+ * 1. Override grade (override_score/override_grade)
+ * 2. AVG assignment score (0-4 scale)
+ * 3. Enrollment grade (grades.current_score/current_grade)
+ *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
  * @returns {Promise<{score: number, letterGrade: string|null, source: string}|null>} Grade data or null
@@ -247,7 +309,15 @@ export async function getCourseGrade(courseId, apiClient) {
         };
     }
 
-    // Try AVG assignment first (primary source)
+    // Priority 1: Check for override grade
+    const overrideData = await fetchOverrideGrade(courseId, apiClient);
+    if (overrideData !== null) {
+        // Override grade is percentage-based with optional letter grade
+        cacheGrade(courseId, overrideData.score, overrideData.letterGrade, 'override');
+        return { score: overrideData.score, letterGrade: overrideData.letterGrade, source: 'override' };
+    }
+
+    // Priority 2: Try AVG assignment
     const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
     if (avgData !== null) {
         // AVG assignment returns 0-4 scale score with letter grade from enrollment
@@ -255,7 +325,7 @@ export async function getCourseGrade(courseId, apiClient) {
         return { score: avgData.score, letterGrade: avgData.letterGrade, source: 'assignment' };
     }
 
-    // Fallback to enrollment score
+    // Priority 3: Fallback to enrollment score
     const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
     if (enrollmentData !== null) {
         cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, 'enrollment');

@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 
 /**
  * CSS class prefix for grade elements
@@ -84,11 +85,26 @@ export function findCourseCard(courseId) {
 }
 
 /**
+ * Convert letter grade to point value based on rating scale
+ * @param {string} letterGrade - Letter grade to convert
+ * @returns {number|null} Point value if found, null otherwise
+ */
+function letterGradeToPoints(letterGrade) {
+    if (!letterGrade) return null;
+
+    const rating = OUTCOME_AND_RUBRIC_RATINGS.find(
+        r => r.description === letterGrade
+    );
+
+    return rating ? rating.points : null;
+}
+
+/**
  * Create grade badge element with hero-integrated styling
  * @param {Object} gradeData - Grade data object
  * @param {number} gradeData.score - Numeric score value
  * @param {string|null} gradeData.letterGrade - Letter grade (if available)
- * @param {string} gradeData.source - Grade source ('assignment' or 'enrollment')
+ * @param {string} gradeData.source - Grade source ('override', 'assignment', or 'enrollment')
  * @param {HTMLElement} heroElement - Hero element for color extraction (optional)
  * @returns {HTMLElement} Grade badge element
  */
@@ -109,10 +125,31 @@ function createGradeBadge(gradeData, heroElement = null) {
         const scoreStr = score.toFixed(1);
         if (letterGrade) {
             displayValue = `${scoreStr} (${letterGrade})`;
-            ariaLabel = `Current score: ${scoreStr} out of 4, ${letterGrade}`;
+            ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
         } else {
             displayValue = scoreStr;
-            ariaLabel = `Current score: ${scoreStr} out of 4`;
+            ariaLabel = `Grade: ${scoreStr}`;
+        }
+    } else if (source === 'override') {
+        // Override grade: convert to point value if letter grade matches rating scale
+        // Otherwise fall back to percentage display
+        const pointValue = letterGradeToPoints(letterGrade);
+
+        if (pointValue !== null) {
+            // Letter grade matches rating scale - display as point value (0-4 scale)
+            const scoreStr = pointValue.toFixed(1);
+            displayValue = `${scoreStr} (${letterGrade})`;
+            ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
+        } else {
+            // Letter grade doesn't match or is missing - display as percentage
+            const percentageStr = `${score.toFixed(1)}%`;
+            if (letterGrade) {
+                displayValue = `${percentageStr} (${letterGrade})`;
+                ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
+            } else {
+                displayValue = percentageStr;
+                ariaLabel = `Grade: ${percentageStr}`;
+            }
         }
     } else {
         // Enrollment: show percentage and letter grade if available
