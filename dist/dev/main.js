@@ -1138,7 +1138,8 @@
     const updateInterval = 1;
     const numberOfUpdates = averages.length;
     logger.debug(`Per-student grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
-    box.setText(`Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...`);
+    const updateMessage = ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE ? `Updating "${AVG_OUTCOME_NAME}" and grade overrides for ${numberOfUpdates} students...` : ENABLE_OUTCOME_UPDATES ? `Updating "${AVG_OUTCOME_NAME}" scores for ${numberOfUpdates} students...` : `Updating grade overrides for ${numberOfUpdates} students...`;
+    box.setText(updateMessage);
     const failedUpdates = [];
     const retryCounts = {};
     const retriedStudents = /* @__PURE__ */ new Set();
@@ -1497,7 +1498,8 @@
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
-    banner.setText(`Checking setup for "${AVG_OUTCOME_NAME}"...`);
+    const setupMessage = ENABLE_OUTCOME_UPDATES ? `Checking setup for "${AVG_OUTCOME_NAME}"...` : "Checking setup for grade overrides...";
+    banner.setText(setupMessage);
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     const data = await getRollup(courseId, apiClient);
     stateMachine.updateContext({ rollupData: data });
@@ -1547,8 +1549,9 @@ Would you like to create it?`);
       const outcomeId = outcomeObj == null ? void 0 : outcomeObj.id;
       if (outcomeId) {
         stateMachine.updateContext({ outcomeId });
+        logger.debug(`Found outcomeId ${outcomeId} for exclusion from average calculation`);
       } else {
-        logger.warn("No outcome found for calculating averages - this may cause issues");
+        logger.debug("No outcome found - will calculate averages without excluding any outcome");
       }
     }
     if (ENABLE_GRADE_OVERRIDE) {
@@ -1586,7 +1589,8 @@ Would you like to create it?`);
   async function handleCalculating(stateMachine) {
     const { rollupData, outcomeId, courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
-    banner.setText(`Calculating "${AVG_OUTCOME_NAME}" scores...`);
+    const calculatingMessage = ENABLE_OUTCOME_UPDATES ? `Calculating "${AVG_OUTCOME_NAME}" scores...` : "Calculating student averages for grade overrides...";
+    banner.setText(calculatingMessage);
     const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
     const numberOfUpdates = averages.length;
     stateMachine.updateContext({
@@ -1712,18 +1716,19 @@ Would you like to create it?`);
     const { numberOfUpdates, banner, courseId, zeroUpdates } = stateMachine.getContext();
     const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
+    const updateTarget = ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE ? `${AVG_OUTCOME_NAME} and grade overrides` : ENABLE_OUTCOME_UPDATES ? AVG_OUTCOME_NAME : "grade overrides";
     if (zeroUpdates || numberOfUpdates === 0) {
-      banner.setText(`No changes to ${AVG_OUTCOME_NAME} found.`);
-      alert(`No changes to ${AVG_OUTCOME_NAME} have been found. No updates performed.`);
+      banner.setText(`No changes to ${updateTarget} found.`);
+      alert(`No changes to ${updateTarget} have been found. No updates performed.`);
       setTimeout(() => {
         banner.remove();
       }, 2e3);
       return STATES.IDLE;
     }
-    banner.setText(`${numberOfUpdates} student scores updated successfully! (elapsed time: ${elapsedTime}s)`);
+    banner.setText(`${numberOfUpdates} student ${updateTarget} updated successfully! (elapsed time: ${elapsedTime}s)`);
     localStorage.setItem(`duration_${courseId}`, elapsedTime);
     localStorage.setItem(`lastUpdateAt_${courseId}`, (/* @__PURE__ */ new Date()).toISOString());
-    alert(`All "${AVG_OUTCOME_NAME}" scores have been updated. (elapsed time: ${elapsedTime}s)
+    alert(`All ${updateTarget} have been updated. (elapsed time: ${elapsedTime}s)
 You may need to refresh the page to see the new scores.`);
     return STATES.IDLE;
   }
@@ -1968,8 +1973,9 @@ You may need to refresh the page to see the new scores.`);
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
+    const initialMessage = ENABLE_OUTCOME_UPDATES && ENABLE_GRADE_OVERRIDE ? `Preparing to update "${AVG_OUTCOME_NAME}" and grade overrides: checking setup...` : ENABLE_OUTCOME_UPDATES ? `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...` : "Preparing to update grade overrides: checking setup...";
     const banner = showFloatingBanner({
-      text: `Preparing to update "${AVG_OUTCOME_NAME}": checking setup...`
+      text: initialMessage
     });
     stateMachine.updateContext({ courseId, banner, button });
     alert("You may minimize this browser or switch to another tab, but please keep this tab open until the process is fully complete.");
@@ -2073,10 +2079,313 @@ You may need to refresh the page to see the new scores.`);
     }, 300);
   }
 
+  // src/dashboard/gradeDataService.js
+  var gradeCache = /* @__PURE__ */ new Map();
+  var CACHE_TTL_MS = 5 * 60 * 1e3;
+  function getCachedGrade(courseId) {
+    const cached = gradeCache.get(courseId);
+    if (!cached) return null;
+    const age = Date.now() - cached.timestamp;
+    if (age > CACHE_TTL_MS) {
+      gradeCache.delete(courseId);
+      return null;
+    }
+    return cached;
+  }
+  function cacheGrade(courseId, value, source) {
+    gradeCache.set(courseId, {
+      value,
+      source,
+      timestamp: Date.now()
+    });
+  }
+  async function fetchAvgAssignmentScore(courseId, apiClient) {
+    try {
+      const assignments = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+        {},
+        "fetchAvgAssignment"
+      );
+      const avgAssignment = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
+      if (!avgAssignment) {
+        logger.debug(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
+        return null;
+      }
+      const submission = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/self`,
+        {},
+        "fetchAvgSubmission"
+      );
+      const score = submission == null ? void 0 : submission.score;
+      if (score === null || score === void 0) {
+        logger.debug(`No score found for AVG assignment in course ${courseId}`);
+        return null;
+      }
+      logger.debug(`AVG assignment score for course ${courseId}: ${score}`);
+      return score;
+    } catch (error) {
+      logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
+      return null;
+    }
+  }
+  async function fetchEnrollmentScore(courseId, apiClient) {
+    var _a15, _b15, _c;
+    try {
+      const enrollments = await apiClient.get(
+        `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
+        {},
+        "fetchEnrollment"
+      );
+      const studentEnrollment = enrollments.find((e) => e.type === "StudentEnrollment");
+      if (!studentEnrollment) {
+        logger.debug(`No student enrollment found for course ${courseId}`);
+        return null;
+      }
+      const score = (_c = (_b15 = (_a15 = studentEnrollment.computed_current_score) != null ? _a15 : studentEnrollment.calculated_current_score) != null ? _b15 : studentEnrollment.computed_final_score) != null ? _c : studentEnrollment.calculated_final_score;
+      if (score === null || score === void 0) {
+        logger.debug(`No enrollment score found for course ${courseId}`);
+        return null;
+      }
+      logger.debug(`Enrollment score for course ${courseId}: ${score}%`);
+      return score;
+    } catch (error) {
+      logger.warn(`Failed to fetch enrollment score for course ${courseId}:`, error.message);
+      return null;
+    }
+  }
+  async function getCourseGrade(courseId, apiClient) {
+    const cached = getCachedGrade(courseId);
+    if (cached) {
+      logger.trace(`Using cached grade for course ${courseId}`);
+      return { value: cached.value, source: cached.source };
+    }
+    const avgScore = await fetchAvgAssignmentScore(courseId, apiClient);
+    if (avgScore !== null) {
+      cacheGrade(courseId, avgScore, "assignment");
+      return { value: avgScore, source: "assignment" };
+    }
+    const enrollmentScore = await fetchEnrollmentScore(courseId, apiClient);
+    if (enrollmentScore !== null) {
+      cacheGrade(courseId, enrollmentScore, "enrollment");
+      return { value: enrollmentScore, source: "enrollment" };
+    }
+    logger.debug(`No grade available for course ${courseId}`);
+    return null;
+  }
+
+  // src/dashboard/cardRenderer.js
+  var GRADE_CLASS_PREFIX = "cg-dashboard-grade";
+  function findCourseCard(courseId) {
+    const card = document.querySelector(`[data-course-id="${courseId}"]`);
+    if (!card) {
+      logger.trace(`Dashboard card not found for course ${courseId}`);
+      return null;
+    }
+    return card;
+  }
+  function createGradeBadge(gradeValue, gradeSource) {
+    const badge = document.createElement("div");
+    badge.className = GRADE_CLASS_PREFIX;
+    badge.setAttribute("data-source", gradeSource);
+    let displayValue;
+    let label;
+    if (gradeSource === "assignment") {
+      displayValue = gradeValue.toFixed(1);
+      label = "Current Score";
+    } else {
+      displayValue = `${gradeValue.toFixed(1)}%`;
+      label = "Grade";
+    }
+    badge.innerHTML = `
+        <span class="${GRADE_CLASS_PREFIX}__value">${displayValue}</span>
+        <span class="${GRADE_CLASS_PREFIX}__label">${label}</span>
+    `;
+    badge.style.cssText = `
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: var(--ic-brand-primary, #0374B5);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+        margin-top: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    `;
+    const valueElement = badge.querySelector(`.${GRADE_CLASS_PREFIX}__value`);
+    if (valueElement) {
+      valueElement.style.cssText = `
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        `;
+    }
+    const labelElement = badge.querySelector(`.${GRADE_CLASS_PREFIX}__label`);
+    if (labelElement) {
+      labelElement.style.cssText = `
+            font-size: 11px;
+            font-weight: 500;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        `;
+    }
+    return badge;
+  }
+  function findGradeContainer(cardElement) {
+    let container = cardElement.querySelector(".ic-DashboardCard__header-subtitle");
+    if (!container) {
+      container = cardElement.querySelector(".ic-DashboardCard__header");
+    }
+    if (!container) {
+      container = cardElement;
+    }
+    return container;
+  }
+  function renderGradeOnCard(cardElement, gradeValue, gradeSource) {
+    removeGradeFromCard(cardElement);
+    const badge = createGradeBadge(gradeValue, gradeSource);
+    const container = findGradeContainer(cardElement);
+    if (container) {
+      container.appendChild(badge);
+      logger.trace(`Grade badge rendered on card (source: ${gradeSource})`);
+    } else {
+      logger.warn("Could not find suitable container for grade badge");
+    }
+  }
+  function removeGradeFromCard(cardElement) {
+    const existingBadge = cardElement.querySelector(`.${GRADE_CLASS_PREFIX}`);
+    if (existingBadge) {
+      existingBadge.remove();
+      logger.trace("Existing grade badge removed from card");
+    }
+  }
+
+  // src/dashboard/gradeDisplay.js
+  var initialized = false;
+  var dashboardObserver = null;
+  async function fetchActiveCourses(apiClient) {
+    try {
+      const courses = await apiClient.get(
+        "/api/v1/courses?enrollment_state=active&include[]=total_scores",
+        {},
+        "fetchActiveCourses"
+      );
+      const studentCourses = courses.filter((course) => {
+        const enrollments = course.enrollments || [];
+        return enrollments.some((e) => e.type === "StudentEnrollment");
+      });
+      logger.debug(`Found ${studentCourses.length} active student courses`);
+      return studentCourses.map((c) => ({ id: String(c.id), name: c.name }));
+    } catch (error) {
+      logger.error("Failed to fetch active courses:", error);
+      return [];
+    }
+  }
+  async function updateCourseCard(courseId, apiClient) {
+    try {
+      const cardElement = findCourseCard(courseId);
+      if (!cardElement) {
+        logger.trace(`Card element not found for course ${courseId}, skipping`);
+        return;
+      }
+      const grade = await getCourseGrade(courseId, apiClient);
+      if (!grade) {
+        logger.trace(`No grade available for course ${courseId}, skipping`);
+        return;
+      }
+      renderGradeOnCard(cardElement, grade.value, grade.source);
+      logger.debug(`Grade displayed for course ${courseId}: ${grade.value} (source: ${grade.source})`);
+    } catch (error) {
+      logger.warn(`Failed to update grade for course ${courseId}:`, error.message);
+    }
+  }
+  async function updateAllCourseCards() {
+    try {
+      const apiClient = new CanvasApiClient();
+      const courses = await fetchActiveCourses(apiClient);
+      if (courses.length === 0) {
+        logger.info("No active student courses found");
+        return;
+      }
+      logger.info(`Updating grades for ${courses.length} courses`);
+      for (const course of courses) {
+        await updateCourseCard(course.id, apiClient);
+      }
+      logger.info("Dashboard grade display update complete");
+    } catch (error) {
+      logger.error("Failed to update dashboard grades:", error);
+    }
+  }
+  function waitForDashboardCards(maxWaitMs = 5e3) {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const checkCards = () => {
+        const cards = document.querySelectorAll("[data-course-id]");
+        if (cards.length > 0) {
+          logger.debug(`Dashboard cards found: ${cards.length}`);
+          resolve(true);
+          return;
+        }
+        if (Date.now() - startTime > maxWaitMs) {
+          logger.warn("Timeout waiting for dashboard cards");
+          resolve(false);
+          return;
+        }
+        setTimeout(checkCards, 100);
+      };
+      checkCards();
+    });
+  }
+  function setupDashboardObserver() {
+    if (dashboardObserver) {
+      dashboardObserver.disconnect();
+    }
+    dashboardObserver = new MutationObserver((mutations) => {
+      const cardsAdded = mutations.some((mutation) => {
+        return Array.from(mutation.addedNodes).some((node) => {
+          var _a15, _b15;
+          return node.nodeType === Node.ELEMENT_NODE && (((_a15 = node.hasAttribute) == null ? void 0 : _a15.call(node, "data-course-id")) || ((_b15 = node.querySelector) == null ? void 0 : _b15.call(node, "[data-course-id]")));
+        });
+      });
+      if (cardsAdded) {
+        logger.debug("Dashboard cards detected, updating grades");
+        updateAllCourseCards();
+      }
+    });
+    const dashboardContainer = document.querySelector("#dashboard") || document.body;
+    dashboardObserver.observe(dashboardContainer, {
+      childList: true,
+      subtree: true
+    });
+    logger.debug("Dashboard observer setup complete");
+  }
+  async function initDashboardGradeDisplay() {
+    if (initialized) {
+      logger.debug("Dashboard grade display already initialized");
+      return;
+    }
+    initialized = true;
+    logger.info("Initializing dashboard grade display");
+    const cardsFound = await waitForDashboardCards();
+    if (!cardsFound) {
+      logger.warn("Dashboard cards not found, grade display may not work");
+    }
+    await updateAllCourseCards();
+    setupDashboardObserver();
+  }
+
   // src/main.js
+  function isDashboardPage() {
+    const path = window.location.pathname;
+    return path === "/" || path === "/dashboard" || path.startsWith("/dashboard/");
+  }
   (function init() {
-    logBanner("dev", "2026-01-07 3:56:01 PM (dev, 0870d58)");
-    exposeVersion("dev", "2026-01-07 3:56:01 PM (dev, 0870d58)");
+    logBanner("dev", "2026-01-13 8:55:29 AM (dev, 34aee9c)");
+    exposeVersion("dev", "2026-01-13 8:55:29 AM (dev, 34aee9c)");
     if (true) {
       logger.info("Running in DEV mode");
     }
@@ -2086,6 +2395,9 @@ You may need to refresh the page to see the new scores.`);
     logger.info(`Build environment: ${"dev"}`);
     if (window.location.pathname.includes("/gradebook")) {
       injectButtons();
+    }
+    if (isDashboardPage()) {
+      initDashboardGradeDisplay();
     }
   })();
 })();
