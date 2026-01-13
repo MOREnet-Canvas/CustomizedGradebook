@@ -84,107 +84,188 @@ export function findCourseCard(courseId) {
 }
 
 /**
- * Create grade badge element styled to match Canvas ic-badge design
- * @param {number} gradeValue - Grade value to display
- * @param {string} gradeSource - Grade source ('assignment' or 'enrollment')
+ * Create grade badge element with hero-integrated styling
+ * @param {Object} gradeData - Grade data object
+ * @param {number} gradeData.score - Numeric score value
+ * @param {string|null} gradeData.letterGrade - Letter grade (if available)
+ * @param {string} gradeData.source - Grade source ('assignment' or 'enrollment')
+ * @param {HTMLElement} heroElement - Hero element for color extraction (optional)
  * @returns {HTMLElement} Grade badge element
  */
-function createGradeBadge(gradeValue, gradeSource) {
-    const badge = document.createElement('span');
-    badge.className = `${GRADE_CLASS_PREFIX} ic-badge`;
-    badge.setAttribute('data-source', gradeSource);
-    badge.setAttribute('role', 'status');
-    badge.setAttribute('aria-label', `Grade: ${gradeValue}`);
+function createGradeBadge(gradeData, heroElement = null) {
+    const { score, letterGrade, source } = gradeData;
 
-    // Format grade based on source
+    const badge = document.createElement('div');
+    badge.className = `${GRADE_CLASS_PREFIX}`;
+    badge.setAttribute('data-source', source);
+    badge.setAttribute('role', 'status');
+
+    // Format grade display based on source
     let displayValue;
     let ariaLabel;
 
-    if (gradeSource === 'assignment') {
+    if (source === 'assignment') {
         // AVG assignment: 0-4 scale, show with 1 decimal
-        displayValue = gradeValue.toFixed(1);
+        displayValue = score.toFixed(1);
         ariaLabel = `Current score: ${displayValue} out of 4`;
     } else {
-        // Enrollment: percentage, show with 1 decimal
-        displayValue = `${gradeValue.toFixed(1)}%`;
-        ariaLabel = `Grade: ${displayValue}`;
+        // Enrollment: show percentage and letter grade if available
+        const percentageStr = `${score.toFixed(1)}%`;
+        if (letterGrade) {
+            displayValue = `${percentageStr} (${letterGrade})`;
+            ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
+        } else {
+            displayValue = percentageStr;
+            ariaLabel = `Grade: ${percentageStr}`;
+        }
     }
 
     badge.setAttribute('aria-label', ariaLabel);
     badge.textContent = displayValue;
 
-    // Apply inline styles matching Canvas ic-badge pattern
-    // Using semi-transparent dark background for subtle, less intrusive appearance
-    // rgba(64, 64, 64, 0.85) provides excellent contrast ratio (>10:1) with white text
-    // Meets WCAG AA standards and works well across light and dark Canvas themes
+    // Extract hero background color for badge styling
+    let badgeBackground = 'rgba(64, 64, 64, 0.85)'; // Default fallback
+
+    if (heroElement) {
+        const heroStyles = window.getComputedStyle(heroElement);
+        const heroColor = heroStyles.backgroundColor;
+
+        if (heroColor && heroColor !== 'transparent' && heroColor !== 'rgba(0, 0, 0, 0)') {
+            // Derive a translucent version of the hero color
+            badgeBackground = deriveTranslucentColor(heroColor);
+            logger.trace(`Derived badge background from hero color: ${heroColor} -> ${badgeBackground}`);
+        }
+    }
+
+    // Apply inline styles with frosted-glass effect
+    // Positioned to overlay on hero section
     badge.style.cssText = `
-        font-size: 0.6875rem;
-        min-width: 20px;
-        line-height: 20px;
-        border-radius: 10px;
-        background: rgba(64, 64, 64, 0.85);
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 0.75rem;
+        line-height: 1.4;
+        border-radius: 8px;
+        background: ${badgeBackground};
         color: #fff;
         display: inline-block;
-        vertical-align: middle;
         text-align: center;
         box-sizing: border-box;
-        padding: 0 8px;
+        padding: 6px 10px;
         font-weight: 600;
-        margin-left: 8px;
         white-space: nowrap;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        z-index: 10;
     `;
 
     return badge;
 }
 
 /**
- * Find appropriate container within card for grade badge
- * Targets the card header area for better visual integration
+ * Derive a translucent color from a hero background color
+ * Creates a water-like/frosted-glass effect
+ * @param {string} colorString - CSS color string (rgb, rgba, hex, etc.)
+ * @returns {string} RGBA color string with translucency
+ */
+function deriveTranslucentColor(colorString) {
+    // Parse the color to extract RGB values
+    const rgb = parseColor(colorString);
+
+    if (!rgb) {
+        // Fallback if parsing fails
+        return 'rgba(64, 64, 64, 0.75)';
+    }
+
+    // Darken the color slightly and add translucency
+    const r = Math.max(0, Math.floor(rgb.r * 0.7));
+    const g = Math.max(0, Math.floor(rgb.g * 0.7));
+    const b = Math.max(0, Math.floor(rgb.b * 0.7));
+
+    // Use 75% opacity for frosted-glass effect
+    return `rgba(${r}, ${g}, ${b}, 0.75)`;
+}
+
+/**
+ * Parse CSS color string to RGB object
+ * @param {string} colorString - CSS color string
+ * @returns {{r: number, g: number, b: number}|null} RGB object or null
+ */
+function parseColor(colorString) {
+    // Handle rgb() and rgba() formats
+    const rgbMatch = colorString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (rgbMatch) {
+        return {
+            r: parseInt(rgbMatch[1], 10),
+            g: parseInt(rgbMatch[2], 10),
+            b: parseInt(rgbMatch[3], 10)
+        };
+    }
+
+    // Handle hex format
+    const hexMatch = colorString.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+    if (hexMatch) {
+        return {
+            r: parseInt(hexMatch[1], 16),
+            g: parseInt(hexMatch[2], 16),
+            b: parseInt(hexMatch[3], 16)
+        };
+    }
+
+    // Could not parse
+    return null;
+}
+
+/**
+ * Find hero container within card for grade badge overlay
+ * Targets the card hero section for visual integration with the colored background
  * @param {HTMLElement} cardElement - Dashboard card element
- * @returns {HTMLElement|null} Container element or null
+ * @returns {HTMLElement|null} Hero container element or null
  */
 function findGradeContainer(cardElement) {
-    // Strategy 1: Find the header subtitle area (ideal location for metadata badges)
-    // This is typically where term info and other metadata appears
-    let container = cardElement.querySelector('.ic-DashboardCard__header-subtitle');
+    // Strategy 1: Find the hero section (primary target for badge overlay)
+    // This is the colored header area at the top of each card
+    let hero = cardElement.querySelector('.ic-DashboardCard__header_hero');
 
-    if (container) {
-        logger.trace('Using header subtitle for grade badge placement');
-        return container;
+    if (hero) {
+        // Ensure hero has position: relative for absolute positioning of badge
+        const heroStyles = window.getComputedStyle(hero);
+        if (heroStyles.position === 'static') {
+            hero.style.position = 'relative';
+        }
+
+        logger.trace('Using header hero for grade badge placement');
+        return hero;
     }
 
-    // Strategy 2: Find the header term area (alternative metadata location)
-    container = cardElement.querySelector('.ic-DashboardCard__header-term');
+    // Strategy 2: Look for alternative hero class names
+    hero = cardElement.querySelector('[class*="hero"]') ||
+           cardElement.querySelector('[class*="Hero"]');
 
-    if (container) {
-        logger.trace('Using header term for grade badge placement');
-        return container;
+    if (hero) {
+        // Ensure hero has position: relative
+        const heroStyles = window.getComputedStyle(hero);
+        if (heroStyles.position === 'static') {
+            hero.style.position = 'relative';
+        }
+
+        logger.trace('Using hero-like element for grade badge placement');
+        return hero;
     }
 
-    // Strategy 3: Find the main header and create a metadata container
+    // Strategy 3: Find the main header and use it as fallback
     const header = cardElement.querySelector('.ic-DashboardCard__header');
 
     if (header) {
-        // Check if we already created a metadata container
-        let metadataContainer = header.querySelector(`.${GRADE_CLASS_PREFIX}-container`);
-
-        if (!metadataContainer) {
-            // Create a new container for grade badges in the header
-            metadataContainer = document.createElement('div');
-            metadataContainer.className = `${GRADE_CLASS_PREFIX}-container`;
-            metadataContainer.style.cssText = `
-                display: flex;
-                align-items: center;
-                margin-top: 4px;
-                gap: 8px;
-            `;
-
-            // Append to header
-            header.appendChild(metadataContainer);
-            logger.trace('Created new metadata container in header');
+        // Ensure header has position: relative
+        const headerStyles = window.getComputedStyle(header);
+        if (headerStyles.position === 'static') {
+            header.style.position = 'relative';
         }
 
-        return metadataContainer;
+        logger.trace('Using card header for grade badge placement (fallback)');
+        return header;
     }
 
     // Strategy 4: Look for any header-like element
@@ -192,42 +273,61 @@ function findGradeContainer(cardElement) {
                        cardElement.querySelector('[class*="Header"]');
 
     if (headerLike) {
+        // Ensure it has position: relative
+        const styles = window.getComputedStyle(headerLike);
+        if (styles.position === 'static') {
+            headerLike.style.position = 'relative';
+        }
+
         logger.trace('Using header-like element for grade badge placement');
         return headerLike;
     }
 
     // Last resort: use the card itself
-    logger.trace('Using card element itself for grade badge placement (fallback)');
+    logger.warn('Could not find hero or header element, using card itself (fallback)');
+    const cardStyles = window.getComputedStyle(cardElement);
+    if (cardStyles.position === 'static') {
+        cardElement.style.position = 'relative';
+    }
+
     return cardElement;
 }
 
 /**
  * Render grade on a dashboard card
  * @param {HTMLElement} cardElement - Dashboard card element
- * @param {number} gradeValue - Grade value to display
- * @param {string} gradeSource - Grade source ('assignment' or 'enrollment')
+ * @param {Object} gradeData - Grade data object
+ * @param {number} gradeData.score - Numeric score value
+ * @param {string|null} gradeData.letterGrade - Letter grade (if available)
+ * @param {string} gradeData.source - Grade source ('assignment' or 'enrollment')
  */
-export function renderGradeOnCard(cardElement, gradeValue, gradeSource) {
+export function renderGradeOnCard(cardElement, gradeData) {
     // Remove any existing grade badge first
     removeGradeFromCard(cardElement);
 
-    // Create new badge
-    const badge = createGradeBadge(gradeValue, gradeSource);
+    // Find hero container for color extraction
+    const heroContainer = findGradeContainer(cardElement);
 
-    // Find container and append badge
-    const container = findGradeContainer(cardElement);
-    if (container) {
-        container.appendChild(badge);
-
-        if (logger.isDebugEnabled()) {
-            logger.debug(`Grade badge rendered (value: ${gradeValue}, source: ${gradeSource})`);
-            logger.debug(`Badge placed in: ${container.className || container.tagName}`);
-        } else {
-            logger.trace(`Grade badge rendered on card (source: ${gradeSource})`);
-        }
-    } else {
+    if (!heroContainer) {
         logger.warn('Could not find suitable container for grade badge');
         logger.warn('Card element:', cardElement);
+        return;
+    }
+
+    // Create new badge with hero color integration
+    const badge = createGradeBadge(gradeData, heroContainer);
+
+    // Append badge to hero container
+    heroContainer.appendChild(badge);
+
+    if (logger.isDebugEnabled()) {
+        const displayInfo = gradeData.letterGrade
+            ? `${gradeData.score}% (${gradeData.letterGrade})`
+            : `${gradeData.score}`;
+        logger.debug(`Grade badge rendered (${displayInfo}, source: ${gradeData.source})`);
+        logger.debug(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
+    } else {
+        logger.trace(`Grade badge rendered on card (source: ${gradeData.source})`);
     }
 }
 
@@ -241,13 +341,6 @@ export function removeGradeFromCard(cardElement) {
     if (existingBadge) {
         existingBadge.remove();
         logger.trace('Existing grade badge removed from card');
-    }
-
-    // Clean up empty metadata container if it exists
-    const metadataContainer = cardElement.querySelector(`.${GRADE_CLASS_PREFIX}-container`);
-    if (metadataContainer && metadataContainer.children.length === 0) {
-        metadataContainer.remove();
-        logger.trace('Empty metadata container removed');
     }
 }
 

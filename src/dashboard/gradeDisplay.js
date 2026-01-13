@@ -89,18 +89,22 @@ async function updateCourseCard(courseId, apiClient) {
             logger.trace(`Card element not found for course ${courseId}, skipping`);
             return;
         }
-        
-        // Fetch grade
-        const grade = await getCourseGrade(courseId, apiClient);
-        if (!grade) {
+
+        // Fetch grade data (score, letterGrade, source)
+        const gradeData = await getCourseGrade(courseId, apiClient);
+        if (!gradeData) {
             logger.trace(`No grade available for course ${courseId}, skipping`);
             return;
         }
-        
+
         // Render grade on card
-        renderGradeOnCard(cardElement, grade.value, grade.source);
-        logger.debug(`Grade displayed for course ${courseId}: ${grade.value} (source: ${grade.source})`);
-        
+        renderGradeOnCard(cardElement, gradeData);
+
+        const displayInfo = gradeData.letterGrade
+            ? `${gradeData.score}% (${gradeData.letterGrade})`
+            : `${gradeData.score}`;
+        logger.debug(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${gradeData.source})`);
+
     } catch (error) {
         // Fail silently for individual courses - don't break the entire dashboard
         logger.warn(`Failed to update grade for course ${courseId}:`, error.message);
