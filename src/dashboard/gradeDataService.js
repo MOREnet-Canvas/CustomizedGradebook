@@ -4,9 +4,8 @@
  *
  * Fetches grade data for dashboard display using Canvas APIs.
  * Implements a fallback hierarchy:
- * 1. Primary: Override grade (override_score/override_grade from enrollment)
- * 2. Secondary: AVG_ASSIGNMENT_NAME assignment score (0-4 scale)
- * 3. Fallback: Total course score from enrollments API (grades.current_score/current_grade)
+ * 1. Primary: AVG_ASSIGNMENT_NAME assignment score (0-4 scale)
+ * 2. Fallback: Total course score from enrollments API (grades.current_score/current_grade)
  *
  * This service is designed to be flexible for future changes in grading approaches.
  */
@@ -49,7 +48,7 @@ function getCachedGrade(courseId) {
  * @param {string} courseId - Course ID
  * @param {number} score - Grade score value
  * @param {string|null} letterGrade - Letter grade (if available)
- * @param {string} source - Grade source ('override', 'assignment', or 'enrollment')
+ * @param {string} source - Grade source ('assignment' or 'enrollment')
  */
 function cacheGrade(courseId, score, letterGrade, source) {
     gradeCache.set(courseId, {
@@ -58,73 +57,6 @@ function cacheGrade(courseId, score, letterGrade, source) {
         source,
         timestamp: Date.now()
     });
-}
-
-/**
- * Fetch override grade from enrollment data
- * @param {string} courseId - Course ID
- * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<{score: number, letterGrade: string|null}|null>} Override grade data or null if not found
- */
-async function fetchOverrideGrade(courseId, apiClient) {
-    try {
-        logger.trace(`[Override Debug] Course ${courseId}: Fetching enrollments to check for override grade...`);
-
-        // Fetch enrollments to check for override grades
-        const enrollments = await apiClient.get(
-            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
-            {},
-            'fetchOverrideGrade'
-        );
-
-        logger.trace(`[Override Debug] Course ${courseId}: Received ${enrollments.length} enrollment(s)`);
-
-        // Find student enrollment
-        const studentEnrollment = enrollments.find(e =>
-            e.type === 'StudentEnrollment' ||
-            e.type === 'student' ||
-            e.role === 'StudentEnrollment'
-        );
-
-        if (!studentEnrollment) {
-            logger.trace(`[Override Debug] Course ${courseId}: No student enrollment found`);
-            if (enrollments.length > 0) {
-                logger.trace(`[Override Debug] Course ${courseId}: Available enrollment types:`, enrollments.map(e => e.type || e.role));
-            }
-            return null;
-        }
-
-        logger.trace(`[Override Debug] Course ${courseId}: Student enrollment found, checking for override_score field...`);
-
-        // Check for override_score at top level of enrollment object
-        const overrideScore = studentEnrollment.override_score;
-
-        logger.trace(`[Override Debug] Course ${courseId}: override_score = ${overrideScore} (type: ${typeof overrideScore})`);
-
-        if (overrideScore === null || overrideScore === undefined) {
-            logger.trace(`[Override Debug] Course ${courseId}: No override score found (override_score is null or undefined)`);
-            logger.trace(`[Override Debug] Course ${courseId}: Enrollment object keys:`, Object.keys(studentEnrollment));
-            return null;
-        }
-
-        // Extract override letter grade if available
-        const overrideGrade = studentEnrollment.override_grade ?? null;
-
-        logger.trace(`[Override Debug] Course ${courseId}: override_grade = "${overrideGrade}"`);
-        logger.debug(`Override grade found for course ${courseId}: ${overrideScore}% (${overrideGrade || 'no letter grade'})`);
-
-        return {
-            score: overrideScore,
-            letterGrade: overrideGrade
-        };
-
-    } catch (error) {
-        logger.warn(`[Override Debug] Course ${courseId}: Failed to fetch override grade:`, error.message);
-        if (logger.isDebugEnabled()) {
-            logger.warn(`Full error:`, error);
-        }
-        return null;
-    }
 }
 
 /**
@@ -167,7 +99,7 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
         let letterGrade = null;
         try {
             const enrollments = await apiClient.get(
-                `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
+                `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
                 {},
                 'fetchEnrollmentForLetterGrade'
             );
@@ -217,9 +149,9 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
  */
 async function fetchEnrollmentScore(courseId, apiClient) {
     try {
-        // Fetch enrollments with total scores
+        // Fetch enrollments
         const enrollments = await apiClient.get(
-            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
+            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
             {},
             'fetchEnrollment'
         );
@@ -300,9 +232,8 @@ async function fetchEnrollmentScore(courseId, apiClient) {
 /**
  * Get course grade with fallback hierarchy
  * Priority order:
- * 1. Override grade (override_score/override_grade)
- * 2. AVG assignment score (0-4 scale)
- * 3. Enrollment grade (grades.current_score/current_grade)
+ * 1. Primary: AVG assignment score (0-4 scale)
+ * 2. Fallback: Enrollment grade (grades.current_score/current_grade)
  *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
@@ -322,19 +253,8 @@ export async function getCourseGrade(courseId, apiClient) {
         };
     }
 
-    // Priority 1: Check for override grade
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 1 - override grade...`);
-    const overrideData = await fetchOverrideGrade(courseId, apiClient);
-    if (overrideData !== null) {
-        logger.trace(`[Grade Source Debug] Course ${courseId}: Override grade found! score=${overrideData.score}, letterGrade=${overrideData.letterGrade}`);
-        // Override grade is percentage-based with optional letter grade
-        cacheGrade(courseId, overrideData.score, overrideData.letterGrade, 'override');
-        return { score: overrideData.score, letterGrade: overrideData.letterGrade, source: 'override' };
-    }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Override grade not found, checking priority 2...`);
-
-    // Priority 2: Try AVG assignment
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 2 - AVG assignment...`);
+    // Priority 1: Try AVG assignment
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 1 - AVG assignment...`);
     const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
     if (avgData !== null) {
         logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${avgData.letterGrade}`);
@@ -342,10 +262,10 @@ export async function getCourseGrade(courseId, apiClient) {
         cacheGrade(courseId, avgData.score, avgData.letterGrade, 'assignment');
         return { score: avgData.score, letterGrade: avgData.letterGrade, source: 'assignment' };
     }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment not found, checking priority 3...`);
+    logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment not found, checking priority 2...`);
 
-    // Priority 3: Fallback to enrollment score
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 3 - enrollment grade...`);
+    // Priority 2: Fallback to enrollment score
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 2 - enrollment grade...`);
     const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
     if (enrollmentData !== null) {
         logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
