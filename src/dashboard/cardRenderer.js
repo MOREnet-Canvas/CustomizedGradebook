@@ -90,13 +90,23 @@ export function findCourseCard(courseId) {
  * @returns {boolean} True if letter grade matches a rating description
  */
 function isValidLetterGrade(letterGrade) {
-    if (!letterGrade) return false;
+    if (!letterGrade) {
+        logger.trace(`[Letter Grade Validation] letterGrade is empty/null/undefined`);
+        return false;
+    }
 
     const rating = OUTCOME_AND_RUBRIC_RATINGS.find(
         r => r.description === letterGrade
     );
 
-    return rating !== undefined;
+    const isValid = rating !== undefined;
+    logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValid ? 'MATCH FOUND' : 'NO MATCH'}`);
+
+    if (!isValid && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
+        logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description));
+    }
+
+    return isValid;
 }
 
 /**
@@ -121,6 +131,8 @@ function percentageToPoints(percentageScore) {
 function createGradeBadge(gradeData, heroElement = null) {
     const { score, letterGrade, source } = gradeData;
 
+    logger.trace(`[Grade Conversion Debug] Received grade data: source=${source}, score=${score}, letterGrade=${letterGrade}`);
+
     const badge = document.createElement('div');
     badge.className = `${GRADE_CLASS_PREFIX}`;
     badge.setAttribute('data-source', source);
@@ -140,10 +152,12 @@ function createGradeBadge(gradeData, heroElement = null) {
             displayValue = scoreStr;
             ariaLabel = `Grade: ${scoreStr}`;
         }
-    } else if (source === 'override') {
-        // Override grade: convert to point value if letter grade matches rating scale
+        logger.trace(`[Grade Conversion Debug] Assignment grade: display=${displayValue}`);
+    } else if (source === 'override' || source === 'enrollment') {
+        // Override/Enrollment grade: convert to point value if letter grade matches rating scale
         // Otherwise fall back to percentage display
         const isValidGrade = isValidLetterGrade(letterGrade);
+        logger.trace(`[Grade Conversion Debug] isValidLetterGrade("${letterGrade}") = ${isValidGrade}`);
 
         if (isValidGrade) {
             // Letter grade matches rating scale - calculate and display as point value
@@ -152,19 +166,23 @@ function createGradeBadge(gradeData, heroElement = null) {
             const scoreStr = pointValue.toFixed(1);
             displayValue = `${scoreStr} (${letterGrade})`;
             ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
+            logger.trace(`[Grade Conversion Debug] Converted to points: ${score}% -> ${pointValue} -> display="${displayValue}"`);
         } else {
             // Letter grade doesn't match or is missing - display as percentage
             const percentageStr = `${score.toFixed(1)}%`;
             if (letterGrade) {
                 displayValue = `${percentageStr} (${letterGrade})`;
                 ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
+                logger.trace(`[Grade Conversion Debug] Letter grade "${letterGrade}" not in rating scale, using percentage: display="${displayValue}"`);
             } else {
                 displayValue = percentageStr;
                 ariaLabel = `Grade: ${percentageStr}`;
+                logger.trace(`[Grade Conversion Debug] No letter grade, using percentage: display="${displayValue}"`);
             }
         }
     } else {
-        // Enrollment: show percentage and letter grade if available
+        // Unknown source - should not happen, but handle gracefully
+        logger.warn(`[Grade Conversion Debug] Unknown grade source: ${source}`);
         const percentageStr = `${score.toFixed(1)}%`;
         if (letterGrade) {
             displayValue = `${percentageStr} (${letterGrade})`;

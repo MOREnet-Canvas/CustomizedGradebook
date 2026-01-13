@@ -68,6 +68,8 @@ function cacheGrade(courseId, score, letterGrade, source) {
  */
 async function fetchOverrideGrade(courseId, apiClient) {
     try {
+        logger.trace(`[Override Debug] Course ${courseId}: Fetching enrollments to check for override grade...`);
+
         // Fetch enrollments to check for override grades
         const enrollments = await apiClient.get(
             `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&include[]=total_scores`,
@@ -75,7 +77,7 @@ async function fetchOverrideGrade(courseId, apiClient) {
             'fetchOverrideGrade'
         );
 
-        logger.debug(`Checking for override grade in course ${courseId}`);
+        logger.trace(`[Override Debug] Course ${courseId}: Received ${enrollments.length} enrollment(s)`);
 
         // Find student enrollment
         const studentEnrollment = enrollments.find(e =>
@@ -85,21 +87,30 @@ async function fetchOverrideGrade(courseId, apiClient) {
         );
 
         if (!studentEnrollment) {
-            logger.debug(`No student enrollment found for override check in course ${courseId}`);
+            logger.trace(`[Override Debug] Course ${courseId}: No student enrollment found`);
+            if (enrollments.length > 0) {
+                logger.trace(`[Override Debug] Course ${courseId}: Available enrollment types:`, enrollments.map(e => e.type || e.role));
+            }
             return null;
         }
+
+        logger.trace(`[Override Debug] Course ${courseId}: Student enrollment found, checking for override_score field...`);
 
         // Check for override_score at top level of enrollment object
         const overrideScore = studentEnrollment.override_score;
 
+        logger.trace(`[Override Debug] Course ${courseId}: override_score = ${overrideScore} (type: ${typeof overrideScore})`);
+
         if (overrideScore === null || overrideScore === undefined) {
-            logger.debug(`No override score found for course ${courseId}`);
+            logger.trace(`[Override Debug] Course ${courseId}: No override score found (override_score is null or undefined)`);
+            logger.trace(`[Override Debug] Course ${courseId}: Enrollment object keys:`, Object.keys(studentEnrollment));
             return null;
         }
 
         // Extract override letter grade if available
         const overrideGrade = studentEnrollment.override_grade ?? null;
 
+        logger.trace(`[Override Debug] Course ${courseId}: override_grade = "${overrideGrade}"`);
         logger.debug(`Override grade found for course ${courseId}: ${overrideScore}% (${overrideGrade || 'no letter grade'})`);
 
         return {
@@ -108,7 +119,7 @@ async function fetchOverrideGrade(courseId, apiClient) {
         };
 
     } catch (error) {
-        logger.warn(`Failed to fetch override grade for course ${courseId}:`, error.message);
+        logger.warn(`[Override Debug] Course ${courseId}: Failed to fetch override grade:`, error.message);
         if (logger.isDebugEnabled()) {
             logger.warn(`Full error:`, error);
         }
@@ -298,10 +309,12 @@ async function fetchEnrollmentScore(courseId, apiClient) {
  * @returns {Promise<{score: number, letterGrade: string|null, source: string}|null>} Grade data or null
  */
 export async function getCourseGrade(courseId, apiClient) {
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
+
     // Check cache first
     const cached = getCachedGrade(courseId);
     if (cached) {
-        logger.trace(`Using cached grade for course ${courseId}`);
+        logger.trace(`[Grade Source Debug] Course ${courseId}: Using cached grade (source=${cached.source}, score=${cached.score}, letterGrade=${cached.letterGrade})`);
         return {
             score: cached.score,
             letterGrade: cached.letterGrade,
@@ -310,24 +323,32 @@ export async function getCourseGrade(courseId, apiClient) {
     }
 
     // Priority 1: Check for override grade
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 1 - override grade...`);
     const overrideData = await fetchOverrideGrade(courseId, apiClient);
     if (overrideData !== null) {
+        logger.trace(`[Grade Source Debug] Course ${courseId}: Override grade found! score=${overrideData.score}, letterGrade=${overrideData.letterGrade}`);
         // Override grade is percentage-based with optional letter grade
         cacheGrade(courseId, overrideData.score, overrideData.letterGrade, 'override');
         return { score: overrideData.score, letterGrade: overrideData.letterGrade, source: 'override' };
     }
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Override grade not found, checking priority 2...`);
 
     // Priority 2: Try AVG assignment
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 2 - AVG assignment...`);
     const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
     if (avgData !== null) {
+        logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${avgData.letterGrade}`);
         // AVG assignment returns 0-4 scale score with letter grade from enrollment
         cacheGrade(courseId, avgData.score, avgData.letterGrade, 'assignment');
         return { score: avgData.score, letterGrade: avgData.letterGrade, source: 'assignment' };
     }
+    logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment not found, checking priority 3...`);
 
     // Priority 3: Fallback to enrollment score
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 3 - enrollment grade...`);
     const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
     if (enrollmentData !== null) {
+        logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
         cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, 'enrollment');
         return {
             score: enrollmentData.score,
@@ -335,9 +356,10 @@ export async function getCourseGrade(courseId, apiClient) {
             source: 'enrollment'
         };
     }
+    logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade not found`);
 
     // No grade available
-    logger.debug(`No grade available for course ${courseId}`);
+    logger.debug(`[Grade Source Debug] Course ${courseId}: No grade available from any source`);
     return null;
 }
 
