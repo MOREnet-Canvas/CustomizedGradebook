@@ -7,7 +7,7 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
+import { OUTCOME_AND_RUBRIC_RATINGS, DEFAULT_MAX_POINTS } from '../config.js';
 
 /**
  * CSS class prefix for grade elements
@@ -85,18 +85,28 @@ export function findCourseCard(courseId) {
 }
 
 /**
- * Convert letter grade to point value based on rating scale
- * @param {string} letterGrade - Letter grade to convert
- * @returns {number|null} Point value if found, null otherwise
+ * Check if letter grade matches any rating description
+ * @param {string} letterGrade - Letter grade to check
+ * @returns {boolean} True if letter grade matches a rating description
  */
-function letterGradeToPoints(letterGrade) {
-    if (!letterGrade) return null;
+function isValidLetterGrade(letterGrade) {
+    if (!letterGrade) return false;
 
     const rating = OUTCOME_AND_RUBRIC_RATINGS.find(
         r => r.description === letterGrade
     );
 
-    return rating ? rating.points : null;
+    return rating !== undefined;
+}
+
+/**
+ * Convert percentage score to point value based on configured maximum
+ * @param {number} percentageScore - Percentage score (0-100)
+ * @returns {number} Point value (0-DEFAULT_MAX_POINTS scale)
+ */
+function percentageToPoints(percentageScore) {
+    // Formula: (percentageScore / 100) * DEFAULT_MAX_POINTS
+    return (percentageScore / 100) * DEFAULT_MAX_POINTS;
 }
 
 /**
@@ -133,10 +143,12 @@ function createGradeBadge(gradeData, heroElement = null) {
     } else if (source === 'override') {
         // Override grade: convert to point value if letter grade matches rating scale
         // Otherwise fall back to percentage display
-        const pointValue = letterGradeToPoints(letterGrade);
+        const isValidGrade = isValidLetterGrade(letterGrade);
 
-        if (pointValue !== null) {
-            // Letter grade matches rating scale - display as point value (0-4 scale)
+        if (isValidGrade) {
+            // Letter grade matches rating scale - calculate and display as point value
+            // Formula: (percentageScore / 100) * DEFAULT_MAX_POINTS
+            const pointValue = percentageToPoints(score);
             const scoreStr = pointValue.toFixed(1);
             displayValue = `${scoreStr} (${letterGrade})`;
             ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
