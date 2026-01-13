@@ -18,7 +18,7 @@
         REMOVE_ASSIGNMENT_TAB: false,
 
         // Grading mode configuration
-        ENABLE_OUTCOME_UPDATES: false,
+        ENABLE_OUTCOME_UPDATES: true,
         ENABLE_GRADE_OVERRIDE: true,
 
 
