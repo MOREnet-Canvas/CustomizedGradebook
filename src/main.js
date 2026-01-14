@@ -1,6 +1,7 @@
 import { logger, logBanner, exposeVersion } from "./utils/logger.js";
 import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
+import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
 
 /**
  * Check if current page is the dashboard
@@ -9,6 +10,14 @@ import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 function isDashboardPage() {
     const path = window.location.pathname;
     return path === "/" || path === "/dashboard" || path.startsWith("/dashboard/");
+}
+
+/**
+ * Check if current page is SpeedGrader
+ * @returns {boolean} True if on SpeedGrader page
+ */
+function isSpeedGraderPage() {
+    return window.location.pathname.includes('/speed_grader');
 }
 
 (function init() {
@@ -28,6 +37,11 @@ function isDashboardPage() {
     // Dashboard grade display (student-side)
     if (isDashboardPage()) {
         initDashboardGradeDisplay();
+    }
+
+    // SpeedGrader grading dropdown auto-activator (teacher-side)
+    if (isSpeedGraderPage()) {
+        initSpeedGraderDropdown();
     }
 
 })();
