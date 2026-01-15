@@ -53,7 +53,7 @@ if (!existsSync(outdir)) mkdirSync(outdir, { recursive: true });
 
 esbuild.build({
     entryPoints: ["src/customGradebookInit.js"],
-    outfile: `${outdir}/main.js`,
+    outfile: `${outdir}/customGradebookInit.js`,
     bundle: true,
     minify: mode === "prod",
     sourcemap: mode === "dev",
@@ -66,5 +66,5 @@ esbuild.build({
         "BUILD_VERSION": JSON.stringify(versionString),
     }
 }).then(() => {
-    console.log(`✔️  Built ${mode} bundle → ${outdir}/main.js`);
+    console.log(`✔️  Built ${mode} bundle → ${outdir}/customGradebookInit.js`);
 }).catch(() => process.exit(1));

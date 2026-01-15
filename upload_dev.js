@@ -64,10 +64,10 @@
     script.id = "cg_dev_bundle";
     const cacheBuster = Date.now(); // new number every load
 
-    script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/main.js?v=${cacheBuster}`;
+    script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=${cacheBuster}`;
 
-    //script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/dev/main.js?v=${cacheBuster}`;
-    script.onload = () => console.log("[CG] Loaded DEV bundle from GitHub (no cache)");
-    script.onerror = () => console.error("[CG] Failed to load DEV bundle from GitHub");
+    //script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/dev/customGradebookInit.js?v=${cacheBuster}`;
+    script.onload = () => console.log("[CG] Loaded customGradebookInit.js (DEV) from GitHub");
+    script.onerror = () => console.error("[CG] Failed to load customGradebookInit.js (DEV) from GitHub");
     document.head.appendChild(script);
 })();
