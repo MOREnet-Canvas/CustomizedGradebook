@@ -151,8 +151,21 @@ function normalizeGroupTotalsRow() {
 }
 
 /**
+ * Format grade display with score and letter grade
+ * @param {string} score - Numeric score (e.g., "2.74")
+ * @param {string|null} letterGrade - Letter grade (e.g., "Target")
+ * @returns {string} Formatted display string
+ */
+function formatGradeDisplay(score, letterGrade) {
+    if (letterGrade) {
+        return `${score} (${letterGrade})`;
+    }
+    return score;
+}
+
+/**
  * Normalize final grade row
- * Replaces percentage with mastery score from Current Score Assignment
+ * Replaces percentage with mastery score and letter grade from Current Score Assignment
  */
 function normalizeFinalGradeRow() {
     document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {
@@ -160,15 +173,13 @@ function normalizeFinalGradeRow() {
         const possibleEl = row.querySelector(".details .possible.points_possible");
 
         if (gradeEl) {
-            // Get mastery score from the page (Current Score Assignment value)
-            const masteryScore = extractCurrentScoreFromPage();
+            // Get mastery score and letter grade from the page (Current Score Assignment value)
+            const gradeData = extractCurrentScoreFromPage();
 
-            if (masteryScore && typeof masteryScore === "string" && masteryScore.trim() !== "") {
-                // Overwrite whatever Canvas put there (e.g., "67.43%")
-                gradeEl.textContent = masteryScore.trim();
-            } else if (masteryScore && typeof masteryScore === "number") {
-                // If extract function returns a number
-                gradeEl.textContent = masteryScore.toString();
+            if (gradeData && gradeData.score) {
+                // Format with both score and letter grade
+                const displayValue = formatGradeDisplay(gradeData.score, gradeData.letterGrade);
+                gradeEl.textContent = displayValue;
             } else {
                 // If we couldn't get the mastery score, hide the percent instead
                 const raw = gradeEl.textContent.trim();

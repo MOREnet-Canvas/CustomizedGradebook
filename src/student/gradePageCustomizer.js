@@ -90,32 +90,50 @@ function goToLearningMasteryTab() {
 }
 
 /**
- * Replace the right sidebar with a clean mastery score display
- * 
- * @param {string} score - The mastery score to display (e.g., "2.74")
+ * Format grade display with score and letter grade
+ * @param {string} score - Numeric score (e.g., "2.74")
+ * @param {string|null} letterGrade - Letter grade (e.g., "Target")
+ * @returns {string} Formatted display string
  */
-function replaceRightSidebar(score) {
+function formatGradeDisplay(score, letterGrade) {
+    if (letterGrade) {
+        return `${score} (${letterGrade})`;
+    }
+    return score;
+}
+
+/**
+ * Replace the right sidebar with a clean mastery score display
+ *
+ * @param {Object} gradeData - Grade data object
+ * @param {string} gradeData.score - The mastery score to display (e.g., "2.74")
+ * @param {string|null} gradeData.letterGrade - The letter grade (e.g., "Target")
+ */
+function replaceRightSidebar(gradeData) {
+    const { score, letterGrade } = gradeData;
+    const displayValue = formatGradeDisplay(score, letterGrade);
+
     const rightSide = getRightSideElement();
-    
+
     if (!rightSide) {
         logger.trace('Right sidebar not found; deferring...');
         return;
     }
-    
+
     if (rightSide.dataset.processed) {
         // Already processed, just update the score
         const masteryAside = document.getElementById('mastery-right-side');
         if (masteryAside) {
             const span = masteryAside.querySelector('.mastery-grade');
-            if (span) span.textContent = score;
+            if (span) span.textContent = displayValue;
         }
         return;
     }
-    
+
     // Hide original sidebar
     rightSide.style.display = 'none';
     rightSide.dataset.processed = 'true';
-    
+
     // Create new mastery sidebar
     const masteryAside = document.createElement('aside');
     masteryAside.id = 'mastery-right-side';
@@ -124,15 +142,15 @@ function replaceRightSidebar(score) {
         color: inherit; font-weight: inherit; font-size: inherit; font-family: inherit;
         margin: inherit; padding: inherit; background: inherit; border: inherit;
     `;
-    
+
     masteryAside.innerHTML = `
         <div id="student-grades-right-content">
             <div class="student_assignment mastery_total">
-                ${AVG_OUTCOME_NAME}: <span class="mastery-grade">${score}</span>
+                ${AVG_OUTCOME_NAME}: <span class="mastery-grade">${displayValue}</span>
             </div>
         </div>
     `;
-    
+
     // Make it typographically consistent with Canvas
     const headerEl = masteryAside.querySelector('.mastery_total');
     if (headerEl) {
@@ -142,20 +160,22 @@ function replaceRightSidebar(score) {
             headerEl.style.fontWeight = 'bold';
         }
     }
-    
+
     // Insert after the original sidebar
     rightSide.parentNode.insertBefore(masteryAside, rightSide.nextSibling);
 
-    logger.debug(`Sidebar replaced with ${AVG_OUTCOME_NAME}: ${score}`);
+    logger.debug(`Sidebar replaced with ${AVG_OUTCOME_NAME}: ${displayValue}`);
 }
 
 /**
  * Apply all customizations to the grades page
  *
- * @param {string} score - The mastery score to display
+ * @param {Object} gradeData - Grade data object
+ * @param {string} gradeData.score - The mastery score to display
+ * @param {string|null} gradeData.letterGrade - The letter grade
  * @returns {boolean} True if customizations were applied, false if already processed
  */
-function applyCustomizations(score) {
+function applyCustomizations(gradeData) {
     if (processed) return false;
 
     // 1) Remove Assignments tab (if configured)
@@ -165,7 +185,7 @@ function applyCustomizations(score) {
     }
 
     // 2) Replace the right sidebar with mastery score display
-    replaceRightSidebar(score);
+    replaceRightSidebar(gradeData);
 
     processed = true;
     return true;
@@ -180,13 +200,13 @@ function applyCustomizations(score) {
 function runOnce() {
     if (processed) return true;
 
-    const score = extractCurrentScoreFromPage();
-    if (score === null) {
+    const gradeData = extractCurrentScoreFromPage();
+    if (gradeData === null) {
         // If score not found, do nothing
         return false;
     }
 
-    return applyCustomizations(score);
+    return applyCustomizations(gradeData);
 }
 
 /**
