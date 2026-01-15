@@ -8,9 +8,9 @@ then push
 
 For checking version in DevTools: CG.version
 
-Dashboard Card Grades
+Student-Facing Grades Display Normalization
+Also for per student grade page as teacher
 zero points assignment toggle
-grade box enabling
 rubric / grade box scoring
 
 TODO: Have the button appear for CBE courses on both gradebook pages
