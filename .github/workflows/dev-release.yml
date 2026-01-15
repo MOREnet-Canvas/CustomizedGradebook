@@ -28,5 +28,5 @@ jobs:
           name: Dev Build
           allowUpdates: true
           replacesArtifacts: true
-          artifacts: "dist/dev/main.js"
+          artifacts: "dist/dev/customGradebookInit.js"
 
