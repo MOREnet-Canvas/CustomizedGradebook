@@ -62,9 +62,9 @@
     script.id = "cg_prod_bundle";
     const cacheBuster = Date.now();
 
-    script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/prod/main.js?v=${cacheBuster}`;
-    script.onload = () => console.log("[CG] Loaded PROD bundle");
-    script.onerror = () => console.error("[CG] Failed to load PROD bundle");
+    script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/prod/customGradebookInit.js?v=${cacheBuster}`;
+    script.onload = () => console.log("[CG] Loaded customGradebookInit.js (PROD)");
+    script.onerror = () => console.error("[CG] Failed to load customGradebookInit.js (PROD)");
     document.head.appendChild(script);
 })();
 
