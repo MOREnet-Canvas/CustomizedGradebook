@@ -1,0 +1,32 @@
+graph TB
+    Init[customGradebookInit.js]
+    Main[studentGradeCustomization.js<br/>Main Entry Point]
+
+    Init -->|initStudentGradeCustomization| Main
+
+    Main -->|Check Role| RoleCheck{User is<br/>student_like?}
+    RoleCheck -->|No| End1[Skip]
+    RoleCheck -->|Yes| FeatureCheck{Feature<br/>Enabled?}
+
+    FeatureCheck -->|No| End2[Skip]
+    FeatureCheck -->|Yes| PageCheck{Page Type?}
+
+    PageCheck -->|Grades Page| GPC[gradePageCustomizer.js]
+    PageCheck -->|Dashboard/Course| CObs[cleanupObserver.js]
+
+    GPC -->|Extract Score| GE1[gradeExtractor.js]
+    GPC -->|Remove Tab| RemoveTab[Remove Assignments Tab]
+    GPC -->|Switch Tab| SwitchTab[Switch to Learning Mastery]
+    GPC -->|Replace Sidebar| Sidebar[Show Mastery Score]
+
+    CObs -->|Setup Observer| MutObs[MutationObserver]
+    MutObs -->|Debounced| GN[gradeNormalizer.js]
+    GN -->|Extract Score| GE2[gradeExtractor.js]
+    GN -->|Clean Display| Clean[Remove Fractions]
+
+    style Main fill:#4a90e2,stroke:#2e5c8a,color:#fff
+    style GPC fill:#50c878,stroke:#2d7a4a,color:#fff
+    style CObs fill:#50c878,stroke:#2d7a4a,color:#fff
+    style GN fill:#f39c12,stroke:#c87f0a,color:#fff
+    style GE1 fill:#9b59b6,stroke:#6c3483,color:#fff
+    style GE2 fill:#9b59b6,stroke:#6c3483,color:#fff

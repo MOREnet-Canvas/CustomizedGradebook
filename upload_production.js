@@ -15,7 +15,6 @@
     window.CG_CONFIG = {
         // Feature flags
         ENABLE_STUDENT_GRADE_CUSTOMIZATION: true,
-        REMOVE_ASSIGNMENT_TAB: false,
 
         // Grading mode configuration
         ENABLE_OUTCOME_UPDATES: true,

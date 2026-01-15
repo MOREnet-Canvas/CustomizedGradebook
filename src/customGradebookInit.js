@@ -15,12 +15,14 @@
  * - Dashboard pages → initDashboardGradeDisplay() (student-side grade display)
  * - Gradebook pages → injectButtons() (teacher-side gradebook customization)
  * - SpeedGrader pages → initSpeedGraderDropdown() (teacher-side grading dropdown activation)
+ * - Student pages → initStudentGradeCustomization() (student-side grade normalization)
  */
 
 import { logger, logBanner, exposeVersion } from "./utils/logger.js";
 import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
+import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
 
 /**
  * Check if current page is the dashboard
@@ -66,6 +68,10 @@ function isSpeedGraderPage() {
     if (isSpeedGraderPage()) {
         initSpeedGraderDropdown();
     }
+
+    // Student grade customization (student-side)
+    // Runs on grades pages, dashboard, and course pages for students
+    initStudentGradeCustomization();
 
 })();
 
