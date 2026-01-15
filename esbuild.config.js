@@ -52,7 +52,7 @@ const versionString = `${humanTime} (${mode}, ${gitHash})`;
 if (!existsSync(outdir)) mkdirSync(outdir, { recursive: true });
 
 esbuild.build({
-    entryPoints: ["src/main.js"],
+    entryPoints: ["src/customGradebookInit.js"],
     outfile: `${outdir}/main.js`,
     bundle: true,
     minify: mode === "prod",
