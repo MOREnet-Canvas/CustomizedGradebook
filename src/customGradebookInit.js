@@ -1,3 +1,22 @@
+// src/customGradebookInit.js
+/**
+ * CustomizedGradebook - Main Entry Point & Initialization
+ * 
+ * This file serves as the primary entry point for the CustomizedGradebook Canvas extension.
+ * It orchestrates the initialization of different modules based on the current Canvas page type.
+ * 
+ * Responsibilities:
+ * - Detect current Canvas page type (dashboard, gradebook, SpeedGrader)
+ * - Initialize appropriate modules for each page type
+ * - Display version information and logging configuration
+ * - Coordinate module loading and startup sequence
+ * 
+ * Page Type Detection & Module Routing:
+ * - Dashboard pages → initDashboardGradeDisplay() (student-side grade display)
+ * - Gradebook pages → injectButtons() (teacher-side gradebook customization)
+ * - SpeedGrader pages → initSpeedGraderDropdown() (teacher-side grading dropdown activation)
+ */
+
 import { logger, logBanner, exposeVersion } from "./utils/logger.js";
 import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
@@ -20,6 +39,10 @@ function isSpeedGraderPage() {
     return window.location.pathname.includes('/speed_grader');
 }
 
+/**
+ * Main initialization function
+ * Immediately invoked on script load to bootstrap the CustomizedGradebook extension
+ */
 (function init() {
     // Banner + version stamp
     logBanner(ENV_NAME, BUILD_VERSION);
@@ -45,5 +68,4 @@ function isSpeedGraderPage() {
     }
 
 })();
-
 
