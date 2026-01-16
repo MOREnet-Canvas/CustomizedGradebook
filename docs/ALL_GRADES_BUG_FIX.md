@@ -238,10 +238,13 @@ console.log('Rows found:', rows?.length);
 ## Files Modified
 
 1. **`src/student/allGradesPageCustomizer.js`**
-   - Added `fetchGradeDataFromAPI()` function
-   - Updated `enrichCoursesWithAPI()` to use grade map
-   - Updated `fetchCourseGrades()` to fetch API grades
-   - Improved DOM extraction with better selectors and logging
+   - **Line 118**: Changed selector from `.grade` to `.percent` (DOM extraction fix)
+   - **Lines 144-186**: Added `fetchGradeDataFromAPI()` function (API fallback)
+   - **Lines 188-269**: Updated `enrichCoursesWithAPI()` to merge DOM and API data
+   - **Lines 226-234**: Fixed detection to always call `isStandardsBasedCourse()` with letter grade
+   - **Lines 247-250**: Use API letter grade instead of calculating from point value
+   - **Lines 271-321**: Updated `fetchCourseGrades()` to fetch API grades
+   - **Added logging**: Track grade sources (DOM vs API) and letter grade source
 
 2. **`docs/ALL_GRADES_IMPROVEMENTS.md`**
    - Updated hybrid strategy description
@@ -252,7 +255,16 @@ console.log('Rows found:', rows?.length);
    - Common issues and solutions
    - Manual testing procedures
 
-4. **`docs/ALL_GRADES_BUG_FIX.md`** (this file)
+4. **`docs/ALL_GRADES_SELECTOR_FIX.md`** (NEW)
+   - Quick reference for the selector fix
+   - Testing instructions
+
+5. **`docs/ALL_GRADES_DETECTION_FIX.md`** (NEW)
+   - Detection inconsistency analysis
+   - Letter grade validation fix
+   - Comparison with dashboard behavior
+
+6. **`docs/ALL_GRADES_BUG_FIX.md`** (this file)
    - Bug summary and fix documentation
 
 ## Summary
