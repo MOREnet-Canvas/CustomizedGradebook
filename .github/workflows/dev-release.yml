@@ -3,6 +3,7 @@ name: Build dev and upload to Release (no Pages)
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,7 +16,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - run: npm ci
@@ -28,5 +29,6 @@ jobs:
           name: Dev Build
           allowUpdates: true
           replacesArtifacts: true
-          artifacts: "dist/dev/customGradebookInit.js"
+          artifacts: "dist/dev/customGradebookInit.js,dist/dev/customGradebookInit.js.map"
+
 
