@@ -13,18 +13,29 @@
 import { ENABLE_STUDENT_GRADE_CUSTOMIZATION } from '../config.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
 import { initGradePageCustomizer } from './gradePageCustomizer.js';
+import { initAllGradesPageCustomizer } from './allGradesPageCustomizer.js';
 import { initCleanupObservers } from './cleanupObserver.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Check if current page is a student grades page
- * @returns {boolean} True if on student grades page
+ * Check if current page is a single-course grades page
+ * @returns {boolean} True if on single-course grades page
  */
-function isStudentGradesPage() {
+function isSingleCourseGradesPage() {
     return (
         window.location.href.includes('/courses/') &&
         window.location.pathname.includes('/grades')
     );
+}
+
+/**
+ * Check if current page is the all-grades page
+ * @returns {boolean} True if on all-grades page
+ */
+function isAllGradesPage() {
+    const path = window.location.pathname;
+    // All-grades page is /grades without /courses/ in the path
+    return path === '/grades' || (path.includes('/grades') && !path.includes('/courses/'));
 }
 
 /**
@@ -46,13 +57,16 @@ export function initStudentGradeCustomization() {
     }
     
     logger.info('Initializing student grade customizations');
-    
-    // Initialize grade page customizer (only on grades pages)
-    if (isStudentGradesPage()) {
-        logger.debug('On student grades page, initializing grade page customizer');
+
+    // Route to appropriate customizer based on page type
+    if (isAllGradesPage()) {
+        logger.debug('On all-grades page, initializing all-grades customizer');
+        initAllGradesPageCustomizer();
+    } else if (isSingleCourseGradesPage()) {
+        logger.debug('On single-course grades page, initializing grade page customizer');
         initGradePageCustomizer();
     }
-    
+
     // Initialize cleanup observers (runs on dashboard and course pages)
     initCleanupObservers();
 }

@@ -23,6 +23,7 @@ import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
+import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
 
 /**
  * Check if current page is the dashboard
@@ -72,6 +73,13 @@ function isSpeedGraderPage() {
     // Student grade customization (student-side)
     // Runs on grades pages, dashboard, and course pages for students
     initStudentGradeCustomization();
+
+    // Expose test function for all-grades page data source comparison
+    // Usage: Open console on /grades page and run: window.CG_testAllGradesDataSources()
+    if (ENV_DEV) {
+        window.CG_testAllGradesDataSources = compareDataSourceApproaches;
+        logger.debug('Test function exposed: window.CG_testAllGradesDataSources()');
+    }
 
 })();
 

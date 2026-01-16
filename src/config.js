@@ -82,3 +82,16 @@ export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_R
 // Outcome filtering
 const defaultExcludedKeywords = [];
 export const EXCLUDED_OUTCOME_KEYWORDS = window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS ?? defaultExcludedKeywords;
+
+// Standards-Based Course Detection (for all-grades page)
+// Array of patterns to match against course names to identify standards-based courses
+// Supports both string matching (case-insensitive) and regex patterns
+// Examples: ["Standards Based", "SBG", "Mastery", /^SBG-/, /\[SBG\]/]
+const defaultStandardsBasedPatterns = [
+    "Standards Based",
+    "SBG",
+    "Mastery",
+    /\[SBG\]/i,
+    /^SBG[-\s]/i
+];
+export const STANDARDS_BASED_COURSE_PATTERNS = window.CG_CONFIG?.STANDARDS_BASED_COURSE_PATTERNS ?? defaultStandardsBasedPatterns;
