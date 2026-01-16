@@ -91,34 +91,40 @@ const isStandardsBased = await isStandardsBasedCourse({
 
 **Solution**:
 - Hybrid approach combines best of both methods
-- DOM parsing for immediate course extraction (fast)
+- DOM parsing for course list extraction (fast - names and IDs)
+- Enrollments API for grade data (reliable - percentages and letter grades)
 - Pattern matching for instant detection of obvious standards-based courses
 - API verification only for courses not matching patterns (thorough)
 
 **Strategy**:
 ```
-1. Extract courses from DOM (fast - no API calls)
-   ├─ Course name, ID, percentage
+1. Extract course list from DOM (fast - no API calls)
+   ├─ Course name, ID
    └─ Check if name matches patterns
 
-2. For each course:
-   ├─ If matches pattern → Mark as standards-based (cached)
-   ├─ If not matching → Verify with API
-   └─ Calculate display values
+2. Fetch grade data from Enrollments API (single call)
+   ├─ Percentages (current_score/final_score)
+   └─ Letter grades (current_grade/final_grade)
 
-3. Render table with all courses
+3. Merge DOM and API data:
+   ├─ Use API grades (more reliable)
+   ├─ Fall back to DOM grades if API missing
+   └─ Detect standards-based courses
+
+4. Render table with all courses
 ```
 
 **Performance Benefits**:
-- **Fast path**: Courses matching patterns show immediately
-- **Thorough path**: Non-matching courses verified with API
-- **Parallel processing**: All API calls run concurrently
+- **Fast course list**: DOM extraction ~10ms
+- **Reliable grades**: Single API call ~200ms
+- **Parallel detection**: All courses processed concurrently
 - **Cached results**: Subsequent loads use cached detection
 
-**Expected Performance** (5 courses, 3 matching patterns):
-- Pattern matches: ~0ms (instant)
-- API verification: ~200ms (2 courses in parallel)
-- Total: ~200ms (vs ~700ms with old API-first approach)
+**Expected Performance** (5 courses):
+- DOM extraction: ~10ms
+- API grade fetch: ~200ms
+- Course enrichment: ~100ms (parallel)
+- Total: ~310ms (vs ~700ms with old API-first approach)
 
 **Files Modified**:
 - `src/student/allGradesPageCustomizer.js`

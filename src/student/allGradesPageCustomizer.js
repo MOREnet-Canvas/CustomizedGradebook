@@ -114,11 +114,13 @@ function extractCoursesFromDOM() {
 
             const courseId = courseIdMatch[1];
 
-            // Extract grade percentage
-            const gradeCell = row.querySelector('.grade');
+            // Extract grade percentage from .percent cell
+            const gradeCell = row.querySelector('.percent');
             const gradeText = gradeCell?.textContent.trim() || '';
             const percentageMatch = gradeText.match(/(\d+(?:\.\d+)?)\s*%/);
             const percentage = percentageMatch ? parseFloat(percentageMatch[1]) : null;
+
+            logger.trace(`[Hybrid] Course ${courseName}: DOM grade text="${gradeText}", percentage=${percentage}`);
 
             // Check if course name matches pattern (fast detection)
             const matchesPattern = matchesCourseNamePattern(courseName);
@@ -142,17 +144,84 @@ function extractCoursesFromDOM() {
 }
 
 /**
- * Enrich course data with API verification (for courses not matching patterns)
+ * Fetch grade data from Enrollments API
+ * @param {CanvasApiClient} apiClient - API client instance
+ * @returns {Promise<Map>} Map of courseId -> grade data
+ */
+async function fetchGradeDataFromAPI(apiClient) {
+    const gradeMap = new Map();
+
+    try {
+        logger.debug('[Hybrid] Fetching grade data from Enrollments API...');
+
+        const enrollments = await apiClient.get(
+            '/api/v1/users/self/enrollments',
+            {
+                'type[]': 'StudentEnrollment',
+                'state[]': 'active',
+                'include[]': 'total_scores'
+            },
+            'fetchAllGrades'
+        );
+
+        logger.debug(`[Hybrid] Fetched ${enrollments.length} enrollments from API`);
+
+        for (const enrollment of enrollments) {
+            const courseId = enrollment.course_id?.toString();
+            if (!courseId) continue;
+
+            const grades = enrollment.grades || {};
+            const percentage = grades.current_score ?? grades.final_score ?? null;
+            const letterGrade = grades.current_grade ?? grades.final_grade ?? null;
+
+            gradeMap.set(courseId, {
+                percentage,
+                letterGrade
+            });
+
+            logger.trace(`[Hybrid] Course ${courseId} grade from API: ${percentage}%`);
+        }
+
+        return gradeMap;
+
+    } catch (error) {
+        logger.warn('[Hybrid] Failed to fetch grade data from API:', error.message);
+        return gradeMap;
+    }
+}
+
+/**
+ * Enrich course data with grades and detection
  * @param {Array} courses - Array of course objects from DOM
+ * @param {Map} gradeMap - Map of courseId -> grade data from API
  * @param {CanvasApiClient} apiClient - API client instance
  * @returns {Promise<Array>} Array of enriched course objects
  */
-async function enrichCoursesWithAPI(courses, apiClient) {
+async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
     const startTime = performance.now();
 
     // Process courses in parallel
     const enrichedPromises = courses.map(async (course) => {
-        const { courseId, courseName, percentage, matchesPattern } = course;
+        const { courseId, courseName, percentage: domPercentage, matchesPattern } = course;
+
+        // Merge DOM and API grade data
+        let percentage = domPercentage;
+        let apiLetterGrade = null;
+        let gradeSource = 'DOM';
+
+        if (gradeMap.has(courseId)) {
+            const apiGrade = gradeMap.get(courseId);
+            apiLetterGrade = apiGrade.letterGrade;
+
+            // Use API data if DOM extraction failed
+            if (percentage === null && apiGrade.percentage !== null) {
+                percentage = apiGrade.percentage;
+                gradeSource = 'API';
+                logger.debug(`[Hybrid] Using API grade for ${courseName}: ${percentage}%`);
+            } else if (percentage !== null) {
+                logger.trace(`[Hybrid] Using DOM grade for ${courseName}: ${percentage}%`);
+            }
+        }
 
         // Determine if standards-based
         let isStandardsBased = matchesPattern;
@@ -162,6 +231,7 @@ async function enrichCoursesWithAPI(courses, apiClient) {
             isStandardsBased = await isStandardsBasedCourse({
                 courseId,
                 courseName,
+                letterGrade: apiLetterGrade,
                 apiClient,
                 skipApiCheck: false
             });
@@ -184,12 +254,16 @@ async function enrichCoursesWithAPI(courses, apiClient) {
             displayLetterGrade = scoreToGradeLevel(pointValue);
         }
 
+        logger.trace(`[Hybrid] Course ${courseName}: percentage=${percentage}, displayScore=${displayScore}, type=${displayType}, source=${gradeSource}`);
+
         return {
             ...course,
+            percentage,
             displayScore,
             displayLetterGrade,
             displayType,
-            isStandardsBased
+            isStandardsBased,
+            gradeSource
         };
     });
 
@@ -201,9 +275,10 @@ async function enrichCoursesWithAPI(courses, apiClient) {
 
 /**
  * Fetch course grade data using hybrid strategy
- * 1. Extract courses from DOM immediately (fast)
- * 2. For courses matching patterns, show converted grades immediately
- * 3. For other courses, verify with API in background
+ * 1. Extract course list from DOM (fast - course names and IDs)
+ * 2. Fetch grade data from Enrollments API (reliable - percentages and letter grades)
+ * 3. Merge DOM and API data
+ * 4. Detect standards-based courses and convert grades
  *
  * @returns {Promise<Array>} Array of course grade objects
  */
@@ -212,20 +287,37 @@ async function fetchCourseGrades() {
     const apiClient = new CanvasApiClient();
 
     try {
-        // Step 1: Extract courses from DOM (fast - no API calls)
-        logger.debug('[Hybrid] Step 1: Extracting courses from DOM...');
+        // Step 1: Extract course list from DOM (fast - no API calls)
+        logger.debug('[Hybrid] Step 1: Extracting course list from DOM...');
         const courses = extractCoursesFromDOM();
 
         if (courses.length === 0) {
             throw new Error('No courses found in DOM');
         }
 
-        logger.debug(`[Hybrid] Step 2: Enriching ${courses.length} courses with API verification...`);
+        logger.debug(`[Hybrid] Found ${courses.length} courses in DOM`);
 
-        // Step 2: Enrich with API verification
-        const enrichedCourses = await enrichCoursesWithAPI(courses, apiClient);
+        // Step 2: Fetch grade data from API (reliable source for percentages)
+        logger.debug('[Hybrid] Step 2: Fetching grade data from Enrollments API...');
+        const gradeMap = await fetchGradeDataFromAPI(apiClient);
+
+        logger.debug(`[Hybrid] Fetched grade data for ${gradeMap.size} courses from API`);
+
+        // Step 3: Enrich courses with grades and detection
+        logger.debug(`[Hybrid] Step 3: Enriching courses with grades and detection...`);
+        const enrichedCourses = await enrichCoursesWithAPI(courses, gradeMap, apiClient);
 
         logger.info(`[Hybrid] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
+
+        // Log summary
+        const withGrades = enrichedCourses.filter(c => c.displayScore !== null).length;
+        const withoutGrades = enrichedCourses.length - withGrades;
+        const fromDOM = enrichedCourses.filter(c => c.gradeSource === 'DOM').length;
+        const fromAPI = enrichedCourses.filter(c => c.gradeSource === 'API').length;
+
+        logger.info(`[Hybrid] Courses with grades: ${withGrades}, without grades: ${withoutGrades}`);
+        logger.info(`[Hybrid] Grade sources: ${fromDOM} from DOM, ${fromAPI} from API`);
+
         return enrichedCourses;
 
     } catch (error) {
