@@ -110,40 +110,63 @@ export async function isStandardsBasedCourse(options) {
         return false;
     }
 
+    logger.trace(`[Detection] Starting detection for course ${courseId} "${courseName}"`);
+    logger.trace(`[Detection] Input: letterGrade="${letterGrade}", skipApiCheck=${skipApiCheck}`);
+
     // 1. Check cache first
     const cacheKey = `standardsBased_${courseId}`;
     const cached = sessionStorage.getItem(cacheKey);
     if (cached !== null) {
-        logger.trace(`[Course Detection] Cache hit for course ${courseId}: ${cached}`);
+        logger.trace(`[Detection] Step 1 - Cache: HIT (${cached})`);
         return cached === 'true';
     }
+    logger.trace(`[Detection] Step 1 - Cache: MISS`);
 
     // 2. Check course name patterns (fastest - no API calls)
-    if (matchesCourseNamePattern(courseName)) {
-        logger.debug(`[Course Detection] Course "${courseName}" matches standards-based pattern`);
+    const matchesPattern = matchesCourseNamePattern(courseName);
+    logger.trace(`[Detection] Step 2 - Pattern match: ${matchesPattern ? 'YES' : 'NO'}`);
+    if (matchesPattern) {
+        logger.debug(`[Detection] ✅ Course "${courseName}" detected as standards-based (pattern match)`);
         sessionStorage.setItem(cacheKey, 'true');
         return true;
     }
 
     // 3. Check letter grade validity (if provided)
-    if (letterGrade && isValidLetterGrade(letterGrade)) {
-        logger.debug(`[Course Detection] Course "${courseName}" has valid letter grade: ${letterGrade}`);
-        sessionStorage.setItem(cacheKey, 'true');
-        return true;
+    logger.trace(`[Detection] Step 3 - Letter grade validation: letterGrade="${letterGrade}"`);
+    if (letterGrade) {
+        const isValid = isValidLetterGrade(letterGrade);
+        logger.trace(`[Detection] Step 3 - isValidLetterGrade("${letterGrade}") = ${isValid}`);
+
+        if (isValid) {
+            logger.debug(`[Detection] ✅ Course "${courseName}" detected as standards-based (valid letter grade: "${letterGrade}")`);
+            sessionStorage.setItem(cacheKey, 'true');
+            return true;
+        } else {
+            // Log why it failed
+            const availableGrades = OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description).join(', ');
+            logger.trace(`[Detection] Step 3 - Letter grade "${letterGrade}" does NOT match any rating. Available: ${availableGrades}`);
+        }
+    } else {
+        logger.trace(`[Detection] Step 3 - No letter grade provided, skipping validation`);
     }
 
     // 4. Check AVG Assignment presence (requires API call)
     if (!skipApiCheck && apiClient) {
+        logger.trace(`[Detection] Step 4 - Checking AVG Assignment presence via API...`);
         const hasAvg = await hasAvgAssignment(courseId, apiClient);
+        logger.trace(`[Detection] Step 4 - AVG Assignment: ${hasAvg ? 'FOUND' : 'NOT FOUND'}`);
+
         if (hasAvg) {
-            logger.debug(`[Course Detection] Course "${courseName}" has AVG Assignment`);
+            logger.debug(`[Detection] ✅ Course "${courseName}" detected as standards-based (AVG Assignment found)`);
             sessionStorage.setItem(cacheKey, 'true');
             return true;
         }
+    } else {
+        logger.trace(`[Detection] Step 4 - Skipped (skipApiCheck=${skipApiCheck}, hasApiClient=${!!apiClient})`);
     }
 
     // Not standards-based
-    logger.trace(`[Course Detection] Course "${courseName}" is traditional (not standards-based)`);
+    logger.debug(`[Detection] ❌ Course "${courseName}" is traditional (not standards-based)`);
     sessionStorage.setItem(cacheKey, 'false');
     return false;
 }

@@ -100,7 +100,7 @@ function extractCoursesFromDOM() {
 
         // Extract course rows
         const rows = table.querySelectorAll('tbody tr');
-        logger.debug(`[Hybrid] Found ${rows.length} course rows in DOM`);
+        logger.trace(`[Hybrid] Found ${rows.length} course rows in DOM`);
 
         for (const row of rows) {
             // Find course link
@@ -134,7 +134,7 @@ function extractCoursesFromDOM() {
             });
         }
 
-        logger.debug(`[Hybrid] Extracted ${courses.length} courses from DOM`);
+        logger.trace(`[Hybrid] Extracted ${courses.length} courses from DOM`);
         return courses;
 
     } catch (error) {
@@ -164,7 +164,7 @@ async function fetchGradeDataFromAPI(apiClient) {
             'fetchAllGrades'
         );
 
-        logger.debug(`[Hybrid] Fetched ${enrollments.length} enrollments from API`);
+        logger.trace(`[Hybrid] Fetched ${enrollments.length} enrollments from API`);
 
         for (const enrollment of enrollments) {
             const courseId = enrollment.course_id?.toString();
@@ -172,14 +172,17 @@ async function fetchGradeDataFromAPI(apiClient) {
 
             const grades = enrollment.grades || {};
             const percentage = grades.current_score ?? grades.final_score ?? null;
-            const letterGrade = grades.current_grade ?? grades.final_grade ?? null;
+            const rawLetterGrade = grades.current_grade ?? grades.final_grade ?? null;
+
+            // Trim letter grade to remove whitespace
+            const letterGrade = rawLetterGrade ? rawLetterGrade.trim() : null;
 
             gradeMap.set(courseId, {
                 percentage,
                 letterGrade
             });
 
-            logger.trace(`[Hybrid] Course ${courseId} grade from API: ${percentage}%`);
+            logger.trace(`[Hybrid] Course ${courseId} from API: percentage=${percentage}%, letterGrade="${letterGrade || 'null'}"`);
         }
 
         return gradeMap;
@@ -223,6 +226,9 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             }
         }
 
+        // Log letter grade for debugging
+        logger.trace(`[Hybrid] Course "${courseName}" (${courseId}): percentage=${percentage}, letterGrade="${apiLetterGrade || 'null'}"`);
+
         // Determine if standards-based using full detection hierarchy
         // This ensures letter grade validation happens even if pattern doesn't match
         const isStandardsBased = await isStandardsBasedCourse({
@@ -265,7 +271,7 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
 
     const enrichedCourses = await Promise.all(enrichedPromises);
 
-    logger.info(`[Hybrid] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
+    logger.trace(`[Hybrid] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
     return enrichedCourses;
 }
 
@@ -284,35 +290,49 @@ async function fetchCourseGrades() {
 
     try {
         // Step 1: Extract course list from DOM (fast - no API calls)
-        logger.debug('[Hybrid] Step 1: Extracting course list from DOM...');
+        logger.trace('[Hybrid] Step 1: Extracting course list from DOM...');
         const courses = extractCoursesFromDOM();
 
         if (courses.length === 0) {
             throw new Error('No courses found in DOM');
         }
 
-        logger.debug(`[Hybrid] Found ${courses.length} courses in DOM`);
+        logger.trace(`[Hybrid] Found ${courses.length} courses in DOM`);
 
         // Step 2: Fetch grade data from API (reliable source for percentages)
-        logger.debug('[Hybrid] Step 2: Fetching grade data from Enrollments API...');
+        logger.trace('[Hybrid] Step 2: Fetching grade data from Enrollments API...');
         const gradeMap = await fetchGradeDataFromAPI(apiClient);
 
-        logger.debug(`[Hybrid] Fetched grade data for ${gradeMap.size} courses from API`);
+        logger.trace(`[Hybrid] Fetched grade data for ${gradeMap.size} courses from API`);
 
         // Step 3: Enrich courses with grades and detection
-        logger.debug(`[Hybrid] Step 3: Enriching courses with grades and detection...`);
+        logger.trace(`[Hybrid] Step 3: Enriching courses with grades and detection...`);
         const enrichedCourses = await enrichCoursesWithAPI(courses, gradeMap, apiClient);
 
-        logger.info(`[Hybrid] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
+        logger.trace(`[Hybrid] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
 
         // Log summary
         const withGrades = enrichedCourses.filter(c => c.displayScore !== null).length;
         const withoutGrades = enrichedCourses.length - withGrades;
         const fromDOM = enrichedCourses.filter(c => c.gradeSource === 'DOM').length;
         const fromAPI = enrichedCourses.filter(c => c.gradeSource === 'API').length;
+        const standardsBased = enrichedCourses.filter(c => c.isStandardsBased).length;
+        const traditional = enrichedCourses.length - standardsBased;
 
-        logger.info(`[Hybrid] Courses with grades: ${withGrades}, without grades: ${withoutGrades}`);
-        logger.info(`[Hybrid] Grade sources: ${fromDOM} from DOM, ${fromAPI} from API`);
+        logger.debug(`[Hybrid] Processed ${enrichedCourses.length} courses: ${standardsBased} standards-based, ${traditional} traditional`);
+        logger.debug(`[Hybrid] Grade sources: ${fromDOM} from DOM, ${fromAPI} from API`);
+
+        // Log detailed breakdown for debugging
+        if (logger.isTraceEnabled()) {
+            logger.trace('[Hybrid] Course breakdown:');
+            enrichedCourses.forEach(c => {
+                const type = c.isStandardsBased ? 'SBG' : 'TRAD';
+                const display = c.displayScore !== null
+                    ? (c.isStandardsBased ? `${c.displayScore.toFixed(2)} (${c.displayLetterGrade || 'N/A'})` : `${c.displayScore.toFixed(2)}%`)
+                    : 'N/A';
+                logger.trace(`  [${type}] ${c.courseName}: ${display}`);
+            });
+        }
 
         return enrichedCourses;
 
@@ -458,7 +478,7 @@ async function applyCustomizations() {
         // Log statistics
         const standardsBasedCount = courses.filter(c => c.isStandardsBased).length;
         const traditionalCount = courses.length - standardsBasedCount;
-        logger.info(`Customization complete: ${standardsBasedCount} standards-based, ${traditionalCount} traditional courses`);
+        logger.info(`All-grades customization complete: ${courses.length} courses (${standardsBasedCount} SBG, ${traditionalCount} traditional)`);
 
         processed = true;
 
