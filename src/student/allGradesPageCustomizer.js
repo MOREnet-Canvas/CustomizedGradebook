@@ -19,12 +19,12 @@
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { DEFAULT_MAX_POINTS } from '../config.js';
 import { scoreToGradeLevel } from './gradeExtractor.js';
 import {
     isStandardsBasedCourse,
     matchesCourseNamePattern
 } from '../utils/courseDetection.js';
+import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
 
 /**
  * Track if customizations have been applied
@@ -57,31 +57,6 @@ function injectHideTableCSS() {
     document.head.appendChild(style);
     logger.trace('[All-Grades] Injected CSS to hide original table');
 }
-
-/**
- * Convert percentage score to point value
- * @param {number} percentage - Percentage score (0-100)
- * @returns {number} Point value (0-DEFAULT_MAX_POINTS scale)
- */
-function percentageToPoints(percentage) {
-    return (percentage / 100) * DEFAULT_MAX_POINTS;
-}
-
-/**
- * Format grade display with score and letter grade
- * @param {number} score - Numeric score
- * @param {string|null} letterGrade - Letter grade description
- * @returns {string} Formatted display string
- */
-function formatGradeDisplay(score, letterGrade) {
-    const scoreStr = score.toFixed(2);
-    if (letterGrade) {
-        return `${scoreStr} (${letterGrade})`;
-    }
-    return scoreStr;
-}
-
-
 
 /**
  * Extract course data from DOM (fast path - no API calls yet)

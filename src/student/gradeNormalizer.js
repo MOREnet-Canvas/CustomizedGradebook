@@ -22,6 +22,7 @@
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
 import { extractCurrentScoreFromPage } from './gradeExtractor.js';
 import { logger } from '../utils/logger.js';
+import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 
 /**
  * Remove fraction denominators and "out of X" text from all grade displays
@@ -148,19 +149,6 @@ function normalizeGroupTotalsRow() {
             }
         }
     });
-}
-
-/**
- * Format grade display with score and letter grade
- * @param {string} score - Numeric score (e.g., "2.74")
- * @param {string|null} letterGrade - Letter grade (e.g., "Target")
- * @returns {string} Formatted display string
- */
-function formatGradeDisplay(score, letterGrade) {
-    if (letterGrade) {
-        return `${score} (${letterGrade})`;
-    }
-    return score;
 }
 
 /**

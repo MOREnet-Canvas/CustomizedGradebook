@@ -10,39 +10,10 @@
  */
 
 import { removeFractionScores } from './gradeNormalizer.js';
-import { isDashboardPage, courseHasAvgAssignment } from '../utils/canvas.js';
+import { courseHasAvgAssignment } from '../utils/canvas.js';
 import { logger } from '../utils/logger.js';
-
-/**
- * Debounce function to limit how often a function is called
- * 
- * @param {Function} fn - Function to debounce
- * @param {number} delay - Delay in milliseconds
- * @returns {Function} Debounced function
- */
-function debounce(fn, delay) {
-    let timeout;
-    return function () {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => fn(), delay);
-    };
-}
-
-/**
- * Check if current page is a course page that needs cleanup
- * @returns {boolean} True if page needs cleanup
- */
-function isCoursePageNeedingCleanup() {
-    const path = window.location.pathname;
-    return (
-        window.location.href.includes("/courses/") &&
-        (
-            path.includes("/grades") ||
-            path.includes("/assignments") ||
-            /^\/courses\/\d+$/.test(path)
-        )
-    );
-}
+import { isDashboardPage, isAllGradesPage, isCoursePageNeedingCleanup } from '../utils/pageDetection.js';
+import { debounce } from '../utils/dom.js';
 
 /**
  * Check if current page should have cleanup applied
@@ -93,15 +64,6 @@ export function startCleanupObservers() {
         }, 1000);
         
     }, 500);
-}
-
-/**
- * Check if current page is the all-grades page
- * @returns {boolean} True if on all-grades page
- */
-function isAllGradesPage() {
-    const path = window.location.pathname;
-    return path === '/grades' || (path.includes('/grades') && !path.includes('/courses/'));
 }
 
 /**

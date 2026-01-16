@@ -7,9 +7,10 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { OUTCOME_AND_RUBRIC_RATINGS, DEFAULT_MAX_POINTS } from '../config.js';
+import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { GRADE_SOURCE } from './gradeDataService.js';
 import { isValidLetterGrade as validateLetterGrade } from '../utils/courseDetection.js';
+import { percentageToPoints } from '../utils/gradeFormatting.js';
 
 /**
  * CSS class prefix for grade elements
@@ -110,40 +111,6 @@ export function findCourseCard(courseId) {
 }
 
 /**
- * Check if letter grade matches any rating description
- * @param {string} letterGrade - Letter grade to check
- * @returns {boolean} True if letter grade matches a rating description
- * @deprecated Use isValidLetterGrade from utils/courseDetection.js instead
- */
-function isValidLetterGrade(letterGrade) {
-    // Delegate to shared utility function
-    const isValid = validateLetterGrade(letterGrade);
-
-    // Keep existing trace logging for backward compatibility
-    if (!letterGrade) {
-        logger.trace(`[Letter Grade Validation] letterGrade is empty/null/undefined`);
-    } else {
-        logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValid ? 'MATCH FOUND' : 'NO MATCH'}`);
-
-        if (!isValid && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
-            logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description));
-        }
-    }
-
-    return isValid;
-}
-
-/**
- * Convert percentage score to point value based on configured maximum
- * @param {number} percentageScore - Percentage score (0-100)
- * @returns {number} Point value (0-DEFAULT_MAX_POINTS scale)
- */
-function percentageToPoints(percentageScore) {
-    // Formula: (percentageScore / 100) * DEFAULT_MAX_POINTS
-    return (percentageScore / 100) * DEFAULT_MAX_POINTS;
-}
-
-/**
  * Format grade data for display
  * Pure function - no side effects, easy to test
  * @param {Object} gradeData - Grade data object
@@ -174,7 +141,18 @@ function formatGradeDisplay(gradeData) {
     } else if (source === GRADE_SOURCE.ENROLLMENT) {
         // Enrollment grade: convert to point value if letter grade matches rating scale
         // Otherwise fall back to percentage display
-        const isValidGrade = isValidLetterGrade(letterGrade);
+        const isValidGrade = validateLetterGrade(letterGrade);
+
+        // Trace logging for debugging
+        if (!letterGrade) {
+            logger.trace(`[Letter Grade Validation] letterGrade is empty/null/undefined`);
+        } else {
+            logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValidGrade ? 'MATCH FOUND' : 'NO MATCH'}`);
+            if (!isValidGrade && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
+                logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description));
+            }
+        }
+
         logger.trace(`[Grade Conversion Debug] isValidLetterGrade("${letterGrade}") = ${isValidGrade}`);
 
         if (isValidGrade) {

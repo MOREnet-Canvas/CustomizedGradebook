@@ -80,11 +80,6 @@ export function getUserRoleGroup() {
     return group;
 }
 
-export function isDashboardPage() {
-    const path = window.location.pathname;
-    return path === "/" || path.startsWith("/dashboard");
-}
-
 export async function courseHasAvgAssignment() {
     const courseId = getCourseId();
     if (!courseId) return false;
