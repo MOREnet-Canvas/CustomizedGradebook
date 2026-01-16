@@ -1,14 +1,17 @@
 // src/student/allGradesDataSourceTest.js
 /**
  * All-Grades Page Data Source Testing Module
- * 
- * This module tests and compares two approaches for fetching course grade data:
+ *
+ * NOTE: This module is for testing and comparison purposes only.
+ * The actual implementation now uses a hybrid approach (see allGradesPageCustomizer.js).
+ *
+ * This module tests and compares two legacy approaches for fetching course grade data:
  * 1. DOM Parsing + Individual Course API Calls
  * 2. Single Enrollments API Call + Course Metadata
- * 
+ *
  * Run this module on the all-grades page (/grades) to compare performance,
  * reliability, and data completeness.
- * 
+ *
  * Usage:
  * - Open browser console on /grades page
  * - Run: window.CG_testAllGradesDataSources()
@@ -17,6 +20,7 @@
 import { logger } from '../utils/logger.js';
 import { AVG_ASSIGNMENT_NAME, AVG_OUTCOME_NAME, STANDARDS_BASED_COURSE_PATTERNS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import { matchesCourseNamePattern } from '../utils/courseDetection.js';
 
 /**
  * Approach 1: DOM Parsing + Individual Course API Calls
@@ -233,15 +237,8 @@ async function detectStandardsBasedCourse(courseId, courseName, apiClient) {
         return cached === 'true';
     }
 
-    // 1. Check course name patterns
-    const matchesPattern = STANDARDS_BASED_COURSE_PATTERNS.some(pattern => {
-        if (typeof pattern === 'string') {
-            return courseName.toLowerCase().includes(pattern.toLowerCase());
-        } else if (pattern instanceof RegExp) {
-            return pattern.test(courseName);
-        }
-        return false;
-    });
+    // 1. Check course name patterns (use shared utility)
+    const matchesPattern = matchesCourseNamePattern(courseName);
 
     if (matchesPattern) {
         sessionStorage.setItem(cacheKey, 'true');
