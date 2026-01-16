@@ -223,23 +223,15 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             }
         }
 
-        // Determine if standards-based
-        let isStandardsBased = matchesPattern;
-
-        // If not matching pattern, verify with API
-        if (!matchesPattern) {
-            isStandardsBased = await isStandardsBasedCourse({
-                courseId,
-                courseName,
-                letterGrade: apiLetterGrade,
-                apiClient,
-                skipApiCheck: false
-            });
-        } else {
-            // Cache the pattern match result
-            const cacheKey = `standardsBased_${courseId}`;
-            sessionStorage.setItem(cacheKey, 'true');
-        }
+        // Determine if standards-based using full detection hierarchy
+        // This ensures letter grade validation happens even if pattern doesn't match
+        const isStandardsBased = await isStandardsBasedCourse({
+            courseId,
+            courseName,
+            letterGrade: apiLetterGrade,
+            apiClient,
+            skipApiCheck: false
+        });
 
         // Calculate display values
         let displayScore = percentage;
@@ -251,7 +243,11 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             const pointValue = percentageToPoints(percentage);
             displayScore = pointValue;
             displayType = 'points';
-            displayLetterGrade = scoreToGradeLevel(pointValue);
+
+            // Use API letter grade if available, otherwise calculate from point value
+            displayLetterGrade = apiLetterGrade || scoreToGradeLevel(pointValue);
+
+            logger.trace(`[Hybrid] Standards-based course: ${courseName}, percentage=${percentage}%, points=${pointValue.toFixed(2)}, letterGrade=${displayLetterGrade} (from ${apiLetterGrade ? 'API' : 'calculation'})`);
         }
 
         logger.trace(`[Hybrid] Course ${courseName}: percentage=${percentage}, displayScore=${displayScore}, type=${displayType}, source=${gradeSource}`);
