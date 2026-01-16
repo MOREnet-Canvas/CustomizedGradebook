@@ -101,7 +101,8 @@ export function showFloatingBanner({
     const isLocked = () => now() < lockedUntil;
 
     // const apply = (textValue) => { msg.textContent = textValue; };
-    const courseId = getCourseId();
+    // Only get course ID if we're on a course page (not all-grades page)
+    const courseId = window.location.pathname.includes('/courses/') ? getCourseId() : null;
     const apply = (textValue) => {
         msg.textContent = textValue;
         if (courseId) localStorage.setItem(k('bannerLast', courseId), textValue);
