@@ -16,27 +16,7 @@ import { initGradePageCustomizer } from './gradePageCustomizer.js';
 import { initAllGradesPageCustomizer } from './allGradesPageCustomizer.js';
 import { initCleanupObservers } from './cleanupObserver.js';
 import { logger } from '../utils/logger.js';
-
-/**
- * Check if current page is a single-course grades page
- * @returns {boolean} True if on single-course grades page
- */
-function isSingleCourseGradesPage() {
-    return (
-        window.location.href.includes('/courses/') &&
-        window.location.pathname.includes('/grades')
-    );
-}
-
-/**
- * Check if current page is the all-grades page
- * @returns {boolean} True if on all-grades page
- */
-function isAllGradesPage() {
-    const path = window.location.pathname;
-    // All-grades page is /grades without /courses/ in the path
-    return path === '/grades' || (path.includes('/grades') && !path.includes('/courses/'));
-}
+import { isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetection.js';
 
 /**
  * Initialize all student grade customizations

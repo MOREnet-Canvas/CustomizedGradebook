@@ -14,6 +14,7 @@ import { AVG_OUTCOME_NAME, REMOVE_ASSIGNMENT_TAB } from '../config.js';
 import { extractCurrentScoreFromPage } from './gradeExtractor.js';
 import { logger } from '../utils/logger.js';
 import { inheritFontStylesFrom } from '../utils/dom.js';
+import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 
 /**
  * Track if customizations have been applied (prevent double-runs)
@@ -87,19 +88,6 @@ function goToLearningMasteryTab() {
         // Tabs mount late sometimes, retry
         setTimeout(goToLearningMasteryTab, 300);
     }
-}
-
-/**
- * Format grade display with score and letter grade
- * @param {string} score - Numeric score (e.g., "2.74")
- * @param {string|null} letterGrade - Letter grade (e.g., "Target")
- * @returns {string} Formatted display string
- */
-function formatGradeDisplay(score, letterGrade) {
-    if (letterGrade) {
-        return `${score} (${letterGrade})`;
-    }
-    return score;
 }
 
 /**

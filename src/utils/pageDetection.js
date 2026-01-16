@@ -1,0 +1,95 @@
+// src/utils/pageDetection.js
+/**
+ * Page Detection Utilities
+ * 
+ * Shared utilities for detecting different Canvas page types across the application.
+ * Used by dashboard, student grade customization, cleanup observer, and other modules.
+ * 
+ * Functions:
+ * - isDashboardPage: Check if on Canvas dashboard
+ * - isAllGradesPage: Check if on all-grades page (/grades)
+ * - isSingleCourseGradesPage: Check if on single course grades page
+ * - isCoursePageNeedingCleanup: Check if on course page that needs grade cleanup
+ */
+
+/**
+ * Check if current page is the Canvas dashboard
+ * 
+ * Matches:
+ * - / (root)
+ * - /dashboard
+ * - /dashboard/*
+ * 
+ * @returns {boolean} True if on dashboard page
+ */
+export function isDashboardPage() {
+    const path = window.location.pathname;
+    return path === "/" || path.startsWith("/dashboard");
+}
+
+/**
+ * Check if current page is the all-grades page
+ * 
+ * Matches:
+ * - /grades (exact)
+ * - Any path with /grades but NOT /courses/ (e.g., /users/123/grades)
+ * 
+ * Does NOT match:
+ * - /courses/123/grades (single course grades page)
+ * 
+ * @returns {boolean} True if on all-grades page
+ */
+export function isAllGradesPage() {
+    const path = window.location.pathname;
+    // All-grades page is /grades without /courses/ in the path
+    return path === '/grades' || (path.includes('/grades') && !path.includes('/courses/'));
+}
+
+/**
+ * Check if current page is a single-course grades page
+ * 
+ * Matches:
+ * - /courses/123/grades
+ * - /courses/123/grades#tab-outcomes
+ * - /courses/123/grades?any=params
+ * 
+ * Does NOT match:
+ * - /grades (all-grades page)
+ * - /courses/123 (course homepage)
+ * 
+ * @returns {boolean} True if on single-course grades page
+ */
+export function isSingleCourseGradesPage() {
+    return (
+        window.location.href.includes('/courses/') &&
+        window.location.pathname.includes('/grades')
+    );
+}
+
+/**
+ * Check if current page is a course page that needs grade cleanup
+ * 
+ * Matches:
+ * - /courses/123/grades (grades page)
+ * - /courses/123/assignments (assignments list)
+ * - /courses/123 (course homepage)
+ * 
+ * Does NOT match:
+ * - /courses/123/modules (modules page)
+ * - /courses/123/settings (settings page)
+ * - Other course sub-pages
+ * 
+ * @returns {boolean} True if page needs cleanup
+ */
+export function isCoursePageNeedingCleanup() {
+    const path = window.location.pathname;
+    return (
+        window.location.href.includes("/courses/") &&
+        (
+            path.includes("/grades") ||
+            path.includes("/assignments") ||
+            /^\/courses\/\d+$/.test(path)
+        )
+    );
+}
+
