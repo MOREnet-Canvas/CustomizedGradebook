@@ -9,6 +9,7 @@
 import { logger } from '../utils/logger.js';
 import { OUTCOME_AND_RUBRIC_RATINGS, DEFAULT_MAX_POINTS } from '../config.js';
 import { GRADE_SOURCE } from './gradeDataService.js';
+import { isValidLetterGrade as validateLetterGrade } from '../utils/courseDetection.js';
 
 /**
  * CSS class prefix for grade elements
@@ -112,22 +113,21 @@ export function findCourseCard(courseId) {
  * Check if letter grade matches any rating description
  * @param {string} letterGrade - Letter grade to check
  * @returns {boolean} True if letter grade matches a rating description
+ * @deprecated Use isValidLetterGrade from utils/courseDetection.js instead
  */
 function isValidLetterGrade(letterGrade) {
+    // Delegate to shared utility function
+    const isValid = validateLetterGrade(letterGrade);
+
+    // Keep existing trace logging for backward compatibility
     if (!letterGrade) {
         logger.trace(`[Letter Grade Validation] letterGrade is empty/null/undefined`);
-        return false;
-    }
+    } else {
+        logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValid ? 'MATCH FOUND' : 'NO MATCH'}`);
 
-    const rating = OUTCOME_AND_RUBRIC_RATINGS.find(
-        r => r.description === letterGrade
-    );
-
-    const isValid = rating !== undefined;
-    logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValid ? 'MATCH FOUND' : 'NO MATCH'}`);
-
-    if (!isValid && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
-        logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description));
+        if (!isValid && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
+            logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description));
+        }
     }
 
     return isValid;

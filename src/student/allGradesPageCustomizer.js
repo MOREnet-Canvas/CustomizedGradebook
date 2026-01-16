@@ -19,18 +19,44 @@
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import {
-    AVG_ASSIGNMENT_NAME,
-    DEFAULT_MAX_POINTS,
-    STANDARDS_BASED_COURSE_PATTERNS,
-    OUTCOME_AND_RUBRIC_RATINGS
-} from '../config.js';
+import { DEFAULT_MAX_POINTS } from '../config.js';
 import { scoreToGradeLevel } from './gradeExtractor.js';
+import {
+    isStandardsBasedCourse,
+    matchesCourseNamePattern
+} from '../utils/courseDetection.js';
 
 /**
  * Track if customizations have been applied
  */
 let processed = false;
+
+/**
+ * Inject CSS to hide original table immediately (prevent flash)
+ */
+function injectHideTableCSS() {
+    // Check if CSS already injected
+    if (document.getElementById('cg-hide-grades-table-css')) {
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'cg-hide-grades-table-css';
+    style.textContent = `
+        /* Hide original Canvas grades table to prevent flash of percentages */
+        table.course_details.student_grades:not([data-customized="true"]) {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Show customized table */
+        #customized-grades-table {
+            opacity: 1 !important;
+        }
+    `;
+    document.head.appendChild(style);
+    logger.trace('[All-Grades] Injected CSS to hide original table');
+}
 
 /**
  * Convert percentage score to point value
@@ -55,183 +81,36 @@ function formatGradeDisplay(score, letterGrade) {
     return scoreStr;
 }
 
-/**
- * Detect if a course uses standards-based grading
- * Checks:
- * 1. Course name patterns (from config)
- * 2. Presence of AVG Assignment
- * 
- * @param {string} courseId - Course ID
- * @param {string} courseName - Course name
- * @param {CanvasApiClient} apiClient - API client instance
- * @returns {Promise<boolean>} True if standards-based
- */
-async function detectStandardsBasedCourse(courseId, courseName, apiClient) {
-    // Check cache first
-    const cacheKey = `standardsBased_${courseId}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached !== null) {
-        return cached === 'true';
-    }
 
-    // 1. Check course name patterns
-    const matchesPattern = STANDARDS_BASED_COURSE_PATTERNS.some(pattern => {
-        if (typeof pattern === 'string') {
-            return courseName.toLowerCase().includes(pattern.toLowerCase());
-        } else if (pattern instanceof RegExp) {
-            return pattern.test(courseName);
-        }
-        return false;
-    });
-
-    if (matchesPattern) {
-        logger.debug(`Course "${courseName}" matches standards-based pattern`);
-        sessionStorage.setItem(cacheKey, 'true');
-        return true;
-    }
-
-    // 2. Check for AVG Assignment
-    try {
-        const assignments = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: AVG_ASSIGNMENT_NAME },
-            'checkAvgAssignment'
-        );
-        
-        const hasAvgAssignment = assignments.some(a => a.name === AVG_ASSIGNMENT_NAME);
-        if (hasAvgAssignment) {
-            logger.debug(`Course "${courseName}" has AVG Assignment`);
-            sessionStorage.setItem(cacheKey, 'true');
-            return true;
-        }
-    } catch (error) {
-        logger.warn(`Could not check assignments for course ${courseId}:`, error.message);
-    }
-
-    // Not standards-based
-    sessionStorage.setItem(cacheKey, 'false');
-    return false;
-}
 
 /**
- * Fetch course grade data using Enrollments API
- * @param {CanvasApiClient} apiClient - API client instance
- * @returns {Promise<Array>} Array of course grade objects
+ * Extract course data from DOM (fast path - no API calls yet)
+ * @returns {Array} Array of course objects with basic info
  */
-async function fetchCourseGradesFromAPI(apiClient) {
-    const startTime = performance.now();
-    
-    try {
-        // Fetch all active student enrollments with grades
-        const enrollments = await apiClient.get(
-            '/api/v1/users/self/enrollments',
-            {
-                'type[]': 'StudentEnrollment',
-                'state[]': 'active',
-                'include[]': 'total_scores'
-            },
-            'fetchAllGrades'
-        );
-
-        logger.debug(`Fetched ${enrollments.length} enrollments in ${(performance.now() - startTime).toFixed(2)}ms`);
-
-        // Process enrollments in parallel
-        const coursePromises = enrollments.map(async (enrollment) => {
-            const courseId = enrollment.course_id?.toString();
-            if (!courseId) return null;
-
-            const grades = enrollment.grades || {};
-            const percentage = grades.current_score ?? grades.final_score ?? null;
-            const canvasLetterGrade = grades.current_grade ?? grades.final_grade ?? null;
-
-            // Get course name
-            let courseName = 'Unknown Course';
-            if (enrollment.course?.name) {
-                courseName = enrollment.course.name;
-            } else {
-                // Fetch course details if not included
-                try {
-                    const course = await apiClient.get(
-                        `/api/v1/courses/${courseId}`,
-                        {},
-                        'getCourseDetails'
-                    );
-                    courseName = course.name || courseName;
-                } catch (error) {
-                    logger.warn(`Could not fetch course name for ${courseId}`);
-                }
-            }
-
-            // Detect if standards-based
-            const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient);
-
-            // Calculate display values
-            let displayScore = percentage;
-            let displayLetterGrade = canvasLetterGrade;
-            let displayType = 'percentage'; // 'percentage' or 'points'
-
-            if (isStandardsBased && percentage !== null) {
-                // Convert percentage to points
-                const pointValue = percentageToPoints(percentage);
-                displayScore = pointValue;
-                displayType = 'points';
-
-                // Calculate letter grade from point value
-                displayLetterGrade = scoreToGradeLevel(pointValue);
-            }
-
-            return {
-                courseId,
-                courseName,
-                percentage,
-                displayScore,
-                displayLetterGrade,
-                displayType,
-                isStandardsBased,
-                courseUrl: `/courses/${courseId}/grades`
-            };
-        });
-
-        const results = await Promise.all(coursePromises);
-        const courses = results.filter(c => c !== null);
-
-        logger.info(`Processed ${courses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
-        return courses;
-
-    } catch (error) {
-        logger.error('Failed to fetch course grades from API:', error);
-        throw error;
-    }
-}
-
-/**
- * Fetch course grade data by parsing DOM (fallback method)
- * @returns {Promise<Array>} Array of course grade objects
- */
-async function fetchCourseGradesFromDOM() {
-    const startTime = performance.now();
-    const apiClient = new CanvasApiClient();
+function extractCoursesFromDOM() {
+    const courses = [];
 
     try {
         // Find the grades table
         const table = document.querySelector('table.course_details.student_grades');
         if (!table) {
-            throw new Error('Grades table not found in DOM');
+            logger.warn('[Hybrid] Grades table not found in DOM');
+            return courses;
         }
 
         // Extract course rows
         const rows = table.querySelectorAll('tbody tr');
-        logger.debug(`Found ${rows.length} course rows in DOM`);
+        logger.debug(`[Hybrid] Found ${rows.length} course rows in DOM`);
 
-        const coursePromises = Array.from(rows).map(async (row) => {
+        for (const row of rows) {
             // Find course link
             const courseLink = row.querySelector('a[href*="/courses/"]');
-            if (!courseLink) return null;
+            if (!courseLink) continue;
 
             const courseName = courseLink.textContent.trim();
             const href = courseLink.getAttribute('href');
             const courseIdMatch = href.match(/\/courses\/(\d+)/);
-            if (!courseIdMatch) return null;
+            if (!courseIdMatch) continue;
 
             const courseId = courseIdMatch[1];
 
@@ -241,66 +120,117 @@ async function fetchCourseGradesFromDOM() {
             const percentageMatch = gradeText.match(/(\d+(?:\.\d+)?)\s*%/);
             const percentage = percentageMatch ? parseFloat(percentageMatch[1]) : null;
 
-            // Detect if standards-based
-            const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient);
+            // Check if course name matches pattern (fast detection)
+            const matchesPattern = matchesCourseNamePattern(courseName);
 
-            // Calculate display values
-            let displayScore = percentage;
-            let displayLetterGrade = null;
-            let displayType = 'percentage';
-
-            if (isStandardsBased && percentage !== null) {
-                const pointValue = percentageToPoints(percentage);
-                displayScore = pointValue;
-                displayType = 'points';
-                displayLetterGrade = scoreToGradeLevel(pointValue);
-            }
-
-            return {
+            courses.push({
                 courseId,
                 courseName,
                 percentage,
-                displayScore,
-                displayLetterGrade,
-                displayType,
-                isStandardsBased,
+                matchesPattern,
                 courseUrl: `/courses/${courseId}/grades`
-            };
-        });
+            });
+        }
 
-        const results = await Promise.all(coursePromises);
-        const courses = results.filter(c => c !== null);
-
-        logger.info(`Processed ${courses.length} courses from DOM in ${(performance.now() - startTime).toFixed(2)}ms`);
+        logger.debug(`[Hybrid] Extracted ${courses.length} courses from DOM`);
         return courses;
 
     } catch (error) {
-        logger.error('Failed to fetch course grades from DOM:', error);
-        throw error;
+        logger.error('[Hybrid] Failed to extract courses from DOM:', error);
+        return courses;
     }
 }
 
 /**
- * Fetch course grade data with fallback strategy
+ * Enrich course data with API verification (for courses not matching patterns)
+ * @param {Array} courses - Array of course objects from DOM
+ * @param {CanvasApiClient} apiClient - API client instance
+ * @returns {Promise<Array>} Array of enriched course objects
+ */
+async function enrichCoursesWithAPI(courses, apiClient) {
+    const startTime = performance.now();
+
+    // Process courses in parallel
+    const enrichedPromises = courses.map(async (course) => {
+        const { courseId, courseName, percentage, matchesPattern } = course;
+
+        // Determine if standards-based
+        let isStandardsBased = matchesPattern;
+
+        // If not matching pattern, verify with API
+        if (!matchesPattern) {
+            isStandardsBased = await isStandardsBasedCourse({
+                courseId,
+                courseName,
+                apiClient,
+                skipApiCheck: false
+            });
+        } else {
+            // Cache the pattern match result
+            const cacheKey = `standardsBased_${courseId}`;
+            sessionStorage.setItem(cacheKey, 'true');
+        }
+
+        // Calculate display values
+        let displayScore = percentage;
+        let displayLetterGrade = null;
+        let displayType = 'percentage';
+
+        if (isStandardsBased && percentage !== null) {
+            // Convert percentage to points
+            const pointValue = percentageToPoints(percentage);
+            displayScore = pointValue;
+            displayType = 'points';
+            displayLetterGrade = scoreToGradeLevel(pointValue);
+        }
+
+        return {
+            ...course,
+            displayScore,
+            displayLetterGrade,
+            displayType,
+            isStandardsBased
+        };
+    });
+
+    const enrichedCourses = await Promise.all(enrichedPromises);
+
+    logger.info(`[Hybrid] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
+    return enrichedCourses;
+}
+
+/**
+ * Fetch course grade data using hybrid strategy
+ * 1. Extract courses from DOM immediately (fast)
+ * 2. For courses matching patterns, show converted grades immediately
+ * 3. For other courses, verify with API in background
+ *
  * @returns {Promise<Array>} Array of course grade objects
  */
 async function fetchCourseGrades() {
+    const startTime = performance.now();
     const apiClient = new CanvasApiClient();
 
     try {
-        // Try API approach first
-        logger.debug('Fetching course grades via Enrollments API...');
-        return await fetchCourseGradesFromAPI(apiClient);
-    } catch (error) {
-        logger.warn('API approach failed, falling back to DOM parsing:', error.message);
+        // Step 1: Extract courses from DOM (fast - no API calls)
+        logger.debug('[Hybrid] Step 1: Extracting courses from DOM...');
+        const courses = extractCoursesFromDOM();
 
-        try {
-            // Fallback to DOM parsing
-            return await fetchCourseGradesFromDOM();
-        } catch (domError) {
-            logger.error('Both API and DOM approaches failed:', domError);
-            throw new Error('Could not fetch course grades');
+        if (courses.length === 0) {
+            throw new Error('No courses found in DOM');
         }
+
+        logger.debug(`[Hybrid] Step 2: Enriching ${courses.length} courses with API verification...`);
+
+        // Step 2: Enrich with API verification
+        const enrichedCourses = await enrichCoursesWithAPI(courses, apiClient);
+
+        logger.info(`[Hybrid] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
+        return enrichedCourses;
+
+    } catch (error) {
+        logger.error('[Hybrid] Failed to fetch course grades:', error);
+        throw error;
     }
 }
 
@@ -314,13 +244,12 @@ function createGradesTable(courses) {
     table.className = 'ic-Table ic-Table--hover-row ic-Table--striped customized-grades-table';
     table.style.cssText = 'width: 100%; margin-top: 1rem;';
 
-    // Create table header
+    // Create table header (removed Type column per requirements)
     const thead = document.createElement('thead');
     thead.innerHTML = `
         <tr>
             <th class="ic-Table-header" style="text-align: left; padding: 0.75rem;">Course</th>
             <th class="ic-Table-header" style="text-align: right; padding: 0.75rem;">Grade</th>
-            <th class="ic-Table-header" style="text-align: center; padding: 0.75rem;">Type</th>
         </tr>
     `;
     table.appendChild(thead);
@@ -370,30 +299,11 @@ function createGradesTable(courses) {
             gradeCell.style.color = '#73818C'; // Gray for no grade
         }
 
-        // Type cell
-        const typeCell = document.createElement('td');
-        typeCell.className = 'ic-Table-cell';
-        typeCell.style.cssText = 'text-align: center; padding: 0.75rem; font-size: 0.875rem;';
-
-        if (course.isStandardsBased) {
-            const badge = document.createElement('span');
-            badge.textContent = 'Standards';
-            badge.style.cssText = `
-                background-color: #E5F3ED;
-                color: #0B874B;
-                padding: 0.25rem 0.5rem;
-                border-radius: 0.25rem;
-                font-weight: 600;
-            `;
-            typeCell.appendChild(badge);
-        } else {
-            typeCell.textContent = 'Traditional';
-            typeCell.style.color = '#73818C';
-        }
+        // Log course type for debugging (Type column removed from display)
+        logger.trace(`[Table] ${course.courseName}: ${course.isStandardsBased ? 'Standards-Based' : 'Traditional'}`);
 
         row.appendChild(nameCell);
         row.appendChild(gradeCell);
-        row.appendChild(typeCell);
         tbody.appendChild(row);
     }
 
@@ -413,7 +323,14 @@ function replaceGradesTable(courses) {
         return;
     }
 
-    // Hide original table
+    // Remove any existing customized table (prevent duplicates)
+    const existingCustomTable = document.getElementById('customized-grades-table');
+    if (existingCustomTable) {
+        logger.debug('Removing existing customized table to prevent duplicates');
+        existingCustomTable.remove();
+    }
+
+    // Hide original table and mark as customized
     originalTable.style.display = 'none';
     originalTable.dataset.customized = 'true';
 
@@ -469,6 +386,9 @@ async function applyCustomizations() {
  */
 export function initAllGradesPageCustomizer() {
     logger.debug('Initializing all-grades page customizer');
+
+    // Inject CSS immediately to prevent flash of percentages
+    injectHideTableCSS();
 
     // Try immediately
     applyCustomizations();
