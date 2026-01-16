@@ -9,6 +9,7 @@ then push
 For checking version in DevTools: CG.version
 
 Student-Facing Grades Display Normalization
+ - on dashboard --> grades:  [ERROR] Course ID not found on page.
 Also for per student grade page as teacher
 zero points assignment toggle
 rubric / grade box scoring

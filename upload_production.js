@@ -60,9 +60,12 @@
 
     const script = document.createElement("script");
     script.id = "cg_prod_bundle";
-    const cacheBuster = Date.now();
+    // const cacheBuster = Date.now();
+    //
+    // script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/prod/customGradebookInit.js?v=${cacheBuster}`;
+    const VERSION = "v1.0.0"; // bump per release
+    script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/${VERSION}/customGradebookInit.js`;
 
-    script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/prod/customGradebookInit.js?v=${cacheBuster}`;
     script.onload = () => console.log("[CG] Loaded customGradebookInit.js (PROD)");
     script.onerror = () => console.error("[CG] Failed to load customGradebookInit.js (PROD)");
     document.head.appendChild(script);
