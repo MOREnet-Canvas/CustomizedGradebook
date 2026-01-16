@@ -239,6 +239,8 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             skipApiCheck: false
         });
 
+        logger.trace(`[Hybrid] Detection result for "${courseName}": isStandardsBased=${isStandardsBased}`);
+
         // Calculate display values
         let displayScore = percentage;
         let displayLetterGrade = null;
@@ -254,9 +256,13 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             displayLetterGrade = apiLetterGrade || scoreToGradeLevel(pointValue);
 
             logger.trace(`[Hybrid] Standards-based course: ${courseName}, percentage=${percentage}%, points=${pointValue.toFixed(2)}, letterGrade=${displayLetterGrade} (from ${apiLetterGrade ? 'API' : 'calculation'})`);
+        } else if (isStandardsBased && percentage === null) {
+            logger.trace(`[Hybrid] Course "${courseName}" is standards-based but has no percentage grade`);
+        } else {
+            logger.trace(`[Hybrid] Traditional course: ${courseName}, percentage=${percentage}%`);
         }
 
-        logger.trace(`[Hybrid] Course ${courseName}: percentage=${percentage}, displayScore=${displayScore}, type=${displayType}, source=${gradeSource}`);
+        logger.trace(`[Hybrid] Final values for "${courseName}": displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
 
         return {
             ...course,
@@ -397,18 +403,21 @@ function createGradesTable(courses) {
                 // Standards-based: show points with letter grade
                 gradeCell.textContent = formatGradeDisplay(course.displayScore, course.displayLetterGrade);
                 gradeCell.style.color = '#0B874B'; // Green for standards-based
+                logger.trace(`[Table] ${course.courseName}: Rendering as SBG (${course.displayScore.toFixed(2)} ${course.displayLetterGrade})`);
             } else {
                 // Traditional: show percentage
                 gradeCell.textContent = `${course.displayScore.toFixed(2)}%`;
                 gradeCell.style.color = '#2D3B45'; // Default color
+                logger.trace(`[Table] ${course.courseName}: Rendering as traditional (${course.displayScore.toFixed(2)}%)`);
             }
         } else {
             gradeCell.textContent = 'N/A';
             gradeCell.style.color = '#73818C'; // Gray for no grade
+            logger.trace(`[Table] ${course.courseName}: No grade available`);
         }
 
-        // Log course type for debugging (Type column removed from display)
-        logger.trace(`[Table] ${course.courseName}: ${course.isStandardsBased ? 'Standards-Based' : 'Traditional'}`);
+        // Log detailed course data for debugging
+        logger.trace(`[Table] ${course.courseName} details: isStandardsBased=${course.isStandardsBased}, displayType=${course.displayType}, displayScore=${course.displayScore}`);
 
         row.appendChild(nameCell);
         row.appendChild(gradeCell);

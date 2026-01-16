@@ -189,3 +189,20 @@ export function clearDetectionCache(courseId = null) {
     }
 }
 
+/**
+ * Debug function to show all cached detection results
+ * Useful for troubleshooting cache issues
+ * @returns {Object} Map of courseId -> cached value
+ */
+export function debugDetectionCache() {
+    const cached = {};
+    Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('standardsBased_')) {
+            const courseId = key.replace('standardsBased_', '');
+            cached[courseId] = sessionStorage.getItem(key);
+        }
+    });
+    logger.info('[Detection] Cached detection results:', cached);
+    return cached;
+}
+
