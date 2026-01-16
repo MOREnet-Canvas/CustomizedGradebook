@@ -96,11 +96,27 @@ export function startCleanupObservers() {
 }
 
 /**
+ * Check if current page is the all-grades page
+ * @returns {boolean} True if on all-grades page
+ */
+function isAllGradesPage() {
+    const path = window.location.pathname;
+    return path === '/grades' || (path.includes('/grades') && !path.includes('/courses/'));
+}
+
+/**
  * Initialize cleanup observers based on page context
  * For dashboard: always run
  * For course pages: only run if course has AVG assignment
+ * For all-grades page: skip (no course ID available)
  */
 export async function initCleanupObservers() {
+    // Skip all-grades page (no course ID available)
+    if (isAllGradesPage()) {
+        logger.trace('Skipping cleanup observers on all-grades page (no course context)');
+        return;
+    }
+
     if (isDashboardPage()) {
         // Dashboard: always allow cleanup
         // The removeFractionScores() function will only rewrite scores
