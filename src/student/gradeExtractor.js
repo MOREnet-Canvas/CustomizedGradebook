@@ -8,6 +8,7 @@
 
 import { AVG_ASSIGNMENT_NAME, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { extractCourseIdFromHref } from '../utils/canvas.js';
 
 /**
  * Convert a numeric score to a grade level description
@@ -128,15 +129,5 @@ export function extractCurrentScoreFromPage() {
 
     logger.trace(`No ${AVG_ASSIGNMENT_NAME} found on page`);
     return null;
-}
-
-/**
- * Extract course ID from a href attribute
- * @param {string} href - The href value (e.g., "/courses/512/grades/190")
- * @returns {string|null} The course ID or null if not found
- */
-export function extractCourseIdFromHref(href) {
-    const match = href.match(/^\/courses\/(\d+)\b/);
-    return match ? match[1] : null;
 }
 

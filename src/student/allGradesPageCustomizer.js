@@ -25,6 +25,7 @@ import {
     matchesCourseNamePattern
 } from '../utils/courseDetection.js';
 import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
+import { extractCourseIdFromHref } from '../utils/canvas.js';
 
 /**
  * Track if customizations have been applied
@@ -84,10 +85,8 @@ function extractCoursesFromDOM() {
 
             const courseName = courseLink.textContent.trim();
             const href = courseLink.getAttribute('href');
-            const courseIdMatch = href.match(/\/courses\/(\d+)/);
-            if (!courseIdMatch) continue;
-
-            const courseId = courseIdMatch[1];
+            const courseId = extractCourseIdFromHref(href);
+            if (!courseId) continue;
 
             // Extract grade percentage from .percent cell
             const gradeCell = row.querySelector('.percent');
