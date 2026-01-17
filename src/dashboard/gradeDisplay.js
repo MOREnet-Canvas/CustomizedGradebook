@@ -22,6 +22,7 @@ import {
     findCourseCard,
     looksLikeDashboardCard
 } from './cardSelectors.js';
+import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 
 /**
  * Track if initialization has been attempted
@@ -292,8 +293,13 @@ function setupDashboardObserver() {
         dashboardObserver.disconnect();
     }
 
+    // Observe the dashboard container
+    const dashboardContainer = document.querySelector('#dashboard') ||
+                              document.querySelector('#content') ||
+                              document.body;
+
     // Create new observer
-    dashboardObserver = new MutationObserver((mutations) => {
+    dashboardObserver = createPersistentObserver((mutations) => {
         // Check if dashboard cards were added
         const cardsAdded = mutations.some(mutation => {
             return Array.from(mutation.addedNodes).some(node => {
@@ -306,16 +312,10 @@ function setupDashboardObserver() {
             logger.trace('Dashboard cards detected via MutationObserver, updating grades');
             updateAllCourseCards();
         }
-    });
-
-    // Observe the dashboard container
-    const dashboardContainer = document.querySelector('#dashboard') ||
-                              document.querySelector('#content') ||
-                              document.body;
-
-    dashboardObserver.observe(dashboardContainer, {
-        childList: true,
-        subtree: true
+    }, {
+        config: OBSERVER_CONFIGS.CHILD_LIST,
+        target: dashboardContainer,
+        name: 'DashboardGradeDisplay'
     });
 
     logger.trace('Dashboard observer setup complete, observing:', dashboardContainer.id || dashboardContainer.tagName);

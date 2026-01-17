@@ -14,6 +14,7 @@ import { AVG_OUTCOME_NAME, REMOVE_ASSIGNMENT_TAB } from '../config.js';
 import { extractCurrentScoreFromPage } from './gradeExtractor.js';
 import { logger } from '../utils/logger.js';
 import { inheritFontStylesFrom } from '../utils/dom.js';
+import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 
 /**
@@ -209,24 +210,18 @@ export function initGradePageCustomizer() {
 
     // If content is lazy-loaded, observe and retry when score appears
     if (!didRun) {
-        const obs = new MutationObserver(() => {
-            if (runOnce()) {
-                obs.disconnect();
+        createConditionalObserver(() => {
+            const success = runOnce();
+            if (success) {
                 logger.debug('Student grade customization applied after DOM updates');
             }
+            return success; // Disconnect when successful
+        }, {
+            timeout: 30000,
+            config: OBSERVER_CONFIGS.CHILD_LIST_AND_ATTRIBUTES,
+            target: document.body,
+            name: 'GradePageCustomizer'
         });
-
-        obs.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true
-        });
-
-        // Safety stop after 30s
-        setTimeout(() => {
-            obs.disconnect();
-            logger.trace('Student grade customization observer disconnected (timeout)');
-        }, 30000);
     }
 }
 

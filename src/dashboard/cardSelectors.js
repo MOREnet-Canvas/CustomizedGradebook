@@ -11,6 +11,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { extractCourseLinks } from '../utils/domExtractors.js';
 
 /**
  * Selectors for finding dashboard card elements
@@ -115,21 +116,10 @@ export function findDashboardCards() {
     }
 
     // Last resort: look for any links to /courses/ on the dashboard
-    const courseLinks = document.querySelectorAll('a[href*="/courses/"]');
-    if (courseLinks.length > 0) {
-        logger.trace(`Found ${courseLinks.length} course links as fallback`);
-        // Filter to only dashboard area (not global navigation)
-        const dashboardLinks = Array.from(courseLinks).filter(link => {
-            const isDashboardArea = !link.closest('.ic-app-header') &&
-                                   !link.closest('[role="navigation"]') &&
-                                   !link.closest('.menu');
-            return isDashboardArea;
-        });
-
-        if (dashboardLinks.length > 0) {
-            logger.trace(`Found ${dashboardLinks.length} dashboard course links`);
-            return dashboardLinks;
-        }
+    const dashboardLinks = extractCourseLinks(document.body, true);
+    if (dashboardLinks.length > 0) {
+        logger.trace(`Found ${dashboardLinks.length} dashboard course links`);
+        return dashboardLinks;
     }
 
     logger.trace('No dashboard cards found with any selector');
@@ -176,14 +166,13 @@ export function findCourseCard(courseId) {
     }
 
     // Strategy 3: Look for course link and use its parent structure
-    for (const link of links) {
-        // Skip navigation links
-        if (link.closest('.ic-app-header') ||
-            link.closest('[role="navigation"]') ||
-            link.closest('.menu')) {
-            continue;
-        }
+    // Use shared utility to filter out navigation links
+    const dashboardLinks = extractCourseLinks(document.body, true).filter(link => {
+        const href = link.getAttribute('href');
+        return href && href.includes(courseUrl);
+    });
 
+    for (const link of dashboardLinks) {
         // The link itself or a close parent might be the card
         // Try a few levels up
         let parent = link;

@@ -13,6 +13,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 
 /**
  * Track if initialization has been attempted
@@ -67,9 +68,14 @@ function setupGradingDropdownObserver() {
     if (gradingDropdownObserver) {
         gradingDropdownObserver.disconnect();
     }
-    
-    // Create new observer
-    gradingDropdownObserver = new MutationObserver((mutations) => {
+
+    // Create new observer with custom attribute filter
+    const customConfig = {
+        ...OBSERVER_CONFIGS.CHILD_LIST_AND_ATTRIBUTES,
+        attributeFilter: ['disabled', 'readonly', 'aria-disabled', 'class']
+    };
+
+    gradingDropdownObserver = createPersistentObserver((mutations) => {
         mutations.forEach((mutation) => {
             // Handle new nodes being added to the DOM
             if (mutation.type === 'childList') {
@@ -95,17 +101,11 @@ function setupGradingDropdownObserver() {
                 activateGradingDropdown();
             }
         });
+    }, {
+        config: customConfig,
+        target: document.body,
+        name: 'GradingDropdownObserver'
     });
-    
-    // Observe the entire document body for changes
-    gradingDropdownObserver.observe(document.body, {
-        childList: true,      // Watch for nodes being added/removed
-        subtree: true,        // Watch all descendants, not just direct children
-        attributes: true,     // Watch for attribute changes
-        attributeFilter: ['disabled', 'readonly', 'aria-disabled', 'class']  // Only watch these attributes
-    });
-    
-    logger.trace('Grading dropdown observer setup complete');
 }
 
 /**

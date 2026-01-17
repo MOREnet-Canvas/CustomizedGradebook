@@ -21,7 +21,7 @@ import { logger } from '../utils/logger.js';
 import { AVG_ASSIGNMENT_NAME, AVG_OUTCOME_NAME, STANDARDS_BASED_COURSE_PATTERNS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { matchesCourseNamePattern } from '../utils/courseDetection.js';
-import { extractCourseIdFromHref } from '../utils/canvas.js';
+import { extractCourseDataFromRow, findTableRows } from '../utils/domExtractors.js';
 
 /**
  * Approach 1: DOM Parsing + Individual Course API Calls
@@ -37,14 +37,12 @@ async function testDOMParsingApproach() {
     };
 
     try {
-        // Find the grades table
-        const table = document.querySelector('table.course_details.student_grades');
-        if (!table) {
-            throw new Error('Grades table not found');
+        // Use shared DOM extraction utility to find table rows
+        const rows = findTableRows();
+        if (rows.length === 0) {
+            throw new Error('Grades table not found or has no rows');
         }
 
-        // Extract course rows
-        const rows = table.querySelectorAll('tbody tr');
         logger.info(`[DOM Approach] Found ${rows.length} course rows`);
 
         const apiClient = new CanvasApiClient();
@@ -85,20 +83,11 @@ async function testDOMParsingApproach() {
  * Extract course data from a table row
  */
 async function extractCourseFromRow(row, apiClient) {
-    // Find course link
-    const courseLink = row.querySelector('a[href*="/courses/"]');
-    if (!courseLink) return null;
+    // Use shared DOM extraction utility
+    const courseData = extractCourseDataFromRow(row);
+    if (!courseData) return null;
 
-    const courseName = courseLink.textContent.trim();
-    const href = courseLink.getAttribute('href');
-    const courseId = extractCourseIdFromHref(href);
-    if (!courseId) return null;
-
-    // Extract grade percentage
-    const gradeCell = row.querySelector('.grade');
-    const gradeText = gradeCell?.textContent.trim() || '';
-    const percentageMatch = gradeText.match(/(\d+(?:\.\d+)?)\s*%/);
-    const percentage = percentageMatch ? parseFloat(percentageMatch[1]) : null;
+    const { courseId, courseName, percentage } = courseData;
 
     // Detect if standards-based
     const detectionStart = performance.now();

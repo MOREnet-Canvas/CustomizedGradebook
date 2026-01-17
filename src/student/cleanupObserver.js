@@ -14,6 +14,7 @@ import { courseHasAvgAssignment } from '../utils/canvas.js';
 import { logger } from '../utils/logger.js';
 import { isDashboardPage, isAllGradesPage, isCoursePageNeedingCleanup } from '../utils/pageDetection.js';
 import { debounce } from '../utils/dom.js';
+import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 
 /**
  * Check if current page should have cleanup applied
@@ -40,20 +41,18 @@ export function startCleanupObservers() {
     // Initial call after slight delay so Canvas can render
     setTimeout(() => {
         debouncedClean();
-        
-        const observer = new MutationObserver(() => {
-            debouncedClean();
-        });
-        
+
         // Only start observing if we're actually on a page we care about
         if (shouldClean()) {
-            observer.observe(document.body, { 
-                childList: true, 
-                subtree: true 
+            createPersistentObserver(() => {
+                debouncedClean();
+            }, {
+                config: OBSERVER_CONFIGS.CHILD_LIST,
+                target: document.body,
+                name: 'GradeCleanupObserver'
             });
-            logger.debug('MutationObserver started for grade cleanup');
         }
-        
+
         // Also handle SPA-style URL changes (tab switches, /grades → /grades#tab-outcomes, etc.)
         let lastUrl = location.href;
         setInterval(() => {
@@ -62,7 +61,7 @@ export function startCleanupObservers() {
                 debouncedClean();
             }
         }, 1000);
-        
+
     }, 500);
 }
 

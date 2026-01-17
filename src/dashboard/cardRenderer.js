@@ -9,8 +9,7 @@
 import { logger } from '../utils/logger.js';
 import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { GRADE_SOURCE } from './gradeDataService.js';
-import { isValidLetterGrade as validateLetterGrade } from '../utils/courseDetection.js';
-import { percentageToPoints } from '../utils/gradeFormatting.js';
+import { calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
 import { HERO_SELECTORS, findCourseCard } from './cardSelectors.js';
 
 /**
@@ -32,72 +31,18 @@ function formatGradeDisplay(gradeData) {
 
     logger.trace(`[Grade Conversion Debug] Formatting grade data: source=${source}, score=${score}, letterGrade=${letterGrade}`);
 
-    let displayValue;
-    let ariaLabel;
+    // Map GRADE_SOURCE to DISPLAY_SOURCE
+    const displaySource = source === GRADE_SOURCE.ASSIGNMENT
+        ? DISPLAY_SOURCE.ASSIGNMENT
+        : DISPLAY_SOURCE.ENROLLMENT;
 
-    if (source === GRADE_SOURCE.ASSIGNMENT) {
-        // AVG assignment: 0-4 scale, show with 2 decimals and letter grade if available
-        const scoreStr = score.toFixed(2);
-        if (letterGrade) {
-            displayValue = `${scoreStr} (${letterGrade})`;
-            ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
-        } else {
-            displayValue = scoreStr;
-            ariaLabel = `Grade: ${scoreStr}`;
-        }
-        logger.trace(`[Grade Conversion Debug] Assignment grade: display=${displayValue}`);
-    } else if (source === GRADE_SOURCE.ENROLLMENT) {
-        // Enrollment grade: convert to point value if letter grade matches rating scale
-        // Otherwise fall back to percentage display
-        const isValidGrade = validateLetterGrade(letterGrade);
-
-        // Trace logging for debugging
-        if (!letterGrade) {
-            logger.trace(`[Letter Grade Validation] letterGrade is empty/null/undefined`);
-        } else {
-            logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValidGrade ? 'MATCH FOUND' : 'NO MATCH'}`);
-            if (!isValidGrade && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
-                logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description));
-            }
-        }
-
-        logger.trace(`[Grade Conversion Debug] isValidLetterGrade("${letterGrade}") = ${isValidGrade}`);
-
-        if (isValidGrade) {
-            // Letter grade matches rating scale - calculate and display as point value
-            // Formula: (percentageScore / 100) * DEFAULT_MAX_POINTS
-            const pointValue = percentageToPoints(score);
-            const scoreStr = pointValue.toFixed(2);
-            displayValue = `${scoreStr} (${letterGrade})`;
-            ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
-            logger.trace(`[Grade Conversion Debug] Converted to points: ${score}% -> ${pointValue} -> display="${displayValue}"`);
-        } else {
-            // Letter grade doesn't match or is missing - display as percentage
-            const percentageStr = `${score.toFixed(2)}%`;
-            if (letterGrade) {
-                displayValue = `${percentageStr} (${letterGrade})`;
-                ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
-                logger.trace(`[Grade Conversion Debug] Letter grade "${letterGrade}" not in rating scale, using percentage: display="${displayValue}"`);
-            } else {
-                displayValue = percentageStr;
-                ariaLabel = `Grade: ${percentageStr}`;
-                logger.trace(`[Grade Conversion Debug] No letter grade, using percentage: display="${displayValue}"`);
-            }
-        }
-    } else {
-        // Unknown source - should not happen, but handle gracefully
-        logger.warn(`[Grade Conversion Debug] Unknown grade source: ${source}`);
-        const percentageStr = `${score.toFixed(2)}%`;
-        if (letterGrade) {
-            displayValue = `${percentageStr} (${letterGrade})`;
-            ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
-        } else {
-            displayValue = percentageStr;
-            ariaLabel = `Grade: ${percentageStr}`;
-        }
-    }
-
-    return { displayValue, ariaLabel };
+    // Use shared display calculation
+    return calculateDisplayValue({
+        score,
+        letterGrade,
+        source: displaySource,
+        includeAriaLabel: true
+    });
 }
 
 /**
