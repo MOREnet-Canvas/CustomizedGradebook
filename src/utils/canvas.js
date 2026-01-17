@@ -2,9 +2,34 @@
 import { AVG_ASSIGNMENT_NAME } from "../config.js";
 import { logger } from "./logger.js";
 
+/**
+ * Extract course ID from a Canvas URL or href
+ *
+ * Examples:
+ * - "/courses/512/grades" => "512"
+ * - "/courses/123" => "123"
+ * - "/courses/456/assignments/789" => "456"
+ *
+ * @param {string} href - URL or href containing course ID
+ * @returns {string|null} Course ID or null if not found
+ */
+export function extractCourseIdFromHref(href) {
+    const match = href.match(/^\/courses\/(\d+)\b/);
+    return match ? match[1] : null;
+}
+
+/**
+ * Get the current course ID from the page
+ *
+ * Tries two methods:
+ * 1. ENV.COURSE_ID (Canvas global variable)
+ * 2. Extract from URL pathname
+ *
+ * @returns {string|null} Course ID or null if not found
+ */
 export function getCourseId() {
     const envCourseId = ENV?.COURSE_ID;
-    const pathCourseId = window.location.pathname.match(/courses\/(\d+)/)?.[1] ?? null;
+    const pathCourseId = extractCourseIdFromHref(window.location.pathname);
     const courseId = envCourseId || pathCourseId;
 
     if (!courseId) {

@@ -18,7 +18,10 @@ TODO: Make sure there isn't an option for notifying students of updates in the a
 TODO: option to zero out points possible toggle.
 TODO: Explore ways to speed up Dashboard grade loading times
 TODO: Is there a safe way to cache the gradebook data for students?
-
+TODO: Is there any better way to get rid of the grades page flashing? - change hyperlink?
+TODO: When no avg_assignment course grade page doesn't remove /4
+TODO: Teacher dashboard console says student role not found, but it still searchs through courses, another debug
+    message says no active student classes found.
 possible changes:
 - add spinner instead of timer
 - grey out button if process is already running

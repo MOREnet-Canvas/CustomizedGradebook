@@ -11,104 +11,12 @@ import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { GRADE_SOURCE } from './gradeDataService.js';
 import { isValidLetterGrade as validateLetterGrade } from '../utils/courseDetection.js';
 import { percentageToPoints } from '../utils/gradeFormatting.js';
+import { HERO_SELECTORS, findCourseCard } from './cardSelectors.js';
 
 /**
  * CSS class prefix for grade elements
  */
 const GRADE_CLASS_PREFIX = 'cg-dashboard-grade';
-
-/**
- * Selectors for finding dashboard card elements
- * Ordered by specificity and reliability
- */
-const CARD_SELECTORS = [
-    '.ic-DashboardCard',
-    '[class*="DashboardCard"]',
-    '[class*="CourseCard"]',
-    '.course-list-item',
-    '.dashboard-card'
-];
-
-/**
- * Selectors for finding hero/header containers within cards
- * Ordered by preference for badge placement
- */
-const HERO_SELECTORS = [
-    '.ic-DashboardCard__header_hero',
-    '[class*="hero"]',
-    '[class*="Hero"]',
-    '.ic-DashboardCard__header',
-    '[class*="header"]',
-    '[class*="Header"]'
-];
-
-/**
- * Find dashboard card element for a course
- * Uses multiple strategies to locate the card
- * @param {string} courseId - Course ID
- * @returns {HTMLElement|null} Card element or null if not found
- */
-export function findCourseCard(courseId) {
-    // Strategy 1: Try data-course-id attribute (older Canvas)
-    let card = document.querySelector(`[data-course-id="${courseId}"]`);
-    if (card) {
-        logger.trace(`Found card for course ${courseId} using data-course-id`);
-        return card;
-    }
-
-    // Strategy 2: Try finding by href to course using selector array
-    const courseUrl = `/courses/${courseId}`;
-    const links = document.querySelectorAll(`a[href*="${courseUrl}"]`);
-
-    for (const link of links) {
-        // Try each card selector to find the closest card-like container
-        for (const selector of CARD_SELECTORS) {
-            const cardContainer = link.closest(selector);
-
-            if (cardContainer) {
-                // Verify this is actually for the right course
-                const cardLink = cardContainer.querySelector(`a[href*="${courseUrl}"]`);
-                if (cardLink) {
-                    logger.trace(`Found card for course ${courseId} using href strategy with selector: ${selector}`);
-                    return cardContainer;
-                }
-            }
-        }
-    }
-
-    // Strategy 3: Look for course link and use its parent structure
-    for (const link of links) {
-        // Skip navigation links
-        if (link.closest('.ic-app-header') ||
-            link.closest('[role="navigation"]') ||
-            link.closest('.menu')) {
-            continue;
-        }
-
-        // The link itself or a close parent might be the card
-        // Try a few levels up
-        let parent = link;
-        for (let i = 0; i < 5; i++) {
-            parent = parent.parentElement;
-            if (!parent) break;
-
-            // Check if this looks like a card container
-            const hasCardClass = parent.className && (
-                parent.className.includes('Card') ||
-                parent.className.includes('card') ||
-                parent.className.includes('course')
-            );
-
-            if (hasCardClass) {
-                logger.trace(`Found card for course ${courseId} using parent traversal`);
-                return parent;
-            }
-        }
-    }
-
-    logger.trace(`Dashboard card not found for course ${courseId}`);
-    return null;
-}
 
 /**
  * Format grade data for display

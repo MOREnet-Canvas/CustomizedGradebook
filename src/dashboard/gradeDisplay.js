@@ -15,7 +15,13 @@
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { getCourseGrade, preCacheEnrollmentGrades } from './gradeDataService.js';
-import { findCourseCard, renderGradeOnCard } from './cardRenderer.js';
+import { renderGradeOnCard } from './cardRenderer.js';
+import {
+    getDashboardCardSelectors,
+    findDashboardCards,
+    findCourseCard,
+    looksLikeDashboardCard
+} from './cardSelectors.js';
 
 /**
  * Track if initialization has been attempted
@@ -235,60 +241,6 @@ async function updateAllCourseCards() {
 }
 
 /**
- * Get all possible selectors for Canvas dashboard cards
- * Canvas uses different selectors depending on version/theme
- * @returns {string[]} Array of CSS selectors to try
- */
-function getDashboardCardSelectors() {
-    return [
-        '[data-course-id]',                    // Older Canvas versions
-        '.ic-DashboardCard',                   // Common Canvas class
-        '[class*="DashboardCard"]',            // Any class containing DashboardCard
-        '.course-list-item',                   // Alternative Canvas layout
-        '[class*="CourseCard"]',               // Modern Canvas
-        'div[id^="dashboard_card_"]',          // ID-based cards
-        '.dashboard-card',                     // Lowercase variant
-    ];
-}
-
-/**
- * Find dashboard cards using multiple selector strategies
- * @returns {NodeList|null} Dashboard card elements or null
- */
-function findDashboardCards() {
-    const selectors = getDashboardCardSelectors();
-
-    for (const selector of selectors) {
-        const cards = document.querySelectorAll(selector);
-        if (cards.length > 0) {
-            logger.trace(`Found ${cards.length} dashboard cards using selector: ${selector}`);
-            return cards;
-        }
-    }
-
-    // Last resort: look for any links to /courses/ on the dashboard
-    const courseLinks = document.querySelectorAll('a[href*="/courses/"]');
-    if (courseLinks.length > 0) {
-        logger.trace(`Found ${courseLinks.length} course links as fallback`);
-        // Filter to only dashboard area (not global navigation)
-        const dashboardLinks = Array.from(courseLinks).filter(link => {
-            const isDashboardArea = !link.closest('.ic-app-header') &&
-                                   !link.closest('[role="navigation"]') &&
-                                   !link.closest('.menu');
-            return isDashboardArea;
-        });
-
-        if (dashboardLinks.length > 0) {
-            logger.trace(`Found ${dashboardLinks.length} dashboard course links`);
-            return dashboardLinks;
-        }
-    }
-
-    logger.trace('No dashboard cards found with any selector');
-    return null;
-}
-
-/**
  * Wait for dashboard cards to be loaded in the DOM
  * @param {number} maxWaitMs - Maximum time to wait in milliseconds
  * @returns {Promise<boolean>} True if cards found, false if timeout
@@ -328,38 +280,6 @@ function waitForDashboardCards(maxWaitMs = 5000) {
 
         checkCards();
     });
-}
-
-/**
- * Check if a node looks like a dashboard card
- * @param {Node} node - DOM node to check
- * @returns {boolean} True if node appears to be a dashboard card
- */
-function looksLikeDashboardCard(node) {
-    if (node.nodeType !== Node.ELEMENT_NODE) return false;
-
-    const element = node;
-
-    // Check for data-course-id attribute
-    if (element.hasAttribute?.('data-course-id')) return true;
-
-    // Check for dashboard card classes
-    const className = element.className || '';
-    if (typeof className === 'string') {
-        if (className.includes('DashboardCard') ||
-            className.includes('CourseCard') ||
-            className.includes('course-list-item') ||
-            className.includes('dashboard-card')) {
-            return true;
-        }
-    }
-
-    // Check if it contains course links
-    if (element.querySelector?.('a[href*="/courses/"]')) {
-        return true;
-    }
-
-    return false;
 }
 
 /**

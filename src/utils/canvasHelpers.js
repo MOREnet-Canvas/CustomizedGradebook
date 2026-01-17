@@ -1,15 +1,15 @@
 // src/utils/canvasHelpers.js
 /**
  * Canvas-Specific Helper Functions
- * 
+ *
  * This module contains utility functions specific to Canvas LMS:
  * - Finding assignments by name
- * - Extracting course IDs from URLs
  * - Extracting scores from the DOM
  */
 
 import { AVG_ASSIGNMENT_NAME } from "../config.js";
 import { logger } from "./logger.js";
+import { extractCourseIdFromHref } from "./canvas.js";
 
 /**
  * Get the assignment ID for the average assignment by name
@@ -23,16 +23,6 @@ export async function getAssignmentId(courseId) {
 
     const avgAssignment = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
     return avgAssignment ? avgAssignment.id : null;
-}
-
-/**
- * Extract course ID from a Canvas URL
- * @param {string} href - URL like "/courses/512/grades/190"
- * @returns {string|null} Course ID or null if not found
- */
-export function extractCourseIdFromHref(href) {
-    const m = href.match(/^\/courses\/(\d+)\b/);
-    return m ? m[1] : null;
 }
 
 /**

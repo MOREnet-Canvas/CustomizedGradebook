@@ -21,6 +21,7 @@ import { logger } from '../utils/logger.js';
 import { AVG_ASSIGNMENT_NAME, AVG_OUTCOME_NAME, STANDARDS_BASED_COURSE_PATTERNS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { matchesCourseNamePattern } from '../utils/courseDetection.js';
+import { extractCourseIdFromHref } from '../utils/canvas.js';
 
 /**
  * Approach 1: DOM Parsing + Individual Course API Calls
@@ -90,10 +91,8 @@ async function extractCourseFromRow(row, apiClient) {
 
     const courseName = courseLink.textContent.trim();
     const href = courseLink.getAttribute('href');
-    const courseIdMatch = href.match(/\/courses\/(\d+)/);
-    if (!courseIdMatch) return null;
-
-    const courseId = courseIdMatch[1];
+    const courseId = extractCourseIdFromHref(href);
+    if (!courseId) return null;
 
     // Extract grade percentage
     const gradeCell = row.querySelector('.grade');
