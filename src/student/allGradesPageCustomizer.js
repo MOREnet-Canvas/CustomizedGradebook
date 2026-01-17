@@ -20,12 +20,10 @@
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { scoreToGradeLevel } from './gradeExtractor.js';
-import {
-    isStandardsBasedCourse,
-    matchesCourseNamePattern
-} from '../utils/courseDetection.js';
+import { isStandardsBasedCourse } from '../utils/courseDetection.js';
 import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
-import { extractCourseIdFromHref } from '../utils/canvas.js';
+import { extractAllCoursesFromTable } from '../utils/domExtractors.js';
+import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 
 /**
  * Track if customizations have been applied
@@ -64,56 +62,21 @@ function injectHideTableCSS() {
  * @returns {Array} Array of course objects with basic info
  */
 function extractCoursesFromDOM() {
-    const courses = [];
-
     try {
-        // Find the grades table
-        const table = document.querySelector('table.course_details.student_grades');
-        if (!table) {
-            logger.warn('[Hybrid] Grades table not found in DOM');
-            return courses;
+        // Use shared DOM extraction utility
+        const courses = extractAllCoursesFromTable();
+
+        if (courses.length === 0) {
+            logger.warn('[Hybrid] No courses found in DOM');
+        } else {
+            logger.trace(`[Hybrid] Extracted ${courses.length} courses from DOM`);
         }
 
-        // Extract course rows
-        const rows = table.querySelectorAll('tbody tr');
-        logger.trace(`[Hybrid] Found ${rows.length} course rows in DOM`);
-
-        for (const row of rows) {
-            // Find course link
-            const courseLink = row.querySelector('a[href*="/courses/"]');
-            if (!courseLink) continue;
-
-            const courseName = courseLink.textContent.trim();
-            const href = courseLink.getAttribute('href');
-            const courseId = extractCourseIdFromHref(href);
-            if (!courseId) continue;
-
-            // Extract grade percentage from .percent cell
-            const gradeCell = row.querySelector('.percent');
-            const gradeText = gradeCell?.textContent.trim() || '';
-            const percentageMatch = gradeText.match(/(\d+(?:\.\d+)?)\s*%/);
-            const percentage = percentageMatch ? parseFloat(percentageMatch[1]) : null;
-
-            logger.trace(`[Hybrid] Course ${courseName}: DOM grade text="${gradeText}", percentage=${percentage}`);
-
-            // Check if course name matches pattern (fast detection)
-            const matchesPattern = matchesCourseNamePattern(courseName);
-
-            courses.push({
-                courseId,
-                courseName,
-                percentage,
-                matchesPattern,
-                courseUrl: `/courses/${courseId}/grades`
-            });
-        }
-
-        logger.trace(`[Hybrid] Extracted ${courses.length} courses from DOM`);
         return courses;
 
     } catch (error) {
         logger.error('[Hybrid] Failed to extract courses from DOM:', error);
-        return courses;
+        return [];
     }
 }
 
@@ -485,23 +448,16 @@ export function initAllGradesPageCustomizer() {
     applyCustomizations();
 
     // Also observe for lazy-loaded content
-    const observer = new MutationObserver(() => {
+    createPersistentObserver(() => {
         const table = document.querySelector('table.course_details.student_grades');
         if (table && !table.dataset.customized && !processed) {
             logger.debug('Grades table detected, applying customizations...');
             applyCustomizations();
         }
+    }, {
+        config: OBSERVER_CONFIGS.CHILD_LIST,
+        target: document.body,
+        name: 'AllGradesPageCustomizer'
     });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-
-    // Safety stop after 30s
-    setTimeout(() => {
-        observer.disconnect();
-        logger.trace('All-grades customization observer disconnected (timeout)');
-    }, 30000);
 }
 

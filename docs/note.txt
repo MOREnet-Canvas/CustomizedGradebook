@@ -16,12 +16,34 @@ TODO: rubric / grade box scoring
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
 TODO: option to zero out points possible toggle.
-TODO: Explore ways to speed up Dashboard grade loading times
-TODO: Is there a safe way to cache the gradebook data for students?
-TODO: Is there any better way to get rid of the grades page flashing? - change hyperlink?
-TODO: When no avg_assignment course grade page doesn't remove /4
 TODO: Teacher dashboard console says student role not found, but it still searchs through courses, another debug
     message says no active student classes found.
-possible changes:
+TODO: figure out how to get grading scheme(s) --> this might be easy way to determine class type
+TODO: services/verification rename
+TODO: remove canvasHelpers.js?
+
+## Grade Customization
+TODO: Use session memory to store course and type indefinately until tab is closed
+TODO: When no avg_assignment course grade page doesn't remove /4
+TODO: Is there any better way to get rid of the grades page flashing? - change hyperlink?
+TODO: Explore ways to speed up Dashboard grade loading times
+TODO: Is there a safe way to cache the gradebook data for students?
+TODO: gradeDataService.js should it be in dashboard folder? should dashboard be under studnet?
+     is the grade customization pages using same function?
+
+
+## possible changes:
 - add spinner instead of timer
 - grey out button if process is already running
+
+
+### ???
+Good! Both files are already using formatGradeDisplay() from the shared utilities. The calculateDisplayValue() function I created is specifically for the dashboard card renderer's use case where it needs to handle different grade sources (assignment vs enrollment) and determine whether to show percentages or points.
+
+Let me verify the current usage patterns and see if there are opportunities to use calculateDisplayValue():
+
+Augment Context Engine
+After analyzing the code, I can see that:
+allGradesPageCustomizer.js and gradePageCustomizer.js are already using formatGradeDisplay() from shared utilities ✅
+cardRenderer.js is now using calculateDisplayValue() ✅
+The display logic in allGradesPageCustomizer (lines 219-250) is actually business logic for determining whether a course should show points or percentages - this is different from the formatting logic and should stay where it is.
