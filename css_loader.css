@@ -1,0 +1,4 @@
+/* Only hide the Canvas table while our script says "processing" */
+body.responsive_student_grades_page.cg_processing_grades table.course_details.student_grades {
+    display: none !important;
+}

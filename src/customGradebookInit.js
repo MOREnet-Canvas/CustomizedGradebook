@@ -83,4 +83,12 @@ function isSpeedGraderPage() {
         logger.debug('  - window.CG_testAllGradesDataSources()');
     }
 
+    /**
+     * Gate class to hide grade table on all grades page
+     */
+    if (document.body.classList.contains('responsive_student_grades_page')) {
+        document.body.classList.add('cg_processing_grades');
+    }
+
+
 })();

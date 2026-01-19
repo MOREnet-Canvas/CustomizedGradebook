@@ -413,9 +413,14 @@ async function applyCustomizations() {
 
         processed = true;
 
+        document.body.classList.remove('cg_processing_grades');
+
+
     } catch (error) {
         logger.error('Failed to apply all-grades customizations:', error);
         // Don't set processed = true so it can retry
+        document.body.classList.remove('cg_processing_grades');
+
     }
 }
 
