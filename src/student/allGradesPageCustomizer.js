@@ -432,7 +432,7 @@ export function initAllGradesPageCustomizer() {
     logger.debug('Initializing all-grades page customizer');
 
     // Inject CSS immediately to prevent flash of percentages
-    injectHideTableCSS();
+    //injectHideTableCSS();
 
     // Try immediately
     applyCustomizations();
