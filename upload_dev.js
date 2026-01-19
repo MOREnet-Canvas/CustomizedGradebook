@@ -49,6 +49,17 @@
         EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
     };
 
+    // Hide the Canvas /grades table ASAP to prevent flash (Theme CSS uses this gate)
+    const addGradesGate = () => {
+        if (document.body && document.body.classList.contains('responsive_student_grades_page')) {
+            document.body.classList.add('cg_processing_grades');
+        }
+    };
+
+    addGradesGate();
+    document.addEventListener('DOMContentLoaded', addGradesGate, { once: true });
+
+
     console.log("[CG] Configuration loaded:", window.CG_CONFIG);
 
     // ========================================================================
