@@ -51,7 +51,9 @@
 
     // Hide the Canvas /grades table ASAP to prevent flash (Theme CSS uses this gate)
     const addGradesGate = () => {
-        if (document.body && document.body.classList.contains('responsive_student_grades_page')) {
+        if (document.body
+            && window.location.pathname === '/grades'
+            && document.body.classList.contains('responsive_student_grades_page')) {
             document.body.classList.add('cg_processing_grades');
         }
     };
