@@ -8,7 +8,7 @@
 
 import { logger } from '../utils/logger.js';
 import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
-import { GRADE_SOURCE } from './gradeDataService.js';
+import { GRADE_SOURCE } from '../services/gradeDataService.js';
 import { calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
 import { HERO_SELECTORS, findCourseCard } from './cardSelectors.js';
 
@@ -245,4 +245,3 @@ export function removeGradeFromCard(cardElement) {
         logger.trace('Existing grade badge removed from card');
     }
 }
-

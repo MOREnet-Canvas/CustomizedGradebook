@@ -14,7 +14,7 @@
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getCourseGrade, preCacheEnrollmentGrades } from './gradeDataService.js';
+import { getCourseGrade, preCacheEnrollmentGrades } from '../services/gradeDataService.js';
 import { renderGradeOnCard } from './cardRenderer.js';
 import {
     getDashboardCardSelectors,
@@ -520,4 +520,3 @@ export async function testConcurrentPerformance() {
         return { error: error.message };
     }
 }
-
