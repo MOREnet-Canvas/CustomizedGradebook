@@ -1,8 +1,10 @@
-// src/dashboard/gradeDataService.js
+// src/services/gradeDataService.js
 /**
  * Grade Data Service
  *
- * Fetches grade data for dashboard display using Canvas APIs.
+ * Shared service for fetching grade data using Canvas APIs.
+ * Used by both dashboard and student modules.
+ *
  * Implements a fallback hierarchy:
  * 1. Primary: AVG_ASSIGNMENT_NAME assignment score (0-4 scale)
  * 2. Fallback: Total course score from enrollments API (grades.current_score/current_grade)
@@ -13,6 +15,7 @@
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import { parseEnrollmentGrade, fetchSingleEnrollment } from './enrollmentService.js';
 
 /**
  * Grade source types
@@ -100,42 +103,14 @@ export function preCacheEnrollmentGrades(courses) {
             continue;
         }
 
-        // Extract score and letter grade from enrollment data
-        // Use the same extraction logic as fetchEnrollmentScore()
-        let score = null;
-        let letterGrade = null;
+        // Extract score and letter grade using shared enrollment service
+        const gradeData = parseEnrollmentGrade(enrollmentData);
 
-        // Try nested grades object first (most common structure with include[]=total_scores)
-        if (enrollmentData.grades) {
-            score = enrollmentData.grades.current_score
-                ?? enrollmentData.grades.final_score;
-
-            letterGrade = (enrollmentData.grades.current_grade
-                ?? enrollmentData.grades.final_grade
-                ?? null)?.trim() ?? null;
-        }
-
-        // Fallback to top-level fields (alternative API response structure)
-        if (score === null || score === undefined) {
-            score = enrollmentData.computed_current_score
-                ?? enrollmentData.calculated_current_score
-                ?? enrollmentData.computed_final_score
-                ?? enrollmentData.calculated_final_score;
-        }
-
-        if (letterGrade === null && score !== null) {
-            letterGrade = (enrollmentData.computed_current_grade
-                ?? enrollmentData.calculated_current_grade
-                ?? enrollmentData.computed_final_grade
-                ?? enrollmentData.calculated_final_grade
-                ?? null)?.trim() ?? null;
-        }
-
-        // Only cache if we have a valid score
-        if (score !== null && score !== undefined) {
-            cacheGrade(courseId, score, letterGrade, GRADE_SOURCE.ENROLLMENT);
+        // Only cache if we have valid grade data
+        if (gradeData && gradeData.score !== null && gradeData.score !== undefined) {
+            cacheGrade(courseId, gradeData.score, gradeData.letterGrade, GRADE_SOURCE.ENROLLMENT);
             cachedCount++;
-            logger.trace(`Pre-cached enrollment grade for course ${courseId}: ${score}% (${letterGrade || 'no letter grade'})`);
+            logger.trace(`Pre-cached enrollment grade for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || 'no letter grade'})`);
         } else {
             logger.trace(`No valid enrollment score for course ${courseId}, skipping pre-cache`);
         }
@@ -231,85 +206,25 @@ async function fetchEnrollmentScore(courseId, apiClient) {
     // This can happen during MutationObserver re-triggers or cache expiration
     logger.trace(`Enrollment grade not pre-cached for course ${courseId}, fetching via API`);
 
-    try {
-        // Fetch enrollments
-        const enrollments = await apiClient.get(
-            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
-            {},
-            'fetchEnrollment'
-        );
-
-        logger.trace(`Enrollment response for course ${courseId}:`, enrollments);
-
-        // Find student enrollment - try both "StudentEnrollment" and "student"
-        const studentEnrollment = enrollments.find(e =>
-            e.type === 'StudentEnrollment' ||
-            e.type === 'student' ||
-            e.role === 'StudentEnrollment'
-        );
-
-        if (!studentEnrollment) {
-            logger.trace(`No student enrollment found for course ${courseId}`);
-            if (logger.isTraceEnabled() && enrollments.length > 0) {
-                logger.trace(`Available enrollment types:`, enrollments.map(e => e.type || e.role));
-            }
-            return null;
-        }
-
-        logger.trace(`Student enrollment for course ${courseId}:`, studentEnrollment);
-
-        // Extract score - Canvas API can return grades in two different structures:
-        // 1. Nested in 'grades' object: grades.current_score, grades.final_score
-        // 2. Top-level fields: computed_current_score, calculated_current_score, etc.
-        let score = null;
-        let letterGrade = null;
-
-        // Try nested grades object first (most common structure)
-        if (studentEnrollment.grades) {
-            score = studentEnrollment.grades.current_score
-                ?? studentEnrollment.grades.final_score;
-
-            letterGrade = (studentEnrollment.grades.current_grade
-                ?? studentEnrollment.grades.final_grade
-                ?? null)?.trim() ?? null;
-        }
-
-        // Fallback to top-level fields (alternative API response structure)
-        if (score === null || score === undefined) {
-            score = studentEnrollment.computed_current_score
-                ?? studentEnrollment.calculated_current_score
-                ?? studentEnrollment.computed_final_score
-                ?? studentEnrollment.calculated_final_score;
-        }
-
-        if (letterGrade === null && score !== null) {
-            letterGrade = (studentEnrollment.computed_current_grade
-                ?? studentEnrollment.calculated_current_grade
-                ?? studentEnrollment.computed_final_grade
-                ?? studentEnrollment.calculated_final_grade
-                ?? null)?.trim() ?? null;
-        }
-
-        if (score === null || score === undefined) {
-            logger.trace(`No enrollment score found for course ${courseId}`);
-            logger.trace(`Enrollment object:`, studentEnrollment);
-            return null;
-        }
-
-        logger.trace(`Enrollment data for course ${courseId}: ${score}% (${letterGrade || 'no letter grade'})`);
-
-        return {
-            score,
-            letterGrade
-        };
-
-    } catch (error) {
-        logger.warn(`Failed to fetch enrollment score for course ${courseId}:`, error.message);
-        if (logger.isDebugEnabled()) {
-            logger.warn(`Full error:`, error);
-        }
+    // Use shared enrollment service to fetch and parse enrollment data
+    const studentEnrollment = await fetchSingleEnrollment(courseId, apiClient);
+    if (!studentEnrollment) {
         return null;
     }
+
+    // Parse enrollment grade using shared service
+    const gradeData = parseEnrollmentGrade(studentEnrollment);
+    if (!gradeData || gradeData.score === null || gradeData.score === undefined) {
+        logger.trace(`No enrollment score found for course ${courseId}`);
+        return null;
+    }
+
+    logger.trace(`Enrollment data for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || 'no letter grade'})`);
+
+    return {
+        score: gradeData.score,
+        letterGrade: gradeData.letterGrade
+    };
 }
 
 /**
@@ -373,4 +288,3 @@ export async function getCourseGrade(courseId, apiClient) {
     logger.trace(`[Grade Source Debug] Course ${courseId}: No grade available from any source`);
     return null;
 }
-

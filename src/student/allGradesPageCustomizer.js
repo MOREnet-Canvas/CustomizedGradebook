@@ -24,6 +24,7 @@ import { isStandardsBasedCourse } from '../utils/courseDetection.js';
 import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
 import { extractAllCoursesFromTable } from '../utils/domExtractors.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
+import { fetchAllEnrollments, extractEnrollmentData } from '../services/enrollmentService.js';
 
 /**
  * Track if customizations have been applied
@@ -86,47 +87,26 @@ function extractCoursesFromDOM() {
  * @returns {Promise<Map>} Map of courseId -> grade data
  */
 async function fetchGradeDataFromAPI(apiClient) {
-    const gradeMap = new Map();
-
     try {
         logger.debug('[Hybrid] Fetching grade data from Enrollments API...');
 
-        const enrollments = await apiClient.get(
-            '/api/v1/users/self/enrollments',
-            {
-                'type[]': 'StudentEnrollment',
-                'state[]': 'active',
-                'include[]': 'total_scores'
-            },
-            'fetchAllGrades'
-        );
+        // Use shared enrollment service to fetch all enrollments
+        const enrollments = await fetchAllEnrollments(apiClient, {
+            state: 'active',
+            includeTotalScores: true
+        });
 
         logger.trace(`[Hybrid] Fetched ${enrollments.length} enrollments from API`);
 
-        for (const enrollment of enrollments) {
-            const courseId = enrollment.course_id?.toString();
-            if (!courseId) continue;
+        // Use shared enrollment service to extract grade data
+        const gradeMap = extractEnrollmentData(enrollments);
 
-            const grades = enrollment.grades || {};
-            const percentage = grades.current_score ?? grades.final_score ?? null;
-            const rawLetterGrade = grades.current_grade ?? grades.final_grade ?? null;
-
-            // Trim letter grade to remove whitespace
-            const letterGrade = rawLetterGrade ? rawLetterGrade.trim() : null;
-
-            gradeMap.set(courseId, {
-                percentage,
-                letterGrade
-            });
-
-            logger.trace(`[Hybrid] Course ${courseId} from API: percentage=${percentage}%, letterGrade="${letterGrade || 'null'}"`);
-        }
-
+        logger.trace(`[Hybrid] Extracted grade data for ${gradeMap.size} courses`);
         return gradeMap;
 
     } catch (error) {
         logger.warn('[Hybrid] Failed to fetch grade data from API:', error.message);
-        return gradeMap;
+        return new Map();
     }
 }
 
@@ -460,4 +440,3 @@ export function initAllGradesPageCustomizer() {
         name: 'AllGradesPageCustomizer'
     });
 }
-
