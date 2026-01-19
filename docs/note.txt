@@ -28,8 +28,7 @@ TODO: When no avg_assignment course grade page doesn't remove /4
 TODO: Is there any better way to get rid of the grades page flashing? - change hyperlink?
 TODO: Explore ways to speed up Dashboard grade loading times
 TODO: Is there a safe way to cache the gradebook data for students?
-TODO: gradeDataService.js should it be in dashboard folder? should dashboard be under studnet?
-     is the grade customization pages using same function?
+
 TODO: coursetype can be stored in session memory and only cleared on logout
 TODO: is the grade customization pages using same function to determine if class is standards based?
 TODO: cache clearer on entry

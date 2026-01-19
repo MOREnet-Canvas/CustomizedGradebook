@@ -1,17 +1,16 @@
 // src/utils/courseDetection.js
 /**
  * Course Detection Utilities
- * 
- * Shared utilities for detecting standards-based courses across the application.
- * Used by dashboard, all-grades page, and other modules that need to identify
- * which courses use standards-based grading (0-4 scale) vs traditional grading.
- * 
+ *
+ * Pure detection utilities for identifying standards-based courses.
+ * Used by courseSnapshotService to populate course type in snapshots.
+ *
  * Detection Methods:
  * 1. Course name pattern matching (fastest - no API calls)
  * 2. AVG Assignment presence check (reliable - requires API call)
  * 3. Letter grade validation against rating scale (for enrollment data)
- * 
- * All results are cached in sessionStorage for performance.
+ *
+ * NOTE: This module does NOT cache results. Caching is handled by courseSnapshotService.
  */
 
 import { logger } from './logger.js';
@@ -87,15 +86,17 @@ export async function hasAvgAssignment(courseId, apiClient) {
 
 /**
  * Detect if a course uses standards-based grading
- * 
+ *
+ * Pure detection function - does NOT cache results.
+ * Caching is handled by courseSnapshotService.
+ *
  * Detection strategy (in order):
- * 1. Check cache - return cached result if available
- * 2. Check course name patterns - fastest, no API calls
- * 3. Check letter grade validity - if enrollment data includes letter grade
- * 4. Check AVG Assignment presence - requires API call
- * 
+ * 1. Check course name patterns - fastest, no API calls
+ * 2. Check letter grade validity - if enrollment data includes letter grade
+ * 3. Check AVG Assignment presence - requires API call
+ *
  * @param {Object} options - Detection options
- * @param {string} options.courseId - Course ID (required)
+ * @param {string} options.courseId - Course ID (required for logging)
  * @param {string} options.courseName - Course name (required for pattern matching)
  * @param {string|null} [options.letterGrade] - Letter grade from enrollment (optional)
  * @param {Object} options.apiClient - CanvasApiClient instance (required for API checks)
@@ -113,96 +114,47 @@ export async function isStandardsBasedCourse(options) {
     logger.trace(`[Detection] Starting detection for course ${courseId} "${courseName}"`);
     logger.trace(`[Detection] Input: letterGrade="${letterGrade}", skipApiCheck=${skipApiCheck}`);
 
-    // 1. Check cache first
-    const cacheKey = `standardsBased_${courseId}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached !== null) {
-        logger.trace(`[Detection] Step 1 - Cache: HIT (${cached})`);
-        return cached === 'true';
-    }
-    logger.trace(`[Detection] Step 1 - Cache: MISS`);
-
-    // 2. Check course name patterns (fastest - no API calls)
+    // 1. Check course name patterns (fastest - no API calls)
     const matchesPattern = matchesCourseNamePattern(courseName);
-    logger.trace(`[Detection] Step 2 - Pattern match: ${matchesPattern ? 'YES' : 'NO'}`);
+    logger.trace(`[Detection] Step 1 - Pattern match: ${matchesPattern ? 'YES' : 'NO'}`);
     if (matchesPattern) {
         logger.debug(`[Detection] ✅ Course "${courseName}" detected as standards-based (pattern match)`);
-        sessionStorage.setItem(cacheKey, 'true');
         return true;
     }
 
-    // 3. Check letter grade validity (if provided)
-    logger.trace(`[Detection] Step 3 - Letter grade validation: letterGrade="${letterGrade}"`);
+    // 2. Check letter grade validity (if provided)
+    logger.trace(`[Detection] Step 2 - Letter grade validation: letterGrade="${letterGrade}"`);
     if (letterGrade) {
         const isValid = isValidLetterGrade(letterGrade);
-        logger.trace(`[Detection] Step 3 - isValidLetterGrade("${letterGrade}") = ${isValid}`);
+        logger.trace(`[Detection] Step 2 - isValidLetterGrade("${letterGrade}") = ${isValid}`);
 
         if (isValid) {
             logger.debug(`[Detection] ✅ Course "${courseName}" detected as standards-based (valid letter grade: "${letterGrade}")`);
-            sessionStorage.setItem(cacheKey, 'true');
             return true;
         } else {
             // Log why it failed
             const availableGrades = OUTCOME_AND_RUBRIC_RATINGS.map(r => r.description).join(', ');
-            logger.trace(`[Detection] Step 3 - Letter grade "${letterGrade}" does NOT match any rating. Available: ${availableGrades}`);
+            logger.trace(`[Detection] Step 2 - Letter grade "${letterGrade}" does NOT match any rating. Available: ${availableGrades}`);
         }
     } else {
-        logger.trace(`[Detection] Step 3 - No letter grade provided, skipping validation`);
+        logger.trace(`[Detection] Step 2 - No letter grade provided, skipping validation`);
     }
 
-    // 4. Check AVG Assignment presence (requires API call)
+    // 3. Check AVG Assignment presence (requires API call)
     if (!skipApiCheck && apiClient) {
-        logger.trace(`[Detection] Step 4 - Checking AVG Assignment presence via API...`);
+        logger.trace(`[Detection] Step 3 - Checking AVG Assignment presence via API...`);
         const hasAvg = await hasAvgAssignment(courseId, apiClient);
-        logger.trace(`[Detection] Step 4 - AVG Assignment: ${hasAvg ? 'FOUND' : 'NOT FOUND'}`);
+        logger.trace(`[Detection] Step 3 - AVG Assignment: ${hasAvg ? 'FOUND' : 'NOT FOUND'}`);
 
         if (hasAvg) {
             logger.debug(`[Detection] ✅ Course "${courseName}" detected as standards-based (AVG Assignment found)`);
-            sessionStorage.setItem(cacheKey, 'true');
             return true;
         }
     } else {
-        logger.trace(`[Detection] Step 4 - Skipped (skipApiCheck=${skipApiCheck}, hasApiClient=${!!apiClient})`);
+        logger.trace(`[Detection] Step 3 - Skipped (skipApiCheck=${skipApiCheck}, hasApiClient=${!!apiClient})`);
     }
 
     // Not standards-based
     logger.debug(`[Detection] ❌ Course "${courseName}" is traditional (not standards-based)`);
-    sessionStorage.setItem(cacheKey, 'false');
     return false;
 }
-
-/**
- * Clear detection cache for a specific course or all courses
- * @param {string|null} courseId - Course ID to clear, or null to clear all
- */
-export function clearDetectionCache(courseId = null) {
-    if (courseId) {
-        const cacheKey = `standardsBased_${courseId}`;
-        sessionStorage.removeItem(cacheKey);
-        logger.debug(`[Course Detection] Cleared cache for course ${courseId}`);
-    } else {
-        // Clear all detection cache entries
-        const keys = Object.keys(sessionStorage);
-        const detectionKeys = keys.filter(k => k.startsWith('standardsBased_'));
-        detectionKeys.forEach(k => sessionStorage.removeItem(k));
-        logger.debug(`[Course Detection] Cleared all detection cache (${detectionKeys.length} entries)`);
-    }
-}
-
-/**
- * Debug function to show all cached detection results
- * Useful for troubleshooting cache issues
- * @returns {Object} Map of courseId -> cached value
- */
-export function debugDetectionCache() {
-    const cached = {};
-    Object.keys(sessionStorage).forEach(key => {
-        if (key.startsWith('standardsBased_')) {
-            const courseId = key.replace('standardsBased_', '');
-            cached[courseId] = sessionStorage.getItem(key);
-        }
-    });
-    logger.info('[Detection] Cached detection results:', cached);
-    return cached;
-}
-

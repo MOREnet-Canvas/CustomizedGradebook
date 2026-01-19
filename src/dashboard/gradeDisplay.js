@@ -14,7 +14,11 @@
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getCourseGrade, preCacheEnrollmentGrades } from '../services/gradeDataService.js';
+import {
+    populateCourseSnapshot,
+    getCourseSnapshot,
+    PAGE_CONTEXT
+} from '../services/courseSnapshotService.js';
 import { renderGradeOnCard } from './cardRenderer.js';
 import {
     getDashboardCardSelectors,
@@ -121,11 +125,12 @@ async function fetchActiveCourses(apiClient) {
 }
 
 /**
- * Update a single course card with grade
+ * Update a single course card with grade using snapshot service
  * @param {string} courseId - Course ID
+ * @param {string} courseName - Course name
  * @param {CanvasApiClient} apiClient - Canvas API client
  */
-async function updateCourseCard(courseId, apiClient) {
+async function updateCourseCard(courseId, courseName, apiClient) {
     try {
         // Find the card element
         const cardElement = findCourseCard(courseId);
@@ -134,20 +139,30 @@ async function updateCourseCard(courseId, apiClient) {
             return;
         }
 
-        // Fetch grade data (score, letterGrade, source)
-        const gradeData = await getCourseGrade(courseId, apiClient);
-        if (!gradeData) {
+        // Check if snapshot exists, populate if not
+        let snapshot = getCourseSnapshot(courseId);
+        if (!snapshot) {
+            logger.trace(`No snapshot for course ${courseId}, populating...`);
+            snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+        }
+
+        if (!snapshot) {
             logger.trace(`No grade available for course ${courseId}, skipping`);
             return;
         }
 
-        // Render grade on card
+        // Render grade on card using snapshot data
+        const gradeData = {
+            score: snapshot.score,
+            letterGrade: snapshot.letterGrade,
+            source: snapshot.gradeSource
+        };
         renderGradeOnCard(cardElement, gradeData);
 
-        const displayInfo = gradeData.letterGrade
-            ? `${gradeData.score}% (${gradeData.letterGrade})`
-            : `${gradeData.score}`;
-        logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${gradeData.source})`);
+        const displayInfo = snapshot.letterGrade
+            ? `${snapshot.score}% (${snapshot.letterGrade})`
+            : `${snapshot.score}`;
+        logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${snapshot.gradeSource})`);
 
     } catch (error) {
         // Fail silently for individual courses - don't break the entire dashboard
@@ -178,14 +193,10 @@ async function updateAllCourseCards() {
 
         logger.info(`Updating grades for ${courses.length} courses`);
 
-        // Pre-populate grade cache with enrollment data from courses response
-        // This eliminates redundant enrollment API calls during grade fetching
-        preCacheEnrollmentGrades(courses);
-
         // Update course cards concurrently using worker queue pattern
         // Concurrency level balances performance with Canvas API rate limits
         const concurrency = CONCURRENT_WORKERS;
-        const queue = courses.map(c => c.id);
+        const queue = courses.map(c => ({ id: c.id, name: c.name }));
         let processedCount = 0;
         let successCount = 0;
         let errorCount = 0;
@@ -193,11 +204,11 @@ async function updateAllCourseCards() {
         // Worker function: processes courses from the queue
         async function worker() {
             while (queue.length > 0) {
-                const courseId = queue.shift();
-                if (!courseId) break;
+                const course = queue.shift();
+                if (!course) break;
 
                 try {
-                    await updateCourseCard(courseId, apiClient);
+                    await updateCourseCard(course.id, course.name, apiClient);
                     processedCount++;
                     successCount++;
 
@@ -208,7 +219,7 @@ async function updateAllCourseCards() {
                 } catch (error) {
                     processedCount++;
                     errorCount++;
-                    logger.warn(`Worker failed to process course ${courseId}:`, error.message);
+                    logger.warn(`Worker failed to process course ${course.id}:`, error.message);
                 }
             }
         }
@@ -438,16 +449,13 @@ export async function testConcurrentPerformance() {
 
         logger.info(`Testing with ${courses.length} courses`);
 
-        // Pre-cache enrollment data
-        preCacheEnrollmentGrades(courses);
-
         // Test 1: Sequential processing (baseline)
         logger.info('Test 1: Sequential processing...');
         const sequentialStart = performance.now();
 
         for (const course of courses) {
             try {
-                await getCourseGrade(course.id, apiClient);
+                await populateCourseSnapshot(course.id, course.name, apiClient);
             } catch (error) {
                 logger.trace(`Sequential test error for course ${course.id}:`, error.message);
             }
@@ -456,27 +464,22 @@ export async function testConcurrentPerformance() {
         const sequentialTime = performance.now() - sequentialStart;
         logger.info(`Sequential: ${sequentialTime.toFixed(0)}ms total, ${(sequentialTime / courses.length).toFixed(0)}ms per course`);
 
-        // Clear cache for fair comparison
-        const { clearGradeCache } = await import('./gradeDataService.js');
-        clearGradeCache();
-        preCacheEnrollmentGrades(courses);
-
         // Test 2: Concurrent processing (optimized)
         logger.info('Test 2: Concurrent processing...');
         const concurrentStart = performance.now();
 
         const concurrency = CONCURRENT_WORKERS;
-        const queue = courses.map(c => c.id);
+        const queue = courses.map(c => ({ id: c.id, name: c.name }));
 
         async function worker() {
             while (queue.length > 0) {
-                const courseId = queue.shift();
-                if (!courseId) break;
+                const course = queue.shift();
+                if (!course) break;
 
                 try {
-                    await getCourseGrade(courseId, apiClient);
+                    await populateCourseSnapshot(course.id, course.name, apiClient);
                 } catch (error) {
-                    logger.trace(`Concurrent test error for course ${courseId}:`, error.message);
+                    logger.trace(`Concurrent test error for course ${course.id}:`, error.message);
                 }
             }
         }

@@ -20,11 +20,17 @@
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { scoreToGradeLevel } from './gradeExtractor.js';
-import { isStandardsBasedCourse } from '../utils/courseDetection.js';
 import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
 import { extractAllCoursesFromTable } from '../utils/domExtractors.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { fetchAllEnrollments, extractEnrollmentData } from '../services/enrollmentService.js';
+import {
+    populateCourseSnapshot,
+    getCourseSnapshot,
+    shouldRefreshGrade,
+    refreshCourseSnapshot,
+    PAGE_CONTEXT
+} from '../services/courseSnapshotService.js';
 
 /**
  * Track if customizations have been applied
@@ -111,7 +117,7 @@ async function fetchGradeDataFromAPI(apiClient) {
 }
 
 /**
- * Enrich course data with grades and detection
+ * Enrich course data with grades and detection using snapshot service
  * @param {Array} courses - Array of course objects from DOM
  * @param {Map} gradeMap - Map of courseId -> grade data from API
  * @param {CanvasApiClient} apiClient - API client instance
@@ -124,39 +130,38 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
     const enrichedPromises = courses.map(async (course) => {
         const { courseId, courseName, percentage: domPercentage, matchesPattern } = course;
 
-        // Merge DOM and API grade data
+        // Check if we should refresh the snapshot for this course
+        const needsRefresh = shouldRefreshGrade(courseId, PAGE_CONTEXT.ALL_GRADES);
+
+        let snapshot = getCourseSnapshot(courseId);
+
+        // Populate or refresh snapshot if needed
+        if (!snapshot || needsRefresh) {
+            logger.trace(`[All-Grades] ${!snapshot ? 'Populating' : 'Refreshing'} snapshot for course ${courseId}...`);
+            snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.ALL_GRADES);
+        }
+
+        // Extract data from snapshot
         let percentage = domPercentage;
         let apiLetterGrade = null;
         let gradeSource = 'DOM';
+        let isStandardsBased = false;
 
-        if (gradeMap.has(courseId)) {
-            const apiGrade = gradeMap.get(courseId);
-            apiLetterGrade = apiGrade.letterGrade;
+        if (snapshot) {
+            isStandardsBased = snapshot.isStandardsBased;
+            apiLetterGrade = snapshot.letterGrade;
 
-            // Use API data if DOM extraction failed
-            if (percentage === null && apiGrade.percentage !== null) {
-                percentage = apiGrade.percentage;
-                gradeSource = 'API';
-                logger.debug(`[Hybrid] Using API grade for ${courseName}: ${percentage}%`);
+            // Use snapshot score if DOM extraction failed
+            if (percentage === null && snapshot.score !== null) {
+                percentage = snapshot.score;
+                gradeSource = 'Snapshot';
+                logger.debug(`[All-Grades] Using snapshot grade for ${courseName}: ${percentage}%`);
             } else if (percentage !== null) {
-                logger.trace(`[Hybrid] Using DOM grade for ${courseName}: ${percentage}%`);
+                logger.trace(`[All-Grades] Using DOM grade for ${courseName}: ${percentage}%`);
             }
         }
 
-        // Log letter grade for debugging
-        logger.trace(`[Hybrid] Course "${courseName}" (${courseId}): percentage=${percentage}, letterGrade="${apiLetterGrade || 'null'}"`);
-
-        // Determine if standards-based using full detection hierarchy
-        // This ensures letter grade validation happens even if pattern doesn't match
-        const isStandardsBased = await isStandardsBasedCourse({
-            courseId,
-            courseName,
-            letterGrade: apiLetterGrade,
-            apiClient,
-            skipApiCheck: false
-        });
-
-        logger.trace(`[Hybrid] Detection result for "${courseName}": isStandardsBased=${isStandardsBased}`);
+        logger.trace(`[All-Grades] Course "${courseName}" (${courseId}): percentage=${percentage}, letterGrade="${apiLetterGrade || 'null'}", isStandardsBased=${isStandardsBased}`);
 
         // Calculate display values
         let displayScore = percentage;
