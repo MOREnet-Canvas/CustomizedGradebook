@@ -8,7 +8,7 @@
  * @module services/enrollmentService
  */
 
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Parses grade information from a Canvas enrollment object.
