@@ -108,18 +108,8 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
     logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}"`);
 
     try {
-        // Step 1: Detect course type (SINGLE SOURCE OF TRUTH)
-        logger.trace(`[Snapshot] Step 1: Detecting course type for ${courseId}...`);
-        const isStandardsBased = await isStandardsBasedCourse({
-            courseId,
-            courseName,
-            apiClient,
-            skipApiCheck: false
-        });
-        logger.trace(`[Snapshot] Course ${courseId} detection result: isStandardsBased=${isStandardsBased}`);
-
-        // Step 2: Fetch grade data (SINGLE SOURCE OF TRUTH)
-        logger.trace(`[Snapshot] Step 2: Fetching grade for ${courseId}...`);
+        // Step 1: Fetch grade data first (needed for letter grade in detection)
+        logger.trace(`[Snapshot] Step 1: Fetching grade for ${courseId}...`);
         const gradeData = await getCourseGrade(courseId, apiClient);
 
         if (!gradeData) {
@@ -128,6 +118,17 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         }
 
         logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
+
+        // Step 2: Detect course type with letter grade (SINGLE SOURCE OF TRUTH)
+        logger.trace(`[Snapshot] Step 2: Detecting course type for ${courseId} with letterGrade="${gradeData.letterGrade}"...`);
+        const isStandardsBased = await isStandardsBasedCourse({
+            courseId,
+            courseName,
+            letterGrade: gradeData.letterGrade,
+            apiClient,
+            skipApiCheck: false
+        });
+        logger.trace(`[Snapshot] Course ${courseId} detection result: isStandardsBased=${isStandardsBased}`);
 
         // Step 3: Create unified snapshot
         const snapshot = {
