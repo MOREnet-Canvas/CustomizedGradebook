@@ -24,7 +24,6 @@ import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
-import { clearDetectionCache, debugDetectionCache } from "./utils/courseDetection.js";
 
 /**
  * Check if current page is the dashboard
@@ -80,15 +79,8 @@ function isSpeedGraderPage() {
         // Test function for all-grades page data source comparison
         window.CG_testAllGradesDataSources = compareDataSourceApproaches;
 
-        // Debug functions for course detection cache
-        window.CG_clearDetectionCache = clearDetectionCache;
-        window.CG_debugDetectionCache = debugDetectionCache;
-
         logger.debug('Debug functions exposed:');
         logger.debug('  - window.CG_testAllGradesDataSources()');
-        logger.debug('  - window.CG_clearDetectionCache(courseId) or CG_clearDetectionCache() for all');
-        logger.debug('  - window.CG_debugDetectionCache()');
     }
 
 })();
-

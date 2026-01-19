@@ -2,14 +2,14 @@
 /**
  * Grade Data Service
  *
- * Shared service for fetching grade data using Canvas APIs.
- * Used by both dashboard and student modules.
+ * Pure fetching service for grade data using Canvas APIs.
+ * Used by courseSnapshotService for grade population.
  *
  * Implements a fallback hierarchy:
  * 1. Primary: AVG_ASSIGNMENT_NAME assignment score (0-4 scale)
  * 2. Fallback: Total course score from enrollments API (grades.current_score/current_grade)
  *
- * This service is designed to be flexible for future changes in grading approaches.
+ * NOTE: This service does NOT cache data. Caching is handled by courseSnapshotService.
  */
 
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
@@ -28,107 +28,11 @@ export const GRADE_SOURCE = Object.freeze({
 });
 
 /**
- * Cache TTL in milliseconds (5 minutes)
- * Centralized configuration for easy adjustment
- */
-const CACHE_TTL_MS = 5 * 60 * 1000;
-
-/**
- * Cache for course grades (session-based)
- * Key: courseId, Value: { value: { score, letterGrade, source }, expiresAt: timestamp }
- */
-const gradeCache = new Map();
-
-/**
- * Get cached grade if available and not expired
- * @param {string} courseId - Course ID
- * @returns {Object|null} Cached grade data or null
- */
-function getCachedGrade(courseId) {
-    const cached = gradeCache.get(courseId);
-    if (!cached) return null;
-
-    // Check if cache entry has expired
-    if (Date.now() > cached.expiresAt) {
-        gradeCache.delete(courseId);
-        logger.trace(`Cache expired for course ${courseId}`);
-        return null;
-    }
-
-    logger.trace(`Cache hit for course ${courseId}, expires in ${Math.round((cached.expiresAt - Date.now()) / 1000)}s`);
-    return cached.value;
-}
-
-/**
- * Cache grade data with explicit expiration timestamp
- * @param {string} courseId - Course ID
- * @param {number} score - Grade score value
- * @param {string|null} letterGrade - Letter grade (if available)
- * @param {string} source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
- */
-function cacheGrade(courseId, score, letterGrade, source) {
-    const expiresAt = Date.now() + CACHE_TTL_MS;
-    gradeCache.set(courseId, {
-        value: { score, letterGrade, source },
-        expiresAt
-    });
-    logger.trace(`Cached grade for course ${courseId}, expires at ${new Date(expiresAt).toISOString()}`);
-}
-
-/**
- * Clear all cached grades
- * Useful for debugging and SPA navigation cleanup
- */
-export function clearGradeCache() {
-    const size = gradeCache.size;
-    gradeCache.clear();
-    logger.debug(`Grade cache cleared (${size} entries removed)`);
-}
-
-/**
- * Pre-populate grade cache with enrollment data from courses API response
- * This eliminates redundant enrollment API calls during grade fetching
- * @param {Array<{id: string, enrollmentData: Object}>} courses - Courses with enrollment data
- */
-export function preCacheEnrollmentGrades(courses) {
-    logger.debug(`Pre-caching enrollment grades for ${courses.length} courses`);
-
-    let cachedCount = 0;
-
-    for (const course of courses) {
-        const { id: courseId, enrollmentData } = course;
-
-        if (!enrollmentData) {
-            logger.trace(`No enrollment data for course ${courseId}, skipping pre-cache`);
-            continue;
-        }
-
-        // Extract score and letter grade using shared enrollment service
-        const gradeData = parseEnrollmentGrade(enrollmentData);
-
-        // Only cache if we have valid grade data
-        if (gradeData && gradeData.score !== null && gradeData.score !== undefined) {
-            cacheGrade(courseId, gradeData.score, gradeData.letterGrade, GRADE_SOURCE.ENROLLMENT);
-            cachedCount++;
-            logger.trace(`Pre-cached enrollment grade for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || 'no letter grade'})`);
-        } else {
-            logger.trace(`No valid enrollment score for course ${courseId}, skipping pre-cache`);
-        }
-    }
-
-    logger.debug(`Pre-cached ${cachedCount} enrollment grades`);
-}
-
-/**
- * Fetch AVG assignment score and letter grade for a course
- *
- * Performance optimization: Letter grade is retrieved from pre-cached enrollment data
- * instead of making a redundant enrollment API call. This function only makes
- * assignment-related API calls (search + submission).
+ * Fetch AVG assignment score for a course
  *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<{score: number, letterGrade: string|null}|null>} Assignment data or null if not found
+ * @returns {Promise<{score: number}|null>} Assignment score or null if not found
  */
 async function fetchAvgAssignmentScore(courseId, apiClient) {
     try {
@@ -160,19 +64,8 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
             return null;
         }
 
-        // Retrieve letter grade from pre-cached enrollment data (no API call needed)
-        // The enrollment data was pre-cached during initial dashboard load
-        let letterGrade = null;
-        const cached = getCachedGrade(courseId);
-        if (cached && cached.source === GRADE_SOURCE.ENROLLMENT) {
-            letterGrade = cached.letterGrade;
-            logger.trace(`Retrieved letter grade from pre-cached enrollment data for course ${courseId}: ${letterGrade || 'no letter grade'}`);
-        } else {
-            logger.trace(`No pre-cached enrollment data available for letter grade in course ${courseId}`);
-        }
-
-        logger.trace(`AVG assignment data for course ${courseId}: ${score} (${letterGrade || 'no letter grade'})`);
-        return { score, letterGrade };
+        logger.trace(`AVG assignment score for course ${courseId}: ${score}`);
+        return { score };
 
     } catch (error) {
         logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
@@ -182,30 +75,12 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
 
 /**
  * Fetch total course score and letter grade from enrollments
- * NOTE: This function now primarily uses pre-cached enrollment data from the initial
- * courses API call (with include[]=total_scores). It only makes an API call as a fallback
- * if enrollment data wasn't pre-cached (e.g., during MutationObserver re-triggers).
  *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
  * @returns {Promise<{score: number, letterGrade: string}|null>} Grade data or null if not found
  */
 async function fetchEnrollmentScore(courseId, apiClient) {
-    // Check if enrollment grade is already cached from initial courses fetch
-    // This avoids redundant API calls in the common case
-    const cached = getCachedGrade(courseId);
-    if (cached && cached.source === GRADE_SOURCE.ENROLLMENT) {
-        logger.trace(`Using pre-cached enrollment grade for course ${courseId}: ${cached.score}% (${cached.letterGrade || 'no letter grade'})`);
-        return {
-            score: cached.score,
-            letterGrade: cached.letterGrade
-        };
-    }
-
-    // Fallback: Fetch enrollment data via API if not pre-cached
-    // This can happen during MutationObserver re-triggers or cache expiration
-    logger.trace(`Enrollment grade not pre-cached for course ${courseId}, fetching via API`);
-
     // Use shared enrollment service to fetch and parse enrollment data
     const studentEnrollment = await fetchSingleEnrollment(courseId, apiClient);
     if (!studentEnrollment) {
@@ -229,62 +104,52 @@ async function fetchEnrollmentScore(courseId, apiClient) {
 
 /**
  * Get course grade with fallback hierarchy
- * Priority order:
- * 1. Primary: AVG assignment score (0-4 scale) - always check, even if enrollment is cached
- * 2. Fallback: Enrollment grade (grades.current_score/current_grade) - pre-cached from initial API call
  *
- * Performance optimization: Enrollment grades are pre-cached from the initial courses API call
- * (with include[]=total_scores), so we only make API calls for AVG assignment checks.
+ * Pure fetching function - does NOT cache results.
+ * Caching is handled by courseSnapshotService.
+ *
+ * Priority order:
+ * 1. Primary: AVG assignment score (0-4 scale)
+ * 2. Fallback: Enrollment grade (grades.current_score/current_grade)
  *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
  * @returns {Promise<{score: number, letterGrade: string|null, source: string}|null>} Grade data or null
  */
 export async function getCourseGrade(courseId, apiClient) {
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
 
-    // Check if we have a cached AVG assignment grade (highest priority)
-    const cached = getCachedGrade(courseId);
-    if (cached && cached.source === GRADE_SOURCE.ASSIGNMENT) {
-        logger.trace(`[Grade Source Debug] Course ${courseId}: Using cached AVG assignment grade (score=${cached.score}, letterGrade=${cached.letterGrade})`);
-        return {
-            score: cached.score,
-            letterGrade: cached.letterGrade,
-            source: cached.source
-        };
-    }
-
-    // Priority 1: Try AVG assignment (even if enrollment is cached)
-    // AVG assignment is more accurate than enrollment grade, so always check for it
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 1 - AVG assignment...`);
+    // Priority 1: Try AVG assignment
+    logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
     const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
     if (avgData !== null) {
-        logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${avgData.letterGrade}`);
-        // AVG assignment returns 0-4 scale score with letter grade from enrollment
-        cacheGrade(courseId, avgData.score, avgData.letterGrade, GRADE_SOURCE.ASSIGNMENT);
-        return { score: avgData.score, letterGrade: avgData.letterGrade, source: GRADE_SOURCE.ASSIGNMENT };
+        // Fetch enrollment data to get letter grade
+        const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
+        const letterGrade = enrollmentData?.letterGrade || null;
+
+        logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${letterGrade}`);
+        return {
+            score: avgData.score,
+            letterGrade,
+            source: GRADE_SOURCE.ASSIGNMENT
+        };
     }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment not found, checking priority 2...`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment not found, checking priority 2...`);
 
     // Priority 2: Fallback to enrollment score
-    // This will use pre-cached data from initial courses fetch (no API call in common case)
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 2 - enrollment grade...`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 2 - enrollment grade...`);
     const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
     if (enrollmentData !== null) {
-        logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
-        // Only cache if not already cached (fetchEnrollmentScore returns cached data)
-        if (!cached || cached.source !== GRADE_SOURCE.ENROLLMENT) {
-            cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, GRADE_SOURCE.ENROLLMENT);
-        }
+        logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
         return {
             score: enrollmentData.score,
             letterGrade: enrollmentData.letterGrade,
             source: GRADE_SOURCE.ENROLLMENT
         };
     }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade not found`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade not found`);
 
     // No grade available
-    logger.trace(`[Grade Source Debug] Course ${courseId}: No grade available from any source`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: No grade available from any source`);
     return null;
 }
