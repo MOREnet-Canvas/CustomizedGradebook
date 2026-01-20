@@ -24,6 +24,7 @@ import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
+import { clearAllSnapshots, debugSnapshots, validateAllSnapshots } from "./services/courseSnapshotService.js";
 
 /**
  * Check if current page is the dashboard
@@ -55,6 +56,9 @@ function isSpeedGraderPage() {
     if (ENV_PROD) {logger.info("Running in PROD mode");}
     logger.info(`Build environment: ${ENV_NAME}`);
 
+    // Validate all existing snapshots on initialization (security)
+    validateAllSnapshots();
+
     // Gradebook functionality (teacher-side)
     if (window.location.pathname.includes("/gradebook")) {
         injectButtons();
@@ -74,14 +78,24 @@ function isSpeedGraderPage() {
     // Runs on grades pages, dashboard, and course pages for students
     initStudentGradeCustomization();
 
-    // Expose debug and test functions
+    // Expose debug and utility functions
     if (ENV_DEV) {
         // Test function for all-grades page data source comparison
         window.CG_testAllGradesDataSources = compareDataSourceApproaches;
 
+        // Snapshot debugging and management
+        window.CG_clearAllSnapshots = clearAllSnapshots;
+        window.CG_debugSnapshots = debugSnapshots;
+
         logger.debug('Debug functions exposed:');
         logger.debug('  - window.CG_testAllGradesDataSources()');
+        logger.debug('  - window.CG_clearAllSnapshots() - Clear all cached snapshots');
+        logger.debug('  - window.CG_debugSnapshots() - Show all cached snapshots');
     }
+
+    // Always expose clearAllSnapshots for logout/user change scenarios
+    if (!window.CG) window.CG = {};
+    window.CG.clearAllSnapshots = clearAllSnapshots;
 
 
 
