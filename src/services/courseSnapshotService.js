@@ -9,7 +9,10 @@
  * - Single unified cache entry per course (cg_courseSnapshot_<courseId>)
  * - Centralized population logic (only place where detection and grade computation occur)
  * - Page-aware refresh logic (standards-based vs non-standards-based)
- * - No TTL-based invalidation (session-scoped, explicit refresh only)
+ * - TTL-based expiration (10 minutes)
+ * - User ownership validation (prevents data leakage between users)
+ * - Role-based access control (student-like users only)
+ * - Page-based access control (authorized pages only)
  *
  * Snapshot Structure:
  * {
@@ -19,7 +22,9 @@
  *   score: number,
  *   letterGrade: string|null,
  *   gradeSource: 'assignment' | 'enrollment',
- *   timestamp: number  // For debugging, not for TTL
+ *   timestamp: number,
+ *   userId: string,           // For user ownership validation
+ *   expiresAt: number         // TTL expiration timestamp
  * }
  *
  * @module services/courseSnapshotService
@@ -28,11 +33,23 @@
 import { logger } from '../utils/logger.js';
 import { isStandardsBasedCourse } from '../utils/courseDetection.js';
 import { getCourseGrade } from './gradeDataService.js';
+import { getUserRoleGroup } from '../utils/canvas.js';
+import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetection.js';
 
 /**
  * Key prefix for all course snapshots in sessionStorage
  */
 const SNAPSHOT_KEY_PREFIX = 'cg_courseSnapshot_';
+
+/**
+ * Key for storing current user ID in sessionStorage
+ */
+const USER_ID_KEY = 'cg_userId';
+
+/**
+ * TTL for snapshots in milliseconds (10 minutes)
+ */
+const SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Page context types for refresh logic
@@ -46,13 +63,134 @@ export const PAGE_CONTEXT = Object.freeze({
 });
 
 /**
+ * Check if current page is authorized for snapshot operations
+ *
+ * Authorized pages:
+ * - Dashboard
+ * - All grades page (/grades)
+ * - Course grades page (/courses/*/grades)
+ *
+ * @returns {boolean} True if current page is authorized
+ */
+function isAuthorizedPage() {
+    return isDashboardPage() || isAllGradesPage() || isSingleCourseGradesPage();
+}
+
+/**
+ * Validate user ownership and clear snapshots if user changed
+ *
+ * This function MUST be called before any snapshot read/write operations.
+ * If the current user differs from the cached user, all snapshots are cleared.
+ *
+ * Security: Prevents data leakage between users in shared browser sessions.
+ *
+ * @returns {boolean} True if user is valid (same as cached or first time)
+ */
+function validateUserOwnership() {
+    const currentUserId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
+
+    if (!currentUserId) {
+        logger.warn('[Snapshot] Cannot validate user ownership - ENV.current_user_id not available');
+        return false;
+    }
+
+    const cachedUserId = sessionStorage.getItem(USER_ID_KEY);
+
+    // First time - store user ID
+    if (!cachedUserId) {
+        sessionStorage.setItem(USER_ID_KEY, currentUserId);
+        logger.debug(`[Snapshot] Initialized user ownership tracking for user ${currentUserId}`);
+        return true;
+    }
+
+    // User changed - clear all snapshots
+    if (cachedUserId !== currentUserId) {
+        logger.warn(`[Snapshot] User changed from ${cachedUserId} to ${currentUserId} - clearing all snapshots`);
+        const count = clearAllSnapshots();
+        sessionStorage.setItem(USER_ID_KEY, currentUserId);
+        logger.info(`[Snapshot] Cleared ${count} snapshots due to user change`);
+        return true;
+    }
+
+    // Same user - all good
+    return true;
+}
+
+/**
+ * Validate all existing snapshots and clear any that don't belong to current user
+ *
+ * This should be called on script initialization to ensure no stale data from previous users.
+ *
+ * @returns {number} Number of invalid snapshots cleared
+ */
+export function validateAllSnapshots() {
+    const currentUserId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
+
+    if (!currentUserId) {
+        logger.warn('[Snapshot] Cannot validate snapshots - ENV.current_user_id not available');
+        return 0;
+    }
+
+    const cachedUserId = sessionStorage.getItem(USER_ID_KEY);
+
+    // If no cached user ID or user changed, clear all snapshots
+    if (!cachedUserId || cachedUserId !== currentUserId) {
+        logger.warn(`[Snapshot] User validation failed on init (cached=${cachedUserId}, current=${currentUserId}) - clearing all snapshots`);
+        const count = clearAllSnapshots();
+        sessionStorage.setItem(USER_ID_KEY, currentUserId);
+        return count;
+    }
+
+    // Validate individual snapshots for userId and TTL
+    const keys = Object.keys(sessionStorage);
+    const snapshotKeys = keys.filter(k => k.startsWith(SNAPSHOT_KEY_PREFIX));
+    let clearedCount = 0;
+
+    snapshotKeys.forEach(key => {
+        try {
+            const snapshot = JSON.parse(sessionStorage.getItem(key));
+
+            // Check if snapshot has userId field and it matches current user
+            if (snapshot.userId && snapshot.userId !== currentUserId) {
+                logger.warn(`[Snapshot] Removing snapshot with mismatched userId: ${key}`);
+                sessionStorage.removeItem(key);
+                clearedCount++;
+                return;
+            }
+
+            // Check TTL expiration
+            if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+                logger.debug(`[Snapshot] Removing expired snapshot: ${key}`);
+                sessionStorage.removeItem(key);
+                clearedCount++;
+                return;
+            }
+        } catch (error) {
+            logger.warn(`[Snapshot] Failed to parse snapshot ${key}, removing:`, error.message);
+            sessionStorage.removeItem(key);
+            clearedCount++;
+        }
+    });
+
+    if (clearedCount > 0) {
+        logger.info(`[Snapshot] Cleared ${clearedCount} invalid/expired snapshots on init`);
+    } else {
+        logger.debug('[Snapshot] All existing snapshots validated successfully');
+    }
+
+    return clearedCount;
+}
+
+/**
  * Get course snapshot from sessionStorage (read-only access for consumers)
  *
  * This is the ONLY way consumers should access course data.
  * Consumers must NEVER independently detect course type or compute grades.
  *
+ * Security: Validates user ownership and TTL before returning data.
+ *
  * @param {string} courseId - Course ID
- * @returns {Object|null} Course snapshot or null if not found
+ * @returns {Object|null} Course snapshot or null if not found/expired
  *
  * @example
  * const snapshot = getCourseSnapshot('12345');
@@ -63,6 +201,11 @@ export const PAGE_CONTEXT = Object.freeze({
  * }
  */
 export function getCourseSnapshot(courseId) {
+    // Validate user ownership first
+    if (!validateUserOwnership()) {
+        return null;
+    }
+
     const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
     const cached = sessionStorage.getItem(key);
 
@@ -73,6 +216,22 @@ export function getCourseSnapshot(courseId) {
 
     try {
         const snapshot = JSON.parse(cached);
+
+        // Validate userId matches current user
+        const currentUserId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
+        if (snapshot.userId && snapshot.userId !== currentUserId) {
+            logger.warn(`[Snapshot] User ID mismatch for course ${courseId}, removing snapshot`);
+            sessionStorage.removeItem(key);
+            return null;
+        }
+
+        // Check TTL expiration
+        if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+            logger.debug(`[Snapshot] Snapshot expired for course ${courseId}, removing`);
+            sessionStorage.removeItem(key);
+            return null;
+        }
+
         logger.trace(`[Snapshot] Cache HIT for course ${courseId}: isStandardsBased=${snapshot.isStandardsBased}, score=${snapshot.score}, source=${snapshot.gradeSource}`);
         return snapshot;
     } catch (error) {
@@ -93,6 +252,8 @@ export function getCourseSnapshot(courseId) {
  *
  * All other modules must treat sessionStorage as read-only.
  *
+ * Security: Validates user ownership, role, and page authorization before writing data.
+ *
  * @param {string} courseId - Course ID
  * @param {string} courseName - Course name
  * @param {Object} apiClient - CanvasApiClient instance
@@ -105,6 +266,31 @@ export function getCourseSnapshot(courseId) {
  * }
  */
 export async function populateCourseSnapshot(courseId, courseName, apiClient) {
+    // Validate user ownership first
+    if (!validateUserOwnership()) {
+        logger.warn(`[Snapshot] Cannot populate snapshot - user ownership validation failed`);
+        return null;
+    }
+
+    // Check user role - only student-like users can create snapshots
+    const roleGroup = getUserRoleGroup();
+    if (roleGroup !== 'student_like') {
+        logger.trace(`[Snapshot] Skipping snapshot population - user is ${roleGroup}, not student_like`);
+        return null;
+    }
+
+    // Check page authorization
+    if (!isAuthorizedPage()) {
+        logger.trace(`[Snapshot] Skipping snapshot population - unauthorized page`);
+        return null;
+    }
+
+    const currentUserId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
+    if (!currentUserId) {
+        logger.warn(`[Snapshot] Cannot populate snapshot - ENV.current_user_id not available`);
+        return null;
+    }
+
     logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}"`);
 
     try {
@@ -130,7 +316,7 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         });
         logger.trace(`[Snapshot] Course ${courseId} detection result: isStandardsBased=${isStandardsBased}`);
 
-        // Step 3: Create unified snapshot
+        // Step 3: Create unified snapshot with security fields
         const snapshot = {
             courseId,
             courseName,
@@ -138,14 +324,16 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
             score: gradeData.score,
             letterGrade: gradeData.letterGrade,
             gradeSource: gradeData.source,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            userId: currentUserId,
+            expiresAt: Date.now() + SNAPSHOT_TTL_MS
         };
 
         // Step 4: Write to sessionStorage
         const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
         sessionStorage.setItem(key, JSON.stringify(snapshot));
 
-        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: isStandardsBased=${isStandardsBased}, score=${gradeData.score}, source=${gradeData.source}`);
+        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: isStandardsBased=${isStandardsBased}, score=${gradeData.score}, source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
 
         return snapshot;
 
@@ -160,7 +348,10 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
  *
  * This is the SINGLE FUNCTION that determines page-aware refresh logic.
  *
+ * Security: Only allows refresh on authorized pages.
+ *
  * Refresh Rules:
+ * - Unauthorized pages: NEVER refresh (return false)
  * - Standards-based courses: NEVER refresh (scores are stable)
  * - Non-standards-based courses:
  *   - Dashboard: NEVER refresh (performance optimization)
@@ -184,6 +375,12 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
  * }
  */
 export function shouldRefreshGrade(courseId, pageContext) {
+    // Check page authorization first
+    if (!isAuthorizedPage()) {
+        logger.trace(`[Refresh] Course ${courseId}: Unauthorized page, no refresh allowed`);
+        return false;
+    }
+
     const snapshot = getCourseSnapshot(courseId);
 
     // No snapshot exists, need to populate
@@ -216,6 +413,8 @@ export function shouldRefreshGrade(courseId, pageContext) {
  * Checks shouldRefreshGrade() unless force=true.
  * If refresh is needed, calls populateCourseSnapshot() to update the snapshot.
  *
+ * Security: Validates user ownership and page authorization.
+ *
  * @param {string} courseId - Course ID
  * @param {string} courseName - Course name
  * @param {Object} apiClient - CanvasApiClient instance
@@ -231,6 +430,18 @@ export function shouldRefreshGrade(courseId, pageContext) {
  * const snapshot = await refreshCourseSnapshot('12345', 'Math 101', apiClient, PAGE_CONTEXT.DASHBOARD, true);
  */
 export async function refreshCourseSnapshot(courseId, courseName, apiClient, pageContext, force = false) {
+    // Validate user ownership first
+    if (!validateUserOwnership()) {
+        logger.warn(`[Refresh] Cannot refresh snapshot - user ownership validation failed`);
+        return null;
+    }
+
+    // Check page authorization (unless force=true for debugging)
+    if (!force && !isAuthorizedPage()) {
+        logger.trace(`[Refresh] Cannot refresh snapshot - unauthorized page`);
+        return getCourseSnapshot(courseId);
+    }
+
     if (force) {
         logger.debug(`[Refresh] Force refresh for course ${courseId} (page=${pageContext})`);
         return await populateCourseSnapshot(courseId, courseName, apiClient);
@@ -250,8 +461,8 @@ export async function refreshCourseSnapshot(courseId, courseName, apiClient, pag
 /**
  * Clear all course snapshots from sessionStorage
  *
- * Removes all keys with cg_ prefix.
- * Useful for debugging and testing.
+ * Removes all keys with cg_ prefix (including user ID tracking).
+ * Useful for debugging, testing, and logout cleanup.
  *
  * @returns {number} Number of entries removed
  *
