@@ -2,7 +2,6 @@
   var __defProp = Object.defineProperty;
   var __defProps = Object.defineProperties;
   var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
-  var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -34,18 +33,18 @@
       }
     return target;
   };
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  };
-  var __export = (target, all) => {
-    for (var name in all)
-      __defProp(target, name, { get: all[name], enumerable: true });
-  };
   var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
   var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
   var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
 
   // src/utils/logger.js
+  var LOG_LEVELS = {
+    TRACE: -1,
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+  };
   function determineLogLevel() {
     let logLevel = true ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
     try {
@@ -63,6 +62,76 @@
     }
     return logLevel;
   }
+  var currentLogLevel = determineLogLevel();
+  var logger = {
+    /**
+     * Log trace messages (only shown with ?debug=trace)
+     * Used for very detailed debugging in high-frequency operations like loops
+     * @param {...any} args - Arguments to log
+     */
+    trace(...args) {
+      if (currentLogLevel <= LOG_LEVELS.TRACE) {
+        console.log("%c[TRACE]", "color: #888888", ...args);
+      }
+    },
+    /**
+     * Log debug messages (only shown in dev mode or with ?debug=true)
+     * @param {...any} args - Arguments to log
+     */
+    debug(...args) {
+      if (currentLogLevel <= LOG_LEVELS.DEBUG) {
+        console.log("[DEBUG]", ...args);
+      }
+    },
+    /**
+     * Log informational messages (always shown)
+     * @param {...any} args - Arguments to log
+     */
+    info(...args) {
+      if (currentLogLevel <= LOG_LEVELS.INFO) {
+        console.log("[INFO]", ...args);
+      }
+    },
+    /**
+     * Log warning messages (always shown)
+     * @param {...any} args - Arguments to log
+     */
+    warn(...args) {
+      if (currentLogLevel <= LOG_LEVELS.WARN) {
+        console.warn("[WARN]", ...args);
+      }
+    },
+    /**
+     * Log error messages (always shown)
+     * @param {...any} args - Arguments to log
+     */
+    error(...args) {
+      if (currentLogLevel <= LOG_LEVELS.ERROR) {
+        console.error("[ERROR]", ...args);
+      }
+    },
+    /**
+     * Check if trace logging is enabled
+     * @returns {boolean} True if trace logging is enabled
+     */
+    isTraceEnabled() {
+      return currentLogLevel <= LOG_LEVELS.TRACE;
+    },
+    /**
+     * Check if debug logging is enabled
+     * @returns {boolean} True if debug logging is enabled
+     */
+    isDebugEnabled() {
+      return currentLogLevel <= LOG_LEVELS.DEBUG;
+    },
+    /**
+     * Get the current log level
+     * @returns {number} Current log level
+     */
+    getLogLevel() {
+      return currentLogLevel;
+    }
+  };
   function logBanner(envName, buildVersion) {
     console.log(
       "%cCustomized Gradebook Loaded",
@@ -87,124 +156,230 @@
       logLevel: currentLogLevel
     };
   }
-  var LOG_LEVELS, currentLogLevel, logger;
-  var init_logger = __esm({
-    "src/utils/logger.js"() {
-      LOG_LEVELS = {
-        TRACE: -1,
-        DEBUG: 0,
-        INFO: 1,
-        WARN: 2,
-        ERROR: 3
-      };
-      currentLogLevel = determineLogLevel();
-      logger = {
-        /**
-         * Log trace messages (only shown with ?debug=trace)
-         * Used for very detailed debugging in high-frequency operations like loops
-         * @param {...any} args - Arguments to log
-         */
-        trace(...args) {
-          if (currentLogLevel <= LOG_LEVELS.TRACE) {
-            console.log("%c[TRACE]", "color: #888888", ...args);
-          }
-        },
-        /**
-         * Log debug messages (only shown in dev mode or with ?debug=true)
-         * @param {...any} args - Arguments to log
-         */
-        debug(...args) {
-          if (currentLogLevel <= LOG_LEVELS.DEBUG) {
-            console.log("[DEBUG]", ...args);
-          }
-        },
-        /**
-         * Log informational messages (always shown)
-         * @param {...any} args - Arguments to log
-         */
-        info(...args) {
-          if (currentLogLevel <= LOG_LEVELS.INFO) {
-            console.log("[INFO]", ...args);
-          }
-        },
-        /**
-         * Log warning messages (always shown)
-         * @param {...any} args - Arguments to log
-         */
-        warn(...args) {
-          if (currentLogLevel <= LOG_LEVELS.WARN) {
-            console.warn("[WARN]", ...args);
-          }
-        },
-        /**
-         * Log error messages (always shown)
-         * @param {...any} args - Arguments to log
-         */
-        error(...args) {
-          if (currentLogLevel <= LOG_LEVELS.ERROR) {
-            console.error("[ERROR]", ...args);
-          }
-        },
-        /**
-         * Check if trace logging is enabled
-         * @returns {boolean} True if trace logging is enabled
-         */
-        isTraceEnabled() {
-          return currentLogLevel <= LOG_LEVELS.TRACE;
-        },
-        /**
-         * Check if debug logging is enabled
-         * @returns {boolean} True if debug logging is enabled
-         */
-        isDebugEnabled() {
-          return currentLogLevel <= LOG_LEVELS.DEBUG;
-        },
-        /**
-         * Get the current log level
-         * @returns {number} Current log level
-         */
-        getLogLevel() {
-          return currentLogLevel;
-        }
-      };
+
+  // src/utils/dom.js
+  function inheritFontStylesFrom(selector, element) {
+    const source = document.querySelector(selector);
+    if (source) {
+      const styles = getComputedStyle(source);
+      element.style.fontSize = styles.fontSize;
+      element.style.fontFamily = styles.fontFamily;
+      element.style.fontWeight = styles.fontWeight;
+      return true;
     }
-  });
+    return false;
+  }
+  function debounce(fn, delay) {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
+  // src/ui/buttons.js
+  var BRAND_COLOR_FALLBACK = "#0c7d9d";
+  function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    if (id) button.id = id;
+    if (tooltip) button.title = tooltip;
+    const foundFontStyles = inheritFontStylesFrom(".css-1f65ace-view-link", button);
+    if (!foundFontStyles) {
+      button.style.fontSize = "14px";
+      button.style.fontFamily = "inherit";
+      button.style.fontWeight = "600";
+    }
+    button.style.marginLeft = "1rem";
+    button.style.padding = "0.5rem 1rem";
+    button.style.border = "none";
+    button.style.borderRadius = "5px";
+    button.style.cursor = "pointer";
+    button.style.transition = "background 0.3s, color 0.3s";
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || BRAND_COLOR_FALLBACK;
+    const textColor = rootStyles.getPropertyValue("--ic-brand-button--primary-text").trim() || "#ffffff";
+    const secondaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--secondary-bgd").trim() || "#e0e0e0";
+    const secondaryTextColor = rootStyles.getPropertyValue("--ic-brand-button--secondary-text").trim() || "#ffffff";
+    if (type === "primary") {
+      button.style.background = primaryButtonColor;
+      button.style.color = textColor;
+    } else if (type === "secondary") {
+      button.style.background = secondaryButtonColor;
+      button.style.color = secondaryTextColor;
+      button.style.border = "1px solid #ccc";
+    }
+    if (onClick) {
+      button.addEventListener("click", onClick);
+    }
+    return button;
+  }
+  function createButtonColumnContainer() {
+    const container = document.createElement("div");
+    container.style.display = "flex";
+    container.style.flexDirection = "row";
+    container.style.gap = "0.01rem";
+    container.style.marginLeft = "1rem";
+    return container;
+  }
 
   // src/config.js
-  var _a, _b, ENABLE_STUDENT_GRADE_CUSTOMIZATION, _a2, _b2, REMOVE_ASSIGNMENT_TAB, _a3, _b3, PER_STUDENT_UPDATE_THRESHOLD, _a4, _b4, ENABLE_OUTCOME_UPDATES, _a5, _b5, ENABLE_GRADE_OVERRIDE, defaultOverrideScale, _a6, _b6, OVERRIDE_SCALE, _a7, _b7, UPDATE_AVG_BUTTON_LABEL, _a8, _b8, AVG_OUTCOME_NAME, _a9, _b9, AVG_ASSIGNMENT_NAME, _a10, _b10, AVG_RUBRIC_NAME, _a11, _b11, DEFAULT_MAX_POINTS, _a12, _b12, DEFAULT_MASTERY_THRESHOLD, defaultRatings, _a13, _b13, OUTCOME_AND_RUBRIC_RATINGS, defaultExcludedKeywords, _a14, _b14, EXCLUDED_OUTCOME_KEYWORDS;
-  var init_config = __esm({
-    "src/config.js"() {
-      ENABLE_STUDENT_GRADE_CUSTOMIZATION = (_b = (_a = window.CG_CONFIG) == null ? void 0 : _a.ENABLE_STUDENT_GRADE_CUSTOMIZATION) != null ? _b : true;
-      REMOVE_ASSIGNMENT_TAB = (_b2 = (_a2 = window.CG_CONFIG) == null ? void 0 : _a2.REMOVE_ASSIGNMENT_TAB) != null ? _b2 : false;
-      PER_STUDENT_UPDATE_THRESHOLD = (_b3 = (_a3 = window.CG_CONFIG) == null ? void 0 : _a3.PER_STUDENT_UPDATE_THRESHOLD) != null ? _b3 : 25;
-      ENABLE_OUTCOME_UPDATES = (_b4 = (_a4 = window.CG_CONFIG) == null ? void 0 : _a4.ENABLE_OUTCOME_UPDATES) != null ? _b4 : true;
-      ENABLE_GRADE_OVERRIDE = (_b5 = (_a5 = window.CG_CONFIG) == null ? void 0 : _a5.ENABLE_GRADE_OVERRIDE) != null ? _b5 : true;
-      defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));
-      OVERRIDE_SCALE = (_b6 = (_a6 = window.CG_CONFIG) == null ? void 0 : _a6.OVERRIDE_SCALE) != null ? _b6 : defaultOverrideScale;
-      UPDATE_AVG_BUTTON_LABEL = (_b7 = (_a7 = window.CG_CONFIG) == null ? void 0 : _a7.UPDATE_AVG_BUTTON_LABEL) != null ? _b7 : "Update Current Score";
-      AVG_OUTCOME_NAME = (_b8 = (_a8 = window.CG_CONFIG) == null ? void 0 : _a8.AVG_OUTCOME_NAME) != null ? _b8 : "Current Score";
-      AVG_ASSIGNMENT_NAME = (_b9 = (_a9 = window.CG_CONFIG) == null ? void 0 : _a9.AVG_ASSIGNMENT_NAME) != null ? _b9 : "Current Score Assignment";
-      AVG_RUBRIC_NAME = (_b10 = (_a10 = window.CG_CONFIG) == null ? void 0 : _a10.AVG_RUBRIC_NAME) != null ? _b10 : "Current Score Rubric";
-      DEFAULT_MAX_POINTS = (_b11 = (_a11 = window.CG_CONFIG) == null ? void 0 : _a11.DEFAULT_MAX_POINTS) != null ? _b11 : 4;
-      DEFAULT_MASTERY_THRESHOLD = (_b12 = (_a12 = window.CG_CONFIG) == null ? void 0 : _a12.DEFAULT_MASTERY_THRESHOLD) != null ? _b12 : 3;
-      defaultRatings = [
-        { description: "Exemplary", points: 4 },
-        { description: "Beyond Target", points: 3.5 },
-        { description: "Target", points: 3 },
-        { description: "Approaching Target", points: 2.5 },
-        { description: "Developing", points: 2 },
-        { description: "Beginning", points: 1.5 },
-        { description: "Needs Partial Support", points: 1 },
-        { description: "Needs Full Support", points: 0.5 },
-        { description: "No Evidence", points: 0 }
-      ];
-      OUTCOME_AND_RUBRIC_RATINGS = (_b13 = (_a13 = window.CG_CONFIG) == null ? void 0 : _a13.OUTCOME_AND_RUBRIC_RATINGS) != null ? _b13 : defaultRatings;
-      defaultExcludedKeywords = [];
-      EXCLUDED_OUTCOME_KEYWORDS = (_b14 = (_a14 = window.CG_CONFIG) == null ? void 0 : _a14.EXCLUDED_OUTCOME_KEYWORDS) != null ? _b14 : defaultExcludedKeywords;
+  var _a, _b;
+  var ENABLE_STUDENT_GRADE_CUSTOMIZATION = (_b = (_a = window.CG_CONFIG) == null ? void 0 : _a.ENABLE_STUDENT_GRADE_CUSTOMIZATION) != null ? _b : true;
+  var _a2, _b2;
+  var REMOVE_ASSIGNMENT_TAB = (_b2 = (_a2 = window.CG_CONFIG) == null ? void 0 : _a2.REMOVE_ASSIGNMENT_TAB) != null ? _b2 : false;
+  var _a3, _b3;
+  var PER_STUDENT_UPDATE_THRESHOLD = (_b3 = (_a3 = window.CG_CONFIG) == null ? void 0 : _a3.PER_STUDENT_UPDATE_THRESHOLD) != null ? _b3 : 25;
+  var _a4, _b4;
+  var ENABLE_OUTCOME_UPDATES = (_b4 = (_a4 = window.CG_CONFIG) == null ? void 0 : _a4.ENABLE_OUTCOME_UPDATES) != null ? _b4 : true;
+  var _a5, _b5;
+  var ENABLE_GRADE_OVERRIDE = (_b5 = (_a5 = window.CG_CONFIG) == null ? void 0 : _a5.ENABLE_GRADE_OVERRIDE) != null ? _b5 : true;
+  var defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));
+  var _a6, _b6;
+  var OVERRIDE_SCALE = (_b6 = (_a6 = window.CG_CONFIG) == null ? void 0 : _a6.OVERRIDE_SCALE) != null ? _b6 : defaultOverrideScale;
+  var _a7, _b7;
+  var UPDATE_AVG_BUTTON_LABEL = (_b7 = (_a7 = window.CG_CONFIG) == null ? void 0 : _a7.UPDATE_AVG_BUTTON_LABEL) != null ? _b7 : "Update Current Score";
+  var _a8, _b8;
+  var AVG_OUTCOME_NAME = (_b8 = (_a8 = window.CG_CONFIG) == null ? void 0 : _a8.AVG_OUTCOME_NAME) != null ? _b8 : "Current Score";
+  var _a9, _b9;
+  var AVG_ASSIGNMENT_NAME = (_b9 = (_a9 = window.CG_CONFIG) == null ? void 0 : _a9.AVG_ASSIGNMENT_NAME) != null ? _b9 : "Current Score Assignment";
+  var _a10, _b10;
+  var AVG_RUBRIC_NAME = (_b10 = (_a10 = window.CG_CONFIG) == null ? void 0 : _a10.AVG_RUBRIC_NAME) != null ? _b10 : "Current Score Rubric";
+  var _a11, _b11;
+  var DEFAULT_MAX_POINTS = (_b11 = (_a11 = window.CG_CONFIG) == null ? void 0 : _a11.DEFAULT_MAX_POINTS) != null ? _b11 : 4;
+  var _a12, _b12;
+  var DEFAULT_MASTERY_THRESHOLD = (_b12 = (_a12 = window.CG_CONFIG) == null ? void 0 : _a12.DEFAULT_MASTERY_THRESHOLD) != null ? _b12 : 3;
+  var defaultRatings = [
+    { description: "Exemplary", points: 4 },
+    { description: "Beyond Target", points: 3.5 },
+    { description: "Target", points: 3 },
+    { description: "Approaching Target", points: 2.5 },
+    { description: "Developing", points: 2 },
+    { description: "Beginning", points: 1.5 },
+    { description: "Needs Partial Support", points: 1 },
+    { description: "Needs Full Support", points: 0.5 },
+    { description: "No Evidence", points: 0 }
+  ];
+  var _a13, _b13;
+  var OUTCOME_AND_RUBRIC_RATINGS = (_b13 = (_a13 = window.CG_CONFIG) == null ? void 0 : _a13.OUTCOME_AND_RUBRIC_RATINGS) != null ? _b13 : defaultRatings;
+  var defaultExcludedKeywords = [];
+  var _a14, _b14;
+  var EXCLUDED_OUTCOME_KEYWORDS = (_b14 = (_a14 = window.CG_CONFIG) == null ? void 0 : _a14.EXCLUDED_OUTCOME_KEYWORDS) != null ? _b14 : defaultExcludedKeywords;
+  var defaultStandardsBasedPatterns = [
+    "Standards Based",
+    "SBG",
+    "Mastery",
+    /\[SBG\]/i,
+    /^SBG[-\s]/i
+  ];
+  var _a15, _b15;
+  var STANDARDS_BASED_COURSE_PATTERNS = (_b15 = (_a15 = window.CG_CONFIG) == null ? void 0 : _a15.STANDARDS_BASED_COURSE_PATTERNS) != null ? _b15 : defaultStandardsBasedPatterns;
+
+  // src/utils/canvas.js
+  function extractCourseIdFromHref(href) {
+    const match = href.match(/^\/courses\/(\d+)\b/);
+    return match ? match[1] : null;
+  }
+  function getCourseId() {
+    const envCourseId = ENV == null ? void 0 : ENV.COURSE_ID;
+    const pathCourseId = extractCourseIdFromHref(window.location.pathname);
+    const courseId = envCourseId || pathCourseId;
+    if (!courseId) {
+      logger.error("Course ID not found on page.");
+      return null;
     }
-  });
+    return courseId;
+  }
+  function getUserRoleGroup() {
+    const userId = (ENV == null ? void 0 : ENV.current_user_id) ? String(ENV.current_user_id) : "unknown_user";
+    const cacheKeyGroup = `roleGroup_${userId}`;
+    const cacheKeyDebug = `roleGroup_debug_${userId}`;
+    const cachedGroup = sessionStorage.getItem(cacheKeyGroup);
+    if (cachedGroup) {
+      return cachedGroup;
+    }
+    const collected = /* @__PURE__ */ new Set();
+    if (Array.isArray(ENV == null ? void 0 : ENV.current_user_roles)) {
+      ENV.current_user_roles.forEach((r) => collected.add(String(r)));
+    }
+    if (Array.isArray(ENV == null ? void 0 : ENV.current_user_types)) {
+      ENV.current_user_types.forEach((r) => collected.add(String(r)));
+    }
+    if (ENV == null ? void 0 : ENV.current_user_is_admin) collected.add("admin");
+    if (ENV == null ? void 0 : ENV.current_user_is_student) collected.add("student");
+    if (ENV == null ? void 0 : ENV.current_user_is_teacher) collected.add("teacher");
+    if (ENV == null ? void 0 : ENV.current_user_is_observer) collected.add("observer");
+    const normRoles = Array.from(collected).map((r) => r.toLowerCase());
+    logger.debug("[role debug] userId:", userId);
+    logger.debug("[role debug] normalized roles:", normRoles);
+    const teacherLike = ["teacher", "admin", "root_admin", "designer", "ta", "accountadmin"];
+    const studentLike = ["student", "observer"];
+    let group = "other";
+    if (normRoles.some((r) => studentLike.includes(r))) {
+      group = "student_like";
+    } else if (normRoles.some((r) => teacherLike.includes(r))) {
+      group = "teacher_like";
+    }
+    sessionStorage.setItem(cacheKeyGroup, group);
+    sessionStorage.setItem(
+      cacheKeyDebug,
+      JSON.stringify({ userId, normRoles, decided: group })
+    );
+    return group;
+  }
+  async function courseHasAvgAssignment() {
+    const courseId = getCourseId();
+    if (!courseId) return false;
+    const cacheKey = `hasAvgAssignment_${courseId}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached !== null) {
+      return cached === "true";
+    }
+    try {
+      const response = await fetch(
+        `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(
+          AVG_ASSIGNMENT_NAME
+        )}`
+      );
+      const assignments = await response.json();
+      const hasAvg = assignments.some((a) => a.name === AVG_ASSIGNMENT_NAME);
+      sessionStorage.setItem(cacheKey, hasAvg ? "true" : "false");
+      return hasAvg;
+    } catch (e) {
+      console.warn("Could not verify assignment existence:", e);
+      return false;
+    }
+  }
 
   // src/utils/errorHandler.js
+  var CanvasApiError = class extends Error {
+    constructor(message, statusCode, responseText) {
+      super(message);
+      this.name = "CanvasApiError";
+      this.statusCode = statusCode;
+      this.responseText = responseText;
+    }
+  };
+  var UserCancelledError = class extends Error {
+    constructor(message = "User cancelled the operation") {
+      super(message);
+      this.name = "UserCancelledError";
+    }
+  };
+  var TimeoutError = class extends Error {
+    constructor(message, timeoutMs) {
+      super(message);
+      this.name = "TimeoutError";
+      this.timeoutMs = timeoutMs;
+    }
+  };
+  var ValidationError = class extends Error {
+    constructor(message, field) {
+      super(message);
+      this.name = "ValidationError";
+      this.field = field;
+    }
+  };
   function logError(error, context, metadata = {}) {
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const errorInfo = __spreadValues({
@@ -310,531 +485,8 @@
       );
     }
   }
-  var CanvasApiError, UserCancelledError, TimeoutError, ValidationError;
-  var init_errorHandler = __esm({
-    "src/utils/errorHandler.js"() {
-      init_logger();
-      CanvasApiError = class extends Error {
-        constructor(message, statusCode, responseText) {
-          super(message);
-          this.name = "CanvasApiError";
-          this.statusCode = statusCode;
-          this.responseText = responseText;
-        }
-      };
-      UserCancelledError = class extends Error {
-        constructor(message = "User cancelled the operation") {
-          super(message);
-          this.name = "UserCancelledError";
-        }
-      };
-      TimeoutError = class extends Error {
-        constructor(message, timeoutMs) {
-          super(message);
-          this.name = "TimeoutError";
-          this.timeoutMs = timeoutMs;
-        }
-      };
-      ValidationError = class extends Error {
-        constructor(message, field) {
-          super(message);
-          this.name = "ValidationError";
-          this.field = field;
-        }
-      };
-    }
-  });
-
-  // src/utils/canvasApiClient.js
-  var _CanvasApiClient_instances, getTokenCookie_fn, makeRequest_fn, CanvasApiClient;
-  var init_canvasApiClient = __esm({
-    "src/utils/canvasApiClient.js"() {
-      init_errorHandler();
-      init_logger();
-      CanvasApiClient = class {
-        /**
-         * Create a new Canvas API client
-         * @throws {Error} If CSRF token is not found in cookies
-         */
-        constructor() {
-          __privateAdd(this, _CanvasApiClient_instances);
-          this.csrfToken = __privateMethod(this, _CanvasApiClient_instances, getTokenCookie_fn).call(this, "_csrf_token");
-          if (!this.csrfToken) {
-            throw new Error("CSRF token not found - user may not be authenticated");
-          }
-          logger.debug("CanvasApiClient initialized with cached CSRF token");
-        }
-        /**
-         * Make a GET request to the Canvas API
-         * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async get(url, options = {}, context = "get") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "GET", null, options, context);
-        }
-        /**
-         * Make a POST request to the Canvas API
-         * @param {string} url - API endpoint URL
-         * @param {Object} data - Request body data
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async post(url, data, options = {}, context = "post") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
-        }
-        /**
-         * Make a PUT request to the Canvas API
-         * @param {string} url - API endpoint URL
-         * @param {Object} data - Request body data
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async put(url, data, options = {}, context = "put") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "PUT", data, options, context);
-        }
-        /**
-         * Make a DELETE request to the Canvas API
-         * @param {string} url - API endpoint URL
-         * @param {Object} options - Additional fetch options
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async delete(url, options = {}, context = "delete") {
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "DELETE", null, options, context);
-        }
-        /**
-         * Make a GraphQL request to the Canvas API
-         * @param {string} query - GraphQL query string
-         * @param {Object} variables - GraphQL variables (optional)
-         * @param {string} context - Context for error logging (optional)
-         * @returns {Promise<any>} Parsed JSON response
-         */
-        async graphql(query, variables = {}, context = "graphql") {
-          const url = "/api/graphql";
-          const data = { query, variables };
-          const options = {
-            headers: {
-              "Content-Type": "application/json"
-            }
-          };
-          return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
-        }
-      };
-      _CanvasApiClient_instances = new WeakSet();
-      /**
-       * Get CSRF token from browser cookies
-       * @private
-       * @param {string} name - Cookie name
-       * @returns {string|null} Cookie value or null if not found
-       */
-      getTokenCookie_fn = function(name) {
-        const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
-        for (const cookie of cookies) {
-          const [key, value] = cookie.split("=", 2);
-          if (key === name) {
-            return decodeURIComponent(value);
-          }
-        }
-        return null;
-      };
-      makeRequest_fn = async function(url, method, data, options = {}, context = "request") {
-        const headers = __spreadProps(__spreadValues({
-          "Content-Type": "application/json"
-        }, options.headers), {
-          "X-CSRF-Token": this.csrfToken
-        });
-        let body = null;
-        if (data) {
-          const contentType = headers["Content-Type"] || "application/json";
-          const isJson = contentType.includes("application/json");
-          if (isJson) {
-            if (!data.authenticity_token) {
-              data = __spreadProps(__spreadValues({}, data), { authenticity_token: this.csrfToken });
-            }
-            body = JSON.stringify(data);
-          } else {
-            body = data;
-          }
-        }
-        const _a15 = options, { headers: _optionsHeaders } = _a15, restOptions = __objRest(_a15, ["headers"]);
-        const response = await safeFetch(
-          url,
-          __spreadValues({
-            method,
-            credentials: "same-origin",
-            headers,
-            body
-          }, restOptions),
-          context
-        );
-        return await safeJsonParse(response, context);
-      };
-    }
-  });
-
-  // src/dashboard/gradeDataService.js
-  var gradeDataService_exports = {};
-  __export(gradeDataService_exports, {
-    GRADE_SOURCE: () => GRADE_SOURCE,
-    clearGradeCache: () => clearGradeCache,
-    getCourseGrade: () => getCourseGrade,
-    preCacheEnrollmentGrades: () => preCacheEnrollmentGrades
-  });
-  function getCachedGrade(courseId) {
-    const cached = gradeCache.get(courseId);
-    if (!cached) return null;
-    if (Date.now() > cached.expiresAt) {
-      gradeCache.delete(courseId);
-      logger.trace(`Cache expired for course ${courseId}`);
-      return null;
-    }
-    logger.trace(`Cache hit for course ${courseId}, expires in ${Math.round((cached.expiresAt - Date.now()) / 1e3)}s`);
-    return cached.value;
-  }
-  function cacheGrade(courseId, score, letterGrade, source) {
-    const expiresAt = Date.now() + CACHE_TTL_MS;
-    gradeCache.set(courseId, {
-      value: { score, letterGrade, source },
-      expiresAt
-    });
-    logger.trace(`Cached grade for course ${courseId}, expires at ${new Date(expiresAt).toISOString()}`);
-  }
-  function clearGradeCache() {
-    const size = gradeCache.size;
-    gradeCache.clear();
-    logger.debug(`Grade cache cleared (${size} entries removed)`);
-  }
-  function preCacheEnrollmentGrades(courses) {
-    var _a15, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-    logger.debug(`Pre-caching enrollment grades for ${courses.length} courses`);
-    let cachedCount = 0;
-    for (const course of courses) {
-      const { id: courseId, enrollmentData } = course;
-      if (!enrollmentData) {
-        logger.trace(`No enrollment data for course ${courseId}, skipping pre-cache`);
-        continue;
-      }
-      let score = null;
-      let letterGrade = null;
-      if (enrollmentData.grades) {
-        score = (_a15 = enrollmentData.grades.current_score) != null ? _a15 : enrollmentData.grades.final_score;
-        letterGrade = (_e = (_d = (_c = (_b15 = enrollmentData.grades.current_grade) != null ? _b15 : enrollmentData.grades.final_grade) != null ? _c : null) == null ? void 0 : _d.trim()) != null ? _e : null;
-      }
-      if (score === null || score === void 0) {
-        score = (_h = (_g = (_f = enrollmentData.computed_current_score) != null ? _f : enrollmentData.calculated_current_score) != null ? _g : enrollmentData.computed_final_score) != null ? _h : enrollmentData.calculated_final_score;
-      }
-      if (letterGrade === null && score !== null) {
-        letterGrade = (_n = (_m = (_l = (_k = (_j = (_i = enrollmentData.computed_current_grade) != null ? _i : enrollmentData.calculated_current_grade) != null ? _j : enrollmentData.computed_final_grade) != null ? _k : enrollmentData.calculated_final_grade) != null ? _l : null) == null ? void 0 : _m.trim()) != null ? _n : null;
-      }
-      if (score !== null && score !== void 0) {
-        cacheGrade(courseId, score, letterGrade, GRADE_SOURCE.ENROLLMENT);
-        cachedCount++;
-        logger.trace(`Pre-cached enrollment grade for course ${courseId}: ${score}% (${letterGrade || "no letter grade"})`);
-      } else {
-        logger.trace(`No valid enrollment score for course ${courseId}, skipping pre-cache`);
-      }
-    }
-    logger.debug(`Pre-cached ${cachedCount} enrollment grades`);
-  }
-  async function fetchAvgAssignmentScore(courseId, apiClient) {
-    try {
-      const assignments = await apiClient.get(
-        `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
-        {},
-        "fetchAvgAssignment"
-      );
-      const avgAssignment = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
-      if (!avgAssignment) {
-        logger.trace(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
-        return null;
-      }
-      const submission = await apiClient.get(
-        `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/self`,
-        {},
-        "fetchAvgSubmission"
-      );
-      const score = submission == null ? void 0 : submission.score;
-      if (score === null || score === void 0) {
-        logger.trace(`No score found for AVG assignment in course ${courseId}`);
-        return null;
-      }
-      let letterGrade = null;
-      const cached = getCachedGrade(courseId);
-      if (cached && cached.source === GRADE_SOURCE.ENROLLMENT) {
-        letterGrade = cached.letterGrade;
-        logger.trace(`Retrieved letter grade from pre-cached enrollment data for course ${courseId}: ${letterGrade || "no letter grade"}`);
-      } else {
-        logger.trace(`No pre-cached enrollment data available for letter grade in course ${courseId}`);
-      }
-      logger.trace(`AVG assignment data for course ${courseId}: ${score} (${letterGrade || "no letter grade"})`);
-      return { score, letterGrade };
-    } catch (error) {
-      logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
-      return null;
-    }
-  }
-  async function fetchEnrollmentScore(courseId, apiClient) {
-    var _a15, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-    const cached = getCachedGrade(courseId);
-    if (cached && cached.source === GRADE_SOURCE.ENROLLMENT) {
-      logger.trace(`Using pre-cached enrollment grade for course ${courseId}: ${cached.score}% (${cached.letterGrade || "no letter grade"})`);
-      return {
-        score: cached.score,
-        letterGrade: cached.letterGrade
-      };
-    }
-    logger.trace(`Enrollment grade not pre-cached for course ${courseId}, fetching via API`);
-    try {
-      const enrollments = await apiClient.get(
-        `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
-        {},
-        "fetchEnrollment"
-      );
-      logger.trace(`Enrollment response for course ${courseId}:`, enrollments);
-      const studentEnrollment = enrollments.find(
-        (e) => e.type === "StudentEnrollment" || e.type === "student" || e.role === "StudentEnrollment"
-      );
-      if (!studentEnrollment) {
-        logger.trace(`No student enrollment found for course ${courseId}`);
-        if (logger.isTraceEnabled() && enrollments.length > 0) {
-          logger.trace(`Available enrollment types:`, enrollments.map((e) => e.type || e.role));
-        }
-        return null;
-      }
-      logger.trace(`Student enrollment for course ${courseId}:`, studentEnrollment);
-      let score = null;
-      let letterGrade = null;
-      if (studentEnrollment.grades) {
-        score = (_a15 = studentEnrollment.grades.current_score) != null ? _a15 : studentEnrollment.grades.final_score;
-        letterGrade = (_e = (_d = (_c = (_b15 = studentEnrollment.grades.current_grade) != null ? _b15 : studentEnrollment.grades.final_grade) != null ? _c : null) == null ? void 0 : _d.trim()) != null ? _e : null;
-      }
-      if (score === null || score === void 0) {
-        score = (_h = (_g = (_f = studentEnrollment.computed_current_score) != null ? _f : studentEnrollment.calculated_current_score) != null ? _g : studentEnrollment.computed_final_score) != null ? _h : studentEnrollment.calculated_final_score;
-      }
-      if (letterGrade === null && score !== null) {
-        letterGrade = (_n = (_m = (_l = (_k = (_j = (_i = studentEnrollment.computed_current_grade) != null ? _i : studentEnrollment.calculated_current_grade) != null ? _j : studentEnrollment.computed_final_grade) != null ? _k : studentEnrollment.calculated_final_grade) != null ? _l : null) == null ? void 0 : _m.trim()) != null ? _n : null;
-      }
-      if (score === null || score === void 0) {
-        logger.trace(`No enrollment score found for course ${courseId}`);
-        logger.trace(`Enrollment object:`, studentEnrollment);
-        return null;
-      }
-      logger.trace(`Enrollment data for course ${courseId}: ${score}% (${letterGrade || "no letter grade"})`);
-      return {
-        score,
-        letterGrade
-      };
-    } catch (error) {
-      logger.warn(`Failed to fetch enrollment score for course ${courseId}:`, error.message);
-      if (logger.isDebugEnabled()) {
-        logger.warn(`Full error:`, error);
-      }
-      return null;
-    }
-  }
-  async function getCourseGrade(courseId, apiClient) {
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
-    const cached = getCachedGrade(courseId);
-    if (cached && cached.source === GRADE_SOURCE.ASSIGNMENT) {
-      logger.trace(`[Grade Source Debug] Course ${courseId}: Using cached AVG assignment grade (score=${cached.score}, letterGrade=${cached.letterGrade})`);
-      return {
-        score: cached.score,
-        letterGrade: cached.letterGrade,
-        source: cached.source
-      };
-    }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 1 - AVG assignment...`);
-    const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
-    if (avgData !== null) {
-      logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${avgData.letterGrade}`);
-      cacheGrade(courseId, avgData.score, avgData.letterGrade, GRADE_SOURCE.ASSIGNMENT);
-      return { score: avgData.score, letterGrade: avgData.letterGrade, source: GRADE_SOURCE.ASSIGNMENT };
-    }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: AVG assignment not found, checking priority 2...`);
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Checking priority 2 - enrollment grade...`);
-    const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
-    if (enrollmentData !== null) {
-      logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
-      if (!cached || cached.source !== GRADE_SOURCE.ENROLLMENT) {
-        cacheGrade(courseId, enrollmentData.score, enrollmentData.letterGrade, GRADE_SOURCE.ENROLLMENT);
-      }
-      return {
-        score: enrollmentData.score,
-        letterGrade: enrollmentData.letterGrade,
-        source: GRADE_SOURCE.ENROLLMENT
-      };
-    }
-    logger.trace(`[Grade Source Debug] Course ${courseId}: Enrollment grade not found`);
-    logger.trace(`[Grade Source Debug] Course ${courseId}: No grade available from any source`);
-    return null;
-  }
-  var GRADE_SOURCE, CACHE_TTL_MS, gradeCache;
-  var init_gradeDataService = __esm({
-    "src/dashboard/gradeDataService.js"() {
-      init_config();
-      init_logger();
-      init_canvasApiClient();
-      GRADE_SOURCE = Object.freeze({
-        ASSIGNMENT: "assignment",
-        ENROLLMENT: "enrollment"
-      });
-      CACHE_TTL_MS = 5 * 60 * 1e3;
-      gradeCache = /* @__PURE__ */ new Map();
-    }
-  });
-
-  // src/customGradebookInit.js
-  init_logger();
-
-  // src/utils/dom.js
-  function inheritFontStylesFrom(selector, element) {
-    const source = document.querySelector(selector);
-    if (source) {
-      const styles = getComputedStyle(source);
-      element.style.fontSize = styles.fontSize;
-      element.style.fontFamily = styles.fontFamily;
-      element.style.fontWeight = styles.fontWeight;
-      return true;
-    }
-    return false;
-  }
-
-  // src/ui/buttons.js
-  var BRAND_COLOR_FALLBACK = "#0c7d9d";
-  function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
-    const button = document.createElement("button");
-    button.textContent = label;
-    if (id) button.id = id;
-    if (tooltip) button.title = tooltip;
-    const foundFontStyles = inheritFontStylesFrom(".css-1f65ace-view-link", button);
-    if (!foundFontStyles) {
-      button.style.fontSize = "14px";
-      button.style.fontFamily = "inherit";
-      button.style.fontWeight = "600";
-    }
-    button.style.marginLeft = "1rem";
-    button.style.padding = "0.5rem 1rem";
-    button.style.border = "none";
-    button.style.borderRadius = "5px";
-    button.style.cursor = "pointer";
-    button.style.transition = "background 0.3s, color 0.3s";
-    const rootStyles = getComputedStyle(document.documentElement);
-    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || BRAND_COLOR_FALLBACK;
-    const textColor = rootStyles.getPropertyValue("--ic-brand-button--primary-text").trim() || "#ffffff";
-    const secondaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--secondary-bgd").trim() || "#e0e0e0";
-    const secondaryTextColor = rootStyles.getPropertyValue("--ic-brand-button--secondary-text").trim() || "#ffffff";
-    if (type === "primary") {
-      button.style.background = primaryButtonColor;
-      button.style.color = textColor;
-    } else if (type === "secondary") {
-      button.style.background = secondaryButtonColor;
-      button.style.color = secondaryTextColor;
-      button.style.border = "1px solid #ccc";
-    }
-    if (onClick) {
-      button.addEventListener("click", onClick);
-    }
-    return button;
-  }
-  function createButtonColumnContainer() {
-    const container = document.createElement("div");
-    container.style.display = "flex";
-    container.style.flexDirection = "row";
-    container.style.gap = "0.01rem";
-    container.style.marginLeft = "1rem";
-    return container;
-  }
-
-  // src/utils/canvas.js
-  init_config();
-  init_logger();
-  function getCourseId() {
-    var _a15, _b15;
-    const envCourseId = ENV == null ? void 0 : ENV.COURSE_ID;
-    const pathCourseId = (_b15 = (_a15 = window.location.pathname.match(/courses\/(\d+)/)) == null ? void 0 : _a15[1]) != null ? _b15 : null;
-    const courseId = envCourseId || pathCourseId;
-    if (!courseId) {
-      logger.error("Course ID not found on page.");
-      return null;
-    }
-    return courseId;
-  }
-  function getUserRoleGroup() {
-    const userId = (ENV == null ? void 0 : ENV.current_user_id) ? String(ENV.current_user_id) : "unknown_user";
-    const cacheKeyGroup = `roleGroup_${userId}`;
-    const cacheKeyDebug = `roleGroup_debug_${userId}`;
-    const cachedGroup = sessionStorage.getItem(cacheKeyGroup);
-    if (cachedGroup) {
-      return cachedGroup;
-    }
-    const collected = /* @__PURE__ */ new Set();
-    if (Array.isArray(ENV == null ? void 0 : ENV.current_user_roles)) {
-      ENV.current_user_roles.forEach((r) => collected.add(String(r)));
-    }
-    if (Array.isArray(ENV == null ? void 0 : ENV.current_user_types)) {
-      ENV.current_user_types.forEach((r) => collected.add(String(r)));
-    }
-    if (ENV == null ? void 0 : ENV.current_user_is_admin) collected.add("admin");
-    if (ENV == null ? void 0 : ENV.current_user_is_student) collected.add("student");
-    if (ENV == null ? void 0 : ENV.current_user_is_teacher) collected.add("teacher");
-    if (ENV == null ? void 0 : ENV.current_user_is_observer) collected.add("observer");
-    const normRoles = Array.from(collected).map((r) => r.toLowerCase());
-    logger.debug("[role debug] userId:", userId);
-    logger.debug("[role debug] normalized roles:", normRoles);
-    const teacherLike = ["teacher", "admin", "root_admin", "designer", "ta", "accountadmin"];
-    const studentLike = ["student", "observer"];
-    let group = "other";
-    if (normRoles.some((r) => studentLike.includes(r))) {
-      group = "student_like";
-    } else if (normRoles.some((r) => teacherLike.includes(r))) {
-      group = "teacher_like";
-    }
-    sessionStorage.setItem(cacheKeyGroup, group);
-    sessionStorage.setItem(
-      cacheKeyDebug,
-      JSON.stringify({ userId, normRoles, decided: group })
-    );
-    return group;
-  }
-  function isDashboardPage() {
-    const path = window.location.pathname;
-    return path === "/" || path.startsWith("/dashboard");
-  }
-  async function courseHasAvgAssignment() {
-    const courseId = getCourseId();
-    if (!courseId) return false;
-    const cacheKey = `hasAvgAssignment_${courseId}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached !== null) {
-      return cached === "true";
-    }
-    try {
-      const response = await fetch(
-        `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(
-          AVG_ASSIGNMENT_NAME
-        )}`
-      );
-      const assignments = await response.json();
-      const hasAvg = assignments.some((a) => a.name === AVG_ASSIGNMENT_NAME);
-      sessionStorage.setItem(cacheKey, hasAvg ? "true" : "false");
-      return hasAvg;
-    } catch (e) {
-      console.warn("Could not verify assignment existence:", e);
-      return false;
-    }
-  }
-
-  // src/gradebook/ui/buttonInjection.js
-  init_config();
-  init_errorHandler();
-  init_logger();
 
   // src/gradebook/stateMachine.js
-  init_logger();
   var STATES = {
     IDLE: "IDLE",
     CHECKING_SETUP: "CHECKING_SETUP",
@@ -927,10 +579,10 @@
      * @throws {Error} If transition is invalid
      */
     transition(toState, contextUpdates = {}) {
-      var _a15;
+      var _a16;
       if (!this.canTransition(toState)) {
         throw new Error(
-          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a15 = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a15.join(", ")) || "none"}`
+          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a16 = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a16.join(", ")) || "none"}`
         );
       }
       const fromState = this.currentState;
@@ -1005,20 +657,132 @@
     }
   };
 
-  // src/gradebook/stateHandlers.js
-  init_logger();
-  init_config();
-  init_errorHandler();
-  init_canvasApiClient();
-
-  // src/services/gradeCalculator.js
-  init_config();
-  init_logger();
+  // src/utils/canvasApiClient.js
+  var _CanvasApiClient_instances, getTokenCookie_fn, makeRequest_fn;
+  var CanvasApiClient = class {
+    /**
+     * Create a new Canvas API client
+     * @throws {Error} If CSRF token is not found in cookies
+     */
+    constructor() {
+      __privateAdd(this, _CanvasApiClient_instances);
+      this.csrfToken = __privateMethod(this, _CanvasApiClient_instances, getTokenCookie_fn).call(this, "_csrf_token");
+      if (!this.csrfToken) {
+        throw new Error("CSRF token not found - user may not be authenticated");
+      }
+      logger.debug("CanvasApiClient initialized with cached CSRF token");
+    }
+    /**
+     * Make a GET request to the Canvas API
+     * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async get(url, options = {}, context = "get") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "GET", null, options, context);
+    }
+    /**
+     * Make a POST request to the Canvas API
+     * @param {string} url - API endpoint URL
+     * @param {Object} data - Request body data
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async post(url, data, options = {}, context = "post") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
+    }
+    /**
+     * Make a PUT request to the Canvas API
+     * @param {string} url - API endpoint URL
+     * @param {Object} data - Request body data
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async put(url, data, options = {}, context = "put") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "PUT", data, options, context);
+    }
+    /**
+     * Make a DELETE request to the Canvas API
+     * @param {string} url - API endpoint URL
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async delete(url, options = {}, context = "delete") {
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "DELETE", null, options, context);
+    }
+    /**
+     * Make a GraphQL request to the Canvas API
+     * @param {string} query - GraphQL query string
+     * @param {Object} variables - GraphQL variables (optional)
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} Parsed JSON response
+     */
+    async graphql(query, variables = {}, context = "graphql") {
+      const url = "/api/graphql";
+      const data = { query, variables };
+      const options = {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      };
+      return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "POST", data, options, context);
+    }
+  };
+  _CanvasApiClient_instances = new WeakSet();
+  /**
+   * Get CSRF token from browser cookies
+   * @private
+   * @param {string} name - Cookie name
+   * @returns {string|null} Cookie value or null if not found
+   */
+  getTokenCookie_fn = function(name) {
+    const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
+    for (const cookie of cookies) {
+      const [key, value] = cookie.split("=", 2);
+      if (key === name) {
+        return decodeURIComponent(value);
+      }
+    }
+    return null;
+  };
+  makeRequest_fn = async function(url, method, data, options = {}, context = "request") {
+    const headers = __spreadProps(__spreadValues({
+      "Content-Type": "application/json"
+    }, options.headers), {
+      "X-CSRF-Token": this.csrfToken
+    });
+    let body = null;
+    if (data) {
+      const contentType = headers["Content-Type"] || "application/json";
+      const isJson = contentType.includes("application/json");
+      if (isJson) {
+        if (!data.authenticity_token) {
+          data = __spreadProps(__spreadValues({}, data), { authenticity_token: this.csrfToken });
+        }
+        body = JSON.stringify(data);
+      } else {
+        body = data;
+      }
+    }
+    const _a16 = options, { headers: _optionsHeaders } = _a16, restOptions = __objRest(_a16, ["headers"]);
+    const response = await safeFetch(
+      url,
+      __spreadValues({
+        method,
+        credentials: "same-origin",
+        headers,
+        body
+      }, restOptions),
+      context
+    );
+    return await safeJsonParse(response, context);
+  };
 
   // src/services/gradeOverrideVerification.js
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function enableCourseOverride(courseId, apiClient) {
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping");
@@ -1042,7 +806,7 @@
     }
   }
   async function fetchOverrideGrades(courseId, apiClient) {
-    var _a15;
+    var _a16;
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping fetch");
       return /* @__PURE__ */ new Map();
@@ -1056,7 +820,7 @@
       const overrideMap = /* @__PURE__ */ new Map();
       const overrides = response.final_grade_overrides || {};
       for (const [userId, data] of Object.entries(overrides)) {
-        const percentage = (_a15 = data == null ? void 0 : data.course_grade) == null ? void 0 : _a15.percentage;
+        const percentage = (_a16 = data == null ? void 0 : data.course_grade) == null ? void 0 : _a16.percentage;
         if (percentage !== null && percentage !== void 0) {
           overrideMap.set(userId, percentage);
           logger.trace(`Override grade for user ${userId}: ${percentage}%`);
@@ -1128,25 +892,25 @@
 
   // src/services/gradeCalculator.js
   function buildOutcomeMap(data) {
-    var _a15, _b15;
+    var _a16, _b16;
     const map = {};
-    ((_b15 = (_a15 = data == null ? void 0 : data.linked) == null ? void 0 : _a15.outcomes) != null ? _b15 : []).forEach((o) => {
+    ((_b16 = (_a16 = data == null ? void 0 : data.linked) == null ? void 0 : _a16.outcomes) != null ? _b16 : []).forEach((o) => {
       map[String(o.id)] = o.title;
     });
     return map;
   }
   function getCurrentOutcomeScore(scores, outcomeId) {
-    var _a15;
+    var _a16;
     const match = scores.find((s) => {
-      var _a16;
-      return String((_a16 = s.links) == null ? void 0 : _a16.outcome) === String(outcomeId);
+      var _a17;
+      return String((_a17 = s.links) == null ? void 0 : _a17.outcome) === String(outcomeId);
     });
-    return (_a15 = match == null ? void 0 : match.score) != null ? _a15 : null;
+    return (_a16 = match == null ? void 0 : match.score) != null ? _a16 : null;
   }
   function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywords) {
     return scores.filter((s) => {
-      var _a15;
-      const id = String((_a15 = s.links) == null ? void 0 : _a15.outcome);
+      var _a16;
+      const id = String((_a16 = s.links) == null ? void 0 : _a16.outcome);
       const title = (outcomeMap[id] || "").toLowerCase();
       return typeof s.score === "number" && !excludedOutcomeIds.has(id) && !excludedKeywords.some((keyword) => title.includes(keyword.toLowerCase()));
     });
@@ -1196,7 +960,7 @@
     }
   }
   async function calculateStudentAverages(data, outcomeId, courseId, apiClient) {
-    var _a15, _b15, _c, _d;
+    var _a16, _b16, _c, _d;
     logger.info("Calculating student averages...");
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     const outcomeMap = buildOutcomeMap(data);
@@ -1212,8 +976,8 @@
       }
     }
     const results = [];
-    for (const rollup of (_a15 = data == null ? void 0 : data.rollups) != null ? _a15 : []) {
-      const userId = (_b15 = rollup.links) == null ? void 0 : _b15.user;
+    for (const rollup of (_a16 = data == null ? void 0 : data.rollups) != null ? _a16 : []) {
+      const userId = (_b16 = rollup.links) == null ? void 0 : _b16.user;
       if (!userId) continue;
       const oldAverage = getCurrentOutcomeScore((_c = rollup.scores) != null ? _c : [], outcomeId);
       const relevantScores = getRelevantScores(
@@ -1251,12 +1015,7 @@
     return results;
   }
 
-  // src/services/gradeSubmission.js
-  init_canvasApiClient();
-  init_config();
-
   // src/utils/uiHelpers.js
-  init_logger();
   function getElapsedTimeSinceStart(stateMachine, endTime = Date.now()) {
     if (!stateMachine) return 0;
     const context = stateMachine.getContext();
@@ -1305,13 +1064,9 @@
   }
 
   // src/services/gradeOverride.js
-  init_canvasApiClient();
-  init_config();
-  init_errorHandler();
-  init_logger();
   var __enrollmentMapCache = /* @__PURE__ */ new Map();
   async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) {
-    var _a15, _b15, _c, _d, _e;
+    var _a16, _b16, _c, _d, _e;
     const query = `
     mutation SetOverride($enrollmentId: ID!, $overrideScore: Float!) {
       setOverrideScore(input: { enrollmentId: $enrollmentId, overrideScore: $overrideScore }) {
@@ -1332,7 +1087,7 @@
       logError(error, "setOverrideScoreGQL", { enrollmentId, overrideScore });
       throw error;
     }
-    return (_e = (_d = (_c = (_b15 = (_a15 = json.data) == null ? void 0 : _a15.setOverrideScore) == null ? void 0 : _b15.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
+    return (_e = (_d = (_c = (_b16 = (_a16 = json.data) == null ? void 0 : _a16.setOverrideScore) == null ? void 0 : _b16.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
   }
   async function getAllEnrollmentIds(courseId, apiClient) {
     const courseKey = String(courseId);
@@ -1357,8 +1112,6 @@
   }
 
   // src/services/gradeSubmission.js
-  init_errorHandler();
-  init_logger();
   async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
     if (!ENABLE_OUTCOME_UPDATES) {
       logger.trace(`Outcome updates disabled, skipping rubric score submission for user ${userId}`);
@@ -1561,10 +1314,10 @@
       retryCounts.map((r) => [r.userId, r.attempts])
     );
     const rows = Array.from(allUserIds).map((userId) => {
-      var _a15, _b15;
-      const attempts = (_a15 = retryCountsById[userId]) != null ? _a15 : "";
+      var _a16, _b16;
+      const attempts = (_a16 = retryCountsById[userId]) != null ? _a16 : "";
       const failed = failedById[userId];
-      const average = (_b15 = failed == null ? void 0 : failed.average) != null ? _b15 : "";
+      const average = (_b16 = failed == null ? void 0 : failed.average) != null ? _b16 : "";
       const status = failed ? "UPDATE FAILED" : "";
       const error = (failed == null ? void 0 : failed.error) ? `"${failed.error.replace(/"/g, '""')}"` : "";
       return `${userId},${average},${attempts},${status},${error}`;
@@ -1580,8 +1333,6 @@
   }
 
   // src/services/verification.js
-  init_canvasApiClient();
-  init_logger();
   async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, stateMachine, waitTimeMs = 5e3, maxRetries = 50) {
     let state = "verifying";
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1629,10 +1380,6 @@
   }
 
   // src/services/outcomeService.js
-  init_errorHandler();
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function getRollup(courseId, apiClient) {
     const rollupData = await apiClient.get(
       `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
@@ -1643,11 +1390,11 @@
     return rollupData;
   }
   function getOutcomeObjectByName(data) {
-    var _a15, _b15;
+    var _a16, _b16;
     const outcomeTitle = AVG_OUTCOME_NAME;
     logger.debug("Outcome Title:", outcomeTitle);
     logger.debug("data:", data);
-    const outcomes = (_b15 = (_a15 = data == null ? void 0 : data.linked) == null ? void 0 : _a15.outcomes) != null ? _b15 : [];
+    const outcomes = (_b16 = (_a16 = data == null ? void 0 : data.linked) == null ? void 0 : _a16.outcomes) != null ? _b16 : [];
     logger.debug("outcomes: ", outcomes);
     if (outcomes.length === 0) {
       logger.warn("No outcomes found in rollup data.");
@@ -1709,12 +1456,9 @@
   }
 
   // src/services/assignmentService.js
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient) {
-    var _a15;
-    const alignments = (_a15 = outcomeObject.alignments) != null ? _a15 : [];
+    var _a16;
+    const alignments = (_a16 = outcomeObject.alignments) != null ? _a16 : [];
     for (const alignment of alignments) {
       if (!alignment.startsWith("assignment_")) continue;
       const assignmentId = alignment.split("_")[1];
@@ -1761,9 +1505,6 @@
   }
 
   // src/services/rubricService.js
-  init_canvasApiClient();
-  init_config();
-  init_logger();
   async function getRubricForAssignment(courseId, assignmentId, apiClient) {
     const assignment = await apiClient.get(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
@@ -1825,8 +1566,6 @@
   }
 
   // src/utils/canvasHelpers.js
-  init_config();
-  init_logger();
   async function getAssignmentId(courseId) {
     const response = await fetch(`/api/v1/courses/${courseId}/assignments?per_page=100`);
     const assignments = await response.json();
@@ -2176,7 +1915,7 @@ You may need to refresh the page to see the new scores.`);
     let autoTimer = null;
     const now = () => Date.now();
     const isLocked = () => now() < lockedUntil;
-    const courseId = getCourseId();
+    const courseId = window.location.pathname.includes("/courses/") ? getCourseId() : null;
     const apply = (textValue) => {
       msg.textContent = textValue;
       if (courseId) localStorage.setItem(k("bannerLast", courseId), textValue);
@@ -2235,7 +1974,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/gradebook/ui/debugPanel.js
-  init_logger();
   function updateDebugUI(stateMachine) {
     if (!logger.isDebugEnabled()) return;
     let debugPanel = document.getElementById("state-machine-debug-panel");
@@ -2293,11 +2031,7 @@ You may need to refresh the page to see the new scores.`);
     }
   }
 
-  // src/gradebook/updateFlowOrchestrator.js
-  init_errorHandler();
-
   // src/utils/stateManagement.js
-  init_logger();
   function cleanUpLocalStorage() {
     const courseId = getCourseId();
     if (!courseId) return;
@@ -2313,10 +2047,8 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/gradebook/updateFlowOrchestrator.js
-  init_config();
-  init_logger();
   async function startUpdateFlow(button = null) {
-    var _a15;
+    var _a16;
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
@@ -2344,7 +2076,7 @@ You may need to refresh the page to see the new scores.`);
         }
         updateDebugUI(stateMachine);
       }
-      const buttonWrapper = (_a15 = document.querySelector("#update-scores-button")) == null ? void 0 : _a15.parentElement;
+      const buttonWrapper = (_a16 = document.querySelector("#update-scores-button")) == null ? void 0 : _a16.parentElement;
       if (buttonWrapper) renderLastUpdateNotice(buttonWrapper, courseId);
       resetButtonToNormal(button);
       removeDebugUI();
@@ -2426,22 +2158,702 @@ You may need to refresh the page to see the new scores.`);
     }, 300);
   }
 
-  // src/dashboard/gradeDisplay.js
-  init_logger();
-  init_canvasApiClient();
-  init_gradeDataService();
+  // src/utils/courseDetection.js
+  function matchesCourseNamePattern(courseName) {
+    if (!courseName) return false;
+    return STANDARDS_BASED_COURSE_PATTERNS.some((pattern) => {
+      if (typeof pattern === "string") {
+        return courseName.toLowerCase().includes(pattern.toLowerCase());
+      } else if (pattern instanceof RegExp) {
+        return pattern.test(courseName);
+      }
+      return false;
+    });
+  }
+  function isValidLetterGrade(letterGrade) {
+    if (!letterGrade || typeof letterGrade !== "string") {
+      return false;
+    }
+    const trimmed = letterGrade.trim();
+    if (!trimmed) return false;
+    const rating = OUTCOME_AND_RUBRIC_RATINGS.find(
+      (r) => r.description.toLowerCase() === trimmed.toLowerCase()
+    );
+    return rating !== void 0;
+  }
+  async function hasAvgAssignment(courseId, apiClient) {
+    try {
+      const assignments = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments`,
+        { search_term: AVG_ASSIGNMENT_NAME },
+        "checkAvgAssignment"
+      );
+      return assignments.some((a) => a.name === AVG_ASSIGNMENT_NAME);
+    } catch (error) {
+      logger.warn(`Could not check assignments for course ${courseId}:`, error.message);
+      return false;
+    }
+  }
+  async function isStandardsBasedCourse(options) {
+    const { courseId, courseName, letterGrade = null, apiClient, skipApiCheck = false } = options;
+    if (!courseId || !courseName) {
+      logger.warn("isStandardsBasedCourse called without required courseId or courseName");
+      return false;
+    }
+    logger.trace(`[Detection] Starting detection for course ${courseId} "${courseName}"`);
+    logger.trace(`[Detection] Input: letterGrade="${letterGrade}", skipApiCheck=${skipApiCheck}`);
+    const matchesPattern = matchesCourseNamePattern(courseName);
+    logger.trace(`[Detection] Step 1 - Pattern match: ${matchesPattern ? "YES" : "NO"}`);
+    if (matchesPattern) {
+      logger.debug(`[Detection] \u2705 Course "${courseName}" detected as standards-based (pattern match)`);
+      return true;
+    }
+    logger.trace(`[Detection] Step 2 - Letter grade validation: letterGrade="${letterGrade}"`);
+    if (letterGrade) {
+      const isValid = isValidLetterGrade(letterGrade);
+      logger.trace(`[Detection] Step 2 - isValidLetterGrade("${letterGrade}") = ${isValid}`);
+      if (isValid) {
+        logger.debug(`[Detection] \u2705 Course "${courseName}" detected as standards-based (valid letter grade: "${letterGrade}")`);
+        return true;
+      } else {
+        const availableGrades = OUTCOME_AND_RUBRIC_RATINGS.map((r) => r.description).join(", ");
+        logger.trace(`[Detection] Step 2 - Letter grade "${letterGrade}" does NOT match any rating. Available: ${availableGrades}`);
+      }
+    } else {
+      logger.trace(`[Detection] Step 2 - No letter grade provided, skipping validation`);
+    }
+    if (!skipApiCheck && apiClient) {
+      logger.trace(`[Detection] Step 3 - Checking AVG Assignment presence via API...`);
+      const hasAvg = await hasAvgAssignment(courseId, apiClient);
+      logger.trace(`[Detection] Step 3 - AVG Assignment: ${hasAvg ? "FOUND" : "NOT FOUND"}`);
+      if (hasAvg) {
+        logger.debug(`[Detection] \u2705 Course "${courseName}" detected as standards-based (AVG Assignment found)`);
+        return true;
+      }
+    } else {
+      logger.trace(`[Detection] Step 3 - Skipped (skipApiCheck=${skipApiCheck}, hasApiClient=${!!apiClient})`);
+    }
+    logger.debug(`[Detection] \u274C Course "${courseName}" is traditional (not standards-based)`);
+    return false;
+  }
 
-  // src/dashboard/cardRenderer.js
-  init_logger();
-  init_config();
-  init_gradeDataService();
-  var GRADE_CLASS_PREFIX = "cg-dashboard-grade";
+  // src/services/enrollmentService.js
+  function parseEnrollmentGrade(enrollmentData) {
+    var _a16, _b16, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    if (!enrollmentData) {
+      return null;
+    }
+    let score = null;
+    let letterGrade = null;
+    if (enrollmentData.grades) {
+      score = (_a16 = enrollmentData.grades.current_score) != null ? _a16 : enrollmentData.grades.final_score;
+      letterGrade = (_e = (_d = (_c = (_b16 = enrollmentData.grades.current_grade) != null ? _b16 : enrollmentData.grades.final_grade) != null ? _c : null) == null ? void 0 : _d.trim()) != null ? _e : null;
+    }
+    if (score === null || score === void 0) {
+      score = (_h = (_g = (_f = enrollmentData.computed_current_score) != null ? _f : enrollmentData.calculated_current_score) != null ? _g : enrollmentData.computed_final_score) != null ? _h : enrollmentData.calculated_final_score;
+    }
+    if (letterGrade === null && score !== null) {
+      letterGrade = (_n = (_m = (_l = (_k = (_j = (_i = enrollmentData.computed_current_grade) != null ? _i : enrollmentData.calculated_current_grade) != null ? _j : enrollmentData.computed_final_grade) != null ? _k : enrollmentData.calculated_final_grade) != null ? _l : null) == null ? void 0 : _m.trim()) != null ? _n : null;
+    }
+    if (score === null && letterGrade === null) {
+      return null;
+    }
+    return { score, letterGrade };
+  }
+  async function fetchAllEnrollments(apiClient, options = {}) {
+    const {
+      state = "active",
+      includeTotalScores = true
+    } = options;
+    try {
+      const params = {
+        "type[]": "StudentEnrollment",
+        "state[]": state
+      };
+      if (includeTotalScores) {
+        params["include[]"] = "total_scores";
+      }
+      const enrollments = await apiClient.get(
+        "/api/v1/users/self/enrollments",
+        params,
+        "fetchAllEnrollments"
+      );
+      logger.trace(`[EnrollmentService] Fetched ${enrollments.length} enrollments from API`);
+      return enrollments;
+    } catch (error) {
+      logger.warn("[EnrollmentService] Failed to fetch enrollments:", error.message);
+      return [];
+    }
+  }
+  async function fetchSingleEnrollment(courseId, apiClient) {
+    try {
+      const enrollments = await apiClient.get(
+        `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
+        {},
+        "fetchSingleEnrollment"
+      );
+      logger.trace(`[EnrollmentService] Fetched ${enrollments.length} enrollment(s) for course ${courseId}`);
+      const studentEnrollment = enrollments.find(
+        (e) => e.type === "StudentEnrollment" || e.type === "student" || e.role === "StudentEnrollment"
+      );
+      if (!studentEnrollment) {
+        logger.trace(`[EnrollmentService] No student enrollment found for course ${courseId}`);
+        if (logger.isTraceEnabled() && enrollments.length > 0) {
+          logger.trace(`[EnrollmentService] Available enrollment types:`, enrollments.map((e) => e.type || e.role));
+        }
+        return null;
+      }
+      logger.trace(`[EnrollmentService] Found student enrollment for course ${courseId}`);
+      return studentEnrollment;
+    } catch (error) {
+      logger.warn(`[EnrollmentService] Failed to fetch enrollment for course ${courseId}:`, error.message);
+      return null;
+    }
+  }
+  function extractEnrollmentData(enrollments) {
+    var _a16;
+    const gradeMap = /* @__PURE__ */ new Map();
+    if (!Array.isArray(enrollments)) {
+      logger.warn("[EnrollmentService] extractEnrollmentData called with non-array:", typeof enrollments);
+      return gradeMap;
+    }
+    for (const enrollment of enrollments) {
+      const courseId = (_a16 = enrollment.course_id) == null ? void 0 : _a16.toString();
+      if (!courseId) {
+        logger.trace("[EnrollmentService] Skipping enrollment without course_id");
+        continue;
+      }
+      const gradeData = parseEnrollmentGrade(enrollment);
+      if (!gradeData) {
+        logger.trace(`[EnrollmentService] No grade data found for course ${courseId}`);
+        gradeMap.set(courseId, { percentage: null, letterGrade: null });
+        continue;
+      }
+      gradeMap.set(courseId, {
+        percentage: gradeData.score,
+        letterGrade: gradeData.letterGrade
+      });
+      logger.trace(`[EnrollmentService] Course ${courseId}: percentage=${gradeData.score}%, letterGrade="${gradeData.letterGrade || "null"}"`);
+    }
+    logger.trace(`[EnrollmentService] Extracted grade data for ${gradeMap.size} courses`);
+    return gradeMap;
+  }
+
+  // src/services/gradeDataService.js
+  var GRADE_SOURCE = Object.freeze({
+    ASSIGNMENT: "assignment",
+    ENROLLMENT: "enrollment"
+  });
+  async function fetchAvgAssignmentScore(courseId, apiClient) {
+    try {
+      const assignments = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+        {},
+        "fetchAvgAssignment"
+      );
+      const avgAssignment = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
+      if (!avgAssignment) {
+        logger.trace(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
+        return null;
+      }
+      const submission = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/self`,
+        {},
+        "fetchAvgSubmission"
+      );
+      const score = submission == null ? void 0 : submission.score;
+      if (score === null || score === void 0) {
+        logger.trace(`No score found for AVG assignment in course ${courseId}`);
+        return null;
+      }
+      logger.trace(`AVG assignment score for course ${courseId}: ${score}`);
+      return { score };
+    } catch (error) {
+      logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
+      return null;
+    }
+  }
+  async function fetchEnrollmentScore(courseId, apiClient) {
+    const studentEnrollment = await fetchSingleEnrollment(courseId, apiClient);
+    if (!studentEnrollment) {
+      return null;
+    }
+    const gradeData = parseEnrollmentGrade(studentEnrollment);
+    if (!gradeData || gradeData.score === null || gradeData.score === void 0) {
+      logger.trace(`No enrollment score found for course ${courseId}`);
+      return null;
+    }
+    logger.trace(`Enrollment data for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || "no letter grade"})`);
+    return {
+      score: gradeData.score,
+      letterGrade: gradeData.letterGrade
+    };
+  }
+  async function getCourseGrade(courseId, apiClient) {
+    logger.trace(`[Grade Fetch] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
+    const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
+    if (avgData !== null) {
+      const enrollmentData2 = await fetchEnrollmentScore(courseId, apiClient);
+      const letterGrade = (enrollmentData2 == null ? void 0 : enrollmentData2.letterGrade) || null;
+      logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${letterGrade}`);
+      return {
+        score: avgData.score,
+        letterGrade,
+        source: GRADE_SOURCE.ASSIGNMENT
+      };
+    }
+    logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment not found, checking priority 2...`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 2 - enrollment grade...`);
+    const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
+    if (enrollmentData !== null) {
+      logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
+      return {
+        score: enrollmentData.score,
+        letterGrade: enrollmentData.letterGrade,
+        source: GRADE_SOURCE.ENROLLMENT
+      };
+    }
+    logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade not found`);
+    logger.trace(`[Grade Fetch] Course ${courseId}: No grade available from any source`);
+    return null;
+  }
+
+  // src/utils/pageDetection.js
+  function isDashboardPage() {
+    const path = window.location.pathname;
+    return path === "/" || path.startsWith("/dashboard");
+  }
+  function isAllGradesPage() {
+    const path = window.location.pathname;
+    return path === "/grades" || path.includes("/grades") && !path.includes("/courses/");
+  }
+  function isSingleCourseGradesPage() {
+    return window.location.href.includes("/courses/") && window.location.pathname.includes("/grades");
+  }
+  function isCoursePageNeedingCleanup() {
+    const path = window.location.pathname;
+    return window.location.href.includes("/courses/") && (path.includes("/grades") || path.includes("/assignments") || /^\/courses\/\d+$/.test(path));
+  }
+
+  // src/services/courseSnapshotService.js
+  var SNAPSHOT_KEY_PREFIX = "cg_courseSnapshot_";
+  var USER_ID_KEY = "cg_userId";
+  var SNAPSHOT_TTL_MS = 10 * 60 * 1e3;
+  var PAGE_CONTEXT = Object.freeze({
+    DASHBOARD: "dashboard",
+    ALL_GRADES: "allGrades",
+    COURSE_GRADES: "courseGrades"
+  });
+  function isAuthorizedPage() {
+    return isDashboardPage() || isAllGradesPage() || isSingleCourseGradesPage();
+  }
+  function validateUserOwnership() {
+    const currentUserId = (ENV == null ? void 0 : ENV.current_user_id) ? String(ENV.current_user_id) : null;
+    if (!currentUserId) {
+      logger.warn("[Snapshot] Cannot validate user ownership - ENV.current_user_id not available");
+      return false;
+    }
+    const cachedUserId = sessionStorage.getItem(USER_ID_KEY);
+    if (!cachedUserId) {
+      sessionStorage.setItem(USER_ID_KEY, currentUserId);
+      logger.debug(`[Snapshot] Initialized user ownership tracking for user ${currentUserId}`);
+      return true;
+    }
+    if (cachedUserId !== currentUserId) {
+      logger.warn(`[Snapshot] User changed from ${cachedUserId} to ${currentUserId} - clearing all snapshots`);
+      const count = clearAllSnapshots();
+      sessionStorage.setItem(USER_ID_KEY, currentUserId);
+      logger.info(`[Snapshot] Cleared ${count} snapshots due to user change`);
+      return true;
+    }
+    return true;
+  }
+  function validateAllSnapshots() {
+    const currentUserId = (ENV == null ? void 0 : ENV.current_user_id) ? String(ENV.current_user_id) : null;
+    if (!currentUserId) {
+      logger.warn("[Snapshot] Cannot validate snapshots - ENV.current_user_id not available");
+      return 0;
+    }
+    const cachedUserId = sessionStorage.getItem(USER_ID_KEY);
+    if (!cachedUserId || cachedUserId !== currentUserId) {
+      logger.warn(`[Snapshot] User validation failed on init (cached=${cachedUserId}, current=${currentUserId}) - clearing all snapshots`);
+      const count = clearAllSnapshots();
+      sessionStorage.setItem(USER_ID_KEY, currentUserId);
+      return count;
+    }
+    const keys = Object.keys(sessionStorage);
+    const snapshotKeys = keys.filter((k2) => k2.startsWith(SNAPSHOT_KEY_PREFIX));
+    let clearedCount = 0;
+    snapshotKeys.forEach((key) => {
+      try {
+        const snapshot = JSON.parse(sessionStorage.getItem(key));
+        if (snapshot.userId && snapshot.userId !== currentUserId) {
+          logger.warn(`[Snapshot] Removing snapshot with mismatched userId: ${key}`);
+          sessionStorage.removeItem(key);
+          clearedCount++;
+          return;
+        }
+        if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+          logger.debug(`[Snapshot] Removing expired snapshot: ${key}`);
+          sessionStorage.removeItem(key);
+          clearedCount++;
+          return;
+        }
+      } catch (error) {
+        logger.warn(`[Snapshot] Failed to parse snapshot ${key}, removing:`, error.message);
+        sessionStorage.removeItem(key);
+        clearedCount++;
+      }
+    });
+    if (clearedCount > 0) {
+      logger.info(`[Snapshot] Cleared ${clearedCount} invalid/expired snapshots on init`);
+    } else {
+      logger.debug("[Snapshot] All existing snapshots validated successfully");
+    }
+    return clearedCount;
+  }
+  function getCourseSnapshot(courseId) {
+    if (!validateUserOwnership()) {
+      return null;
+    }
+    const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
+    const cached = sessionStorage.getItem(key);
+    if (!cached) {
+      logger.trace(`[Snapshot] Cache MISS for course ${courseId}`);
+      return null;
+    }
+    try {
+      const snapshot = JSON.parse(cached);
+      const currentUserId = (ENV == null ? void 0 : ENV.current_user_id) ? String(ENV.current_user_id) : null;
+      if (snapshot.userId && snapshot.userId !== currentUserId) {
+        logger.warn(`[Snapshot] User ID mismatch for course ${courseId}, removing snapshot`);
+        sessionStorage.removeItem(key);
+        return null;
+      }
+      if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+        logger.debug(`[Snapshot] Snapshot expired for course ${courseId}, removing`);
+        sessionStorage.removeItem(key);
+        return null;
+      }
+      logger.trace(`[Snapshot] Cache HIT for course ${courseId}: isStandardsBased=${snapshot.isStandardsBased}, score=${snapshot.score}, source=${snapshot.gradeSource}`);
+      return snapshot;
+    } catch (error) {
+      logger.warn(`[Snapshot] Failed to parse snapshot for course ${courseId}:`, error.message);
+      sessionStorage.removeItem(key);
+      return null;
+    }
+  }
+  async function populateCourseSnapshot(courseId, courseName, apiClient) {
+    if (!validateUserOwnership()) {
+      logger.warn(`[Snapshot] Cannot populate snapshot - user ownership validation failed`);
+      return null;
+    }
+    const roleGroup = getUserRoleGroup();
+    if (roleGroup !== "student_like") {
+      logger.trace(`[Snapshot] Skipping snapshot population - user is ${roleGroup}, not student_like`);
+      return null;
+    }
+    if (!isAuthorizedPage()) {
+      logger.trace(`[Snapshot] Skipping snapshot population - unauthorized page`);
+      return null;
+    }
+    const currentUserId = (ENV == null ? void 0 : ENV.current_user_id) ? String(ENV.current_user_id) : null;
+    if (!currentUserId) {
+      logger.warn(`[Snapshot] Cannot populate snapshot - ENV.current_user_id not available`);
+      return null;
+    }
+    logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}"`);
+    try {
+      logger.trace(`[Snapshot] Step 1: Fetching grade for ${courseId}...`);
+      const gradeData = await getCourseGrade(courseId, apiClient);
+      if (!gradeData) {
+        logger.trace(`[Snapshot] No grade data available for course ${courseId}, skipping snapshot`);
+        return null;
+      }
+      logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
+      logger.trace(`[Snapshot] Step 2: Detecting course type for ${courseId} with letterGrade="${gradeData.letterGrade}"...`);
+      const isStandardsBased = await isStandardsBasedCourse({
+        courseId,
+        courseName,
+        letterGrade: gradeData.letterGrade,
+        apiClient,
+        skipApiCheck: false
+      });
+      logger.trace(`[Snapshot] Course ${courseId} detection result: isStandardsBased=${isStandardsBased}`);
+      const snapshot = {
+        courseId,
+        courseName,
+        isStandardsBased,
+        score: gradeData.score,
+        letterGrade: gradeData.letterGrade,
+        gradeSource: gradeData.source,
+        timestamp: Date.now(),
+        userId: currentUserId,
+        expiresAt: Date.now() + SNAPSHOT_TTL_MS
+      };
+      const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
+      sessionStorage.setItem(key, JSON.stringify(snapshot));
+      logger.debug(`[Snapshot] \u2705 Populated snapshot for course ${courseId}: isStandardsBased=${isStandardsBased}, score=${gradeData.score}, source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+      return snapshot;
+    } catch (error) {
+      logger.warn(`[Snapshot] Failed to populate snapshot for course ${courseId}:`, error.message);
+      return null;
+    }
+  }
+  function shouldRefreshGrade(courseId, pageContext) {
+    if (!isAuthorizedPage()) {
+      logger.trace(`[Refresh] Course ${courseId}: Unauthorized page, no refresh allowed`);
+      return false;
+    }
+    const snapshot = getCourseSnapshot(courseId);
+    if (!snapshot) {
+      logger.trace(`[Refresh] Course ${courseId}: No snapshot exists, needs population`);
+      return true;
+    }
+    if (snapshot.isStandardsBased) {
+      logger.trace(`[Refresh] Course ${courseId}: Standards-based, no refresh needed (page=${pageContext})`);
+      return false;
+    }
+    const refreshPages = [PAGE_CONTEXT.ALL_GRADES, PAGE_CONTEXT.COURSE_GRADES];
+    const shouldRefresh = refreshPages.includes(pageContext);
+    const reason = shouldRefresh ? `page ${pageContext} requires fresh grade` : `page ${pageContext} uses cached grade`;
+    logger.trace(`[Refresh] Course ${courseId}: Non-standards-based, ${reason}`);
+    return shouldRefresh;
+  }
+  async function refreshCourseSnapshot(courseId, courseName, apiClient, pageContext, force = false) {
+    if (!validateUserOwnership()) {
+      logger.warn(`[Refresh] Cannot refresh snapshot - user ownership validation failed`);
+      return null;
+    }
+    if (!force && !isAuthorizedPage()) {
+      logger.trace(`[Refresh] Cannot refresh snapshot - unauthorized page`);
+      return getCourseSnapshot(courseId);
+    }
+    if (force) {
+      logger.debug(`[Refresh] Force refresh for course ${courseId} (page=${pageContext})`);
+      return await populateCourseSnapshot(courseId, courseName, apiClient);
+    }
+    const needsRefresh = shouldRefreshGrade(courseId, pageContext);
+    if (needsRefresh) {
+      logger.debug(`[Refresh] Refreshing snapshot for course ${courseId} (page=${pageContext})`);
+      return await populateCourseSnapshot(courseId, courseName, apiClient);
+    } else {
+      logger.trace(`[Refresh] Using existing snapshot for course ${courseId} (page=${pageContext})`);
+      return getCourseSnapshot(courseId);
+    }
+  }
+  function clearAllSnapshots() {
+    const keys = Object.keys(sessionStorage);
+    const snapshotKeys = keys.filter((k2) => k2.startsWith("cg_"));
+    snapshotKeys.forEach((k2) => sessionStorage.removeItem(k2));
+    logger.debug(`[Snapshot] Cleared all snapshots (${snapshotKeys.length} entries removed)`);
+    return snapshotKeys.length;
+  }
+  function debugSnapshots() {
+    const snapshots = {};
+    const keys = Object.keys(sessionStorage);
+    keys.forEach((key) => {
+      if (key.startsWith(SNAPSHOT_KEY_PREFIX)) {
+        const courseId = key.replace(SNAPSHOT_KEY_PREFIX, "");
+        try {
+          snapshots[courseId] = JSON.parse(sessionStorage.getItem(key));
+        } catch (error) {
+          snapshots[courseId] = { error: "Failed to parse" };
+        }
+      }
+    });
+    logger.info("[Snapshot] All cached snapshots:", snapshots);
+    logger.info(`[Snapshot] Total snapshots: ${Object.keys(snapshots).length}`);
+    const stats = {
+      total: Object.keys(snapshots).length,
+      standardsBased: 0,
+      traditional: 0,
+      assignmentSource: 0,
+      enrollmentSource: 0
+    };
+    Object.values(snapshots).forEach((snapshot) => {
+      if (snapshot.error) return;
+      if (snapshot.isStandardsBased) stats.standardsBased++;
+      else stats.traditional++;
+      if (snapshot.gradeSource === "assignment") stats.assignmentSource++;
+      else if (snapshot.gradeSource === "enrollment") stats.enrollmentSource++;
+    });
+    logger.info("[Snapshot] Statistics:", stats);
+    return snapshots;
+  }
+
+  // src/utils/gradeFormatting.js
+  function formatGradeDisplay(score, letterGrade) {
+    const scoreStr = typeof score === "number" ? score.toFixed(2) : String(score);
+    if (letterGrade) {
+      return `${scoreStr} (${letterGrade})`;
+    }
+    return scoreStr;
+  }
+  function percentageToPoints(percentage) {
+    return percentage / 100 * DEFAULT_MAX_POINTS;
+  }
+  var DISPLAY_SOURCE = {
+    /** Grade from AVG Assignment (0-4 scale) */
+    ASSIGNMENT: "assignment",
+    /** Grade from Enrollment API (percentage) */
+    ENROLLMENT: "enrollment",
+    /** Grade from percentage value (generic) */
+    PERCENTAGE: "percentage"
+  };
+  function calculateDisplayValue(options) {
+    const {
+      score,
+      letterGrade = null,
+      source = DISPLAY_SOURCE.PERCENTAGE,
+      includeAriaLabel = true
+    } = options;
+    let displayValue;
+    let ariaLabel;
+    if (source === DISPLAY_SOURCE.ASSIGNMENT) {
+      const scoreStr = score.toFixed(2);
+      if (letterGrade) {
+        displayValue = `${scoreStr} (${letterGrade})`;
+        ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
+      } else {
+        displayValue = scoreStr;
+        ariaLabel = `Grade: ${scoreStr}`;
+      }
+      logger.trace(`[Grade Display] Assignment grade: display=${displayValue}`);
+    } else if (source === DISPLAY_SOURCE.ENROLLMENT) {
+      const isValidGrade = isValidLetterGrade(letterGrade);
+      if (!letterGrade) {
+        logger.trace(`[Grade Display] Letter grade is empty/null/undefined`);
+      } else {
+        logger.trace(`[Grade Display] Checking "${letterGrade}" against rating scale: ${isValidGrade ? "MATCH FOUND" : "NO MATCH"}`);
+      }
+      if (isValidGrade) {
+        const pointValue = percentageToPoints(score);
+        const scoreStr = pointValue.toFixed(2);
+        displayValue = `${scoreStr} (${letterGrade})`;
+        ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
+        logger.trace(`[Grade Display] Converted to points: ${score}% -> ${pointValue} -> display="${displayValue}"`);
+      } else {
+        const percentageStr = `${score.toFixed(2)}%`;
+        if (letterGrade) {
+          displayValue = `${percentageStr} (${letterGrade})`;
+          ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
+          logger.trace(`[Grade Display] Letter grade "${letterGrade}" not in rating scale, using percentage: display="${displayValue}"`);
+        } else {
+          displayValue = percentageStr;
+          ariaLabel = `Grade: ${percentageStr}`;
+          logger.trace(`[Grade Display] No letter grade, using percentage: display="${displayValue}"`);
+        }
+      }
+    } else {
+      const percentageStr = `${score.toFixed(2)}%`;
+      if (letterGrade) {
+        displayValue = `${percentageStr} (${letterGrade})`;
+        ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
+      } else {
+        displayValue = percentageStr;
+        ariaLabel = `Grade: ${percentageStr}`;
+      }
+      logger.trace(`[Grade Display] Percentage grade: display=${displayValue}`);
+    }
+    if (includeAriaLabel) {
+      return { displayValue, ariaLabel };
+    } else {
+      return { displayValue };
+    }
+  }
+
+  // src/utils/domExtractors.js
+  function extractCourseLinks(container, excludeNavigation = true) {
+    const links = container.querySelectorAll('a[href*="/courses/"]');
+    if (!excludeNavigation) {
+      return Array.from(links);
+    }
+    return Array.from(links).filter((link) => {
+      const isNavigation = link.closest(".ic-app-header") || link.closest('[role="navigation"]') || link.closest(".menu");
+      return !isNavigation;
+    });
+  }
+  function extractGradeFromCell(gradeCell) {
+    if (!gradeCell) return null;
+    const gradeText = gradeCell.textContent.trim();
+    if (!gradeText) return null;
+    const percentageMatch = gradeText.match(/(\d+(?:\.\d+)?)\s*%/);
+    if (percentageMatch) {
+      return parseFloat(percentageMatch[1]);
+    }
+    return null;
+  }
+  function extractCourseDataFromRow(row) {
+    try {
+      const courseLink = row.querySelector('a[href*="/courses/"]');
+      if (!courseLink) {
+        logger.trace("[DOM Extractor] No course link found in row");
+        return null;
+      }
+      const courseName = courseLink.textContent.trim();
+      const href = courseLink.getAttribute("href");
+      const courseId = extractCourseIdFromHref(href);
+      if (!courseId) {
+        logger.trace(`[DOM Extractor] Could not extract course ID from href: ${href}`);
+        return null;
+      }
+      const gradeCell = row.querySelector(".percent");
+      const percentage = extractGradeFromCell(gradeCell);
+      const matchesPattern = matchesCourseNamePattern(courseName);
+      logger.trace(`[DOM Extractor] Extracted course: ${courseName} (${courseId}), grade=${percentage}%, matchesPattern=${matchesPattern}`);
+      return {
+        courseId,
+        courseName,
+        percentage,
+        matchesPattern,
+        courseUrl: `/courses/${courseId}/grades`
+      };
+    } catch (error) {
+      logger.warn("[DOM Extractor] Failed to extract course data from row:", error);
+      return null;
+    }
+  }
+  function findTableRows() {
+    const table = document.querySelector("table.course_details.student_grades");
+    if (!table) {
+      logger.trace("[DOM Extractor] Grades table not found");
+      return [];
+    }
+    const rows = table.querySelectorAll("tbody tr");
+    logger.trace(`[DOM Extractor] Found ${rows.length} table rows`);
+    return Array.from(rows);
+  }
+  function extractAllCoursesFromTable() {
+    const rows = findTableRows();
+    const courses = [];
+    for (const row of rows) {
+      const courseData = extractCourseDataFromRow(row);
+      if (courseData) {
+        courses.push(courseData);
+      }
+    }
+    logger.trace(`[DOM Extractor] Extracted ${courses.length} courses from table`);
+    return courses;
+  }
+
+  // src/dashboard/cardSelectors.js
   var CARD_SELECTORS = [
+    "[data-course-id]",
+    // Older Canvas versions
     ".ic-DashboardCard",
+    // Common Canvas class
     '[class*="DashboardCard"]',
-    '[class*="CourseCard"]',
+    // Any class containing DashboardCard
     ".course-list-item",
+    // Alternative Canvas layout
+    '[class*="CourseCard"]',
+    // Modern Canvas
+    'div[id^="dashboard_card_"]',
+    // ID-based cards
     ".dashboard-card"
+    // Lowercase variant
   ];
   var HERO_SELECTORS = [
     ".ic-DashboardCard__header_hero",
@@ -2451,6 +2863,43 @@ You may need to refresh the page to see the new scores.`);
     '[class*="header"]',
     '[class*="Header"]'
   ];
+  function getDashboardCardSelectors() {
+    return CARD_SELECTORS;
+  }
+  function looksLikeDashboardCard(node) {
+    var _a16, _b16;
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const element = node;
+    if ((_a16 = element.hasAttribute) == null ? void 0 : _a16.call(element, "data-course-id")) return true;
+    const className = element.className || "";
+    if (typeof className === "string") {
+      if (className.includes("DashboardCard") || className.includes("CourseCard") || className.includes("course-list-item") || className.includes("dashboard-card")) {
+        return true;
+      }
+    }
+    const id = element.id || "";
+    if (id.startsWith("dashboard_card_")) return true;
+    if ((_b16 = element.querySelector) == null ? void 0 : _b16.call(element, 'a[href*="/courses/"]')) {
+      return true;
+    }
+    return false;
+  }
+  function findDashboardCards() {
+    for (const selector of CARD_SELECTORS) {
+      const cards = document.querySelectorAll(selector);
+      if (cards.length > 0) {
+        logger.trace(`Found ${cards.length} dashboard cards using selector: ${selector}`);
+        return cards;
+      }
+    }
+    const dashboardLinks = extractCourseLinks(document.body, true);
+    if (dashboardLinks.length > 0) {
+      logger.trace(`Found ${dashboardLinks.length} dashboard course links`);
+      return dashboardLinks;
+    }
+    logger.trace("No dashboard cards found with any selector");
+    return null;
+  }
   function findCourseCard(courseId) {
     let card = document.querySelector(`[data-course-id="${courseId}"]`);
     if (card) {
@@ -2471,10 +2920,11 @@ You may need to refresh the page to see the new scores.`);
         }
       }
     }
-    for (const link of links) {
-      if (link.closest(".ic-app-header") || link.closest('[role="navigation"]') || link.closest(".menu")) {
-        continue;
-      }
+    const dashboardLinks = extractCourseLinks(document.body, true).filter((link) => {
+      const href = link.getAttribute("href");
+      return href && href.includes(courseUrl);
+    });
+    for (const link of dashboardLinks) {
       let parent = link;
       for (let i = 0; i < 5; i++) {
         parent = parent.parentElement;
@@ -2489,76 +2939,23 @@ You may need to refresh the page to see the new scores.`);
     logger.trace(`Dashboard card not found for course ${courseId}`);
     return null;
   }
-  function isValidLetterGrade(letterGrade) {
-    if (!letterGrade) {
-      logger.trace(`[Letter Grade Validation] letterGrade is empty/null/undefined`);
-      return false;
-    }
-    const rating = OUTCOME_AND_RUBRIC_RATINGS.find(
-      (r) => r.description === letterGrade
-    );
-    const isValid = rating !== void 0;
-    logger.trace(`[Letter Grade Validation] Checking "${letterGrade}" against rating scale: ${isValid ? "MATCH FOUND" : "NO MATCH"}`);
-    if (!isValid && OUTCOME_AND_RUBRIC_RATINGS.length > 0) {
-      logger.trace(`[Letter Grade Validation] Available rating descriptions:`, OUTCOME_AND_RUBRIC_RATINGS.map((r) => r.description));
-    }
-    return isValid;
-  }
-  function percentageToPoints(percentageScore) {
-    return percentageScore / 100 * DEFAULT_MAX_POINTS;
-  }
-  function formatGradeDisplay(gradeData) {
+
+  // src/dashboard/cardRenderer.js
+  var GRADE_CLASS_PREFIX = "cg-dashboard-grade";
+  function formatGradeDisplay2(gradeData) {
     const { score, letterGrade, source } = gradeData;
     logger.trace(`[Grade Conversion Debug] Formatting grade data: source=${source}, score=${score}, letterGrade=${letterGrade}`);
-    let displayValue;
-    let ariaLabel;
-    if (source === GRADE_SOURCE.ASSIGNMENT) {
-      const scoreStr = score.toFixed(2);
-      if (letterGrade) {
-        displayValue = `${scoreStr} (${letterGrade})`;
-        ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
-      } else {
-        displayValue = scoreStr;
-        ariaLabel = `Grade: ${scoreStr}`;
-      }
-      logger.trace(`[Grade Conversion Debug] Assignment grade: display=${displayValue}`);
-    } else if (source === GRADE_SOURCE.ENROLLMENT) {
-      const isValidGrade = isValidLetterGrade(letterGrade);
-      logger.trace(`[Grade Conversion Debug] isValidLetterGrade("${letterGrade}") = ${isValidGrade}`);
-      if (isValidGrade) {
-        const pointValue = percentageToPoints(score);
-        const scoreStr = pointValue.toFixed(2);
-        displayValue = `${scoreStr} (${letterGrade})`;
-        ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
-        logger.trace(`[Grade Conversion Debug] Converted to points: ${score}% -> ${pointValue} -> display="${displayValue}"`);
-      } else {
-        const percentageStr = `${score.toFixed(2)}%`;
-        if (letterGrade) {
-          displayValue = `${percentageStr} (${letterGrade})`;
-          ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
-          logger.trace(`[Grade Conversion Debug] Letter grade "${letterGrade}" not in rating scale, using percentage: display="${displayValue}"`);
-        } else {
-          displayValue = percentageStr;
-          ariaLabel = `Grade: ${percentageStr}`;
-          logger.trace(`[Grade Conversion Debug] No letter grade, using percentage: display="${displayValue}"`);
-        }
-      }
-    } else {
-      logger.warn(`[Grade Conversion Debug] Unknown grade source: ${source}`);
-      const percentageStr = `${score.toFixed(2)}%`;
-      if (letterGrade) {
-        displayValue = `${percentageStr} (${letterGrade})`;
-        ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
-      } else {
-        displayValue = percentageStr;
-        ariaLabel = `Grade: ${percentageStr}`;
-      }
-    }
-    return { displayValue, ariaLabel };
+    const displaySource = source === GRADE_SOURCE.ASSIGNMENT ? DISPLAY_SOURCE.ASSIGNMENT : DISPLAY_SOURCE.ENROLLMENT;
+    return calculateDisplayValue({
+      score,
+      letterGrade,
+      source: displaySource,
+      includeAriaLabel: true
+    });
   }
   function createGradeBadge(gradeData, heroElement = null) {
     const { source } = gradeData;
-    const { displayValue, ariaLabel } = formatGradeDisplay(gradeData);
+    const { displayValue, ariaLabel } = formatGradeDisplay2(gradeData);
     const badge = document.createElement("div");
     badge.className = `${GRADE_CLASS_PREFIX}`;
     badge.setAttribute("data-source", source);
@@ -2670,12 +3067,91 @@ You may need to refresh the page to see the new scores.`);
     }
   }
 
+  // src/utils/observerHelpers.js
+  var OBSERVER_CONFIGS = {
+    /**
+     * Watch for child elements being added/removed in entire subtree
+     * Use for: Detecting new content, lazy-loaded elements
+     */
+    CHILD_LIST: {
+      childList: true,
+      subtree: true
+    },
+    /**
+     * Watch for child elements and attribute changes in entire subtree
+     * Use for: Comprehensive DOM monitoring
+     */
+    CHILD_LIST_AND_ATTRIBUTES: {
+      childList: true,
+      subtree: true,
+      attributes: true
+    },
+    /**
+     * Watch for specific attributes only
+     * Use for: Monitoring state changes on specific elements
+     * @param {string[]} attributeFilter - Array of attribute names to watch
+     */
+    ATTRIBUTES_ONLY: (attributeFilter = []) => ({
+      attributes: true,
+      attributeFilter
+    }),
+    /**
+     * Full monitoring - child list, attributes, and character data
+     * Use for: Comprehensive change detection (use sparingly - performance impact)
+     */
+    FULL: {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true
+    }
+  };
+  function createConditionalObserver(callback, options = {}) {
+    const {
+      timeout = 3e4,
+      config = OBSERVER_CONFIGS.CHILD_LIST,
+      target = document.body,
+      name = "Observer"
+    } = options;
+    let disconnected = false;
+    const observer = new MutationObserver((mutations) => {
+      if (disconnected) return;
+      const shouldDisconnect = callback(mutations);
+      if (shouldDisconnect) {
+        observer.disconnect();
+        disconnected = true;
+        logger.trace(`${name} disconnected (condition met)`);
+      }
+    });
+    observer.observe(target, config);
+    logger.trace(`${name} started, will auto-disconnect after ${timeout}ms or when condition met`);
+    setTimeout(() => {
+      if (!disconnected) {
+        observer.disconnect();
+        disconnected = true;
+        logger.trace(`${name} auto-disconnected (timeout)`);
+      }
+    }, timeout);
+    return observer;
+  }
+  function createPersistentObserver(callback, options = {}) {
+    const {
+      config = OBSERVER_CONFIGS.CHILD_LIST,
+      target = document.body,
+      name = "Observer"
+    } = options;
+    const observer = new MutationObserver(callback);
+    observer.observe(target, config);
+    logger.trace(`${name} started (persistent - remember to disconnect manually)`);
+    return observer;
+  }
+
   // src/dashboard/gradeDisplay.js
   var initialized = false;
   var dashboardObserver = null;
   var CONCURRENT_WORKERS = 3;
   async function fetchActiveCourses(apiClient) {
-    var _a15;
+    var _a16;
     try {
       const courses = await apiClient.get(
         "/api/v1/courses?enrollment_state=active&include[]=total_scores",
@@ -2713,7 +3189,7 @@ You may need to refresh the page to see the new scores.`);
       if (logger.isTraceEnabled() && coursesWithEnrollmentData.length > 0) {
         const firstCourse = coursesWithEnrollmentData[0];
         logger.trace(`First course enrollment data:`, firstCourse.enrollmentData);
-        if ((_a15 = firstCourse.enrollmentData) == null ? void 0 : _a15.grades) {
+        if ((_a16 = firstCourse.enrollmentData) == null ? void 0 : _a16.grades) {
           logger.trace(`First course grades object:`, firstCourse.enrollmentData.grades);
         }
       }
@@ -2723,21 +3199,30 @@ You may need to refresh the page to see the new scores.`);
       return [];
     }
   }
-  async function updateCourseCard(courseId, apiClient) {
+  async function updateCourseCard(courseId, courseName, apiClient) {
     try {
       const cardElement = findCourseCard(courseId);
       if (!cardElement) {
         logger.trace(`Card element not found for course ${courseId}, skipping`);
         return;
       }
-      const gradeData = await getCourseGrade(courseId, apiClient);
-      if (!gradeData) {
+      let snapshot = getCourseSnapshot(courseId);
+      if (!snapshot) {
+        logger.trace(`No snapshot for course ${courseId}, populating...`);
+        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+      }
+      if (!snapshot) {
         logger.trace(`No grade available for course ${courseId}, skipping`);
         return;
       }
+      const gradeData = {
+        score: snapshot.score,
+        letterGrade: snapshot.letterGrade,
+        source: snapshot.gradeSource
+      };
       renderGradeOnCard(cardElement, gradeData);
-      const displayInfo = gradeData.letterGrade ? `${gradeData.score}% (${gradeData.letterGrade})` : `${gradeData.score}`;
-      logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${gradeData.source})`);
+      const displayInfo = snapshot.letterGrade ? `${snapshot.score}% (${snapshot.letterGrade})` : `${snapshot.score}`;
+      logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${snapshot.gradeSource})`);
     } catch (error) {
       logger.warn(`Failed to update grade for course ${courseId}:`, error.message);
     }
@@ -2752,18 +3237,17 @@ You may need to refresh the page to see the new scores.`);
         return;
       }
       logger.info(`Updating grades for ${courses.length} courses`);
-      preCacheEnrollmentGrades(courses);
       const concurrency = CONCURRENT_WORKERS;
-      const queue = courses.map((c) => c.id);
+      const queue = courses.map((c) => ({ id: c.id, name: c.name }));
       let processedCount = 0;
       let successCount = 0;
       let errorCount = 0;
       async function worker() {
         while (queue.length > 0) {
-          const courseId = queue.shift();
-          if (!courseId) break;
+          const course = queue.shift();
+          if (!course) break;
           try {
-            await updateCourseCard(courseId, apiClient);
+            await updateCourseCard(course.id, course.name, apiClient);
             processedCount++;
             successCount++;
             if (processedCount % 5 === 0) {
@@ -2772,7 +3256,7 @@ You may need to refresh the page to see the new scores.`);
           } catch (error) {
             processedCount++;
             errorCount++;
-            logger.warn(`Worker failed to process course ${courseId}:`, error.message);
+            logger.warn(`Worker failed to process course ${course.id}:`, error.message);
           }
         }
       }
@@ -2794,48 +3278,6 @@ You may need to refresh the page to see the new scores.`);
     } catch (error) {
       logger.error("Failed to update dashboard grades:", error);
     }
-  }
-  function getDashboardCardSelectors() {
-    return [
-      "[data-course-id]",
-      // Older Canvas versions
-      ".ic-DashboardCard",
-      // Common Canvas class
-      '[class*="DashboardCard"]',
-      // Any class containing DashboardCard
-      ".course-list-item",
-      // Alternative Canvas layout
-      '[class*="CourseCard"]',
-      // Modern Canvas
-      'div[id^="dashboard_card_"]',
-      // ID-based cards
-      ".dashboard-card"
-      // Lowercase variant
-    ];
-  }
-  function findDashboardCards() {
-    const selectors = getDashboardCardSelectors();
-    for (const selector of selectors) {
-      const cards = document.querySelectorAll(selector);
-      if (cards.length > 0) {
-        logger.trace(`Found ${cards.length} dashboard cards using selector: ${selector}`);
-        return cards;
-      }
-    }
-    const courseLinks = document.querySelectorAll('a[href*="/courses/"]');
-    if (courseLinks.length > 0) {
-      logger.trace(`Found ${courseLinks.length} course links as fallback`);
-      const dashboardLinks = Array.from(courseLinks).filter((link) => {
-        const isDashboardArea = !link.closest(".ic-app-header") && !link.closest('[role="navigation"]') && !link.closest(".menu");
-        return isDashboardArea;
-      });
-      if (dashboardLinks.length > 0) {
-        logger.trace(`Found ${dashboardLinks.length} dashboard course links`);
-        return dashboardLinks;
-      }
-    }
-    logger.trace("No dashboard cards found with any selector");
-    return null;
   }
   function waitForDashboardCards(maxWaitMs = 5e3) {
     return new Promise((resolve) => {
@@ -2865,42 +3307,26 @@ You may need to refresh the page to see the new scores.`);
       checkCards();
     });
   }
-  function looksLikeDashboardCard(node) {
-    var _a15, _b15;
-    if (node.nodeType !== Node.ELEMENT_NODE) return false;
-    const element = node;
-    if ((_a15 = element.hasAttribute) == null ? void 0 : _a15.call(element, "data-course-id")) return true;
-    const className = element.className || "";
-    if (typeof className === "string") {
-      if (className.includes("DashboardCard") || className.includes("CourseCard") || className.includes("course-list-item") || className.includes("dashboard-card")) {
-        return true;
-      }
-    }
-    if ((_b15 = element.querySelector) == null ? void 0 : _b15.call(element, 'a[href*="/courses/"]')) {
-      return true;
-    }
-    return false;
-  }
   function setupDashboardObserver() {
     if (dashboardObserver) {
       dashboardObserver.disconnect();
     }
-    dashboardObserver = new MutationObserver((mutations) => {
+    const dashboardContainer = document.querySelector("#dashboard") || document.querySelector("#content") || document.body;
+    dashboardObserver = createPersistentObserver((mutations) => {
       const cardsAdded = mutations.some((mutation) => {
         return Array.from(mutation.addedNodes).some((node) => {
-          var _a15;
-          return looksLikeDashboardCard(node) || ((_a15 = node.querySelector) == null ? void 0 : _a15.call(node, getDashboardCardSelectors().join(",")));
+          var _a16;
+          return looksLikeDashboardCard(node) || ((_a16 = node.querySelector) == null ? void 0 : _a16.call(node, getDashboardCardSelectors().join(",")));
         });
       });
       if (cardsAdded) {
         logger.trace("Dashboard cards detected via MutationObserver, updating grades");
         updateAllCourseCards();
       }
-    });
-    const dashboardContainer = document.querySelector("#dashboard") || document.querySelector("#content") || document.body;
-    dashboardObserver.observe(dashboardContainer, {
-      childList: true,
-      subtree: true
+    }, {
+      config: OBSERVER_CONFIGS.CHILD_LIST,
+      target: dashboardContainer,
+      name: "DashboardGradeDisplay"
     });
     logger.trace("Dashboard observer setup complete, observing:", dashboardContainer.id || dashboardContainer.tagName);
   }
@@ -2965,33 +3391,29 @@ You may need to refresh the page to see the new scores.`);
         return { error: "No courses found" };
       }
       logger.info(`Testing with ${courses.length} courses`);
-      preCacheEnrollmentGrades(courses);
       logger.info("Test 1: Sequential processing...");
       const sequentialStart = performance.now();
       for (const course of courses) {
         try {
-          await getCourseGrade(course.id, apiClient);
+          await populateCourseSnapshot(course.id, course.name, apiClient);
         } catch (error) {
           logger.trace(`Sequential test error for course ${course.id}:`, error.message);
         }
       }
       const sequentialTime = performance.now() - sequentialStart;
       logger.info(`Sequential: ${sequentialTime.toFixed(0)}ms total, ${(sequentialTime / courses.length).toFixed(0)}ms per course`);
-      const { clearGradeCache: clearGradeCache2 } = await Promise.resolve().then(() => (init_gradeDataService(), gradeDataService_exports));
-      clearGradeCache2();
-      preCacheEnrollmentGrades(courses);
       logger.info("Test 2: Concurrent processing...");
       const concurrentStart = performance.now();
       const concurrency = CONCURRENT_WORKERS;
-      const queue = courses.map((c) => c.id);
+      const queue = courses.map((c) => ({ id: c.id, name: c.name }));
       async function worker() {
         while (queue.length > 0) {
-          const courseId = queue.shift();
-          if (!courseId) break;
+          const course = queue.shift();
+          if (!course) break;
           try {
-            await getCourseGrade(courseId, apiClient);
+            await populateCourseSnapshot(course.id, course.name, apiClient);
           } catch (error) {
-            logger.trace(`Concurrent test error for course ${courseId}:`, error.message);
+            logger.trace(`Concurrent test error for course ${course.id}:`, error.message);
           }
         }
       }
@@ -3029,7 +3451,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/speedgrader/gradingDropdown.js
-  init_logger();
   var initialized2 = false;
   var gradingDropdownObserver = null;
   var GRADING_DROPDOWN_ID = "grading-box-extended";
@@ -3053,7 +3474,10 @@ You may need to refresh the page to see the new scores.`);
     if (gradingDropdownObserver) {
       gradingDropdownObserver.disconnect();
     }
-    gradingDropdownObserver = new MutationObserver((mutations) => {
+    const customConfig = __spreadProps(__spreadValues({}, OBSERVER_CONFIGS.CHILD_LIST_AND_ATTRIBUTES), {
+      attributeFilter: ["disabled", "readonly", "aria-disabled", "class"]
+    });
+    gradingDropdownObserver = createPersistentObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === "childList") {
           mutation.addedNodes.forEach((node) => {
@@ -3072,18 +3496,11 @@ You may need to refresh the page to see the new scores.`);
           activateGradingDropdown();
         }
       });
+    }, {
+      config: customConfig,
+      target: document.body,
+      name: "GradingDropdownObserver"
     });
-    gradingDropdownObserver.observe(document.body, {
-      childList: true,
-      // Watch for nodes being added/removed
-      subtree: true,
-      // Watch all descendants, not just direct children
-      attributes: true,
-      // Watch for attribute changes
-      attributeFilter: ["disabled", "readonly", "aria-disabled", "class"]
-      // Only watch these attributes
-    });
-    logger.trace("Grading dropdown observer setup complete");
   }
   function initSpeedGraderDropdown() {
     if (initialized2) {
@@ -3097,17 +3514,9 @@ You may need to refresh the page to see the new scores.`);
     logger.info("SpeedGrader grading dropdown auto-activator started");
   }
 
-  // src/student/studentGradeCustomization.js
-  init_config();
-
-  // src/student/gradePageCustomizer.js
-  init_config();
-
   // src/student/gradeExtractor.js
-  init_config();
-  init_logger();
   function scoreToGradeLevel(score) {
-    var _a15;
+    var _a16;
     const numScore = typeof score === "string" ? parseFloat(score) : score;
     if (isNaN(numScore)) {
       logger.trace(`Invalid score for grade level conversion: ${score}`);
@@ -3119,10 +3528,10 @@ You may need to refresh the page to see the new scores.`);
         return rating.description;
       }
     }
-    return ((_a15 = sortedRatings[sortedRatings.length - 1]) == null ? void 0 : _a15.description) || null;
+    return ((_a16 = sortedRatings[sortedRatings.length - 1]) == null ? void 0 : _a16.description) || null;
   }
   function extractCurrentScoreFromPage() {
-    var _a15, _b15;
+    var _a16, _b16;
     const assignmentLinks = document.querySelectorAll('a[href*="/assignments/"]');
     for (const link of assignmentLinks) {
       if (link.textContent.trim() !== AVG_ASSIGNMENT_NAME) {
@@ -3138,7 +3547,7 @@ You may need to refresh the page to see the new scores.`);
       let score = null;
       for (const el of scoreCandidates) {
         if (!el) continue;
-        const txt = (_a15 = el.textContent) == null ? void 0 : _a15.trim();
+        const txt = (_a16 = el.textContent) == null ? void 0 : _a16.trim();
         if (!txt) continue;
         const match = txt.match(/(\d+(?:\.\d+)?)/);
         if (match) {
@@ -3159,7 +3568,7 @@ You may need to refresh the page to see the new scores.`);
       ];
       for (const el of letterGradeCandidates) {
         if (!el) continue;
-        const txt = (_b15 = el.textContent) == null ? void 0 : _b15.trim();
+        const txt = (_b16 = el.textContent) == null ? void 0 : _b16.trim();
         if (!txt) continue;
         for (const rating of OUTCOME_AND_RUBRIC_RATINGS) {
           if (txt.includes(rating.description)) {
@@ -3182,7 +3591,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/student/gradePageCustomizer.js
-  init_logger();
   var processed = false;
   function getAssignmentsTabLI() {
     return document.querySelector('li[aria-controls="assignments"]');
@@ -3219,15 +3627,9 @@ You may need to refresh the page to see the new scores.`);
       setTimeout(goToLearningMasteryTab, 300);
     }
   }
-  function formatGradeDisplay2(score, letterGrade) {
-    if (letterGrade) {
-      return `${score} (${letterGrade})`;
-    }
-    return score;
-  }
   function replaceRightSidebar(gradeData) {
     const { score, letterGrade } = gradeData;
-    const displayValue = formatGradeDisplay2(score, letterGrade);
+    const displayValue = formatGradeDisplay(score, letterGrade);
     const rightSide = getRightSideElement();
     if (!rightSide) {
       logger.trace("Right sidebar not found; deferring...");
@@ -3290,27 +3692,259 @@ You may need to refresh the page to see the new scores.`);
     logger.debug("Initializing grade page customizer");
     let didRun = runOnce();
     if (!didRun) {
-      const obs = new MutationObserver(() => {
-        if (runOnce()) {
-          obs.disconnect();
+      createConditionalObserver(() => {
+        const success = runOnce();
+        if (success) {
           logger.debug("Student grade customization applied after DOM updates");
         }
+        return success;
+      }, {
+        timeout: 3e4,
+        config: OBSERVER_CONFIGS.CHILD_LIST_AND_ATTRIBUTES,
+        target: document.body,
+        name: "GradePageCustomizer"
       });
-      obs.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true
-      });
-      setTimeout(() => {
-        obs.disconnect();
-        logger.trace("Student grade customization observer disconnected (timeout)");
-      }, 3e4);
     }
   }
 
+  // src/student/allGradesPageCustomizer.js
+  var processed2 = false;
+  function extractCoursesFromDOM() {
+    try {
+      const courses = extractAllCoursesFromTable();
+      if (courses.length === 0) {
+        logger.warn("[Hybrid] No courses found in DOM");
+      } else {
+        logger.trace(`[Hybrid] Extracted ${courses.length} courses from DOM`);
+      }
+      return courses;
+    } catch (error) {
+      logger.error("[Hybrid] Failed to extract courses from DOM:", error);
+      return [];
+    }
+  }
+  async function fetchGradeDataFromAPI(apiClient) {
+    try {
+      logger.debug("[Hybrid] Fetching grade data from Enrollments API...");
+      const enrollments = await fetchAllEnrollments(apiClient, {
+        state: "active",
+        includeTotalScores: true
+      });
+      logger.trace(`[Hybrid] Fetched ${enrollments.length} enrollments from API`);
+      const gradeMap = extractEnrollmentData(enrollments);
+      logger.trace(`[Hybrid] Extracted grade data for ${gradeMap.size} courses`);
+      return gradeMap;
+    } catch (error) {
+      logger.warn("[Hybrid] Failed to fetch grade data from API:", error.message);
+      return /* @__PURE__ */ new Map();
+    }
+  }
+  async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
+    const startTime = performance.now();
+    const enrichedPromises = courses.map(async (course) => {
+      const { courseId, courseName, percentage: domPercentage, matchesPattern } = course;
+      const needsRefresh = shouldRefreshGrade(courseId, PAGE_CONTEXT.ALL_GRADES);
+      let snapshot = getCourseSnapshot(courseId);
+      if (!snapshot || needsRefresh) {
+        logger.trace(`[All-Grades] ${!snapshot ? "Populating" : "Refreshing"} snapshot for course ${courseId}...`);
+        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.ALL_GRADES);
+      }
+      let percentage = domPercentage;
+      let apiLetterGrade = null;
+      let gradeSource = "DOM";
+      let isStandardsBased = false;
+      if (snapshot) {
+        isStandardsBased = snapshot.isStandardsBased;
+        apiLetterGrade = snapshot.letterGrade;
+        if (percentage === null && snapshot.score !== null) {
+          percentage = snapshot.score;
+          gradeSource = "Snapshot";
+          logger.debug(`[All-Grades] Using snapshot grade for ${courseName}: ${percentage}%`);
+        } else if (percentage !== null) {
+          logger.trace(`[All-Grades] Using DOM grade for ${courseName}: ${percentage}%`);
+        }
+      }
+      logger.trace(`[All-Grades] Course "${courseName}" (${courseId}): percentage=${percentage}, letterGrade="${apiLetterGrade || "null"}", isStandardsBased=${isStandardsBased}`);
+      let displayScore = percentage;
+      let displayLetterGrade = null;
+      let displayType = "percentage";
+      if (isStandardsBased && percentage !== null) {
+        const pointValue = percentageToPoints(percentage);
+        displayScore = pointValue;
+        displayType = "points";
+        displayLetterGrade = apiLetterGrade || scoreToGradeLevel(pointValue);
+        logger.trace(`[Hybrid] Standards-based course: ${courseName}, percentage=${percentage}%, points=${pointValue.toFixed(2)}, letterGrade=${displayLetterGrade} (from ${apiLetterGrade ? "API" : "calculation"})`);
+      } else if (isStandardsBased && percentage === null) {
+        logger.trace(`[Hybrid] Course "${courseName}" is standards-based but has no percentage grade`);
+      } else {
+        logger.trace(`[Hybrid] Traditional course: ${courseName}, percentage=${percentage}%`);
+      }
+      logger.trace(`[Hybrid] Final values for "${courseName}": displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
+      return __spreadProps(__spreadValues({}, course), {
+        percentage,
+        displayScore,
+        displayLetterGrade,
+        displayType,
+        isStandardsBased,
+        gradeSource
+      });
+    });
+    const enrichedCourses = await Promise.all(enrichedPromises);
+    logger.trace(`[Hybrid] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
+    return enrichedCourses;
+  }
+  async function fetchCourseGrades() {
+    const startTime = performance.now();
+    const apiClient = new CanvasApiClient();
+    try {
+      logger.trace("[Hybrid] Step 1: Extracting course list from DOM...");
+      const courses = extractCoursesFromDOM();
+      if (courses.length === 0) {
+        throw new Error("No courses found in DOM");
+      }
+      logger.trace(`[Hybrid] Found ${courses.length} courses in DOM`);
+      logger.trace("[Hybrid] Step 2: Fetching grade data from Enrollments API...");
+      const gradeMap = await fetchGradeDataFromAPI(apiClient);
+      logger.trace(`[Hybrid] Fetched grade data for ${gradeMap.size} courses from API`);
+      logger.trace(`[Hybrid] Step 3: Enriching courses with grades and detection...`);
+      const enrichedCourses = await enrichCoursesWithAPI(courses, gradeMap, apiClient);
+      logger.trace(`[Hybrid] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
+      const withGrades = enrichedCourses.filter((c) => c.displayScore !== null).length;
+      const withoutGrades = enrichedCourses.length - withGrades;
+      const fromDOM = enrichedCourses.filter((c) => c.gradeSource === "DOM").length;
+      const fromAPI = enrichedCourses.filter((c) => c.gradeSource === "API").length;
+      const standardsBased = enrichedCourses.filter((c) => c.isStandardsBased).length;
+      const traditional = enrichedCourses.length - standardsBased;
+      logger.debug(`[Hybrid] Processed ${enrichedCourses.length} courses: ${standardsBased} standards-based, ${traditional} traditional`);
+      logger.debug(`[Hybrid] Grade sources: ${fromDOM} from DOM, ${fromAPI} from API`);
+      if (logger.isTraceEnabled()) {
+        logger.trace("[Hybrid] Course breakdown:");
+        enrichedCourses.forEach((c) => {
+          const type = c.isStandardsBased ? "SBG" : "TRAD";
+          const display = c.displayScore !== null ? c.isStandardsBased ? `${c.displayScore.toFixed(2)} (${c.displayLetterGrade || "N/A"})` : `${c.displayScore.toFixed(2)}%` : "N/A";
+          logger.trace(`  [${type}] ${c.courseName}: ${display}`);
+        });
+      }
+      return enrichedCourses;
+    } catch (error) {
+      logger.error("[Hybrid] Failed to fetch course grades:", error);
+      throw error;
+    }
+  }
+  function createGradesTable(courses) {
+    const table = document.createElement("table");
+    table.className = "ic-Table ic-Table--hover-row ic-Table--striped customized-grades-table";
+    table.style.cssText = "width: 100%; margin-top: 1rem;";
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+        <tr>
+            <th class="ic-Table-header" style="text-align: left; padding: 0.75rem;">Course</th>
+            <th class="ic-Table-header" style="text-align: right; padding: 0.75rem;">Grade</th>
+        </tr>
+    `;
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    for (const course of courses) {
+      const row = document.createElement("tr");
+      row.className = "ic-Table-row";
+      const nameCell = document.createElement("td");
+      nameCell.className = "ic-Table-cell";
+      nameCell.style.padding = "0.75rem";
+      const courseLink = document.createElement("a");
+      courseLink.href = course.courseUrl;
+      courseLink.textContent = course.courseName;
+      courseLink.style.cssText = "color: #0374B5; text-decoration: none;";
+      courseLink.addEventListener("mouseenter", () => {
+        courseLink.style.textDecoration = "underline";
+      });
+      courseLink.addEventListener("mouseleave", () => {
+        courseLink.style.textDecoration = "none";
+      });
+      nameCell.appendChild(courseLink);
+      const gradeCell = document.createElement("td");
+      gradeCell.className = "ic-Table-cell";
+      gradeCell.style.cssText = "text-align: right; padding: 0.75rem; font-weight: bold;";
+      if (course.displayScore !== null) {
+        if (course.displayType === "points") {
+          gradeCell.textContent = formatGradeDisplay(course.displayScore, course.displayLetterGrade);
+          gradeCell.style.color = "#0B874B";
+          logger.trace(`[Table] ${course.courseName}: Rendering as SBG (${course.displayScore.toFixed(2)} ${course.displayLetterGrade})`);
+        } else {
+          gradeCell.textContent = `${course.displayScore.toFixed(2)}%`;
+          gradeCell.style.color = "#2D3B45";
+          logger.trace(`[Table] ${course.courseName}: Rendering as traditional (${course.displayScore.toFixed(2)}%)`);
+        }
+      } else {
+        gradeCell.textContent = "N/A";
+        gradeCell.style.color = "#73818C";
+        logger.trace(`[Table] ${course.courseName}: No grade available`);
+      }
+      logger.trace(`[Table] ${course.courseName} details: isStandardsBased=${course.isStandardsBased}, displayType=${course.displayType}, displayScore=${course.displayScore}`);
+      row.appendChild(nameCell);
+      row.appendChild(gradeCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+  function replaceGradesTable(courses) {
+    const originalTable = document.querySelector("table.course_details.student_grades");
+    if (!originalTable) {
+      logger.warn("Original grades table not found");
+      return;
+    }
+    const existingCustomTable = document.getElementById("customized-grades-table");
+    if (existingCustomTable) {
+      logger.debug("Removing existing customized table to prevent duplicates");
+      existingCustomTable.remove();
+    }
+    originalTable.style.display = "none";
+    originalTable.dataset.customized = "true";
+    const newTable = createGradesTable(courses);
+    newTable.id = "customized-grades-table";
+    originalTable.parentNode.insertBefore(newTable, originalTable.nextSibling);
+    logger.info(`Replaced grades table with ${courses.length} courses`);
+  }
+  async function applyCustomizations2() {
+    if (processed2) {
+      logger.debug("All-grades customizations already applied");
+      return;
+    }
+    try {
+      logger.info("Applying all-grades page customizations...");
+      const courses = await fetchCourseGrades();
+      if (courses.length === 0) {
+        logger.warn("No courses found, skipping customization");
+        return;
+      }
+      replaceGradesTable(courses);
+      const standardsBasedCount = courses.filter((c) => c.isStandardsBased).length;
+      const traditionalCount = courses.length - standardsBasedCount;
+      logger.info(`All-grades customization complete: ${courses.length} courses (${standardsBasedCount} SBG, ${traditionalCount} traditional)`);
+      processed2 = true;
+      document.body.classList.remove("cg_processing_grades");
+    } catch (error) {
+      logger.error("Failed to apply all-grades customizations:", error);
+      document.body.classList.remove("cg_processing_grades");
+    }
+  }
+  function initAllGradesPageCustomizer() {
+    logger.debug("Initializing all-grades page customizer");
+    applyCustomizations2();
+    createPersistentObserver(() => {
+      const table = document.querySelector("table.course_details.student_grades");
+      if (table && !table.dataset.customized && !processed2) {
+        logger.debug("Grades table detected, applying customizations...");
+        applyCustomizations2();
+      }
+    }, {
+      config: OBSERVER_CONFIGS.CHILD_LIST,
+      target: document.body,
+      name: "AllGradesPageCustomizer"
+    });
+  }
+
   // src/student/gradeNormalizer.js
-  init_config();
-  init_logger();
   function removeFractionScores() {
     document.querySelectorAll(".score-display").forEach((scoreEl) => {
       const html = scoreEl.innerHTML;
@@ -3383,12 +4017,6 @@ You may need to refresh the page to see the new scores.`);
       }
     });
   }
-  function formatGradeDisplay3(score, letterGrade) {
-    if (letterGrade) {
-      return `${score} (${letterGrade})`;
-    }
-    return score;
-  }
   function normalizeFinalGradeRow() {
     document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach((row) => {
       const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
@@ -3396,7 +4024,7 @@ You may need to refresh the page to see the new scores.`);
       if (gradeEl) {
         const gradeData = extractCurrentScoreFromPage();
         if (gradeData && gradeData.score) {
-          const displayValue = formatGradeDisplay3(gradeData.score, gradeData.letterGrade);
+          const displayValue = formatGradeDisplay(gradeData.score, gradeData.letterGrade);
           gradeEl.textContent = displayValue;
         } else {
           const raw = gradeEl.textContent.trim();
@@ -3415,18 +4043,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/student/cleanupObserver.js
-  init_logger();
-  function debounce(fn, delay) {
-    let timeout;
-    return function() {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => fn(), delay);
-    };
-  }
-  function isCoursePageNeedingCleanup() {
-    const path = window.location.pathname;
-    return window.location.href.includes("/courses/") && (path.includes("/grades") || path.includes("/assignments") || /^\/courses\/\d+$/.test(path));
-  }
   function shouldClean() {
     return isDashboardPage() || isCoursePageNeedingCleanup();
   }
@@ -3439,15 +4055,14 @@ You may need to refresh the page to see the new scores.`);
     }, 100);
     setTimeout(() => {
       debouncedClean();
-      const observer = new MutationObserver(() => {
-        debouncedClean();
-      });
       if (shouldClean()) {
-        observer.observe(document.body, {
-          childList: true,
-          subtree: true
+        createPersistentObserver(() => {
+          debouncedClean();
+        }, {
+          config: OBSERVER_CONFIGS.CHILD_LIST,
+          target: document.body,
+          name: "GradeCleanupObserver"
         });
-        logger.debug("MutationObserver started for grade cleanup");
       }
       let lastUrl = location.href;
       setInterval(() => {
@@ -3459,6 +4074,10 @@ You may need to refresh the page to see the new scores.`);
     }, 500);
   }
   async function initCleanupObservers() {
+    if (isAllGradesPage()) {
+      logger.trace("Skipping cleanup observers on all-grades page (no course context)");
+      return;
+    }
     if (isDashboardPage()) {
       logger.debug("Initializing cleanup observers for dashboard");
       startCleanupObservers();
@@ -3474,10 +4093,6 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/student/studentGradeCustomization.js
-  init_logger();
-  function isStudentGradesPage() {
-    return window.location.href.includes("/courses/") && window.location.pathname.includes("/grades");
-  }
   function initStudentGradeCustomization() {
     if (!ENABLE_STUDENT_GRADE_CUSTOMIZATION) {
       logger.debug("Student grade customization disabled");
@@ -3489,11 +4104,275 @@ You may need to refresh the page to see the new scores.`);
       return;
     }
     logger.info("Initializing student grade customizations");
-    if (isStudentGradesPage()) {
-      logger.debug("On student grades page, initializing grade page customizer");
+    if (isAllGradesPage()) {
+      logger.debug("On all-grades page, initializing all-grades customizer");
+      initAllGradesPageCustomizer();
+    } else if (isSingleCourseGradesPage()) {
+      logger.debug("On single-course grades page, initializing grade page customizer");
       initGradePageCustomizer();
     }
     initCleanupObservers();
+  }
+
+  // src/student/allGradesDataSourceTest.js
+  async function testDOMParsingApproach() {
+    const startTime = performance.now();
+    const results = {
+      approach: "DOM Parsing + Individual API Calls",
+      courses: [],
+      errors: [],
+      metrics: {}
+    };
+    try {
+      const rows = findTableRows();
+      if (rows.length === 0) {
+        throw new Error("Grades table not found or has no rows");
+      }
+      logger.info(`[DOM Approach] Found ${rows.length} course rows`);
+      const apiClient = new CanvasApiClient();
+      const coursePromises = [];
+      for (const row of rows) {
+        coursePromises.push(extractCourseFromRow(row, apiClient));
+      }
+      const courseResults = await Promise.allSettled(coursePromises);
+      for (const result of courseResults) {
+        if (result.status === "fulfilled" && result.value) {
+          results.courses.push(result.value);
+        } else if (result.status === "rejected") {
+          results.errors.push(result.reason.message);
+        }
+      }
+    } catch (error) {
+      results.errors.push(error.message);
+      logger.error("[DOM Approach] Fatal error:", error);
+    }
+    const endTime = performance.now();
+    results.metrics = {
+      totalTime: endTime - startTime,
+      coursesFound: results.courses.length,
+      errorCount: results.errors.length,
+      avgTimePerCourse: results.courses.length > 0 ? (endTime - startTime) / results.courses.length : 0
+    };
+    return results;
+  }
+  async function extractCourseFromRow(row, apiClient) {
+    const courseData = extractCourseDataFromRow(row);
+    if (!courseData) return null;
+    const { courseId, courseName, percentage } = courseData;
+    const detectionStart = performance.now();
+    const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient);
+    const detectionTime = performance.now() - detectionStart;
+    return {
+      courseId,
+      courseName,
+      percentage,
+      isStandardsBased,
+      detectionTime,
+      source: "DOM"
+    };
+  }
+  async function testEnrollmentsAPIApproach() {
+    const startTime = performance.now();
+    const results = {
+      approach: "Enrollments API",
+      courses: [],
+      errors: [],
+      metrics: {}
+    };
+    try {
+      const apiClient = new CanvasApiClient();
+      const apiCallStart = performance.now();
+      const enrollments = await apiClient.get(
+        "/api/v1/users/self/enrollments",
+        {
+          "type[]": "StudentEnrollment",
+          "state[]": "active",
+          "include[]": "total_scores"
+        },
+        "testEnrollmentsAPI"
+      );
+      const apiCallTime = performance.now() - apiCallStart;
+      logger.info(`[API Approach] Fetched ${enrollments.length} enrollments in ${apiCallTime.toFixed(2)}ms`);
+      const coursePromises = enrollments.map(
+        (enrollment) => processCourseFromEnrollment(enrollment, apiClient)
+      );
+      const courseResults = await Promise.allSettled(coursePromises);
+      for (const result of courseResults) {
+        if (result.status === "fulfilled" && result.value) {
+          results.courses.push(result.value);
+        } else if (result.status === "rejected") {
+          results.errors.push(result.reason.message);
+        }
+      }
+    } catch (error) {
+      results.errors.push(error.message);
+      logger.error("[API Approach] Fatal error:", error);
+    }
+    const endTime = performance.now();
+    results.metrics = {
+      totalTime: endTime - startTime,
+      coursesFound: results.courses.length,
+      errorCount: results.errors.length,
+      avgTimePerCourse: results.courses.length > 0 ? (endTime - startTime) / results.courses.length : 0
+    };
+    return results;
+  }
+  async function processCourseFromEnrollment(enrollment, apiClient) {
+    var _a16, _b16, _c, _d, _e, _f;
+    const courseId = (_a16 = enrollment.course_id) == null ? void 0 : _a16.toString();
+    if (!courseId) return null;
+    const grades = enrollment.grades || {};
+    const percentage = (_c = (_b16 = grades.current_score) != null ? _b16 : grades.final_score) != null ? _c : null;
+    let courseName = (_d = enrollment.course) == null ? void 0 : _d.name;
+    if (!courseName) {
+      try {
+        const course = await apiClient.get(
+          `/api/v1/courses/${courseId}`,
+          {},
+          "getCourseDetails"
+        );
+        courseName = course.name;
+      } catch (error) {
+        logger.warn(`[API Approach] Could not fetch course name for ${courseId}:`, error.message);
+        courseName = `Course ${courseId}`;
+      }
+    }
+    const detectionStart = performance.now();
+    const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient);
+    const detectionTime = performance.now() - detectionStart;
+    return {
+      courseId,
+      courseName,
+      percentage,
+      isStandardsBased,
+      detectionTime,
+      source: "API",
+      letterGrade: (_f = (_e = grades.current_grade) != null ? _e : grades.final_grade) != null ? _f : null
+    };
+  }
+  async function detectStandardsBasedCourse(courseId, courseName, apiClient) {
+    const cacheKey = `standardsBased_${courseId}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached !== null) {
+      return cached === "true";
+    }
+    const matchesPattern = matchesCourseNamePattern(courseName);
+    if (matchesPattern) {
+      sessionStorage.setItem(cacheKey, "true");
+      return true;
+    }
+    try {
+      const assignments = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments`,
+        { search_term: AVG_ASSIGNMENT_NAME },
+        "checkAvgAssignment"
+      );
+      const hasAvgAssignment2 = assignments.some((a) => a.name === AVG_ASSIGNMENT_NAME);
+      if (hasAvgAssignment2) {
+        sessionStorage.setItem(cacheKey, "true");
+        return true;
+      }
+    } catch (error) {
+      logger.warn(`[Detection] Could not check assignments for course ${courseId}:`, error.message);
+    }
+    sessionStorage.setItem(cacheKey, "false");
+    return false;
+  }
+  async function compareDataSourceApproaches() {
+    logger.info("=".repeat(80));
+    logger.info("ALL-GRADES PAGE DATA SOURCE COMPARISON TEST");
+    logger.info("=".repeat(80));
+    logger.info("\n\u{1F4CA} Running DOM Parsing Approach...");
+    const domResults = await testDOMParsingApproach();
+    logger.info("\n\u{1F4CA} Running Enrollments API Approach...");
+    const apiResults = await testEnrollmentsAPIApproach();
+    logger.info("\n" + "=".repeat(80));
+    logger.info("COMPARISON RESULTS");
+    logger.info("=".repeat(80));
+    console.table([
+      {
+        Approach: domResults.approach,
+        "Total Time (ms)": domResults.metrics.totalTime.toFixed(2),
+        "Courses Found": domResults.metrics.coursesFound,
+        "Errors": domResults.metrics.errorCount,
+        "Avg Time/Course (ms)": domResults.metrics.avgTimePerCourse.toFixed(2)
+      },
+      {
+        Approach: apiResults.approach,
+        "Total Time (ms)": apiResults.metrics.totalTime.toFixed(2),
+        "Courses Found": apiResults.metrics.coursesFound,
+        "Errors": apiResults.metrics.errorCount,
+        "Avg Time/Course (ms)": apiResults.metrics.avgTimePerCourse.toFixed(2)
+      }
+    ]);
+    logger.info("\n\u{1F4CB} Course Details (DOM Approach):");
+    console.table(domResults.courses.map((c) => ({
+      "Course ID": c.courseId,
+      "Course Name": c.courseName.substring(0, 40),
+      "Percentage": c.percentage,
+      "Standards-Based": c.isStandardsBased,
+      "Detection Time (ms)": c.detectionTime.toFixed(2)
+    })));
+    logger.info("\n\u{1F4CB} Course Details (API Approach):");
+    console.table(apiResults.courses.map((c) => ({
+      "Course ID": c.courseId,
+      "Course Name": c.courseName.substring(0, 40),
+      "Percentage": c.percentage,
+      "Standards-Based": c.isStandardsBased,
+      "Letter Grade": c.letterGrade,
+      "Detection Time (ms)": c.detectionTime.toFixed(2)
+    })));
+    logger.info("\n" + "=".repeat(80));
+    logger.info("RECOMMENDATION");
+    logger.info("=".repeat(80));
+    const recommendation = generateRecommendation(domResults, apiResults);
+    logger.info(recommendation);
+    return { domResults, apiResults, recommendation };
+  }
+  function generateRecommendation(domResults, apiResults) {
+    const timeDiff = domResults.metrics.totalTime - apiResults.metrics.totalTime;
+    const timeDiffPercent = timeDiff / domResults.metrics.totalTime * 100;
+    let recommendation = "";
+    if (apiResults.metrics.totalTime < domResults.metrics.totalTime) {
+      recommendation += `\u2705 RECOMMENDED: Enrollments API Approach
+
+`;
+      recommendation += `Reasons:
+`;
+      recommendation += `- Faster by ${Math.abs(timeDiff).toFixed(2)}ms (${Math.abs(timeDiffPercent).toFixed(1)}%)
+`;
+      recommendation += `- More reliable (single API call for initial data)
+`;
+      recommendation += `- Provides letter grades directly from Canvas
+`;
+      recommendation += `- Less dependent on DOM structure
+`;
+    } else {
+      recommendation += `\u2705 RECOMMENDED: DOM Parsing Approach
+
+`;
+      recommendation += `Reasons:
+`;
+      recommendation += `- Faster by ${Math.abs(timeDiff).toFixed(2)}ms (${Math.abs(timeDiffPercent).toFixed(1)}%)
+`;
+      recommendation += `- No additional API calls for initial data
+`;
+      recommendation += `- Works even if API is slow/unavailable
+`;
+    }
+    if (domResults.metrics.errorCount > 0 || apiResults.metrics.errorCount > 0) {
+      recommendation += `
+\u26A0\uFE0F  Errors detected:
+`;
+      recommendation += `- DOM Approach: ${domResults.metrics.errorCount} errors
+`;
+      recommendation += `- API Approach: ${apiResults.metrics.errorCount} errors
+`;
+    }
+    return recommendation;
+  }
+  if (typeof window !== "undefined") {
+    window.CG_testAllGradesDataSources = compareDataSourceApproaches;
   }
 
   // src/customGradebookInit.js
@@ -3505,8 +4384,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-01-15 5:04:33 PM (dev, 1271e52)");
-    exposeVersion("dev", "2026-01-15 5:04:33 PM (dev, 1271e52)");
+    logBanner("dev", "2026-01-20 10:37:56 AM (dev, 66c2b20)");
+    exposeVersion("dev", "2026-01-20 10:37:56 AM (dev, 66c2b20)");
     if (true) {
       logger.info("Running in DEV mode");
     }
@@ -3514,6 +4393,7 @@ You may need to refresh the page to see the new scores.`);
       logger.info("Running in PROD mode");
     }
     logger.info(`Build environment: ${"dev"}`);
+    validateAllSnapshots();
     if (window.location.pathname.includes("/gradebook")) {
       injectButtons();
     }
@@ -3524,6 +4404,17 @@ You may need to refresh the page to see the new scores.`);
       initSpeedGraderDropdown();
     }
     initStudentGradeCustomization();
+    if (true) {
+      window.CG_testAllGradesDataSources = compareDataSourceApproaches;
+      window.CG_clearAllSnapshots = clearAllSnapshots;
+      window.CG_debugSnapshots = debugSnapshots;
+      logger.debug("Debug functions exposed:");
+      logger.debug("  - window.CG_testAllGradesDataSources()");
+      logger.debug("  - window.CG_clearAllSnapshots() - Clear all cached snapshots");
+      logger.debug("  - window.CG_debugSnapshots() - Show all cached snapshots");
+    }
+    if (!window.CG) window.CG = {};
+    window.CG.clearAllSnapshots = clearAllSnapshots;
   })();
 })();
 //# sourceMappingURL=customGradebookInit.js.map

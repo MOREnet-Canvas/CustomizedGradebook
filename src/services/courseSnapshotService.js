@@ -68,7 +68,7 @@ export const PAGE_CONTEXT = Object.freeze({
  * Authorized pages:
  * - Dashboard
  * - All grades page (/grades)
- * - Course grades page (/courses/*/grades)
+ * - Course grades page (/courses/[courseId]/grades)
  *
  * @returns {boolean} True if current page is authorized
  */
