@@ -20,6 +20,7 @@
 
 import { logger, logBanner, exposeVersion } from "./utils/logger.js";
 import { injectButtons } from "./gradebook/ui/buttonInjection.js";
+import { initAssignmentKebabMenuInjection } from "./gradebook/ui/assignmentKebabMenu.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
@@ -62,6 +63,7 @@ function isSpeedGraderPage() {
     // Gradebook functionality (teacher-side)
     if (window.location.pathname.includes("/gradebook")) {
         injectButtons();
+        initAssignmentKebabMenuInjection();
     }
 
     // Dashboard grade display (student-side)
