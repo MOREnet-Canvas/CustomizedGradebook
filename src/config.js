@@ -38,6 +38,7 @@
 export const ENABLE_STUDENT_GRADE_CUSTOMIZATION = window.CG_CONFIG?.ENABLE_STUDENT_GRADE_CUSTOMIZATION ?? true;
 export const REMOVE_ASSIGNMENT_TAB = window.CG_CONFIG?.REMOVE_ASSIGNMENT_TAB ?? false;
 export const PER_STUDENT_UPDATE_THRESHOLD = window.CG_CONFIG?.PER_STUDENT_UPDATE_THRESHOLD ?? 25;
+export const MASTERY_REFRESH_ENABLED = window.CG_CONFIG?.MASTERY_REFRESH_ENABLED ?? true;
 
 // Grading mode configuration
 // ENABLE_OUTCOME_UPDATES: Controls whether outcome scores (and assignments/rubrics) are updated
@@ -95,3 +96,8 @@ const defaultStandardsBasedPatterns = [
     /^SBG[-\s]/i
 ];
 export const STANDARDS_BASED_COURSE_PATTERNS = window.CG_CONFIG?.STANDARDS_BASED_COURSE_PATTERNS ?? defaultStandardsBasedPatterns;
+
+// Mastery Refresh Configuration
+// Delay in milliseconds to wait for Canvas to propagate points_possible changes
+// before reverting back to 0 (default: 5 seconds)
+export const MASTERY_REFRESH_DELAY_MS = window.CG_CONFIG?.MASTERY_REFRESH_DELAY_MS ?? 5000;
