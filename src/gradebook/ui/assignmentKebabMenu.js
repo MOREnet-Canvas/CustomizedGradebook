@@ -211,32 +211,25 @@ async function updateGradebookSettings(courseId, assignmentId) {
 
         const apiClient = new CanvasApiClient();
 
-        // Step 1: Fetch current gradebook settings
-        const currentSettings = await apiClient.get(
-            `/api/v1/courses/${courseId}/gradebook_settings`,
-            {},
-            'getGradebookSettings'
-        );
-
-        logger.debug('[RefreshMastery] Current gradebook settings:', currentSettings);
-
-        // Step 2: Prepare updated settings object
-        const updatedSettings = {
-            ...currentSettings,
-            enter_grades_as: {
-                ...(currentSettings.enter_grades_as || {}),
-                [assignmentId]: 'gradingScheme'
-            },
-            view_hidden_grades_indicator: 'true'
+        // Prepare the settings payload in the format Canvas expects
+        // The payload should be nested under 'gradebook_settings' key
+        const payload = {
+            gradebook_settings: {
+                enter_grades_as: {
+                    [assignmentId]: 'gradingScheme'
+                }
+            }
         };
 
-        logger.debug('[RefreshMastery] Updated gradebook settings:', updatedSettings);
+        logger.debug('[RefreshMastery] Sending gradebook settings update:', payload);
 
-        // Step 3: Save updated settings
+        // Send PUT request to update gradebook settings
+        // Note: CanvasApiClient.put signature is: put(url, data, options, context)
         await apiClient.put(
             `/api/v1/courses/${courseId}/gradebook_settings`,
-            updatedSettings,
-            'updateGradebookSettings'
+            payload,
+            {},  // options
+            'updateGradebookSettings'  // context
         );
 
         logger.info(`[RefreshMastery] Successfully updated gradebook settings for assignment ${assignmentId}`);
