@@ -100,12 +100,4 @@ export const STANDARDS_BASED_COURSE_PATTERNS = window.CG_CONFIG?.STANDARDS_BASED
 // Mastery Refresh Configuration
 // Delay in milliseconds to wait for Canvas to propagate points_possible changes
 // before reverting back to 0 (default: 5 seconds)
-export const MASTERY_REFRESH_DELAY_MS = window.CG_CONFIG?.MASTERY_REFRESH_DELAY_MS ?? 10000;
-
-// Maximum time in milliseconds to wait for Canvas to propagate assignment changes
-// and recompute per-student gradebook data (default: 15 seconds)
-export const MASTERY_REFRESH_PROPAGATION_TIMEOUT_MS = window.CG_CONFIG?.MASTERY_REFRESH_PROPAGATION_TIMEOUT_MS ?? 100000;
-
-// Time in milliseconds between polling attempts when checking for propagation
-// (default: 2 seconds)
-export const MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS = window.CG_CONFIG?.MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS ?? 2000;
+export const MASTERY_REFRESH_DELAY_MS = window.CG_CONFIG?.MASTERY_REFRESH_DELAY_MS ?? 5000;

@@ -10,11 +10,7 @@ import { logger } from '../../utils/logger.js';
 import { getCourseId } from '../../utils/canvas.js';
 import { CanvasApiClient } from '../../utils/canvasApiClient.js';
 import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
-import {
-    MASTERY_REFRESH_ENABLED,
-    MASTERY_REFRESH_PROPAGATION_TIMEOUT_MS,
-    MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS
-} from '../../config.js';
+import { MASTERY_REFRESH_ENABLED } from '../../config.js';
 
 /**
  * Constants
@@ -241,98 +237,6 @@ async function updateGradebookSettings(courseId, assignmentId) {
 }
 
 /**
- * Wait for Canvas to propagate assignment changes and recompute per-student gradebook data
- *
- * Polls the submissions endpoint to detect when Canvas has finished processing the
- * assignment changes. This provides a more reliable signal than a fixed delay.
- *
- * @param {string} courseId - Course ID
- * @param {string} assignmentId - Assignment ID
- * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @returns {Promise<{settled: boolean, attempts: number}>} Result object indicating if propagation settled
- */
-async function waitForAssignmentPropagation(courseId, assignmentId, apiClient) {
-    const maxAttempts = Math.ceil(MASTERY_REFRESH_PROPAGATION_TIMEOUT_MS / MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS);
-    const stabilityThreshold = 2; // Number of consecutive stable responses required
-
-    let attempts = 0;
-    let consecutiveStableResponses = 0;
-    let previousResponseHash = null;
-
-    logger.debug(`[RefreshMastery] Starting propagation polling for assignment ${assignmentId}`, {
-        maxAttempts,
-        pollInterval: MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS,
-        timeout: MASTERY_REFRESH_PROPAGATION_TIMEOUT_MS
-    });
-
-    try {
-        while (attempts < maxAttempts) {
-            attempts++;
-
-            try {
-                // Poll submissions endpoint with minimal data (per_page=1)
-                const submissions = await apiClient.get(
-                    `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions`,
-                    { per_page: 1 },
-                    'pollAssignmentPropagation'
-                );
-
-                // Create a simple hash of the response structure to detect stability
-                // We check if the response structure remains consistent across polls
-                const responseHash = JSON.stringify({
-                    count: submissions?.length || 0,
-                    hasData: submissions && submissions.length > 0,
-                    firstSubmissionId: submissions?.[0]?.id || null
-                });
-
-                logger.debug(`[RefreshMastery] Propagation poll attempt ${attempts}/${maxAttempts}`, {
-                    responseHash,
-                    previousResponseHash,
-                    consecutiveStableResponses
-                });
-
-                // Check if response is stable (same as previous)
-                if (responseHash === previousResponseHash) {
-                    consecutiveStableResponses++;
-
-                    if (consecutiveStableResponses >= stabilityThreshold) {
-                        logger.info(`[RefreshMastery] Propagation settled after ${attempts} attempts (${attempts * MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS}ms)`);
-                        return { settled: true, attempts };
-                    }
-                } else {
-                    // Response changed, reset stability counter
-                    consecutiveStableResponses = 1;
-                    previousResponseHash = responseHash;
-                }
-
-                // Wait before next poll (unless this was the last attempt)
-                if (attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS));
-                }
-
-            } catch (pollError) {
-                // Log individual poll errors but continue polling
-                logger.debug(`[RefreshMastery] Poll attempt ${attempts} failed (continuing):`, pollError);
-
-                // Wait before retry
-                if (attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, MASTERY_REFRESH_PROPAGATION_POLL_INTERVAL_MS));
-                }
-            }
-        }
-
-        // Timeout reached
-        logger.info(`[RefreshMastery] Propagation polling timed out after ${attempts} attempts (${MASTERY_REFRESH_PROPAGATION_TIMEOUT_MS}ms)`);
-        return { settled: false, attempts };
-
-    } catch (error) {
-        // Unexpected error in polling logic
-        logger.warn('[RefreshMastery] Propagation polling failed (non-critical):', error);
-        return { settled: false, attempts };
-    }
-}
-
-/**
  * Inject "Refresh Mastery" menu item into a kebab menu
  *
  * @param {HTMLElement} menuElement - The menu element
@@ -396,41 +300,11 @@ function injectRefreshMasteryMenuItem(menuElement) {
 
             logger.info(`[RefreshMastery] Successfully refreshed assignment ${assignmentId}`);
 
-            // Step 1.5: Wait for Canvas to propagate changes
-            const apiClient = new CanvasApiClient();
-            const { settled, attempts } = await waitForAssignmentPropagation(courseId, assignmentId, apiClient);
-
-            logger.info(`[RefreshMastery] Propagation check completed`, { settled, attempts });
-
             // Step 2: Update gradebook settings to configure assignment for grading scheme display
-            // This ensures the settings are correct, even though it won't trigger a UI refresh
             await updateGradebookSettings(courseId, assignmentId);
 
-            // Step 3: Show success toast with refresh instruction (message varies based on propagation status)
-            const toastMessage = settled
-                ? '✓ Mastery refreshed and propagated - Refresh page to see changes'
-                : '✓ Mastery refreshed (Canvas still processing) - Refresh page in a moment';
-            showToast(toastMessage, 4000);
-
-            // Step 4: Prompt user to refresh the page immediately
-            // Note: Canvas gradebook uses aggressive client-side caching, so a page reload
-            // is required to see updated mastery levels and letter grades
-            setTimeout(() => {
-                const baseMessage = '✓ Mastery levels have been refreshed successfully!\n\n' +
-                    'Canvas requires a page refresh to display the updated mastery levels and letter grades.\n\n';
-
-                const propagationNote = settled
-                    ? ''
-                    : 'Note: Canvas may still be processing changes. If grades don\'t appear after refreshing, wait 10-20 seconds and refresh again.\n\n';
-
-                const actionPrompt = 'Click OK to refresh now, or Cancel to continue working (you can refresh manually later).';
-
-                const shouldRefresh = confirm(baseMessage + propagationNote + actionPrompt);
-
-                if (shouldRefresh) {
-                    window.location.reload();
-                }
-            }, 500);
+            // Step 3: Show success toast with guidance
+            showToast('✓ Mastery refreshed - Canvas may still be updating; refresh page in a few seconds', 5000);
 
         } catch (error) {
             logger.error('[RefreshMastery] Refresh failed:', error);
