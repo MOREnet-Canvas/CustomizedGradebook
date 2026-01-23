@@ -8,6 +8,7 @@
 
 import { logger } from '../../utils/logger.js';
 import { getCourseId } from '../../utils/canvas.js';
+import { CanvasApiClient } from '../../utils/canvasApiClient.js';
 import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
 import { MASTERY_REFRESH_ENABLED } from '../../config.js';
 
@@ -190,6 +191,59 @@ function showToast(message, duration = 2500) {
 }
 
 /**
+ * Update gradebook settings to configure the assignment for grading scheme display
+ *
+ * This is a "belt and suspenders" approach: we update the settings via API to ensure
+ * they're correct, even though this alone won't trigger a UI refresh (which is why
+ * we still prompt for manual page refresh).
+ *
+ * @param {string} courseId - Course ID
+ * @param {string} assignmentId - Assignment ID
+ * @returns {Promise<void>}
+ */
+async function updateGradebookSettings(courseId, assignmentId) {
+    try {
+        logger.debug(`[RefreshMastery] Updating gradebook settings for assignment ${assignmentId}`);
+
+        const apiClient = new CanvasApiClient();
+
+        // Step 1: Fetch current gradebook settings
+        const currentSettings = await apiClient.get(
+            `/api/v1/courses/${courseId}/gradebook_settings`,
+            {},
+            'getGradebookSettings'
+        );
+
+        logger.debug('[RefreshMastery] Current gradebook settings:', currentSettings);
+
+        // Step 2: Prepare updated settings object
+        const updatedSettings = {
+            ...currentSettings,
+            enter_grades_as: {
+                ...(currentSettings.enter_grades_as || {}),
+                [assignmentId]: 'gradingScheme'
+            },
+            view_hidden_grades_indicator: 'true'
+        };
+
+        logger.debug('[RefreshMastery] Updated gradebook settings:', updatedSettings);
+
+        // Step 3: Save updated settings
+        await apiClient.put(
+            `/api/v1/courses/${courseId}/gradebook_settings`,
+            updatedSettings,
+            'updateGradebookSettings'
+        );
+
+        logger.info(`[RefreshMastery] Successfully updated gradebook settings for assignment ${assignmentId}`);
+
+    } catch (error) {
+        // Log error but don't fail the overall refresh operation
+        logger.warn('[RefreshMastery] Failed to update gradebook settings (non-critical):', error);
+    }
+}
+
+/**
  * Inject "Refresh Mastery" menu item into a kebab menu
  *
  * @param {HTMLElement} menuElement - The menu element
@@ -248,19 +302,26 @@ function injectRefreshMasteryMenuItem(menuElement) {
         try {
             logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId}`);
 
+            // Step 1: Perform mastery refresh (update points_possible: 0 → temp → 0)
             await refreshMasteryForAssignment(courseId, assignmentId);
 
             logger.info(`[RefreshMastery] Successfully refreshed assignment ${assignmentId}`);
 
-            // Show success toast
-            showToast('Mastery refreshed');
+            // Step 2: Update gradebook settings to configure assignment for grading scheme display
+            // This ensures the settings are correct, even though it won't trigger a UI refresh
+            await updateGradebookSettings(courseId, assignmentId);
 
-            // Prompt user to manually refresh the page
+            // Step 3: Show success toast with refresh instruction
+            showToast('✓ Mastery refreshed - Refresh page to see changes', 4000);
+
+            // Step 4: Prompt user to refresh the page immediately
+            // Note: Canvas gradebook uses aggressive client-side caching, so a page reload
+            // is required to see updated mastery levels and letter grades
             setTimeout(() => {
                 const shouldRefresh = confirm(
-                    'Mastery levels have been refreshed.\n\n' +
-                    'Please refresh your browser page to see the updated mastery levels and letter grades.\n\n' +
-                    'Click OK to refresh now, or Cancel to refresh later.'
+                    '✓ Mastery levels have been refreshed successfully!\n\n' +
+                    'Canvas requires a page refresh to display the updated mastery levels and letter grades.\n\n' +
+                    'Click OK to refresh now, or Cancel to continue working (you can refresh manually later).'
                 );
 
                 if (shouldRefresh) {
@@ -270,7 +331,7 @@ function injectRefreshMasteryMenuItem(menuElement) {
 
         } catch (error) {
             logger.error('[RefreshMastery] Refresh failed:', error);
-            showToast('Refresh Mastery failed', 3500);
+            showToast('✗ Refresh Mastery failed - Please try again', 3500);
         } finally {
             // Re-enable menu item
             menuItem.removeAttribute('aria-disabled');
