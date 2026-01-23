@@ -12,124 +12,150 @@ import { refreshMasteryForAssignment } from '../../services/masteryRefreshServic
 import { MASTERY_REFRESH_ENABLED } from '../../config.js';
 
 /**
- * Track which assignment IDs have already been injected to avoid duplicates
+ * Constants
  */
-const injectedAssignments = new Set();
+const MENU_ITEM_ID = 'cg-refresh-mastery-menuitem';
+const STYLE_ID = 'cg-refresh-mastery-style';
 
 /**
- * Extract assignment ID from kebab menu element
- *
- * Canvas kebab menus typically have data attributes or are within elements
- * that contain the assignment ID. This function attempts multiple strategies.
- *
- * @param {HTMLElement} menuElement - The kebab menu element
- * @returns {string|null} Assignment ID or null if not found
+ * Track the last clicked kebab button to extract assignment ID
  */
-function extractAssignmentId(menuElement) {
-    // Strategy 1: Look for data-assignment-id attribute on menu or parent
-    let element = menuElement;
-    for (let i = 0; i < 5; i++) {
-        if (!element) break;
+let lastKebabButton = null;
 
-        const assignmentId = element.getAttribute('data-assignment-id') ||
-                           element.getAttribute('data-id') ||
-                           element.dataset?.assignmentId ||
-                           element.dataset?.id;
+/**
+ * Check if an element is visible
+ *
+ * @param {HTMLElement} element - Element to check
+ * @returns {boolean} True if element is visible
+ */
+function isVisible(element) {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+}
 
-        if (assignmentId) {
-            return assignmentId;
+/**
+ * Check if a menu is an assignment actions menu
+ *
+ * Validates by checking for "SpeedGrader" menu item which is unique to assignment menus
+ *
+ * @param {HTMLElement} menuElement - The menu element to check
+ * @returns {boolean} True if this is an assignment actions menu
+ */
+function isAssignmentActionsMenu(menuElement) {
+    const menuItems = [...menuElement.querySelectorAll('[role="menuitem"]')];
+    const texts = menuItems.map(item => (item.innerText || item.textContent || '').trim());
+    return texts.includes('SpeedGrader');
+}
+
+/**
+ * Extract assignment ID from the kebab button's parent column header
+ *
+ * @param {HTMLElement} kebabButton - The kebab button element
+ * @returns {number|null} Assignment ID or null if not found
+ */
+function extractAssignmentIdFromHeader(kebabButton) {
+    if (!kebabButton) {
+        logger.warn('[RefreshMastery] No kebab button reference available');
+        return null;
+    }
+
+    // Find the parent column header
+    const headerColumn = kebabButton.closest('.slick-header-column.assignment');
+    if (!headerColumn) {
+        logger.warn('[RefreshMastery] Could not find parent .slick-header-column.assignment');
+        return null;
+    }
+
+    // Strategy 1: Extract from class name (e.g., "assignment_12345")
+    const classMatch = headerColumn.className.match(/\bassignment_(\d+)\b/);
+    if (classMatch) {
+        return Number(classMatch[1]);
+    }
+
+    // Strategy 2: Extract from assignment link href
+    const assignmentLink = headerColumn.querySelector('a[href*="/assignments/"]');
+    if (assignmentLink) {
+        const hrefMatch = assignmentLink.getAttribute('href')?.match(/\/assignments\/(\d+)/);
+        if (hrefMatch) {
+            return Number(hrefMatch[1]);
         }
-
-        element = element.parentElement;
     }
 
-    // Strategy 2: Look for assignment ID in menu item hrefs or onclick handlers
-    const menuItems = menuElement.querySelectorAll('a, button');
-    for (const item of menuItems) {
-        const href = item.getAttribute('href') || '';
-        const onclick = item.getAttribute('onclick') || '';
-
-        // Match patterns like /assignments/12345 or assignment_id=12345
-        const match = (href + onclick).match(/assignments?[\/=](\d+)/);
-        if (match) {
-            return match[1];
-        }
-    }
-
-    // Strategy 3: Look in parent column header
-    let column = menuElement.closest('[data-assignment-id]');
-    if (column) {
-        return column.getAttribute('data-assignment-id');
-    }
-
-    logger.warn('[RefreshMastery] Could not extract assignment ID from kebab menu');
+    logger.warn('[RefreshMastery] Could not extract assignment ID from header column');
     return null;
 }
 
 /**
- * Create "Refresh Mastery" menu item
+ * Reset menu focus to prevent stale active highlights
  *
- * @param {string} assignmentId - Assignment ID
- * @param {string} courseId - Course ID
- * @returns {HTMLElement} Menu item element
+ * @param {HTMLElement} menuElement - The menu element
  */
-function createRefreshMasteryMenuItem(assignmentId, courseId) {
-    const menuItem = document.createElement('li');
-    menuItem.className = 'ui-menu-item';
-    menuItem.setAttribute('role', 'presentation');
+function resetMenuFocus(menuElement) {
+    try {
+        menuElement.setAttribute('tabindex', '-1');
+        menuElement.focus({ preventScroll: true });
+    } catch (error) {
+        // Ignore focus errors
+    }
 
-    const link = document.createElement('a');
-    link.className = 'ui-corner-all';
-    link.setAttribute('role', 'menuitem');
-    link.setAttribute('tabindex', '-1');
-    link.textContent = 'Refresh Mastery';
-    link.style.cursor = 'pointer';
-
-    // Click handler
-    link.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Disable the menu item during execution
-        link.style.opacity = '0.5';
-        link.style.pointerEvents = 'none';
-        link.textContent = 'Refreshing...';
-
+    const firstMenuItem = menuElement.querySelector('[role="menuitem"]');
+    if (firstMenuItem) {
         try {
-            await refreshMasteryForAssignment(courseId, assignmentId);
-
-            // Show success feedback
-            link.textContent = '✓ Mastery refreshed';
-
-            // Optional: Show toast notification
-            showToast('Mastery refreshed successfully');
-
-            // Reset after 2 seconds
-            setTimeout(() => {
-                link.textContent = 'Refresh Mastery';
-                link.style.opacity = '1';
-                link.style.pointerEvents = 'auto';
-            }, 2000);
-
+            firstMenuItem.focus({ preventScroll: true });
         } catch (error) {
-            logger.error('[RefreshMastery] Failed to refresh mastery:', error);
-
-            // Show error feedback
-            link.textContent = '✗ Failed';
-
-            // Show error message to user
-            alert('Failed to refresh mastery. Please try again.');
-
-            // Reset after 2 seconds
-            setTimeout(() => {
-                link.textContent = 'Refresh Mastery';
-                link.style.opacity = '1';
-                link.style.pointerEvents = 'auto';
-            }, 2000);
+            // Ignore focus errors
         }
-    });
+    }
+}
 
-    menuItem.appendChild(link);
+/**
+ * Create "Refresh Mastery" menu item by cloning an existing menu item
+ *
+ * This approach inherits Canvas's styles automatically
+ *
+ * @param {HTMLElement} menuElement - The menu element to clone from
+ * @returns {HTMLElement|null} Menu item element or null if template not found
+ */
+function createMenuItemLike(menuElement) {
+    // Find a template menu item to clone (try multiple selectors)
+    const template =
+        menuElement.querySelector('a[role="menuitem"].css-1kq4kmj-menuItem') ||
+        menuElement.querySelector('button[role="menuitem"].css-1kq4kmj-menuItem') ||
+        menuElement.querySelector('span[role="menuitem"].css-1kq4kmj-menuItem');
+
+    if (!template) {
+        logger.warn('[RefreshMastery] Could not find menu item template to clone');
+        return null;
+    }
+
+    // Clone the template
+    const menuItem = template.cloneNode(true);
+    menuItem.id = MENU_ITEM_ID;
+
+    // Remove href if it's a link, or set to #
+    menuItem.removeAttribute('href');
+    if (menuItem.tagName.toLowerCase() === 'a') {
+        menuItem.setAttribute('href', '#');
+    }
+    if (menuItem.tagName.toLowerCase() === 'button') {
+        menuItem.type = 'button';
+    }
+
+    // Find and replace the text content
+    const walker = document.createTreeWalker(menuItem, NodeFilter.SHOW_TEXT);
+    let textNode = null;
+    while (walker.nextNode()) {
+        const text = walker.currentNode.nodeValue;
+        if (text && text.trim().length > 0) {
+            textNode = walker.currentNode;
+            break;
+        }
+    }
+
+    if (textNode) {
+        textNode.nodeValue = 'Refresh Mastery';
+    }
+
     return menuItem;
 }
 
@@ -137,83 +163,158 @@ function createRefreshMasteryMenuItem(assignmentId, courseId) {
  * Show a toast notification
  *
  * @param {string} message - Message to display
+ * @param {number} duration - Duration in milliseconds (default: 2500)
  */
-function showToast(message) {
-    // Check if Canvas has a flash message system we can use
-    if (typeof window.$.flashMessage === 'function') {
-        window.$.flashMessage(message);
-        return;
-    }
-
-    // Fallback: Create simple toast
+function showToast(message, duration = 2500) {
     const toast = document.createElement('div');
     toast.textContent = message;
     toast.style.cssText = `
         position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #2d3b45;
+        right: 16px;
+        bottom: 16px;
+        z-index: 999999;
+        padding: 10px 12px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        background: rgba(0,0,0,0.85);
         color: white;
-        padding: 12px 20px;
-        border-radius: 4px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        z-index: 10000;
         font-size: 14px;
+        max-width: 320px;
     `;
 
     document.body.appendChild(toast);
 
     setTimeout(() => {
-        toast.style.transition = 'opacity 0.3s';
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+        toast.remove();
+    }, duration);
 }
 
 /**
  * Inject "Refresh Mastery" menu item into a kebab menu
  *
- * @param {HTMLElement} menuElement - The kebab menu element (ul.ui-menu)
+ * @param {HTMLElement} menuElement - The menu element
  */
 function injectRefreshMasteryMenuItem(menuElement) {
-    const courseId = getCourseId();
-    if (!courseId) {
-        logger.warn('[RefreshMastery] Cannot inject menu item - course ID not found');
+    // Validate this is an assignment actions menu
+    if (!menuElement || !isAssignmentActionsMenu(menuElement)) {
         return;
     }
 
-    const assignmentId = extractAssignmentId(menuElement);
-    if (!assignmentId) {
-        return; // Already logged warning in extractAssignmentId
-    }
+    // Reset focus to prevent stale highlights
+    resetMenuFocus(menuElement);
 
     // Check if already injected
-    const lockKey = `${courseId}_${assignmentId}`;
-    if (injectedAssignments.has(lockKey)) {
+    if (menuElement.querySelector(`#${MENU_ITEM_ID}`)) {
         return;
     }
 
-    // Check if menu item already exists
-    const existingItem = Array.from(menuElement.querySelectorAll('a')).find(
-        a => a.textContent.includes('Refresh Mastery')
-    );
-    if (existingItem) {
-        injectedAssignments.add(lockKey);
+    // Create menu item by cloning existing item
+    const menuItem = createMenuItemLike(menuElement);
+    if (!menuItem) {
         return;
     }
 
-    // Create and inject menu item
-    const menuItem = createRefreshMasteryMenuItem(assignmentId, courseId);
+    // Set up menu item properties
+    menuItem.setAttribute('tabindex', '0');
+
+    // Focus on hover
+    menuItem.addEventListener('mouseenter', () => {
+        try {
+            menuItem.focus({ preventScroll: true });
+        } catch (error) {
+            menuItem.focus();
+        }
+    });
+
+    // Click handler
+    menuItem.addEventListener('click', async (e) => {
+        e.preventDefault();
+
+        const courseId = getCourseId();
+        const assignmentId = extractAssignmentIdFromHeader(lastKebabButton);
+
+        if (!courseId || !assignmentId) {
+            logger.error('[RefreshMastery] Missing courseId or assignmentId', { courseId, assignmentId });
+            showToast('Refresh Mastery failed (missing context)', 3000);
+            return;
+        }
+
+        // Disable menu item during execution
+        menuItem.setAttribute('aria-disabled', 'true');
+        menuItem.style.pointerEvents = 'none';
+        menuItem.style.opacity = '0.7';
+        menuItem.title = 'Refreshing…';
+
+        try {
+            logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId}`);
+
+            await refreshMasteryForAssignment(courseId, assignmentId);
+
+            logger.info(`[RefreshMastery] Successfully refreshed assignment ${assignmentId}`);
+
+            // Show success toast
+            showToast('Mastery refreshed');
+
+            // Prompt user to manually refresh the page
+            setTimeout(() => {
+                const shouldRefresh = confirm(
+                    'Mastery levels have been refreshed.\n\n' +
+                    'Please refresh your browser page to see the updated mastery levels and letter grades.\n\n' +
+                    'Click OK to refresh now, or Cancel to refresh later.'
+                );
+
+                if (shouldRefresh) {
+                    window.location.reload();
+                }
+            }, 500);
+
+        } catch (error) {
+            logger.error('[RefreshMastery] Refresh failed:', error);
+            showToast('Refresh Mastery failed', 3500);
+        } finally {
+            // Re-enable menu item
+            menuItem.removeAttribute('aria-disabled');
+            menuItem.style.pointerEvents = '';
+            menuItem.style.opacity = '';
+            menuItem.title = '';
+        }
+    });
+
+    // Append to menu
     menuElement.appendChild(menuItem);
-    injectedAssignments.add(lockKey);
 
-    logger.debug(`[RefreshMastery] Injected menu item for assignment ${assignmentId}`);
+    logger.debug('[RefreshMastery] Injected menu item');
+}
+
+/**
+ * Inject CSS styles for hover contrast
+ */
+function injectStyles() {
+    if (document.getElementById(STYLE_ID)) {
+        return; // Already injected
+    }
+
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+        #${MENU_ITEM_ID}:hover,
+        #${MENU_ITEM_ID}:focus {
+            color: white !important;
+        }
+        #${MENU_ITEM_ID}:hover *,
+        #${MENU_ITEM_ID}:focus * {
+            color: white !important;
+        }
+    `;
+    document.head.appendChild(style);
+
+    logger.debug('[RefreshMastery] Injected CSS styles');
 }
 
 /**
  * Initialize kebab menu injection
  *
- * Sets up a MutationObserver to detect when kebab menus are rendered
+ * Sets up event listeners and MutationObserver to detect when kebab menus are opened
  * and injects the "Refresh Mastery" menu item.
  */
 export function initAssignmentKebabMenuInjection() {
@@ -224,43 +325,37 @@ export function initAssignmentKebabMenuInjection() {
 
     logger.info('[RefreshMastery] Initializing kebab menu injection');
 
-    // Inject into any existing kebab menus
-    const existingMenus = document.querySelectorAll('.gradebook-header-menu ul.ui-menu, .assignment-menu ul.ui-menu');
-    existingMenus.forEach(menu => {
-        if (menu.offsetParent !== null) { // Check if visible
+    // Inject CSS styles
+    injectStyles();
+
+    // Track the kebab button that opened the menu
+    // This allows us to extract the assignment ID from the column header
+    document.addEventListener('click', (e) => {
+        const kebabButton = e.target.closest('button[aria-haspopup="true"][data-popover-trigger="true"]');
+        if (kebabButton) {
+            lastKebabButton = kebabButton;
+            logger.debug('[RefreshMastery] Tracked kebab button click');
+        }
+    }, true);
+
+    // Observe portal menus opening
+    const observer = new MutationObserver(() => {
+        // Find all visible menus
+        const allMenus = [...document.querySelectorAll('[role="menu"]')].filter(isVisible);
+
+        // Get the most recently opened menu (last in the list)
+        const menu = allMenus[allMenus.length - 1];
+
+        if (menu) {
             injectRefreshMasteryMenuItem(menu);
         }
     });
 
-    // Set up observer for dynamically created menus
-    const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType !== Node.ELEMENT_NODE) continue;
-
-                // Check if the added node is a kebab menu
-                if (node.matches && node.matches('ul.ui-menu')) {
-                    injectRefreshMasteryMenuItem(node);
-                }
-
-                // Check if the added node contains kebab menus
-                if (node.querySelectorAll) {
-                    const menus = node.querySelectorAll('ul.ui-menu');
-                    menus.forEach(menu => {
-                        if (menu.offsetParent !== null) { // Check if visible
-                            injectRefreshMasteryMenuItem(menu);
-                        }
-                    });
-                }
-            }
-        }
-    });
-
-    // Observe the entire document for kebab menu creation
+    // Observe the entire document for menu creation
     observer.observe(document.body, {
         childList: true,
         subtree: true
     });
 
-    logger.debug('[RefreshMastery] Kebab menu observer initialized');
+    logger.info('[RefreshMastery] Kebab menu injection initialized');
 }
