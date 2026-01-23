@@ -11,6 +11,7 @@ import { getCourseId } from '../../utils/canvas.js';
 import { CanvasApiClient } from '../../utils/canvasApiClient.js';
 import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
 import { showFloatingBanner } from '../../ui/banner.js';
+import { createInfoIconWithTooltip } from '../../ui/infoTooltip.js';
 import { MASTERY_REFRESH_ENABLED } from '../../config.js';
 
 /**
@@ -156,6 +157,28 @@ function createMenuItemLike(menuElement) {
 
     if (textNode) {
         textNode.nodeValue = 'Refresh Mastery';
+
+        // Add info icon with tooltip after the text
+        const { iconContainer } = createInfoIconWithTooltip({
+            tooltipId: 'cg-refresh-mastery-tooltip',
+            ariaLabel: 'About Refresh Mastery',
+            title: 'Refresh Mastery',
+            bodyParagraphs: [
+                'Temporarily gives this assignment points so Canvas recalculates mastery results.',
+                'Does not change student grades.',
+                'Points are automatically set back to zero.'
+            ],
+            footer: 'MOREnet Gradebook Customization',
+            iconSize: 14,
+            position: 'right',
+            offset: 8
+        });
+
+        // Find the parent element that contains the text node
+        const textParent = textNode.parentElement;
+        if (textParent) {
+            textParent.appendChild(iconContainer);
+        }
     }
 
     return menuItem;
@@ -194,6 +217,8 @@ function createInlineSpinner() {
     svg.appendChild(circle);
     return svg;
 }
+
+
 
 /**
  * Update gradebook settings to configure the assignment for grading scheme display
@@ -323,7 +348,7 @@ function injectRefreshMasteryMenuItem(menuElement) {
 
             // Step 3: Show success banner with guidance
             showFloatingBanner({
-                text: '✓ Mastery refreshed - Canvas may still be updating; refresh page in a few seconds',
+                text: '✓ Mastery Levels updated - Reload the page in ~30 seconds to see changes',
                 duration: 5000
             });
 
@@ -368,6 +393,21 @@ function injectStyles() {
         #${MENU_ITEM_ID}:hover *,
         #${MENU_ITEM_ID}:focus * {
             color: white !important;
+        }
+
+        /* Info icon visibility on hover/focus */
+        #${MENU_ITEM_ID}:hover .cg-info-icon-container,
+        #${MENU_ITEM_ID}:focus .cg-info-icon-container,
+        .cg-info-icon-container:hover,
+        .cg-info-icon-container:focus {
+            opacity: 1 !important;
+        }
+
+        /* Info icon focus outline */
+        .cg-info-icon-container:focus {
+            outline: 2px solid rgba(255, 255, 255, 0.5);
+            outline-offset: 2px;
+            border-radius: 50%;
         }
 
         /* Spinner rotation animation */
