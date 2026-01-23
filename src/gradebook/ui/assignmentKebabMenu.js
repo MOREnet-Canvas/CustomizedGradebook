@@ -191,6 +191,40 @@ function showToast(message, duration = 2500) {
 }
 
 /**
+ * Create a Canvas-style inline loading spinner SVG
+ *
+ * @returns {SVGElement} Animated spinner SVG element
+ */
+function createInlineSpinner() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('role', 'status');
+    svg.setAttribute('aria-label', 'Loading');
+    svg.style.cssText = `
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 6px;
+        animation: cg-spinner-rotate 0.8s linear infinite;
+    `;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '8');
+    circle.setAttribute('cy', '8');
+    circle.setAttribute('r', '6');
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', 'currentColor');
+    circle.setAttribute('stroke-width', '2');
+    circle.setAttribute('stroke-linecap', 'round');
+    circle.setAttribute('stroke-dasharray', '28');
+    circle.setAttribute('stroke-dashoffset', '10');
+
+    svg.appendChild(circle);
+    return svg;
+}
+
+/**
  * Update gradebook settings to configure the assignment for grading scheme display
  *
  * This is a "belt and suspenders" approach: we update the settings via API to ensure
@@ -286,11 +320,21 @@ function injectRefreshMasteryMenuItem(menuElement) {
             return;
         }
 
+        // Store original label content
+        const originalLabel = menuItem.querySelector('span')?.textContent || 'Refresh Mastery';
+        const labelSpan = menuItem.querySelector('span');
+
         // Disable menu item during execution
         menuItem.setAttribute('aria-disabled', 'true');
+        menuItem.setAttribute('aria-busy', 'true');
         menuItem.style.pointerEvents = 'none';
-        menuItem.style.opacity = '0.7';
-        menuItem.title = 'Refreshing…';
+
+        // Add spinner to label
+        if (labelSpan) {
+            labelSpan.textContent = 'Refreshing';
+            const spinner = createInlineSpinner();
+            labelSpan.appendChild(spinner);
+        }
 
         try {
             logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId}`);
@@ -310,11 +354,13 @@ function injectRefreshMasteryMenuItem(menuElement) {
             logger.error('[RefreshMastery] Refresh failed:', error);
             showToast('✗ Refresh Mastery failed - Please try again', 3500);
         } finally {
-            // Re-enable menu item
+            // Restore original label and re-enable menu item
+            if (labelSpan) {
+                labelSpan.textContent = originalLabel;
+            }
             menuItem.removeAttribute('aria-disabled');
+            menuItem.removeAttribute('aria-busy');
             menuItem.style.pointerEvents = '';
-            menuItem.style.opacity = '';
-            menuItem.title = '';
         }
     });
 
@@ -325,7 +371,7 @@ function injectRefreshMasteryMenuItem(menuElement) {
 }
 
 /**
- * Inject CSS styles for hover contrast
+ * Inject CSS styles for hover contrast and spinner animation
  */
 function injectStyles() {
     if (document.getElementById(STYLE_ID)) {
@@ -342,6 +388,16 @@ function injectStyles() {
         #${MENU_ITEM_ID}:hover *,
         #${MENU_ITEM_ID}:focus * {
             color: white !important;
+        }
+
+        /* Spinner rotation animation */
+        @keyframes cg-spinner-rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
         }
     `;
     document.head.appendChild(style);
