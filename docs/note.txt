@@ -9,7 +9,7 @@ then push
 For checking version in DevTools: CG.version
 
 
-
+TODO: Mastery Refresh: This does not update rubric scores, so outcome results are unchanged. Maybe this needs to stay this way.
 TODO: Fix per student grade page as teacher
 TODO: zero points assignment toggle
 TODO: rubric / grade box scoring
@@ -31,20 +31,3 @@ TODO: Is there a safe way to cache the gradebook data for students?
 
 TODO: cache clearer on entry
 TODO: Give vertification.js a more appropriate descriptive name
-
-
-## possible changes:
-- add spinner instead of timer
-- grey out button if process is already running
-
-
-### ???
-Good! Both files are already using formatGradeDisplay() from the shared utilities. The calculateDisplayValue() function I created is specifically for the dashboard card renderer's use case where it needs to handle different grade sources (assignment vs enrollment) and determine whether to show percentages or points.
-
-Let me verify the current usage patterns and see if there are opportunities to use calculateDisplayValue():
-
-Augment Context Engine
-After analyzing the code, I can see that:
-allGradesPageCustomizer.js and gradePageCustomizer.js are already using formatGradeDisplay() from shared utilities ✅
-cardRenderer.js is now using calculateDisplayValue() ✅
-The display logic in allGradesPageCustomizer (lines 219-250) is actually business logic for determining whether a course should show points or percentages - this is different from the formatting logic and should stay where it is.
