@@ -10,6 +10,7 @@ import { logger } from '../../utils/logger.js';
 import { getCourseId } from '../../utils/canvas.js';
 import { CanvasApiClient } from '../../utils/canvasApiClient.js';
 import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
+import { showFloatingBanner } from '../../ui/banner.js';
 import { MASTERY_REFRESH_ENABLED } from '../../config.js';
 
 /**
@@ -161,36 +162,6 @@ function createMenuItemLike(menuElement) {
 }
 
 /**
- * Show a toast notification
- *
- * @param {string} message - Message to display
- * @param {number} duration - Duration in milliseconds (default: 2500)
- */
-function showToast(message, duration = 2500) {
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed;
-        right: 16px;
-        bottom: 16px;
-        z-index: 999999;
-        padding: 10px 12px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        background: rgba(0,0,0,0.85);
-        color: white;
-        font-size: 14px;
-        max-width: 320px;
-    `;
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.remove();
-    }, duration);
-}
-
-/**
  * Create a Canvas-style inline loading spinner SVG
  *
  * @returns {SVGElement} Animated spinner SVG element
@@ -316,7 +287,10 @@ function injectRefreshMasteryMenuItem(menuElement) {
 
         if (!courseId || !assignmentId) {
             logger.error('[RefreshMastery] Missing courseId or assignmentId', { courseId, assignmentId });
-            showToast('Refresh Mastery failed (missing context)', 3000);
+            showFloatingBanner({
+                text: 'Refresh Mastery failed (missing context)',
+                duration: 3000
+            });
             return;
         }
 
@@ -347,12 +321,18 @@ function injectRefreshMasteryMenuItem(menuElement) {
             // Step 2: Update gradebook settings to configure assignment for grading scheme display
             await updateGradebookSettings(courseId, assignmentId);
 
-            // Step 3: Show success toast with guidance
-            showToast('✓ Mastery refreshed - Canvas may still be updating; refresh page in a few seconds', 5000);
+            // Step 3: Show success banner with guidance
+            showFloatingBanner({
+                text: '✓ Mastery refreshed - Canvas may still be updating; refresh page in a few seconds',
+                duration: 5000
+            });
 
         } catch (error) {
             logger.error('[RefreshMastery] Refresh failed:', error);
-            showToast('✗ Refresh Mastery failed - Please try again', 3500);
+            showFloatingBanner({
+                text: '✗ Refresh Mastery failed - Please try again',
+                duration: 3500
+            });
         } finally {
             // Restore original label and re-enable menu item
             if (labelSpan) {
