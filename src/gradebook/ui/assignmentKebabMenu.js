@@ -166,7 +166,8 @@ function createMenuItemLike(menuElement) {
             bodyParagraphs: [
                 'Temporarily gives this assignment points so Canvas recalculates mastery results.',
                 'Does not change student grades.',
-                'Points are automatically set back to zero.'
+                'Points possible are automatically set back to zero.',
+                'This does not update rubric scores, so outcome results are unchanged.'
             ],
             footer: 'MOREnet Gradebook Customization',
             iconSize: 14,
