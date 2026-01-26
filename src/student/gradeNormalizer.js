@@ -20,15 +20,22 @@
  */
 
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
-import { extractCurrentScoreFromPage } from './gradeExtractor.js';
 import { logger } from '../utils/logger.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
+import { getCourseId } from '../utils/canvas.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import {
+    getCourseSnapshot,
+    refreshCourseSnapshot,
+    shouldRefreshGrade,
+    PAGE_CONTEXT
+} from '../services/courseSnapshotService.js';
 
 /**
  * Remove fraction denominators and "out of X" text from all grade displays
  * This function is idempotent and can be called multiple times safely
  */
-export function removeFractionScores() {
+export async function removeFractionScores() {
     // --- 1. Course homepage / assignments list style ---
     // <span class="score-display"><b>2.74</b>/4 pts</span>
     document.querySelectorAll(".score-display").forEach(scoreEl => {
@@ -120,7 +127,7 @@ export function removeFractionScores() {
     normalizeGroupTotalsRow();
 
     // --- 9. Final grade row ---
-    normalizeFinalGradeRow();
+    await normalizeFinalGradeRow();
 }
 
 /**
@@ -153,17 +160,40 @@ function normalizeGroupTotalsRow() {
 
 /**
  * Normalize final grade row
- * Replaces percentage with mastery score and letter grade from Current Score Assignment
+ * Replaces percentage with mastery score and letter grade from Course Snapshot Service
  */
-function normalizeFinalGradeRow() {
+async function normalizeFinalGradeRow() {
+    // Get course ID from URL
+    const courseId = getCourseId();
+    if (!courseId) {
+        logger.trace('Cannot get course ID for final grade normalization');
+        return;
+    }
+
+    // Get course name from DOM
+    const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
+
+    // Check snapshot cache first
+    let snapshot = getCourseSnapshot(courseId);
+
+    // Populate/refresh if needed
+    if (!snapshot || shouldRefreshGrade(courseId, PAGE_CONTEXT.COURSE_GRADES)) {
+        logger.trace(`Fetching grade data from API for final grade normalization...`);
+        const apiClient = new CanvasApiClient();
+        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.COURSE_GRADES);
+    }
+
+    // Extract grade data from snapshot
+    const gradeData = snapshot ? {
+        score: snapshot.score,
+        letterGrade: snapshot.letterGrade
+    } : null;
+
     document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {
         const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
         const possibleEl = row.querySelector(".details .possible.points_possible");
 
         if (gradeEl) {
-            // Get mastery score and letter grade from the page (Current Score Assignment value)
-            const gradeData = extractCurrentScoreFromPage();
-
             if (gradeData && gradeData.score) {
                 // Format with both score and letter grade
                 const displayValue = formatGradeDisplay(gradeData.score, gradeData.letterGrade);
@@ -186,4 +216,3 @@ function normalizeFinalGradeRow() {
         }
     });
 }
-
