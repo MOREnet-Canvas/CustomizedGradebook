@@ -30,14 +30,17 @@ function shouldClean() {
  */
 export function startCleanupObservers() {
     logger.debug('Starting cleanup observers for grade normalization');
-    
+
     // Create debounced version to avoid hammering the DOM
+    // Wrap async function to handle promises properly
     const debouncedClean = debounce(() => {
         if (shouldClean()) {
-            removeFractionScores();
+            removeFractionScores().catch(err => {
+                logger.warn('Error in removeFractionScores:', err);
+            });
         }
     }, 100); // 100ms is fast enough to feel instant, slow enough to collapse spam
-    
+
     // Initial call after slight delay so Canvas can render
     setTimeout(() => {
         debouncedClean();
@@ -95,4 +98,3 @@ export async function initCleanupObservers() {
         startCleanupObservers();
     }
 }
-

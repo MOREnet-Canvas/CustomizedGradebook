@@ -11,11 +11,18 @@
  */
 
 import { AVG_OUTCOME_NAME, REMOVE_ASSIGNMENT_TAB } from '../config.js';
-import { extractCurrentScoreFromPage } from './gradeExtractor.js';
 import { logger } from '../utils/logger.js';
 import { inheritFontStylesFrom } from '../utils/dom.js';
 import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
+import { getCourseId } from '../utils/canvas.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import {
+    getCourseSnapshot,
+    refreshCourseSnapshot,
+    shouldRefreshGrade,
+    PAGE_CONTEXT
+} from '../services/courseSnapshotService.js';
 
 /**
  * Track if customizations have been applied (prevent double-runs)
@@ -182,18 +189,45 @@ function applyCustomizations(gradeData) {
 
 /**
  * Main execution function
- * Attempts to extract the score and apply customizations
+ * Attempts to fetch grade data from Course Snapshot Service and apply customizations
  *
- * @returns {boolean} True if customizations were applied, false if score not found
+ * @returns {Promise<boolean>} True if customizations were applied, false if score not found
  */
-function runOnce() {
+async function runOnce() {
     if (processed) return true;
 
-    const gradeData = extractCurrentScoreFromPage();
-    if (gradeData === null) {
-        // If score not found, do nothing
+    // Get course ID from URL
+    const courseId = getCourseId();
+    if (!courseId) {
+        logger.warn('Cannot get course ID from URL');
         return false;
     }
+
+    // Get course name from DOM (try multiple selectors)
+    const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
+
+    // Check snapshot cache first
+    let snapshot = getCourseSnapshot(courseId);
+
+    // Populate/refresh if needed
+    if (!snapshot || shouldRefreshGrade(courseId, PAGE_CONTEXT.COURSE_GRADES)) {
+        logger.trace(`Fetching grade data from API for course ${courseId}...`);
+        const apiClient = new CanvasApiClient();
+        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.COURSE_GRADES);
+    }
+
+    if (!snapshot) {
+        logger.trace('No grade data available from snapshot');
+        return false;
+    }
+
+    // Extract grade data from snapshot
+    const gradeData = {
+        score: snapshot.score,
+        letterGrade: snapshot.letterGrade
+    };
+
+    logger.trace(`Using grade data from snapshot: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
 
     return applyCustomizations(gradeData);
 }
@@ -202,16 +236,16 @@ function runOnce() {
  * Initialize grade page customizations
  * Sets up observers to handle lazy-loaded content
  */
-export function initGradePageCustomizer() {
+export async function initGradePageCustomizer() {
     logger.debug('Initializing grade page customizer');
 
     // Try immediately
-    let didRun = runOnce();
+    let didRun = await runOnce();
 
     // If content is lazy-loaded, observe and retry when score appears
     if (!didRun) {
-        createConditionalObserver(() => {
-            const success = runOnce();
+        createConditionalObserver(async () => {
+            const success = await runOnce();
             if (success) {
                 logger.debug('Student grade customization applied after DOM updates');
             }
@@ -224,4 +258,3 @@ export function initGradePageCustomizer() {
         });
     }
 }
-
