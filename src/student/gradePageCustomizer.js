@@ -221,6 +221,12 @@ async function runOnce() {
         return false;
     }
 
+    // Only apply customizations for standards-based courses
+    if (snapshot.model !== 'standards') {
+        logger.debug(`Skipping grade page customization - course is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+        return false;
+    }
+
     // Extract grade data from snapshot
     const gradeData = {
         score: snapshot.score,

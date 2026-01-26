@@ -33,7 +33,7 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { determineCourseModel, isStandardsBasedCourse } from '../utils/courseDetection.js';
+import { determineCourseModel } from '../utils/courseDetection.js';
 import { getCourseGrade } from './gradeDataService.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
 import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetection.js';

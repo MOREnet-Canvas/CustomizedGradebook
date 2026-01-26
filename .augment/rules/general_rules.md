@@ -12,7 +12,7 @@ priority: highest
 ### 1. Code-Only by Default
 DEFAULT behavior is **code-only output**.
 
-- Do NOT include documentation, long explanations, or summaries.
+- Do NOT create documentation, long explanations, or summaries.
 - Do NOT explain code unless explicitly asked.
 - Keep responses limited to code changes unless clarification is required.
 
