@@ -106,10 +106,16 @@ export function extractCurrentScoreFromPage() {
 
             // Look for letter grade patterns (e.g., "Target", "Developing", "Beginning")
             // Match against our configured rating descriptions
-            for (const rating of OUTCOME_AND_RUBRIC_RATINGS) {
+            // IMPORTANT: Sort by description length (longest first) to avoid substring matches
+            // e.g., "Approaching Target" must be matched before "Target"
+            const sortedRatings = [...OUTCOME_AND_RUBRIC_RATINGS].sort((a, b) =>
+                b.description.length - a.description.length
+            );
+
+            for (const rating of sortedRatings) {
                 if (txt.includes(rating.description)) {
                     letterGrade = rating.description;
-                    logger.trace(`Found letter grade in table: ${letterGrade}`);
+                    logger.trace(`Found letter grade in table: ${letterGrade} (from text: "${txt}")`);
                     break;
                 }
             }
@@ -130,4 +136,3 @@ export function extractCurrentScoreFromPage() {
     logger.trace(`No ${AVG_ASSIGNMENT_NAME} found on page`);
     return null;
 }
-
