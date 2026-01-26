@@ -24,7 +24,7 @@ import { UserCancelledError } from "../utils/errorHandler.js";
 import { CanvasApiClient } from "../utils/canvasApiClient.js";
 import { calculateStudentAverages } from "../services/gradeCalculator.js";
 import { postPerStudentGrades, beginBulkUpdate, waitForBulkGrading } from "../services/gradeSubmission.js";
-import { verifyUIScores } from "../services/verification.js";
+import { verifyUIScores } from "../services/avgOutcomeVerification.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer } from "../utils/uiHelpers.js";
 
 // Import Canvas API service functions
@@ -462,4 +462,3 @@ export const STATE_HANDLERS = {
     [STATES.COMPLETE]: handleComplete,
     [STATES.ERROR]: handleError
 };
-
