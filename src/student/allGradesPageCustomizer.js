@@ -1,29 +1,28 @@
 // src/student/allGradesPageCustomizer.js
 /**
  * All-Grades Page Customizer Module
- * 
+ *
  * Customizes the all-grades page (/grades) to display converted point values
  * for standards-based courses while preserving percentages for traditional courses.
- * 
+ *
  * Features:
  * - Detects standards-based courses via course name patterns and AVG Assignment presence
  * - Converts percentage grades to 0-4 point scale for standards-based courses
  * - Displays letter grades alongside numeric scores (e.g., "2.57 (Developing)")
  * - Replaces Canvas grades table with enhanced custom table
  * - Caches detection results for performance
- * 
+ *
  * Data Source Strategy:
- * - Primary: Enrollments API (/api/v1/users/self/enrollments) - single call, includes grades
- * - Fallback: DOM parsing if API fails
+ * - Fetches courses directly from /api/v1/courses?enrollment_state=active&include[]=total_scores
+ * - Single API call gets course list and enrollment grades
+ * - Matches dashboard grade fetching strategy for consistency
  */
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { scoreToGradeLevel } from './gradeExtractor.js';
 import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
-import { extractAllCoursesFromTable } from '../utils/domExtractors.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
-import { fetchAllEnrollments, extractEnrollmentData } from '../services/enrollmentService.js';
 import {
     populateCourseSnapshot,
     getCourseSnapshot,
@@ -38,97 +37,93 @@ import {
 let processed = false;
 
 /**
- * Inject CSS to hide original table immediately (prevent flash)
+ * Fetch active courses with enrollment grade data
+ * Uses the same strategy as dashboard: /api/v1/courses with include[]=total_scores
+ * @param {CanvasApiClient} apiClient - Canvas API client
+ * @returns {Promise<Array<{id: string, name: string, enrollmentData: Object}>>} Array of active courses with enrollment data
  */
-function injectHideTableCSS() {
-    // Check if CSS already injected
-    if (document.getElementById('cg-hide-grades-table-css')) {
-        return;
-    }
-
-    const style = document.createElement('style');
-    style.id = 'cg-hide-grades-table-css';
-    style.textContent = `
-        /* Hide original Canvas grades table to prevent flash of percentages */
-        table.course_details.student_grades:not([data-customized="true"]) {
-            opacity: 0 !important;
-            pointer-events: none !important;
-        }
-
-        /* Show customized table */
-        #customized-grades-table {
-            opacity: 1 !important;
-        }
-    `;
-    document.head.appendChild(style);
-    logger.trace('[All-Grades] Injected CSS to hide original table');
-}
-
-/**
- * Extract course data from DOM (fast path - no API calls yet)
- * @returns {Array} Array of course objects with basic info
- */
-function extractCoursesFromDOM() {
+async function fetchActiveCourses(apiClient) {
     try {
-        // Use shared DOM extraction utility
-        const courses = extractAllCoursesFromTable();
+        // Fetch active courses with total_scores to get enrollment grades in one call
+        // This matches the dashboard strategy and eliminates the need for separate enrollment API calls
+        const courses = await apiClient.get(
+            '/api/v1/courses?enrollment_state=active&include[]=total_scores',
+            {},
+            'fetchActiveCourses'
+        );
 
-        if (courses.length === 0) {
-            logger.warn('[Hybrid] No courses found in DOM');
-        } else {
-            logger.trace(`[Hybrid] Extracted ${courses.length} courses from DOM`);
+        logger.trace(`[All-Grades] Raw courses response: ${courses?.length || 0} courses`);
+
+        // Log first course structure for debugging
+        if (logger.isTraceEnabled() && courses && courses.length > 0) {
+            logger.trace(`[All-Grades] First course structure:`, courses[0]);
+            logger.trace(`[All-Grades] First course enrollments:`, courses[0].enrollments);
         }
 
-        return courses;
+        // Filter to only student enrollments and extract enrollment data
+        // Canvas enrollment type can be "student" (lowercase) or "StudentEnrollment"
+        const studentCourses = courses.filter(course => {
+            const enrollments = course.enrollments || [];
+            const hasStudentEnrollment = enrollments.some(e =>
+                e.type === 'student' ||
+                e.type === 'StudentEnrollment' ||
+                e.role === 'StudentEnrollment'
+            );
+
+            if (logger.isTraceEnabled() && enrollments.length > 0) {
+                logger.trace(`[All-Grades] Course ${course.id} (${course.name}): enrollments =`, enrollments.map(e => e.type));
+            }
+
+            return hasStudentEnrollment;
+        });
+
+        // Extract enrollment data for each course
+        const coursesWithEnrollmentData = studentCourses.map(course => {
+            const enrollments = course.enrollments || [];
+            const studentEnrollment = enrollments.find(e =>
+                e.type === 'student' ||
+                e.type === 'StudentEnrollment' ||
+                e.role === 'StudentEnrollment'
+            );
+
+            return {
+                id: String(course.id),
+                name: course.name,
+                enrollmentData: studentEnrollment || null
+            };
+        });
+
+        logger.info(`[All-Grades] Found ${coursesWithEnrollmentData.length} active student courses out of ${courses.length} total courses`);
+
+        // Log enrollment data for debugging
+        if (logger.isTraceEnabled() && coursesWithEnrollmentData.length > 0) {
+            const firstCourse = coursesWithEnrollmentData[0];
+            logger.trace(`[All-Grades] First course enrollment data:`, firstCourse.enrollmentData);
+            if (firstCourse.enrollmentData?.grades) {
+                logger.trace(`[All-Grades] First course grades object:`, firstCourse.enrollmentData.grades);
+            }
+        }
+
+        return coursesWithEnrollmentData;
 
     } catch (error) {
-        logger.error('[Hybrid] Failed to extract courses from DOM:', error);
+        logger.error('[All-Grades] Failed to fetch active courses:', error);
         return [];
     }
 }
 
 /**
- * Fetch grade data from Enrollments API
- * @param {CanvasApiClient} apiClient - API client instance
- * @returns {Promise<Map>} Map of courseId -> grade data
- */
-async function fetchGradeDataFromAPI(apiClient) {
-    try {
-        logger.debug('[Hybrid] Fetching grade data from Enrollments API...');
-
-        // Use shared enrollment service to fetch all enrollments
-        const enrollments = await fetchAllEnrollments(apiClient, {
-            state: 'active',
-            includeTotalScores: true
-        });
-
-        logger.trace(`[Hybrid] Fetched ${enrollments.length} enrollments from API`);
-
-        // Use shared enrollment service to extract grade data
-        const gradeMap = extractEnrollmentData(enrollments);
-
-        logger.trace(`[Hybrid] Extracted grade data for ${gradeMap.size} courses`);
-        return gradeMap;
-
-    } catch (error) {
-        logger.warn('[Hybrid] Failed to fetch grade data from API:', error.message);
-        return new Map();
-    }
-}
-
-/**
  * Enrich course data with grades and detection using snapshot service
- * @param {Array} courses - Array of course objects from DOM
- * @param {Map} gradeMap - Map of courseId -> grade data from API
+ * @param {Array} courses - Array of course objects from API
  * @param {CanvasApiClient} apiClient - API client instance
  * @returns {Promise<Array>} Array of enriched course objects
  */
-async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
+async function enrichCoursesWithSnapshots(courses, apiClient) {
     const startTime = performance.now();
 
     // Process courses in parallel
     const enrichedPromises = courses.map(async (course) => {
-        const { courseId, courseName, percentage: domPercentage, matchesPattern } = course;
+        const { id: courseId, name: courseName, enrollmentData } = course;
 
         // Check if we should refresh the snapshot for this course
         const needsRefresh = shouldRefreshGrade(courseId, PAGE_CONTEXT.ALL_GRADES);
@@ -141,23 +136,31 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.ALL_GRADES);
         }
 
+        // Extract grade data from enrollment
+        let percentage = null;
+        let enrollmentLetterGrade = null;
+
+        if (enrollmentData?.grades) {
+            percentage = enrollmentData.grades.current_score ?? enrollmentData.grades.final_score ?? null;
+            enrollmentLetterGrade = (enrollmentData.grades.current_grade ?? enrollmentData.grades.final_grade ?? null)?.trim() ?? null;
+        }
+
         // Extract data from snapshot
-        let percentage = domPercentage;
         let apiLetterGrade = null;
-        let gradeSource = 'DOM';
+        let gradeSource = 'enrollment';
         let isStandardsBased = false;
 
         if (snapshot) {
             isStandardsBased = snapshot.isStandardsBased;
             apiLetterGrade = snapshot.letterGrade;
 
-            // Use snapshot score if DOM extraction failed
+            // Use snapshot score if enrollment extraction failed
             if (percentage === null && snapshot.score !== null) {
                 percentage = snapshot.score;
-                gradeSource = 'Snapshot';
+                gradeSource = 'snapshot';
                 logger.debug(`[All-Grades] Using snapshot grade for ${courseName}: ${percentage}%`);
             } else if (percentage !== null) {
-                logger.trace(`[All-Grades] Using DOM grade for ${courseName}: ${percentage}%`);
+                logger.trace(`[All-Grades] Using enrollment grade for ${courseName}: ${percentage}%`);
             }
         }
 
@@ -177,17 +180,19 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
             // Use API letter grade if available, otherwise calculate from point value
             displayLetterGrade = apiLetterGrade || scoreToGradeLevel(pointValue);
 
-            logger.trace(`[Hybrid] Standards-based course: ${courseName}, percentage=${percentage}%, points=${pointValue.toFixed(2)}, letterGrade=${displayLetterGrade} (from ${apiLetterGrade ? 'API' : 'calculation'})`);
+            logger.trace(`[All-Grades] Standards-based course: ${courseName}, percentage=${percentage}%, points=${pointValue.toFixed(2)}, letterGrade=${displayLetterGrade} (from ${apiLetterGrade ? 'API' : 'calculation'})`);
         } else if (isStandardsBased && percentage === null) {
-            logger.trace(`[Hybrid] Course "${courseName}" is standards-based but has no percentage grade`);
+            logger.trace(`[All-Grades] Course "${courseName}" is standards-based but has no percentage grade`);
         } else {
-            logger.trace(`[Hybrid] Traditional course: ${courseName}, percentage=${percentage}%`);
+            logger.trace(`[All-Grades] Traditional course: ${courseName}, percentage=${percentage}%`);
         }
 
-        logger.trace(`[Hybrid] Final values for "${courseName}": displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
+        logger.trace(`[All-Grades] Final values for "${courseName}": displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
 
         return {
-            ...course,
+            courseId,
+            courseName,
+            courseUrl: `/courses/${courseId}/grades`,
             percentage,
             displayScore,
             displayLetterGrade,
@@ -199,16 +204,14 @@ async function enrichCoursesWithAPI(courses, gradeMap, apiClient) {
 
     const enrichedCourses = await Promise.all(enrichedPromises);
 
-    logger.trace(`[Hybrid] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
+    logger.trace(`[All-Grades] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
     return enrichedCourses;
 }
 
 /**
- * Fetch course grade data using hybrid strategy
- * 1. Extract course list from DOM (fast - course names and IDs)
- * 2. Fetch grade data from Enrollments API (reliable - percentages and letter grades)
- * 3. Merge DOM and API data
- * 4. Detect standards-based courses and convert grades
+ * Fetch course grade data using API-first strategy (matches dashboard)
+ * 1. Fetch courses from /api/v1/courses with include[]=total_scores (single API call)
+ * 2. Enrich with snapshots for course model detection and grade conversion
  *
  * @returns {Promise<Array>} Array of course grade objects
  */
@@ -217,42 +220,37 @@ async function fetchCourseGrades() {
     const apiClient = new CanvasApiClient();
 
     try {
-        // Step 1: Extract course list from DOM (fast - no API calls)
-        logger.trace('[Hybrid] Step 1: Extracting course list from DOM...');
-        const courses = extractCoursesFromDOM();
+        // Step 1: Fetch active courses with enrollment data (single API call)
+        logger.trace('[All-Grades] Step 1: Fetching active courses from API...');
+        const courses = await fetchActiveCourses(apiClient);
 
         if (courses.length === 0) {
-            throw new Error('No courses found in DOM');
+            logger.warn('[All-Grades] No active student courses found');
+            return [];
         }
 
-        logger.trace(`[Hybrid] Found ${courses.length} courses in DOM`);
+        logger.trace(`[All-Grades] Found ${courses.length} active student courses`);
 
-        // Step 2: Fetch grade data from API (reliable source for percentages)
-        logger.trace('[Hybrid] Step 2: Fetching grade data from Enrollments API...');
-        const gradeMap = await fetchGradeDataFromAPI(apiClient);
+        // Step 2: Enrich courses with snapshots for model detection and grade conversion
+        logger.trace(`[All-Grades] Step 2: Enriching courses with snapshots...`);
+        const enrichedCourses = await enrichCoursesWithSnapshots(courses, apiClient);
 
-        logger.trace(`[Hybrid] Fetched grade data for ${gradeMap.size} courses from API`);
-
-        // Step 3: Enrich courses with grades and detection
-        logger.trace(`[Hybrid] Step 3: Enriching courses with grades and detection...`);
-        const enrichedCourses = await enrichCoursesWithAPI(courses, gradeMap, apiClient);
-
-        logger.trace(`[Hybrid] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
+        logger.trace(`[All-Grades] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
 
         // Log summary
         const withGrades = enrichedCourses.filter(c => c.displayScore !== null).length;
         const withoutGrades = enrichedCourses.length - withGrades;
-        const fromDOM = enrichedCourses.filter(c => c.gradeSource === 'DOM').length;
-        const fromAPI = enrichedCourses.filter(c => c.gradeSource === 'API').length;
+        const fromEnrollment = enrichedCourses.filter(c => c.gradeSource === 'enrollment').length;
+        const fromSnapshot = enrichedCourses.filter(c => c.gradeSource === 'snapshot').length;
         const standardsBased = enrichedCourses.filter(c => c.isStandardsBased).length;
         const traditional = enrichedCourses.length - standardsBased;
 
-        logger.debug(`[Hybrid] Processed ${enrichedCourses.length} courses: ${standardsBased} standards-based, ${traditional} traditional`);
-        logger.debug(`[Hybrid] Grade sources: ${fromDOM} from DOM, ${fromAPI} from API`);
+        logger.debug(`[All-Grades] Processed ${enrichedCourses.length} courses: ${standardsBased} standards-based, ${traditional} traditional`);
+        logger.debug(`[All-Grades] Grade sources: ${fromEnrollment} from enrollment, ${fromSnapshot} from snapshot`);
 
         // Log detailed breakdown for debugging
         if (logger.isTraceEnabled()) {
-            logger.trace('[Hybrid] Course breakdown:');
+            logger.trace('[All-Grades] Course breakdown:');
             enrichedCourses.forEach(c => {
                 const type = c.isStandardsBased ? 'SBG' : 'TRAD';
                 const display = c.displayScore !== null
@@ -265,7 +263,7 @@ async function fetchCourseGrades() {
         return enrichedCourses;
 
     } catch (error) {
-        logger.error('[Hybrid] Failed to fetch course grades:', error);
+        logger.error('[All-Grades] Failed to fetch course grades:', error);
         throw error;
     }
 }
