@@ -20,7 +20,7 @@
 import { logger } from '../utils/logger.js';
 import { AVG_ASSIGNMENT_NAME, AVG_OUTCOME_NAME, STANDARDS_BASED_COURSE_PATTERNS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { matchesCourseNamePattern } from '../utils/courseDetection.js';
+import { determineCourseModel } from '../utils/courseDetection.js';
 import { extractCourseDataFromRow, findTableRows } from '../utils/domExtractors.js';
 
 /**
@@ -212,68 +212,16 @@ async function processCourseFromEnrollment(enrollment, apiClient) {
 
 /**
  * Detect if a course uses standards-based grading
- * Checks:
- * 1. Course name patterns
- * 2. Presence of AVG Assignment
- * 3. Presence of AVG Outcome
+ * Uses the shared determineCourseModel function
  */
 async function detectStandardsBasedCourse(courseId, courseName, apiClient) {
-    // Check cache first
-    const cacheKey = `standardsBased_${courseId}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached !== null) {
-        return cached === 'true';
-    }
+    const classification = await determineCourseModel(
+        { courseId, courseName },
+        null,
+        { apiClient }
+    );
 
-    // 1. Check course name patterns (use shared utility)
-    const matchesPattern = matchesCourseNamePattern(courseName);
-
-    if (matchesPattern) {
-        sessionStorage.setItem(cacheKey, 'true');
-        return true;
-    }
-
-    // 2. Check for AVG Assignment
-    try {
-        const assignments = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: AVG_ASSIGNMENT_NAME },
-            'checkAvgAssignment'
-        );
-
-        const hasAvgAssignment = assignments.some(a => a.name === AVG_ASSIGNMENT_NAME);
-        if (hasAvgAssignment) {
-            sessionStorage.setItem(cacheKey, 'true');
-            return true;
-        }
-    } catch (error) {
-        logger.warn(`[Detection] Could not check assignments for course ${courseId}:`, error.message);
-    }
-
-    // 3. Check for AVG Outcome (optional - can be expensive)
-    // Commenting out for now as it requires additional API calls
-    // Can be enabled if needed
-    /*
-    try {
-        const outcomes = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_group_links`,
-            {},
-            'checkAvgOutcome'
-        );
-
-        const hasAvgOutcome = outcomes.some(o => o.outcome?.title === AVG_OUTCOME_NAME);
-        if (hasAvgOutcome) {
-            sessionStorage.setItem(cacheKey, 'true');
-            return true;
-        }
-    } catch (error) {
-        logger.warn(`[Detection] Could not check outcomes for course ${courseId}:`, error.message);
-    }
-    */
-
-    // Not standards-based
-    sessionStorage.setItem(cacheKey, 'false');
-    return false;
+    return classification.model === 'standards';
 }
 
 /**
@@ -381,4 +329,3 @@ function generateRecommendation(domResults, apiResults) {
 if (typeof window !== 'undefined') {
     window.CG_testAllGradesDataSources = compareDataSourceApproaches;
 }
-

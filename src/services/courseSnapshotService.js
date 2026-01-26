@@ -18,7 +18,9 @@
  * {
  *   courseId: string,
  *   courseName: string,
- *   isStandardsBased: boolean,
+ *   model: "standards" | "traditional",  // Course model classification
+ *   modelReason: string,                 // Classification reason (for debugging)
+ *   isStandardsBased: boolean,           // DEPRECATED: Use model === "standards"
  *   score: number,
  *   letterGrade: string|null,
  *   gradeSource: 'assignment' | 'enrollment',
@@ -31,7 +33,7 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { isStandardsBasedCourse } from '../utils/courseDetection.js';
+import { determineCourseModel, isStandardsBasedCourse } from '../utils/courseDetection.js';
 import { getCourseGrade } from './gradeDataService.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
 import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetection.js';
@@ -305,22 +307,22 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
 
         logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
 
-        // Step 2: Detect course type with letter grade (SINGLE SOURCE OF TRUTH)
-        logger.trace(`[Snapshot] Step 2: Detecting course type for ${courseId} with letterGrade="${gradeData.letterGrade}"...`);
-        const isStandardsBased = await isStandardsBasedCourse({
-            courseId,
-            courseName,
-            letterGrade: gradeData.letterGrade,
-            apiClient,
-            skipApiCheck: false
-        });
-        logger.trace(`[Snapshot] Course ${courseId} detection result: isStandardsBased=${isStandardsBased}`);
+        // Step 2: Classify course model (SINGLE SOURCE OF TRUTH)
+        logger.trace(`[Snapshot] Step 2: Classifying course model for ${courseId}...`);
+        const classification = await determineCourseModel(
+            { courseId, courseName },
+            null,
+            { apiClient }
+        );
+        logger.trace(`[Snapshot] Course ${courseId} classification: model=${classification.model}, reason=${classification.reason}`);
 
         // Step 3: Create unified snapshot with security fields
         const snapshot = {
             courseId,
             courseName,
-            isStandardsBased,
+            model: classification.model,
+            modelReason: classification.reason,
+            isStandardsBased: classification.model === 'standards', // DEPRECATED: for backward compatibility
             score: gradeData.score,
             letterGrade: gradeData.letterGrade,
             gradeSource: gradeData.source,
@@ -333,7 +335,7 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
         sessionStorage.setItem(key, JSON.stringify(snapshot));
 
-        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: isStandardsBased=${isStandardsBased}, score=${gradeData.score}, source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), score=${gradeData.score}, source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
 
         return snapshot;
 
