@@ -10,7 +10,8 @@
  */
 
 import { removeFractionScores } from './gradeNormalizer.js';
-import { courseHasAvgAssignment } from '../utils/canvas.js';
+import { getCourseId } from '../utils/canvas.js';
+import { getCourseSnapshot } from '../services/courseSnapshotService.js';
 import { logger } from '../utils/logger.js';
 import { isDashboardPage, isAllGradesPage, isCoursePageNeedingCleanup } from '../utils/pageDetection.js';
 import { debounce } from '../utils/dom.js';
@@ -71,7 +72,7 @@ export function startCleanupObservers() {
 /**
  * Initialize cleanup observers based on page context
  * For dashboard: always run
- * For course pages: only run if course has AVG assignment
+ * For course pages: only run if course is standards-based (uses snapshot)
  * For all-grades page: skip (no course ID available)
  */
 export async function initCleanupObservers() {
@@ -88,13 +89,26 @@ export async function initCleanupObservers() {
         logger.debug('Initializing cleanup observers for dashboard');
         startCleanupObservers();
     } else {
-        // Course pages: only run if this course has the avg assignment
-        const hasAvg = await courseHasAvgAssignment();
-        if (!hasAvg) {
-            logger.debug('Skipping fraction cleanup — no Current Score Assignment in this course');
+        // Course pages: only run if this course is standards-based
+        // Check snapshot for course model classification
+        const courseId = getCourseId();
+        if (!courseId) {
+            logger.trace('Skipping cleanup observers - no course ID');
             return;
         }
-        logger.debug('Initializing cleanup observers for course page');
+
+        const snapshot = getCourseSnapshot(courseId);
+        if (!snapshot) {
+            logger.trace('Skipping cleanup observers - no snapshot available (will be populated by grade customizer)');
+            return;
+        }
+
+        if (snapshot.model !== 'standards') {
+            logger.debug(`Skipping fraction cleanup — course is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+            return;
+        }
+
+        logger.debug('Initializing cleanup observers for standards-based course page');
         startCleanupObservers();
     }
 }

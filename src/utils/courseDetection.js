@@ -2,22 +2,24 @@
 /**
  * Course Detection Utilities
  *
- * Pure detection utilities for identifying standards-based courses.
- * Used by courseSnapshotService to populate course type in snapshots.
+ * Shared function for course model classification.
+ * All modules must use determineCourseModel() for classification.
  *
- * Detection Methods:
- * 1. Course name pattern matching (fastest - no API calls)
- * 2. AVG Assignment presence check (reliable - requires API call)
- * 3. Letter grade validation against rating scale (for enrollment data)
+ * Classification Rules (ONLY these two tests):
+ * 1. Name pattern test (first, short-circuit): If course name matches pattern → "standards"
+ * 2. Assignment presence test (only if name does NOT match): If AVG_ASSIGNMENT_NAME exists → "standards", else → "traditional"
+ *
+ * Results are stored in session data (cg_courseSnapshot_<courseId>).
+ * Modules should read from session data rather than re-fetching.
  *
  * NOTE: This module does NOT cache results. Caching is handled by courseSnapshotService.
  */
 
 import { logger } from './logger.js';
-import { 
-    AVG_ASSIGNMENT_NAME, 
+import {
+    AVG_ASSIGNMENT_NAME,
     STANDARDS_BASED_COURSE_PATTERNS,
-    OUTCOME_AND_RUBRIC_RATINGS 
+    OUTCOME_AND_RUBRIC_RATINGS
 } from '../config.js';
 
 /**
@@ -85,10 +87,80 @@ export async function hasAvgAssignment(courseId, apiClient) {
 }
 
 /**
- * Detect if a course uses standards-based grading
+ * Determine course model classification
+ *
+ * This is the single shared function for course classification.
+ * All modules must use this function or read from session data.
+ *
+ * Classification Rules (ONLY these two tests):
+ * 1. Name pattern test (first, short-circuit): If course name matches pattern → "standards"
+ * 2. Assignment presence test (only if name does NOT match): If AVG_ASSIGNMENT_NAME exists → "standards", else → "traditional"
  *
  * Pure detection function - does NOT cache results.
  * Caching is handled by courseSnapshotService.
+ *
+ * @param {Object} course - Course data
+ * @param {string} course.courseId - Course ID (required)
+ * @param {string} course.courseName - Course name (required)
+ * @param {Object} sessionData - Session data (unused, for future compatibility)
+ * @param {Object} options - Detection options
+ * @param {Object} options.apiClient - CanvasApiClient instance (required for assignment check)
+ * @returns {Promise<{model: "standards"|"traditional", reason: "name-pattern"|"avg-assignment"}>}
+ *
+ * @example
+ * const result = await determineCourseModel(
+ *   { courseId: '12345', courseName: 'Math 101' },
+ *   null,
+ *   { apiClient }
+ * );
+ * console.log(result.model); // "standards" or "traditional"
+ * console.log(result.reason); // "name-pattern" or "avg-assignment"
+ */
+export async function determineCourseModel(course, sessionData, options) {
+    const { courseId, courseName } = course;
+    const { apiClient } = options;
+
+    if (!courseId || !courseName) {
+        logger.warn('[CourseModel] determineCourseModel called without required courseId or courseName');
+        return { model: 'traditional', reason: 'invalid-input' };
+    }
+
+    logger.trace(`[CourseModel] Classifying course ${courseId} "${courseName}"`);
+
+    // Rule 1: Name pattern test (short-circuit)
+    const matchesPattern = matchesCourseNamePattern(courseName);
+    logger.trace(`[CourseModel] Rule 1 - Pattern match: ${matchesPattern ? 'YES' : 'NO'}`);
+    if (matchesPattern) {
+        logger.debug(`[CourseModel] ✅ Course "${courseName}" → standards (name-pattern)`);
+        return { model: 'standards', reason: 'name-pattern' };
+    }
+
+    // Rule 2: Assignment presence test (only if name does NOT match)
+    if (!apiClient) {
+        logger.warn(`[CourseModel] No apiClient provided for course ${courseId}, defaulting to traditional`);
+        return { model: 'traditional', reason: 'no-api-client' };
+    }
+
+    logger.trace(`[CourseModel] Rule 2 - Checking AVG Assignment presence...`);
+    const hasAvg = await hasAvgAssignment(courseId, apiClient);
+    logger.trace(`[CourseModel] Rule 2 - AVG Assignment: ${hasAvg ? 'FOUND' : 'NOT FOUND'}`);
+
+    if (hasAvg) {
+        logger.debug(`[CourseModel] ✅ Course "${courseName}" → standards (avg-assignment)`);
+        return { model: 'standards', reason: 'avg-assignment' };
+    }
+
+    logger.debug(`[CourseModel] ❌ Course "${courseName}" → traditional`);
+    return { model: 'traditional', reason: 'no-match' };
+}
+
+/**
+ * LEGACY: Detect if a course uses standards-based grading
+ *
+ * @deprecated Use determineCourseModel() instead
+ *
+ * This function is kept for backward compatibility.
+ * It wraps determineCourseModel() and returns a boolean.
  *
  * Detection strategy (in order):
  * 1. Check course name patterns - fastest, no API calls
