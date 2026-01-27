@@ -1,12 +1,12 @@
 // src/student/gradeNormalizer.js
 /**
  * Grade Normalizer Module
- * 
+ *
  * Removes fraction denominators and "out of X" text from grade displays across Canvas.
  * This creates a cleaner, standards-based grading experience for students by showing
  * only the mastery score (e.g., "2.74") instead of traditional point-based displays
  * (e.g., "2.74 / 4 pts" or "2.74 out of 4").
- * 
+ *
  * Handles multiple Canvas UI patterns:
  * - Course homepage assignment lists
  * - Grades page tables
@@ -16,20 +16,10 @@
  * - Assignment details pages
  * - Dashboard feedback cards
  * - Assignment group totals
- * - Final grade row
  */
 
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { formatGradeDisplay } from '../utils/gradeFormatting.js';
-import { getCourseId } from '../utils/canvas.js';
-import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import {
-    getCourseSnapshot,
-    refreshCourseSnapshot,
-    shouldRefreshGrade,
-    PAGE_CONTEXT
-} from '../services/courseSnapshotService.js';
 
 /**
  * Remove fraction denominators and "out of X" text from all grade displays
@@ -125,9 +115,6 @@ export async function removeFractionScores() {
 
     // --- 8. Assignment group totals row ---
     normalizeGroupTotalsRow();
-
-    // --- 9. Final grade row ---
-    await normalizeFinalGradeRow();
 }
 
 /**
@@ -153,70 +140,6 @@ function normalizeGroupTotalsRow() {
             // Matches "number / number" or "0.00 / 0.00"
             if (/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(txt)) {
                 possibleEl.textContent = ""; // fully blank out
-            }
-        }
-    });
-}
-
-/**
- * Normalize final grade row
- * Replaces percentage with mastery score and letter grade from Course Snapshot Service
- */
-async function normalizeFinalGradeRow() {
-    // Get course ID from URL
-    const courseId = getCourseId();
-    if (!courseId) {
-        logger.trace('Cannot get course ID for final grade normalization');
-        return;
-    }
-
-    // Get course name from DOM
-    const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
-
-    // Check snapshot cache first
-    let snapshot = getCourseSnapshot(courseId);
-
-    // Populate/refresh if needed
-    if (!snapshot || shouldRefreshGrade(courseId, PAGE_CONTEXT.COURSE_GRADES)) {
-        logger.trace(`Fetching grade data from API for final grade normalization...`);
-        const apiClient = new CanvasApiClient();
-        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.COURSE_GRADES);
-    }
-
-    // Extract display-ready grade data from snapshot
-    const gradeData = snapshot ? {
-        score: snapshot.displayScore,
-        letterGrade: snapshot.displayLetterGrade
-    } : null;
-
-    document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {
-        const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
-        const possibleEl = row.querySelector(".details .possible.points_possible");
-
-        if (gradeEl) {
-            if (gradeData && gradeData.score) {
-                // Format with both score and letter grade
-                const displayValue = formatGradeDisplay(gradeData.score, gradeData.letterGrade);
-
-                // Only update if value has changed (prevents flashing and unnecessary DOM updates)
-                if (gradeEl.textContent !== displayValue) {
-                    gradeEl.textContent = displayValue;
-                    gradeEl.dataset.normalized = 'true';
-                }
-            } else {
-                // If we couldn't get the mastery score, hide the percent instead
-                const raw = gradeEl.textContent.trim();
-                if (/^\d+(\.\d+)?%$/.test(raw)) {
-                    gradeEl.textContent = "";
-                }
-            }
-        }
-
-        if (possibleEl) {
-            // Canvas shows "102.50 / 152.00". We don't want that.
-            const txt = possibleEl.textContent.trim();
-            if (/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(txt)) {
-                possibleEl.textContent = "";
             }
         }
     });
