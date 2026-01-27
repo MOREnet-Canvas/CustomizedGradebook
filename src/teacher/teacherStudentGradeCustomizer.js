@@ -100,10 +100,26 @@ function updateFinalGradeRow(gradeData) {
 
     logger.trace(`updateFinalGradeRow called with score=${score}, letterGrade=${letterGrade}, displayValue="${displayValue}"`);
 
-    // Use the same selector pattern as student view for consistency
-    document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach((row, index) => {
-        const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
-        const possibleEl = row.querySelector(".details .possible.points_possible");
+    // Try multiple selectors to find final grade rows (teacher view might have different structure)
+    const finalGradeRows = [
+        ...document.querySelectorAll("tr.student_assignment.hard_coded.final_grade"),
+        ...document.querySelectorAll("tr.student_assignment.final_grade"),
+        ...document.querySelectorAll("tr.final_grade")
+    ];
+
+    if (finalGradeRows.length === 0) {
+        logger.trace('No final grade rows found');
+        return;
+    }
+
+    logger.trace(`Found ${finalGradeRows.length} final grade row(s)`);
+
+    finalGradeRows.forEach((row, index) => {
+        // Try multiple selectors for grade element
+        const gradeEl = row.querySelector(".assignment_score .tooltip .grade") ||
+                       row.querySelector(".assignment_score .grade") ||
+                       row.querySelector(".tooltip .grade") ||
+                       row.querySelector(".grade");
 
         if (gradeEl) {
             const currentText = gradeEl.textContent.trim();
@@ -121,6 +137,7 @@ function updateFinalGradeRow(gradeData) {
             logger.trace(`Final grade row ${index}: grade element not found`);
         }
 
+        const possibleEl = row.querySelector(".details .possible.points_possible");
         if (possibleEl) {
             // Canvas shows "102.50 / 152.00". We don't want that.
             const txt = possibleEl.textContent.trim();
@@ -196,8 +213,8 @@ function applyCustomizations(gradeData, retryCount = 0) {
     const MAX_RETRIES = 10;
     const RETRY_DELAY = 200; // ms
 
-    // Check if required elements exist
-    const hasFinalGradeRow = document.querySelector("tr.student_assignment.final_grade") !== null;
+    // Check if required elements exist - use same selector as updateFinalGradeRow
+    const hasFinalGradeRow = document.querySelector("tr.student_assignment.hard_coded.final_grade") !== null;
     const hasSidebar = (document.querySelector('#right-side-wrapper') || document.querySelector('#right-side')) !== null;
 
     if (!hasFinalGradeRow || !hasSidebar) {
@@ -210,6 +227,8 @@ function applyCustomizations(gradeData, retryCount = 0) {
             return false;
         }
     }
+
+    logger.trace(`Applying customizations with gradeData: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
 
     // Update final grade row and sidebar
     updateFinalGradeRow(gradeData);
