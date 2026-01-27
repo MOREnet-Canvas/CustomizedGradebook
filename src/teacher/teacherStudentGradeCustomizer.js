@@ -19,7 +19,7 @@ import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 import { removeFractionScores } from '../student/gradeNormalizer.js';
-import { getCourseSnapshot, populateTeacherCourseSnapshot, PAGE_CONTEXT } from '../services/courseSnapshotService.js';
+import { getCourseSnapshot, populateCourseSnapshot, PAGE_CONTEXT } from '../services/courseSnapshotService.js';
 import { getStudentIdFromUrl } from '../utils/pageDetection.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { debounce } from '../utils/dom.js';
@@ -327,8 +327,8 @@ export async function initTeacherStudentGradeCustomizer() {
     let snapshot = getCourseSnapshot(courseId);
 
     if (!snapshot) {
-        logger.debug(`[Teacher] No snapshot for course ${courseId}, creating teacher snapshot...`);
-        snapshot = await populateTeacherCourseSnapshot(courseId, courseName, apiClient);
+        logger.debug(`[Teacher] No snapshot for course ${courseId}, populating snapshot...`);
+        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
     }
 
     if (!snapshot) {
