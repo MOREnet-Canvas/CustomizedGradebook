@@ -91,7 +91,7 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
 
 /**
  * Update the final grade row in the grades table
- * Handles both separate fraction elements and inline fraction text
+ * Matches the student view implementation for consistency
  * @param {Object} gradeData - Grade data object
  */
 function updateFinalGradeRow(gradeData) {
@@ -100,65 +100,29 @@ function updateFinalGradeRow(gradeData) {
 
     logger.trace(`updateFinalGradeRow called with score=${score}, letterGrade=${letterGrade}, displayValue="${displayValue}"`);
 
-    // Try multiple selectors to find the final grade row
-    const finalGradeRows = [
-        ...document.querySelectorAll("tr.student_assignment.hard_coded.final_grade"),
-        ...document.querySelectorAll("tr.student_assignment.final_grade"),
-        ...document.querySelectorAll("tr.final_grade")
-    ];
-
-    if (finalGradeRows.length === 0) {
-        logger.trace('Final grade row not found in table');
-        return;
-    }
-
-    logger.trace(`Found ${finalGradeRows.length} final grade row(s)`);
-
-    finalGradeRows.forEach((row, index) => {
-        // Find grade element - try multiple selectors
-        const gradeEl = row.querySelector(".assignment_score .tooltip .grade") ||
-                       row.querySelector(".assignment_score .grade") ||
-                       row.querySelector(".tooltip .grade") ||
-                       row.querySelector(".grade");
+    // Use the same selector pattern as student view for consistency
+    document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach((row, index) => {
+        const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
+        const possibleEl = row.querySelector(".details .possible.points_possible");
 
         if (gradeEl) {
             const currentText = gradeEl.textContent.trim();
 
-            // Check if there's a separate letter grade element (like sidebar)
-            const letterGradeEl = row.querySelector(".letter_grade") ||
-                                 row.querySelector(".letter-grade");
-
-            if (letterGradeEl) {
-                // Separate elements for score and letter grade (like sidebar)
-                const scoreStr = typeof score === 'number' ? score.toFixed(2) : String(score);
-
-                if (currentText.includes('/') || currentText !== scoreStr) {
-                    gradeEl.textContent = scoreStr;
-                    gradeEl.dataset.normalized = 'true';
-                    logger.trace(`Updated final grade row ${index} score: "${currentText}" -> "${scoreStr}"`);
-                }
-
-                if (letterGrade && letterGradeEl.textContent.trim() !== letterGrade) {
-                    letterGradeEl.textContent = letterGrade;
-                    logger.trace(`Updated final grade row ${index} letter grade: "${letterGradeEl.textContent}" -> "${letterGrade}"`);
-                }
+            // Always update to the combined format (score + letter grade)
+            // This matches the student view behavior
+            if (currentText !== displayValue) {
+                gradeEl.textContent = displayValue;
+                gradeEl.dataset.normalized = 'true';
+                logger.trace(`Updated final grade row ${index}: "${currentText}" -> "${displayValue}"`);
             } else {
-                // Single element for combined display (score + letter grade)
-                if (currentText.includes('/') || currentText !== displayValue) {
-                    gradeEl.textContent = displayValue;
-                    gradeEl.dataset.normalized = 'true';
-                    logger.trace(`Updated final grade row ${index}: "${currentText}" -> "${displayValue}"`);
-                } else {
-                    logger.trace(`Final grade row ${index} already has correct value: "${currentText}"`);
-                }
+                logger.trace(`Final grade row ${index} already has correct value: "${currentText}"`);
             }
         } else {
             logger.trace(`Final grade row ${index}: grade element not found`);
         }
 
-        // Also remove any separate fraction elements
-        const possibleEl = row.querySelector(".details .possible.points_possible");
         if (possibleEl) {
+            // Canvas shows "102.50 / 152.00". We don't want that.
             const txt = possibleEl.textContent.trim();
             if (/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(txt)) {
                 possibleEl.textContent = "";
