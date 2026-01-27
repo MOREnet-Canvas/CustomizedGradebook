@@ -1,18 +1,17 @@
 // src/student/gradePageCustomizer.js
 /**
  * Grade Page Customizer Module
- * 
+ *
  * Customizes the student grades page to emphasize standards-based grading:
  * - Optionally removes the Assignments tab
  * - Switches to the Learning Mastery tab by default
- * - Replaces the right sidebar with a clean mastery score display
- * 
+ * - Updates the grade display in the right sidebar while preserving other content
+ *
  * This module only runs on student grades pages when ENABLE_STUDENT_GRADE_CUSTOMIZATION is true.
  */
 
-import { AVG_OUTCOME_NAME, REMOVE_ASSIGNMENT_TAB } from '../config.js';
+import { REMOVE_ASSIGNMENT_TAB } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { inheritFontStylesFrom } from '../utils/dom.js';
 import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 import { getCourseId } from '../utils/canvas.js';
@@ -99,7 +98,8 @@ function goToLearningMasteryTab() {
 }
 
 /**
- * Replace the right sidebar with a clean mastery score display
+ * Update the grade display in the existing right sidebar
+ * Preserves all other sidebar content (announcements, to-do items, etc.)
  *
  * @param {Object} gradeData - Grade data object
  * @param {string} gradeData.score - The mastery score to display (e.g., "2.74")
@@ -107,7 +107,6 @@ function goToLearningMasteryTab() {
  */
 function replaceRightSidebar(gradeData) {
     const { score, letterGrade } = gradeData;
-    const displayValue = formatGradeDisplay(score, letterGrade);
 
     const rightSide = getRightSideElement();
 
@@ -116,51 +115,46 @@ function replaceRightSidebar(gradeData) {
         return;
     }
 
-    if (rightSide.dataset.processed) {
-        // Already processed, just update the score
-        const masteryAside = document.getElementById('mastery-right-side');
-        if (masteryAside) {
-            const span = masteryAside.querySelector('.mastery-grade');
-            if (span) span.textContent = displayValue;
-        }
+    // Find the final grade display element within the sidebar
+    const finalGradeDiv = rightSide.querySelector('.student_assignment.final_grade');
+
+    if (!finalGradeDiv) {
+        logger.trace('Final grade element (.student_assignment.final_grade) not found in sidebar; deferring...');
         return;
     }
 
-    // Hide original sidebar
-    rightSide.style.display = 'none';
-    rightSide.dataset.processed = 'true';
+    if (rightSide.dataset.processed) {
+        // Already processed, just update the score
+        const gradeSpan = finalGradeDiv.querySelector('.grade');
+        const letterGradeSpan = finalGradeDiv.querySelector('.letter_grade');
 
-    // Create new mastery sidebar
-    const masteryAside = document.createElement('aside');
-    masteryAside.id = 'mastery-right-side';
-    masteryAside.setAttribute('role', 'complementary');
-    masteryAside.style.cssText = `
-        color: inherit; font-weight: inherit; font-size: inherit; font-family: inherit;
-        margin: inherit; padding: inherit; background: inherit; border: inherit;
-    `;
-
-    masteryAside.innerHTML = `
-        <div id="student-grades-right-content">
-            <div class="student_assignment mastery_total">
-                ${AVG_OUTCOME_NAME}: <span class="mastery-grade">${displayValue}</span>
-            </div>
-        </div>
-    `;
-
-    // Make it typographically consistent with Canvas
-    const headerEl = masteryAside.querySelector('.mastery_total');
-    if (headerEl) {
-        const ok = inheritFontStylesFrom('h1.screenreader-only, h1, .ic-app-nav-toggle-and-crumbs h1', headerEl);
-        if (!ok) {
-            headerEl.style.fontSize = '1.5em';
-            headerEl.style.fontWeight = 'bold';
+        if (gradeSpan) {
+            gradeSpan.textContent = typeof score === 'number' ? score.toFixed(2) : String(score);
         }
+        if (letterGradeSpan && letterGrade) {
+            letterGradeSpan.textContent = letterGrade;
+        }
+
+        logger.trace('Grade display updated in existing sidebar');
+        return;
     }
 
-    // Insert after the original sidebar
-    rightSide.parentNode.insertBefore(masteryAside, rightSide.nextSibling);
+    // First-time processing: update the grade elements
+    const gradeSpan = finalGradeDiv.querySelector('.grade');
+    const letterGradeSpan = finalGradeDiv.querySelector('.letter_grade');
 
-    logger.debug(`Sidebar replaced with ${AVG_OUTCOME_NAME}: ${displayValue}`);
+    if (gradeSpan) {
+        gradeSpan.textContent = typeof score === 'number' ? score.toFixed(2) : String(score);
+    }
+    if (letterGradeSpan && letterGrade) {
+        letterGradeSpan.textContent = letterGrade;
+    }
+
+    // Mark as processed
+    rightSide.dataset.processed = 'true';
+
+    const displayValue = formatGradeDisplay(score, letterGrade);
+    logger.debug(`Sidebar grade updated to: ${displayValue}`);
 }
 
 /**
@@ -180,7 +174,7 @@ function applyCustomizations(gradeData) {
         goToLearningMasteryTab();
     }
 
-    // 2) Replace the right sidebar with mastery score display
+    // 2) Update the grade display in the right sidebar
     replaceRightSidebar(gradeData);
 
     processed = true;
