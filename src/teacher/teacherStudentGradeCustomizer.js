@@ -24,6 +24,7 @@ import { getStudentIdFromUrl } from '../utils/pageDetection.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { debounce } from '../utils/dom.js';
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
+import { scoreToGradeLevel } from '../student/gradeExtractor.js';
 
 /**
  * Track if customizations have been applied (prevent double-runs)
@@ -31,7 +32,8 @@ import { AVG_ASSIGNMENT_NAME } from '../config.js';
 let processed = false;
 
 /**
- * Fetch AVG assignment score for a specific student
+ * Fetch AVG assignment score for a specific student via Canvas submissions API
+ * Uses a single API call to get all student submissions, then filters for AVG assignment
  * @param {string} courseId - Course ID
  * @param {string} studentId - Student ID
  * @param {CanvasApiClient} apiClient - Canvas API client
@@ -41,60 +43,61 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
     logger.trace(`[Teacher] fetchStudentAvgScore: courseId=${courseId}, studentId=${studentId}`);
 
     try {
-        // Get AVG assignment ID from snapshot
         const snapshot = getCourseSnapshot(courseId);
         if (!snapshot) {
             logger.warn(`[Teacher] No snapshot available for course ${courseId} - cannot fetch student grade`);
             return null;
         }
 
-        logger.trace(`[Teacher] Snapshot found, searching for AVG assignment...`);
+        logger.trace(`[Teacher] Snapshot found, fetching all submissions for student ${studentId}...`);
 
-        // Search for AVG assignment
-        const assignments = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: AVG_ASSIGNMENT_NAME },
-            'fetchAvgAssignment'
+        // Fetch all submissions for this student (includes assignment details)
+        const submissions = await apiClient.get(
+            `/api/v1/courses/${courseId}/students/submissions`,
+            {
+                student_ids: [studentId],
+                per_page: 100,
+                include: ['assignment']
+            },
+            'fetchStudentSubmissions'
         );
 
-        logger.trace(`[Teacher] Found ${assignments?.length || 0} assignments matching "${AVG_ASSIGNMENT_NAME}"`);
+        logger.trace(`[Teacher] Found ${submissions?.length || 0} total submissions for student ${studentId}`);
 
-        const avgAssignment = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
-        if (!avgAssignment) {
-            logger.warn(`[Teacher] AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
+        // Find the AVG assignment submission by name
+        const avgSubmission = submissions?.find(s => s.assignment?.name === AVG_ASSIGNMENT_NAME);
+
+        if (!avgSubmission) {
+            logger.warn(`[Teacher] AVG assignment "${AVG_ASSIGNMENT_NAME}" submission not found for student ${studentId}`);
             return null;
         }
 
-        logger.trace(`[Teacher] Found AVG assignment: id=${avgAssignment.id}, name="${avgAssignment.name}"`);
+        logger.trace(`[Teacher] Found AVG submission: assignment_id=${avgSubmission.assignment_id}, workflow_state=${avgSubmission.workflow_state}`);
 
-        // Fetch student's submission for AVG assignment
-        logger.trace(`[Teacher] Fetching submission for student ${studentId}, assignment ${avgAssignment.id}...`);
-        const submission = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${studentId}`,
-            {},
-            'fetchStudentSubmission'
-        );
+        // Extract score from submission
+        const score = avgSubmission.score ?? avgSubmission.entered_score ?? null;
 
-        logger.trace(`[Teacher] Submission response: score=${submission?.score}, workflow_state=${submission?.workflow_state}`);
-
-        const score = submission?.score;
         if (score === null || score === undefined) {
-            logger.warn(`[Teacher] No score found for student ${studentId} in AVG assignment (submission exists but score is null/undefined)`);
+            logger.warn(`[Teacher] No score found in AVG assignment submission for student ${studentId}`);
             return null;
         }
 
-        logger.trace(`[Teacher] Student score found: ${score}, fetching enrollment for letter grade...`);
+        logger.trace(`[Teacher] Student score found: ${score}`);
 
-        // Get letter grade from enrollment
-        const enrollment = await apiClient.get(
-            `/api/v1/courses/${courseId}/enrollments`,
-            { user_id: studentId },
-            'fetchStudentEnrollment'
-        );
+        // Extract letter grade from submission (Canvas stores letter grades in grade/entered_grade fields)
+        let letterGrade = avgSubmission.grade ?? avgSubmission.entered_grade ?? null;
 
-        logger.trace(`[Teacher] Enrollment response: ${enrollment?.length || 0} enrollments found`);
+        // If letter grade is numeric or missing, calculate from score
+        if (!letterGrade || !isNaN(parseFloat(letterGrade))) {
+            logger.trace(`[Teacher] No valid letter grade from submission API (got: ${letterGrade}), calculating from score...`);
+            letterGrade = scoreToGradeLevel(score);
 
-        const letterGrade = enrollment?.[0]?.grades?.current_grade || null;
+            if (letterGrade) {
+                logger.trace(`[Teacher] Calculated letter grade from score ${score}: "${letterGrade}"`);
+            }
+        } else {
+            logger.trace(`[Teacher] Letter grade from submission API: "${letterGrade}"`);
+        }
 
         logger.debug(`[Teacher] ✅ Student ${studentId} AVG score: ${score}, letter grade: ${letterGrade}`);
         return { score, letterGrade };
