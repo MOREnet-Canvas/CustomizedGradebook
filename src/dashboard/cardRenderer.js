@@ -9,7 +9,6 @@
 import { logger } from '../utils/logger.js';
 import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { GRADE_SOURCE } from '../services/gradeDataService.js';
-import { calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
 import { HERO_SELECTORS, findCourseCard } from './cardSelectors.js';
 
 /**
@@ -20,42 +19,61 @@ const GRADE_CLASS_PREFIX = 'cg-dashboard-grade';
 /**
  * Format grade data for display
  * Pure function - no side effects, easy to test
+ * Now uses pre-calculated display values from snapshot service
  * @param {Object} gradeData - Grade data object
- * @param {number} gradeData.score - Numeric score value
- * @param {string|null} gradeData.letterGrade - Letter grade (if available)
- * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
+ * @param {number} gradeData.score - Display score (already converted)
+ * @param {string|null} gradeData.letterGrade - Display letter grade
+ * @param {string} gradeData.displayType - Display type ('points' or 'percentage')
  * @returns {{displayValue: string, ariaLabel: string}} Formatted display strings
  */
 function formatGradeDisplay(gradeData) {
-    const { score, letterGrade, source } = gradeData;
+    const { score, letterGrade, displayType } = gradeData;
 
-    logger.trace(`[Grade Conversion Debug] Formatting grade data: source=${source}, score=${score}, letterGrade=${letterGrade}`);
+    logger.trace(`[Grade Display] Formatting display values: score=${score}, letterGrade=${letterGrade}, displayType=${displayType}`);
 
-    // Map GRADE_SOURCE to DISPLAY_SOURCE
-    const displaySource = source === GRADE_SOURCE.ASSIGNMENT
-        ? DISPLAY_SOURCE.ASSIGNMENT
-        : DISPLAY_SOURCE.ENROLLMENT;
+    // Format display value based on type
+    let displayValue;
+    let ariaLabel;
 
-    // Use shared display calculation
-    return calculateDisplayValue({
-        score,
-        letterGrade,
-        source: displaySource,
-        includeAriaLabel: true
-    });
+    if (displayType === 'points') {
+        // Points format: "2.74" or "2.74 (Developing)"
+        const scoreStr = score.toFixed(2);
+        if (letterGrade) {
+            displayValue = `${scoreStr} (${letterGrade})`;
+            ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
+        } else {
+            displayValue = scoreStr;
+            ariaLabel = `Grade: ${scoreStr}`;
+        }
+    } else {
+        // Percentage format: "68.50%" or "68.50% (B)"
+        const percentageStr = `${score.toFixed(2)}%`;
+        if (letterGrade) {
+            displayValue = `${percentageStr} (${letterGrade})`;
+            ariaLabel = `Grade: ${percentageStr}, letter grade ${letterGrade}`;
+        } else {
+            displayValue = percentageStr;
+            ariaLabel = `Grade: ${percentageStr}`;
+        }
+    }
+
+    logger.trace(`[Grade Display] Formatted: displayValue="${displayValue}"`);
+
+    return { displayValue, ariaLabel };
 }
 
 /**
  * Create grade badge element with hero-integrated styling
  * @param {Object} gradeData - Grade data object
- * @param {number} gradeData.score - Numeric score value
- * @param {string|null} gradeData.letterGrade - Letter grade (if available)
+ * @param {number} gradeData.score - Display score (already converted)
+ * @param {string|null} gradeData.letterGrade - Display letter grade
+ * @param {string} gradeData.displayType - Display type ('points' or 'percentage')
  * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
  * @param {HTMLElement} heroElement - Hero element for color extraction (optional)
  * @returns {HTMLElement} Grade badge element
  */
 function createGradeBadge(gradeData, heroElement = null) {
-    const { source } = gradeData;
+    const { source, displayType } = gradeData;
 
     // Format the grade display (pure function)
     const { displayValue, ariaLabel } = formatGradeDisplay(gradeData);
@@ -197,10 +215,12 @@ function findGradeContainer(cardElement) {
 
 /**
  * Render grade on a dashboard card
+ * Uses pre-calculated display values from snapshot service
  * @param {HTMLElement} cardElement - Dashboard card element
  * @param {Object} gradeData - Grade data object
- * @param {number} gradeData.score - Numeric score value
- * @param {string|null} gradeData.letterGrade - Letter grade (if available)
+ * @param {number} gradeData.score - Display score (already converted)
+ * @param {string|null} gradeData.letterGrade - Display letter grade
+ * @param {string} gradeData.displayType - Display type ('points' or 'percentage')
  * @param {string} gradeData.source - Grade source ('assignment' or 'enrollment')
  */
 export function renderGradeOnCard(cardElement, gradeData) {
@@ -223,13 +243,14 @@ export function renderGradeOnCard(cardElement, gradeData) {
     heroContainer.appendChild(badge);
 
     if (logger.isTraceEnabled()) {
+        const suffix = gradeData.displayType === 'percentage' ? '%' : '';
         const displayInfo = gradeData.letterGrade
-            ? `${gradeData.score}% (${gradeData.letterGrade})`
-            : `${gradeData.score}`;
-        logger.trace(`Grade badge rendered (${displayInfo}, source: ${gradeData.source})`);
+            ? `${gradeData.score}${suffix} (${gradeData.letterGrade})`
+            : `${gradeData.score}${suffix}`;
+        logger.trace(`Grade badge rendered (${displayInfo}, type: ${gradeData.displayType}, source: ${gradeData.source})`);
         logger.trace(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
     } else {
-        logger.debug(`Grade badge rendered on card (source: ${gradeData.source})`);
+        logger.debug(`Grade badge rendered on card (type: ${gradeData.displayType}, source: ${gradeData.source})`);
     }
 }
 

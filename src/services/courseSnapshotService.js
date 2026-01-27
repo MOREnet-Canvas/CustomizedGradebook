@@ -21,9 +21,12 @@
  *   model: "standards" | "traditional",  // Course model classification
  *   modelReason: string,                 // Classification reason (for debugging)
  *   isStandardsBased: boolean,           // DEPRECATED: Use model === "standards"
- *   score: number,
- *   letterGrade: string|null,
+ *   score: number,                       // Raw score (percentage or points depending on source)
+ *   letterGrade: string|null,            // Raw letter grade from API
  *   gradeSource: 'assignment' | 'enrollment',
+ *   displayScore: number,                // Display-ready score (converted to points for SBG)
+ *   displayLetterGrade: string|null,     // Display-ready letter grade
+ *   displayType: 'points' | 'percentage', // How to display the score
  *   timestamp: number,
  *   userId: string,           // For user ownership validation
  *   expiresAt: number         // TTL expiration timestamp
@@ -37,6 +40,9 @@ import { determineCourseModel } from '../utils/courseDetection.js';
 import { getCourseGrade } from './gradeDataService.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
 import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetection.js';
+import { percentageToPoints, calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
+import { scoreToGradeLevel } from '../student/gradeExtractor.js';
+import { GRADE_SOURCE } from './gradeDataService.js';
 
 /**
  * Key prefix for all course snapshots in sessionStorage
@@ -316,26 +322,76 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         );
         logger.trace(`[Snapshot] Course ${courseId} classification: model=${classification.model}, reason=${classification.reason}`);
 
-        // Step 3: Create unified snapshot with security fields
+        // Step 3: Calculate display values (SINGLE SOURCE OF TRUTH for rendering)
+        // This ensures all pages display grades identically
+        logger.trace(`[Snapshot] Step 3: Calculating display values for ${courseId}...`);
+
+        const isStandardsBased = classification.model === 'standards';
+        let displayScore = gradeData.score;
+        let displayLetterGrade = gradeData.letterGrade;
+        let displayType = 'percentage';
+
+        // Map GRADE_SOURCE to DISPLAY_SOURCE for calculateDisplayValue
+        const displaySource = gradeData.source === GRADE_SOURCE.ASSIGNMENT
+            ? DISPLAY_SOURCE.ASSIGNMENT
+            : DISPLAY_SOURCE.ENROLLMENT;
+
+        // Use shared display calculation to determine how to show the grade
+        const displayCalc = calculateDisplayValue({
+            score: gradeData.score,
+            letterGrade: gradeData.letterGrade,
+            source: displaySource,
+            includeAriaLabel: false
+        });
+
+        // Parse the display value to determine if it was converted to points
+        // calculateDisplayValue returns "2.74 (Developing)" for SBG or "68.50%" for traditional
+        if (displayCalc.displayValue.includes('(') && !displayCalc.displayValue.includes('%')) {
+            // Points format: "2.74 (Developing)"
+            displayType = 'points';
+            const match = displayCalc.displayValue.match(/^([\d.]+)\s*\(([^)]+)\)/);
+            if (match) {
+                displayScore = parseFloat(match[1]);
+                displayLetterGrade = match[2];
+            }
+        } else if (displayCalc.displayValue.includes('%')) {
+            // Percentage format: "68.50%" or "68.50% (B)"
+            displayType = 'percentage';
+            const match = displayCalc.displayValue.match(/^([\d.]+)%/);
+            if (match) {
+                displayScore = parseFloat(match[1]);
+            }
+        } else {
+            // Just a number (points without letter grade): "2.74"
+            displayType = 'points';
+            displayScore = parseFloat(displayCalc.displayValue);
+        }
+
+        logger.trace(`[Snapshot] Display values: displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
+
+        // Step 4: Create unified snapshot with security fields
         const snapshot = {
             courseId,
             courseName,
             model: classification.model,
             modelReason: classification.reason,
-            isStandardsBased: classification.model === 'standards', // DEPRECATED: for backward compatibility
+            isStandardsBased, // DEPRECATED: for backward compatibility
             score: gradeData.score,
             letterGrade: gradeData.letterGrade,
             gradeSource: gradeData.source,
+            displayScore,
+            displayLetterGrade,
+            displayType,
             timestamp: Date.now(),
             userId: currentUserId,
             expiresAt: Date.now() + SNAPSHOT_TTL_MS
         };
 
-        // Step 4: Write to sessionStorage
+        // Step 5: Write to sessionStorage
         const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
         sessionStorage.setItem(key, JSON.stringify(snapshot));
 
-        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), score=${gradeData.score}, source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), display=${displayScore} (${displayType}), source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
 
         return snapshot;
 

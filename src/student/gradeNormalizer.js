@@ -183,10 +183,10 @@ async function normalizeFinalGradeRow() {
         snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.COURSE_GRADES);
     }
 
-    // Extract grade data from snapshot
+    // Extract display-ready grade data from snapshot
     const gradeData = snapshot ? {
-        score: snapshot.score,
-        letterGrade: snapshot.letterGrade
+        score: snapshot.displayScore,
+        letterGrade: snapshot.displayLetterGrade
     } : null;
 
     document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {

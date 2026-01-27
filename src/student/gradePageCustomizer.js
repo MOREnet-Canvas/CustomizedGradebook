@@ -227,13 +227,13 @@ async function runOnce() {
         return false;
     }
 
-    // Extract grade data from snapshot
+    // Extract display-ready grade data from snapshot
     const gradeData = {
-        score: snapshot.score,
-        letterGrade: snapshot.letterGrade
+        score: snapshot.displayScore,
+        letterGrade: snapshot.displayLetterGrade
     };
 
-    logger.trace(`Using grade data from snapshot: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
+    logger.trace(`Using display grade data from snapshot: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, type=${snapshot.displayType}`);
 
     return applyCustomizations(gradeData);
 }
