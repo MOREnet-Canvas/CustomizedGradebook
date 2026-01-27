@@ -23,6 +23,7 @@ import { getCourseSnapshot, populateCourseSnapshot, PAGE_CONTEXT } from '../serv
 import { getStudentIdFromUrl } from '../utils/pageDetection.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { debounce } from '../utils/dom.js';
+import { AVG_ASSIGNMENT_NAME } from '../config.js';
 
 /**
  * Track if customizations have been applied (prevent double-runs)
@@ -52,15 +53,15 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
         // Search for AVG assignment
         const assignments = await apiClient.get(
             `/api/v1/courses/${courseId}/assignments`,
-            { search_term: 'Current Score' },
+            { search_term: AVG_ASSIGNMENT_NAME },
             'fetchAvgAssignment'
         );
 
-        logger.trace(`[Teacher] Found ${assignments?.length || 0} assignments matching "Current Score"`);
+        logger.trace(`[Teacher] Found ${assignments?.length || 0} assignments matching "${AVG_ASSIGNMENT_NAME}"`);
 
-        const avgAssignment = assignments.find(a => a.name === 'Current Score');
+        const avgAssignment = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
         if (!avgAssignment) {
-            logger.warn(`[Teacher] AVG assignment "Current Score" not found in course ${courseId}`);
+            logger.warn(`[Teacher] AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
             return null;
         }
 
