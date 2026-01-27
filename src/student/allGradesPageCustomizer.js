@@ -20,11 +20,9 @@
 
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { scoreToGradeLevel } from './gradeExtractor.js';
-import { formatGradeDisplay, percentageToPoints } from '../utils/gradeFormatting.js';
+import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import {
-    populateCourseSnapshot,
     getCourseSnapshot,
     shouldRefreshGrade,
     refreshCourseSnapshot,
@@ -123,7 +121,7 @@ async function enrichCoursesWithSnapshots(courses, apiClient) {
 
     // Process courses in parallel
     const enrichedPromises = courses.map(async (course) => {
-        const { id: courseId, name: courseName, enrollmentData } = course;
+        const { id: courseId, name: courseName } = course;
 
         // Check if we should refresh the snapshot for this course
         const needsRefresh = shouldRefreshGrade(courseId, PAGE_CONTEXT.ALL_GRADES);
@@ -136,73 +134,34 @@ async function enrichCoursesWithSnapshots(courses, apiClient) {
             snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.ALL_GRADES);
         }
 
-        // Extract grade data from enrollment
-        let percentage = null;
-        let enrollmentLetterGrade = null;
-
-        if (enrollmentData?.grades) {
-            percentage = enrollmentData.grades.current_score ?? enrollmentData.grades.final_score ?? null;
-            enrollmentLetterGrade = (enrollmentData.grades.current_grade ?? enrollmentData.grades.final_grade ?? null)?.trim() ?? null;
+        // If no snapshot, skip this course
+        if (!snapshot) {
+            logger.trace(`[All-Grades] No snapshot available for course ${courseId}, skipping`);
+            return null;
         }
 
-        // Extract data from snapshot
-        let apiLetterGrade = null;
-        let gradeSource = 'enrollment';
-        let isStandardsBased = false;
+        // Use display values directly from snapshot (already calculated by snapshot service)
+        // This ensures identical rendering across dashboard and all-grades page
+        const displayScore = snapshot.displayScore;
+        const displayLetterGrade = snapshot.displayLetterGrade;
+        const displayType = snapshot.displayType;
+        const isStandardsBased = snapshot.isStandardsBased;
 
-        if (snapshot) {
-            isStandardsBased = snapshot.isStandardsBased;
-            apiLetterGrade = snapshot.letterGrade;
-
-            // Use snapshot score if enrollment extraction failed
-            if (percentage === null && snapshot.score !== null) {
-                percentage = snapshot.score;
-                gradeSource = 'snapshot';
-                logger.debug(`[All-Grades] Using snapshot grade for ${courseName}: ${percentage}%`);
-            } else if (percentage !== null) {
-                logger.trace(`[All-Grades] Using enrollment grade for ${courseName}: ${percentage}%`);
-            }
-        }
-
-        logger.trace(`[All-Grades] Course "${courseName}" (${courseId}): percentage=${percentage}, letterGrade="${apiLetterGrade || 'null'}", isStandardsBased=${isStandardsBased}`);
-
-        // Calculate display values
-        let displayScore = percentage;
-        let displayLetterGrade = null;
-        let displayType = 'percentage';
-
-        if (isStandardsBased && percentage !== null) {
-            // Convert percentage to points
-            const pointValue = percentageToPoints(percentage);
-            displayScore = pointValue;
-            displayType = 'points';
-
-            // Use API letter grade if available, otherwise calculate from point value
-            displayLetterGrade = apiLetterGrade || scoreToGradeLevel(pointValue);
-
-            logger.trace(`[All-Grades] Standards-based course: ${courseName}, percentage=${percentage}%, points=${pointValue.toFixed(2)}, letterGrade=${displayLetterGrade} (from ${apiLetterGrade ? 'API' : 'calculation'})`);
-        } else if (isStandardsBased && percentage === null) {
-            logger.trace(`[All-Grades] Course "${courseName}" is standards-based but has no percentage grade`);
-        } else {
-            logger.trace(`[All-Grades] Traditional course: ${courseName}, percentage=${percentage}%`);
-        }
-
-        logger.trace(`[All-Grades] Final values for "${courseName}": displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
+        logger.trace(`[All-Grades] Course "${courseName}" (${courseId}): displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}, isStandardsBased=${isStandardsBased}`);
 
         return {
             courseId,
             courseName,
             courseUrl: `/courses/${courseId}/grades`,
-            percentage,
             displayScore,
             displayLetterGrade,
             displayType,
             isStandardsBased,
-            gradeSource
+            gradeSource: snapshot.gradeSource
         };
     });
 
-    const enrichedCourses = await Promise.all(enrichedPromises);
+    const enrichedCourses = (await Promise.all(enrichedPromises)).filter(c => c !== null);
 
     logger.trace(`[All-Grades] Enriched ${enrichedCourses.length} courses in ${(performance.now() - startTime).toFixed(2)}ms`);
     return enrichedCourses;

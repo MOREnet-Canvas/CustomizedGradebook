@@ -151,18 +151,20 @@ async function updateCourseCard(courseId, courseName, apiClient) {
             return;
         }
 
-        // Render grade on card using snapshot data
+        // Render grade on card using display values from snapshot
+        // Display values are pre-calculated by snapshot service for consistency
         const gradeData = {
-            score: snapshot.score,
-            letterGrade: snapshot.letterGrade,
-            source: snapshot.gradeSource
+            score: snapshot.displayScore,
+            letterGrade: snapshot.displayLetterGrade,
+            source: snapshot.gradeSource,
+            displayType: snapshot.displayType
         };
         renderGradeOnCard(cardElement, gradeData);
 
-        const displayInfo = snapshot.letterGrade
-            ? `${snapshot.score}% (${snapshot.letterGrade})`
-            : `${snapshot.score}`;
-        logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} (source: ${snapshot.gradeSource})`);
+        const displayInfo = snapshot.displayLetterGrade
+            ? `${snapshot.displayScore} (${snapshot.displayLetterGrade})`
+            : `${snapshot.displayScore}`;
+        logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} ${snapshot.displayType} (source: ${snapshot.gradeSource})`);
 
     } catch (error) {
         // Fail silently for individual courses - don't break the entire dashboard
