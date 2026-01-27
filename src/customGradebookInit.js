@@ -24,8 +24,11 @@ import { initAssignmentKebabMenuInjection } from "./gradebook/ui/assignmentKebab
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
+import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGradeCustomizer.js";
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
 import { clearAllSnapshots, debugSnapshots, validateAllSnapshots } from "./services/courseSnapshotService.js";
+import { getUserRoleGroup } from "./utils/canvas.js";
+import { isTeacherViewingStudentGrades } from "./utils/pageDetection.js";
 
 /**
  * Check if current page is the dashboard
@@ -79,6 +82,12 @@ function isSpeedGraderPage() {
     // Student grade customization (student-side)
     // Runs on grades pages, dashboard, and course pages for students
     initStudentGradeCustomization();
+
+    // Teacher viewing student grades customization (teacher-side)
+    // Runs on /courses/{courseId}/grades/{studentId} for teachers
+    if (isTeacherViewingStudentGrades() && getUserRoleGroup() === 'teacher_like') {
+        initTeacherStudentGradeCustomizer();
+    }
 
     // Expose debug and utility functions
     if (ENV_DEV) {

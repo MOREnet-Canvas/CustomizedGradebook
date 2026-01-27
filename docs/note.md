@@ -23,8 +23,6 @@ TODO: Add Checks for assignments
 
 
 ## Debugging
-TODO: Make sure there isn't an option for notifying students of updates in the assignment creation or update
-TODO: Teacher dashboard console says student role not found, but it still searches through courses, another debug message says no active student classes found.
 
 ## Grade Customization
 TODO: When no avg_assignment course grade page doesn't remove /4 fix?

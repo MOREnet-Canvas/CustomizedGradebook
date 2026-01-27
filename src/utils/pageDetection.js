@@ -68,17 +68,17 @@ export function isSingleCourseGradesPage() {
 
 /**
  * Check if current page is a course page that needs grade cleanup
- * 
+ *
  * Matches:
  * - /courses/123/grades (grades page)
  * - /courses/123/assignments (assignments list)
  * - /courses/123 (course homepage)
- * 
+ *
  * Does NOT match:
  * - /courses/123/modules (modules page)
  * - /courses/123/settings (settings page)
  * - Other course sub-pages
- * 
+ *
  * @returns {boolean} True if page needs cleanup
  */
 export function isCoursePageNeedingCleanup() {
@@ -93,3 +93,31 @@ export function isCoursePageNeedingCleanup() {
     );
 }
 
+/**
+ * Check if current page is teacher viewing individual student grades
+ *
+ * Matches:
+ * - /courses/123/grades/456 (teacher viewing student 456's grades)
+ *
+ * Does NOT match:
+ * - /courses/123/grades (student's own grades page)
+ * - /grades (all-grades page)
+ *
+ * @returns {boolean} True if teacher viewing student grades
+ */
+export function isTeacherViewingStudentGrades() {
+    const path = window.location.pathname;
+    // Pattern: /courses/{courseId}/grades/{studentId}
+    return /^\/courses\/\d+\/grades\/\d+/.test(path);
+}
+
+/**
+ * Extract student ID from teacher viewing student grades page
+ *
+ * @returns {string|null} Student ID or null if not on teacher viewing student grades page
+ */
+export function getStudentIdFromUrl() {
+    const path = window.location.pathname;
+    const match = path.match(/^\/courses\/\d+\/grades\/(\d+)/);
+    return match ? match[1] : null;
+}
