@@ -74,8 +74,11 @@ export function startCleanupObservers() {
  * For dashboard: always run
  * For course pages: only run if course is standards-based (uses snapshot)
  * For all-grades page: skip (no course ID available)
+ *
+ * @param {number} retryCount - Current retry attempt (internal use)
+ * @param {number} maxRetries - Maximum number of retry attempts
  */
-export async function initCleanupObservers() {
+export async function initCleanupObservers(retryCount = 0, maxRetries = 5) {
     // Skip all-grades page (no course ID available)
     if (isAllGradesPage()) {
         logger.trace('Skipping cleanup observers on all-grades page (no course context)');
@@ -99,7 +102,16 @@ export async function initCleanupObservers() {
 
         const snapshot = getCourseSnapshot(courseId);
         if (!snapshot) {
-            logger.trace('Skipping cleanup observers - no snapshot available (will be populated by grade customizer)');
+            // Snapshot not available yet - retry with exponential backoff
+            if (retryCount < maxRetries) {
+                const delay = Math.min(1000, 200 * Math.pow(1.5, retryCount));
+                logger.trace(`No snapshot available yet, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})...`);
+                setTimeout(async () => {
+                    await initCleanupObservers(retryCount + 1, maxRetries);
+                }, delay);
+            } else {
+                logger.trace('Skipping cleanup observers - no snapshot available after max retries');
+            }
             return;
         }
 

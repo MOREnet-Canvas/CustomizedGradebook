@@ -22,20 +22,20 @@ import { isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetectio
  * Initialize all student grade customizations
  * This is the main entry point called from customGradebookInit.js
  */
-export function initStudentGradeCustomization() {
+export async function initStudentGradeCustomization() {
     // Check if feature is enabled
     if (!ENABLE_STUDENT_GRADE_CUSTOMIZATION) {
         logger.debug('Student grade customization disabled');
         return;
     }
-    
+
     // Check if user is a student
     const roleGroup = getUserRoleGroup();
     if (roleGroup !== 'student_like') {
         logger.debug('User is not student-like, skipping student customizations');
         return;
     }
-    
+
     logger.info('Initializing student grade customizations');
 
     // Route to appropriate customizer based on page type
@@ -44,10 +44,9 @@ export function initStudentGradeCustomization() {
         initAllGradesPageCustomizer();
     } else if (isSingleCourseGradesPage()) {
         logger.debug('On single-course grades page, initializing grade page customizer');
-        initGradePageCustomizer();
+        await initGradePageCustomizer();
     }
 
     // Initialize cleanup observers (runs on dashboard and course pages)
-    initCleanupObservers();
+    await initCleanupObservers();
 }
-
