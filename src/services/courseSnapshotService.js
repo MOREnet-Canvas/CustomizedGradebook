@@ -281,13 +281,6 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         return null;
     }
 
-    // Check user role - only student-like users can create snapshots
-    const roleGroup = getUserRoleGroup();
-    if (roleGroup !== 'student_like') {
-        logger.trace(`[Snapshot] Skipping snapshot population - user is ${roleGroup}, not student_like`);
-        return null;
-    }
-
     // Check page authorization
     if (!isAuthorizedPage()) {
         logger.trace(`[Snapshot] Skipping snapshot population - unauthorized page`);
@@ -300,21 +293,22 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         return null;
     }
 
-    logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}"`);
+    const roleGroup = getUserRoleGroup();
+    logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}" (user role: ${roleGroup})`);
 
     try {
-        // Step 1: Fetch grade data first (needed for letter grade in detection)
+        // Step 1: Fetch grade data (optional - may not exist for teachers)
         logger.trace(`[Snapshot] Step 1: Fetching grade for ${courseId}...`);
         const gradeData = await getCourseGrade(courseId, apiClient);
 
-        if (!gradeData) {
-            logger.trace(`[Snapshot] No grade data available for course ${courseId}, skipping snapshot`);
-            return null;
+        if (gradeData) {
+            logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
+        } else {
+            logger.trace(`[Snapshot] No grade data available for course ${courseId} (user may not be enrolled)`);
         }
 
-        logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
-
         // Step 2: Classify course model (SINGLE SOURCE OF TRUTH)
+        // This is ALWAYS performed regardless of grade data availability
         logger.trace(`[Snapshot] Step 2: Classifying course model for ${courseId}...`);
         const classification = await determineCourseModel(
             { courseId, courseName },
@@ -323,52 +317,66 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         );
         logger.trace(`[Snapshot] Course ${courseId} classification: model=${classification.model}, reason=${classification.reason}`);
 
-        // Step 3: Calculate display values (SINGLE SOURCE OF TRUTH for rendering)
-        // This ensures all pages display grades identically
-        logger.trace(`[Snapshot] Step 3: Calculating display values for ${courseId}...`);
-
         const isStandardsBased = classification.model === 'standards';
-        let displayScore = gradeData.score;
-        let displayLetterGrade = gradeData.letterGrade;
-        let displayType = 'percentage';
 
-        // Map GRADE_SOURCE to DISPLAY_SOURCE for calculateDisplayValue
-        const displaySource = gradeData.source === GRADE_SOURCE.ASSIGNMENT
-            ? DISPLAY_SOURCE.ASSIGNMENT
-            : DISPLAY_SOURCE.ENROLLMENT;
+        // Step 3: Calculate display values (only if grade data exists)
+        let displayScore = null;
+        let displayLetterGrade = null;
+        let displayType = null;
+        let score = null;
+        let letterGrade = null;
+        let gradeSource = null;
 
-        // Use shared display calculation to determine how to show the grade
-        const displayCalc = calculateDisplayValue({
-            score: gradeData.score,
-            letterGrade: gradeData.letterGrade,
-            source: displaySource,
-            includeAriaLabel: false
-        });
+        if (gradeData) {
+            logger.trace(`[Snapshot] Step 3: Calculating display values for ${courseId}...`);
 
-        // Parse the display value to determine if it was converted to points
-        // calculateDisplayValue returns "2.74 (Developing)" for SBG or "68.50%" for traditional
-        if (displayCalc.displayValue.includes('(') && !displayCalc.displayValue.includes('%')) {
-            // Points format: "2.74 (Developing)"
-            displayType = 'points';
-            const match = displayCalc.displayValue.match(/^([\d.]+)\s*\(([^)]+)\)/);
-            if (match) {
-                displayScore = parseFloat(match[1]);
-                displayLetterGrade = match[2];
-            }
-        } else if (displayCalc.displayValue.includes('%')) {
-            // Percentage format: "68.50%" or "68.50% (B)"
+            score = gradeData.score;
+            letterGrade = gradeData.letterGrade;
+            gradeSource = gradeData.source;
+            displayScore = gradeData.score;
+            displayLetterGrade = gradeData.letterGrade;
             displayType = 'percentage';
-            const match = displayCalc.displayValue.match(/^([\d.]+)%/);
-            if (match) {
-                displayScore = parseFloat(match[1]);
-            }
-        } else {
-            // Just a number (points without letter grade): "2.74"
-            displayType = 'points';
-            displayScore = parseFloat(displayCalc.displayValue);
-        }
 
-        logger.trace(`[Snapshot] Display values: displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
+            // Map GRADE_SOURCE to DISPLAY_SOURCE for calculateDisplayValue
+            const displaySource = gradeData.source === GRADE_SOURCE.ASSIGNMENT
+                ? DISPLAY_SOURCE.ASSIGNMENT
+                : DISPLAY_SOURCE.ENROLLMENT;
+
+            // Use shared display calculation to determine how to show the grade
+            const displayCalc = calculateDisplayValue({
+                score: gradeData.score,
+                letterGrade: gradeData.letterGrade,
+                source: displaySource,
+                includeAriaLabel: false
+            });
+
+            // Parse the display value to determine if it was converted to points
+            // calculateDisplayValue returns "2.74 (Developing)" for SBG or "68.50%" for traditional
+            if (displayCalc.displayValue.includes('(') && !displayCalc.displayValue.includes('%')) {
+                // Points format: "2.74 (Developing)"
+                displayType = 'points';
+                const match = displayCalc.displayValue.match(/^([\d.]+)\s*\(([^)]+)\)/);
+                if (match) {
+                    displayScore = parseFloat(match[1]);
+                    displayLetterGrade = match[2];
+                }
+            } else if (displayCalc.displayValue.includes('%')) {
+                // Percentage format: "68.50%" or "68.50% (B)"
+                displayType = 'percentage';
+                const match = displayCalc.displayValue.match(/^([\d.]+)%/);
+                if (match) {
+                    displayScore = parseFloat(match[1]);
+                }
+            } else {
+                // Just a number (points without letter grade): "2.74"
+                displayType = 'points';
+                displayScore = parseFloat(displayCalc.displayValue);
+            }
+
+            logger.trace(`[Snapshot] Display values: displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
+        } else {
+            logger.trace(`[Snapshot] Step 3: Skipping display value calculation (no grade data)`);
+        }
 
         // Step 4: Create unified snapshot with security fields
         const snapshot = {
@@ -377,9 +385,9 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
             model: classification.model,
             modelReason: classification.reason,
             isStandardsBased, // DEPRECATED: for backward compatibility
-            score: gradeData.score,
-            letterGrade: gradeData.letterGrade,
-            gradeSource: gradeData.source,
+            score,
+            letterGrade,
+            gradeSource,
             displayScore,
             displayLetterGrade,
             displayType,
@@ -392,7 +400,11 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
         sessionStorage.setItem(key, JSON.stringify(snapshot));
 
-        logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), display=${displayScore} (${displayType}), source=${gradeData.source}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+        if (gradeData) {
+            logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), display=${displayScore} (${displayType}), source=${gradeSource}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+        } else {
+            logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), no grade data, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+        }
 
         return snapshot;
 
@@ -401,99 +413,6 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         return null;
     }
 }
-
-/**
- * Populate course snapshot for teacher-like users (course type only, no grade data)
- *
- * This function creates a minimal snapshot containing only course type classification.
- * It is used by teacher-like users who need to know if a course is standards-based
- * but don't have their own grade data in the course.
- *
- * Security: Validates user ownership and page authorization before writing data.
- *
- * @param {string} courseId - Course ID
- * @param {string} courseName - Course name
- * @param {Object} apiClient - CanvasApiClient instance
- * @returns {Promise<Object|null>} Populated snapshot or null if failed
- *
- * @example
- * const snapshot = await populateTeacherCourseSnapshot('12345', 'Math 101', apiClient);
- * if (snapshot && snapshot.model === 'standards') {
- *   console.log('This is a standards-based course');
- * }
- */
-export async function populateTeacherCourseSnapshot(courseId, courseName, apiClient) {
-    // Validate user ownership first
-    if (!validateUserOwnership()) {
-        logger.warn(`[Snapshot] Cannot populate teacher snapshot - user ownership validation failed`);
-        return null;
-    }
-
-    // Check user role - only teacher-like users can use this function
-    const roleGroup = getUserRoleGroup();
-    if (roleGroup !== 'teacher_like') {
-        logger.trace(`[Snapshot] Skipping teacher snapshot population - user is ${roleGroup}, not teacher_like`);
-        return null;
-    }
-
-    // Check page authorization
-    if (!isAuthorizedPage()) {
-        logger.trace(`[Snapshot] Skipping teacher snapshot population - unauthorized page`);
-        return null;
-    }
-
-    const currentUserId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
-    if (!currentUserId) {
-        logger.warn(`[Snapshot] Cannot populate teacher snapshot - ENV.current_user_id not available`);
-        return null;
-    }
-
-    logger.debug(`[Snapshot] Populating teacher snapshot for course ${courseId} "${courseName}"`);
-
-    try {
-        // Classify course model (SINGLE SOURCE OF TRUTH)
-        logger.trace(`[Snapshot] Teacher snapshot: Classifying course model for ${courseId}...`);
-        const classification = await determineCourseModel(
-            { courseId, courseName },
-            null,
-            { apiClient }
-        );
-        logger.trace(`[Snapshot] Teacher snapshot: Course ${courseId} classification: model=${classification.model}, reason=${classification.reason}`);
-
-        const isStandardsBased = classification.model === 'standards';
-
-        // Create minimal snapshot with course type only (no grade data)
-        const snapshot = {
-            courseId,
-            courseName,
-            model: classification.model,
-            modelReason: classification.reason,
-            isStandardsBased, // DEPRECATED: for backward compatibility
-            score: null,
-            letterGrade: null,
-            gradeSource: null,
-            displayScore: null,
-            displayLetterGrade: null,
-            displayType: null,
-            timestamp: Date.now(),
-            userId: currentUserId,
-            expiresAt: Date.now() + SNAPSHOT_TTL_MS
-        };
-
-        // Write to sessionStorage
-        const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
-        sessionStorage.setItem(key, JSON.stringify(snapshot));
-
-        logger.debug(`[Snapshot] ✅ Populated teacher snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
-
-        return snapshot;
-
-    } catch (error) {
-        logger.warn(`[Snapshot] Failed to populate teacher snapshot for course ${courseId}:`, error.message);
-        return null;
-    }
-}
-
 
 /**
  * Determine if a course grade should be refreshed based on page context
