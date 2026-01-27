@@ -19,7 +19,7 @@ import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 import { removeFractionScores } from '../student/gradeNormalizer.js';
-import { getCourseSnapshot, refreshCourseSnapshot, PAGE_CONTEXT } from '../services/courseSnapshotService.js';
+import { getCourseSnapshot, populateTeacherCourseSnapshot, PAGE_CONTEXT } from '../services/courseSnapshotService.js';
 import { getStudentIdFromUrl } from '../utils/pageDetection.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { debounce } from '../utils/dom.js';
@@ -305,17 +305,19 @@ function startCleanupObservers(gradeData = null) {
  * Main entry point called from customGradebookInit.js
  */
 export async function initTeacherStudentGradeCustomizer() {
-    logger.debug('Initializing teacher student grade page customizer');
+    logger.debug('[Teacher] Initializing teacher student grade page customizer');
 
     // Fetch grade data and apply customizations
     const courseId = getCourseId();
     const studentId = getStudentIdFromUrl();
 
     if (!courseId || !studentId) {
-        logger.trace('Cannot get course ID or student ID from URL');
+        logger.trace('[Teacher] Cannot get course ID or student ID from URL');
         startCleanupObservers(); // Still run fraction cleanup
         return;
     }
+
+    logger.debug(`[Teacher] Teacher viewing student ${studentId} grades for course ${courseId}`);
 
     // Get course name from DOM
     const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
@@ -325,25 +327,34 @@ export async function initTeacherStudentGradeCustomizer() {
     let snapshot = getCourseSnapshot(courseId);
 
     if (!snapshot) {
-        logger.trace(`No snapshot for course ${courseId}, populating...`);
-        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.COURSE_GRADES);
+        logger.debug(`[Teacher] No snapshot for course ${courseId}, creating teacher snapshot...`);
+        snapshot = await populateTeacherCourseSnapshot(courseId, courseName, apiClient);
     }
 
-    if (!snapshot || snapshot.model !== 'standards') {
-        logger.debug(`Skipping teacher student grade customization - course is ${snapshot?.model || 'unknown'}`);
+    if (!snapshot) {
+        logger.warn(`[Teacher] Failed to create snapshot for course ${courseId}`);
+        startCleanupObservers(); // Still run fraction cleanup for any course
+        return;
+    }
+
+    logger.debug(`[Teacher] Course ${courseId} snapshot: model=${snapshot.model}, reason=${snapshot.modelReason}`);
+
+    if (snapshot.model !== 'standards') {
+        logger.debug(`[Teacher] Skipping teacher student grade customization - course is ${snapshot.model}`);
         startCleanupObservers(); // Still run fraction cleanup for any course
         return;
     }
 
     // Fetch student's AVG assignment score
+    logger.debug(`[Teacher] Fetching AVG assignment score for student ${studentId}...`);
     const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
     if (!gradeData) {
-        logger.trace('No AVG assignment score found for student');
+        logger.trace('[Teacher] No AVG assignment score found for student');
         startCleanupObservers(); // Still run fraction cleanup
         return;
     }
 
-    logger.debug(`Applying teacher student grade customizations for student ${studentId}`);
+    logger.debug(`[Teacher] Applying teacher student grade customizations for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
 
     // Apply customizations with retry logic
     applyCustomizations(gradeData);
