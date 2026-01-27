@@ -32,6 +32,13 @@ function shouldClean() {
 export function startCleanupObservers() {
     logger.debug('Starting cleanup observers for grade normalization');
 
+    // Run initial cleanup immediately to eliminate display lag
+    if (shouldClean()) {
+        removeFractionScores().catch(err => {
+            logger.warn('Error in initial removeFractionScores:', err);
+        });
+    }
+
     // Create debounced version to avoid hammering the DOM
     // Wrap async function to handle promises properly
     const debouncedClean = debounce(() => {
@@ -42,10 +49,8 @@ export function startCleanupObservers() {
         }
     }, 100); // 100ms is fast enough to feel instant, slow enough to collapse spam
 
-    // Initial call after slight delay so Canvas can render
+    // Start observer on next tick (0ms delay) to handle subsequent Canvas DOM changes
     setTimeout(() => {
-        debouncedClean();
-
         // Only start observing if we're actually on a page we care about
         if (shouldClean()) {
             createPersistentObserver(() => {
@@ -66,7 +71,7 @@ export function startCleanupObservers() {
             }
         }, 1000);
 
-    }, 500);
+    }, 0);
 }
 
 /**

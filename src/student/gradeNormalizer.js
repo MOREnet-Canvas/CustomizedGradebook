@@ -197,7 +197,12 @@ async function normalizeFinalGradeRow() {
             if (gradeData && gradeData.score) {
                 // Format with both score and letter grade
                 const displayValue = formatGradeDisplay(gradeData.score, gradeData.letterGrade);
-                gradeEl.textContent = displayValue;
+
+                // Only update if value has changed (prevents flashing and unnecessary DOM updates)
+                if (gradeEl.textContent !== displayValue) {
+                    gradeEl.textContent = displayValue;
+                    gradeEl.dataset.normalized = 'true';
+                }
             } else {
                 // If we couldn't get the mastery score, hide the percent instead
                 const raw = gradeEl.textContent.trim();
