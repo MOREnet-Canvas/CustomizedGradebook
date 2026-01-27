@@ -37,13 +37,17 @@ let processed = false;
  * @returns {Promise<{score: number, letterGrade: string|null}|null>} Grade data or null
  */
 async function fetchStudentAvgScore(courseId, studentId, apiClient) {
+    logger.trace(`[Teacher] fetchStudentAvgScore: courseId=${courseId}, studentId=${studentId}`);
+
     try {
         // Get AVG assignment ID from snapshot
         const snapshot = getCourseSnapshot(courseId);
         if (!snapshot) {
-            logger.trace(`No snapshot available for course ${courseId}`);
+            logger.warn(`[Teacher] No snapshot available for course ${courseId} - cannot fetch student grade`);
             return null;
         }
+
+        logger.trace(`[Teacher] Snapshot found, searching for AVG assignment...`);
 
         // Search for AVG assignment
         const assignments = await apiClient.get(
@@ -52,24 +56,33 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
             'fetchAvgAssignment'
         );
 
+        logger.trace(`[Teacher] Found ${assignments?.length || 0} assignments matching "Current Score"`);
+
         const avgAssignment = assignments.find(a => a.name === 'Current Score');
         if (!avgAssignment) {
-            logger.trace(`AVG assignment not found in course ${courseId}`);
+            logger.warn(`[Teacher] AVG assignment "Current Score" not found in course ${courseId}`);
             return null;
         }
 
+        logger.trace(`[Teacher] Found AVG assignment: id=${avgAssignment.id}, name="${avgAssignment.name}"`);
+
         // Fetch student's submission for AVG assignment
+        logger.trace(`[Teacher] Fetching submission for student ${studentId}, assignment ${avgAssignment.id}...`);
         const submission = await apiClient.get(
             `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${studentId}`,
             {},
             'fetchStudentSubmission'
         );
 
+        logger.trace(`[Teacher] Submission response: score=${submission?.score}, workflow_state=${submission?.workflow_state}`);
+
         const score = submission?.score;
         if (score === null || score === undefined) {
-            logger.trace(`No score found for student ${studentId} in AVG assignment`);
+            logger.warn(`[Teacher] No score found for student ${studentId} in AVG assignment (submission exists but score is null/undefined)`);
             return null;
         }
+
+        logger.trace(`[Teacher] Student score found: ${score}, fetching enrollment for letter grade...`);
 
         // Get letter grade from enrollment
         const enrollment = await apiClient.get(
@@ -78,13 +91,15 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
             'fetchStudentEnrollment'
         );
 
+        logger.trace(`[Teacher] Enrollment response: ${enrollment?.length || 0} enrollments found`);
+
         const letterGrade = enrollment?.[0]?.grades?.current_grade || null;
 
-        logger.debug(`Student ${studentId} AVG score: ${score}, letter grade: ${letterGrade}`);
+        logger.debug(`[Teacher] ✅ Student ${studentId} AVG score: ${score}, letter grade: ${letterGrade}`);
         return { score, letterGrade };
 
     } catch (error) {
-        logger.warn(`Failed to fetch student AVG score:`, error.message);
+        logger.warn(`[Teacher] ❌ Failed to fetch student AVG score:`, error.message);
         return null;
     }
 }
@@ -332,12 +347,12 @@ export async function initTeacherStudentGradeCustomizer() {
     logger.debug(`[Teacher] Fetching AVG assignment score for student ${studentId}...`);
     const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
     if (!gradeData) {
-        logger.trace('[Teacher] No AVG assignment score found for student');
+        logger.warn(`[Teacher] ❌ No AVG assignment score found for student ${studentId} - skipping grade customizations`);
         startCleanupObservers(); // Still run fraction cleanup
         return;
     }
 
-    logger.debug(`[Teacher] Applying teacher student grade customizations for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
+    logger.debug(`[Teacher] ✅ Applying teacher student grade customizations for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
 
     // Apply customizations with retry logic
     applyCustomizations(gradeData);
