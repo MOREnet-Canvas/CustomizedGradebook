@@ -48,6 +48,17 @@ export async function removeFractionScores() {
         });
     });
 
+    // --- 2b. Inline fraction in grade elements (teacher view) ---
+    // <span class="grade">2.55 / 4.00</span> -> <span class="grade">2.55</span>
+    document.querySelectorAll("span.grade").forEach(gradeEl => {
+        const txt = gradeEl.textContent.trim();
+        // Match "2.55 / 4.00" or "2.55 / 4" pattern
+        const match = txt.match(/^(\d+(?:\.\d+)?)\s*\/\s*\d+(?:\.\d+)?$/);
+        if (match) {
+            gradeEl.textContent = match[1];
+        }
+    });
+
     // --- 3. Rubric cells like "/4 pts" ---
     // matches plain text nodes like "/4 pts"
     document.querySelectorAll("span, div, td").forEach(el => {

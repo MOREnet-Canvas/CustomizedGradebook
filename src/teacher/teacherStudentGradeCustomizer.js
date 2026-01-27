@@ -91,23 +91,45 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
 
 /**
  * Update the final grade row in the grades table
+ * Handles both separate fraction elements and inline fraction text
  * @param {Object} gradeData - Grade data object
  */
 function updateFinalGradeRow(gradeData) {
     const { score, letterGrade } = gradeData;
     const displayValue = formatGradeDisplay(score, letterGrade);
 
-    document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {
-        const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
-        const possibleEl = row.querySelector(".details .possible.points_possible");
+    // Try multiple selectors to find the final grade row
+    const finalGradeRows = [
+        ...document.querySelectorAll("tr.student_assignment.hard_coded.final_grade"),
+        ...document.querySelectorAll("tr.student_assignment.final_grade"),
+        ...document.querySelectorAll("tr.final_grade")
+    ];
+
+    if (finalGradeRows.length === 0) {
+        logger.trace('Final grade row not found in table');
+        return;
+    }
+
+    finalGradeRows.forEach(row => {
+        // Find grade element - try multiple selectors
+        const gradeEl = row.querySelector(".assignment_score .tooltip .grade") ||
+                       row.querySelector(".assignment_score .grade") ||
+                       row.querySelector(".tooltip .grade") ||
+                       row.querySelector(".grade");
 
         if (gradeEl) {
-            if (gradeEl.textContent !== displayValue) {
+            const currentText = gradeEl.textContent.trim();
+
+            // Check if it contains a fraction (e.g., "2.55 / 4.00")
+            if (currentText.includes('/') || currentText !== displayValue) {
                 gradeEl.textContent = displayValue;
                 gradeEl.dataset.normalized = 'true';
+                logger.trace(`Updated final grade row: "${currentText}" -> "${displayValue}"`);
             }
         }
 
+        // Also remove any separate fraction elements
+        const possibleEl = row.querySelector(".details .possible.points_possible");
         if (possibleEl) {
             const txt = possibleEl.textContent.trim();
             if (/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(txt)) {
@@ -121,11 +143,14 @@ function updateFinalGradeRow(gradeData) {
 
 /**
  * Update the sidebar total grade display
+ * Handles inline fraction text (e.g., "2.55 / 4.00")
  * @param {Object} gradeData - Grade data object
  */
 function updateSidebarGrade(gradeData) {
     const { score, letterGrade } = gradeData;
-    const displayValue = formatGradeDisplay(score, letterGrade);
+
+    // For sidebar, we want just the score (letter grade is in separate element)
+    const scoreStr = typeof score === 'number' ? score.toFixed(2) : String(score);
 
     const rightSide = document.querySelector('#right-side-wrapper') || document.querySelector('#right-side');
     if (!rightSide) {
@@ -140,10 +165,27 @@ function updateSidebarGrade(gradeData) {
     }
 
     const gradeSpan = finalGradeDiv.querySelector('.grade');
-    if (gradeSpan && gradeSpan.textContent !== displayValue) {
-        gradeSpan.textContent = displayValue;
-        logger.debug(`Sidebar grade updated to: ${displayValue}`);
+    if (gradeSpan) {
+        const currentText = gradeSpan.textContent.trim();
+
+        // Check if it contains a fraction (e.g., "2.55 / 4.00")
+        if (currentText.includes('/') || currentText !== scoreStr) {
+            gradeSpan.textContent = scoreStr;
+            logger.trace(`Updated sidebar grade: "${currentText}" -> "${scoreStr}"`);
+        }
     }
+
+    // Also update letter grade if present
+    const letterGradeSpan = finalGradeDiv.querySelector('.letter_grade');
+    if (letterGradeSpan && letterGrade) {
+        const currentLetter = letterGradeSpan.textContent.trim();
+        if (currentLetter !== letterGrade) {
+            letterGradeSpan.textContent = letterGrade;
+            logger.trace(`Updated sidebar letter grade: "${currentLetter}" -> "${letterGrade}"`);
+        }
+    }
+
+    logger.debug(`Sidebar grade updated to: ${scoreStr} (${letterGrade})`);
 }
 
 
@@ -151,32 +193,100 @@ function updateSidebarGrade(gradeData) {
 
 /**
  * Apply all customizations to the teacher student grades page
+ * Retries if DOM elements are not yet available
  * @param {Object} gradeData - Grade data object
+ * @param {number} retryCount - Current retry attempt
+ * @returns {boolean} True if customizations were applied
  */
-function applyCustomizations(gradeData) {
-    if (processed) return;
+function applyCustomizations(gradeData, retryCount = 0) {
+    if (processed) return true;
+
+    const MAX_RETRIES = 10;
+    const RETRY_DELAY = 200; // ms
+
+    // Check if required elements exist
+    const hasFinalGradeRow = document.querySelector("tr.student_assignment.final_grade") !== null;
+    const hasSidebar = (document.querySelector('#right-side-wrapper') || document.querySelector('#right-side')) !== null;
+
+    if (!hasFinalGradeRow || !hasSidebar) {
+        if (retryCount < MAX_RETRIES) {
+            logger.trace(`DOM not ready (retry ${retryCount + 1}/${MAX_RETRIES}), waiting...`);
+            setTimeout(() => applyCustomizations(gradeData, retryCount + 1), RETRY_DELAY);
+            return false;
+        } else {
+            logger.warn('DOM elements not found after max retries');
+            return false;
+        }
+    }
 
     // Update final grade row and sidebar
     updateFinalGradeRow(gradeData);
     updateSidebarGrade(gradeData);
 
     processed = true;
+    logger.debug('Teacher student grade customizations applied successfully');
+    return true;
 }
 
 /**
- * Main execution function
- * Fetches student's AVG assignment score and applies customizations
- * @returns {Promise<boolean>} True if customizations were applied
+ * Start cleanup observers for continuous fraction removal and grade updates
+ * @param {Object|null} gradeData - Grade data for re-applying customizations
  */
-async function runOnce() {
-    if (processed) return true;
+function startCleanupObservers(gradeData = null) {
+    logger.debug('Starting cleanup observers for teacher student grade page');
 
+    // Run initial cleanup immediately
+    removeFractionScores().catch(err => {
+        logger.warn('Error in initial removeFractionScores:', err);
+    });
+
+    // Create debounced version for fraction removal
+    const debouncedClean = debounce(() => {
+        removeFractionScores().catch(err => {
+            logger.warn('Error in removeFractionScores:', err);
+        });
+    }, 100);
+
+    // Create debounced version for grade updates (if we have grade data)
+    let debouncedGradeUpdate = null;
+    if (gradeData) {
+        debouncedGradeUpdate = debounce(() => {
+            // Re-apply grade customizations if Canvas re-renders the elements
+            updateFinalGradeRow(gradeData);
+            updateSidebarGrade(gradeData);
+        }, 150);
+    }
+
+    // Start observer on next tick
+    setTimeout(() => {
+        createPersistentObserver(() => {
+            debouncedClean();
+            if (debouncedGradeUpdate) {
+                debouncedGradeUpdate();
+            }
+        }, {
+            config: OBSERVER_CONFIGS.CHILD_LIST,
+            target: document.body,
+            name: 'TeacherStudentGradeCleanupObserver'
+        });
+    }, 0);
+}
+
+/**
+ * Initialize teacher student grade page customizations
+ * Main entry point called from customGradebookInit.js
+ */
+export async function initTeacherStudentGradeCustomizer() {
+    logger.debug('Initializing teacher student grade page customizer');
+
+    // Fetch grade data and apply customizations
     const courseId = getCourseId();
     const studentId = getStudentIdFromUrl();
 
     if (!courseId || !studentId) {
         logger.trace('Cannot get course ID or student ID from URL');
-        return false;
+        startCleanupObservers(); // Still run fraction cleanup
+        return;
     }
 
     // Get course name from DOM
@@ -193,66 +303,23 @@ async function runOnce() {
 
     if (!snapshot || snapshot.model !== 'standards') {
         logger.debug(`Skipping teacher student grade customization - course is ${snapshot?.model || 'unknown'}`);
-        return false;
+        startCleanupObservers(); // Still run fraction cleanup for any course
+        return;
     }
 
     // Fetch student's AVG assignment score
     const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
     if (!gradeData) {
         logger.trace('No AVG assignment score found for student');
-        return false;
+        startCleanupObservers(); // Still run fraction cleanup
+        return;
     }
 
     logger.debug(`Applying teacher student grade customizations for student ${studentId}`);
+
+    // Apply customizations with retry logic
     applyCustomizations(gradeData);
 
-    return true;
-}
-
-/**
- * Start cleanup observers for continuous fraction removal
- */
-function startCleanupObservers() {
-    logger.debug('Starting cleanup observers for teacher student grade page');
-
-    // Run initial cleanup immediately
-    removeFractionScores().catch(err => {
-        logger.warn('Error in initial removeFractionScores:', err);
-    });
-
-    // Create debounced version
-    const debouncedClean = debounce(() => {
-        removeFractionScores().catch(err => {
-            logger.warn('Error in removeFractionScores:', err);
-        });
-    }, 100);
-
-    // Start observer on next tick
-    setTimeout(() => {
-        createPersistentObserver(() => {
-            debouncedClean();
-        }, {
-            config: OBSERVER_CONFIGS.CHILD_LIST,
-            target: document.body,
-            name: 'TeacherStudentGradeCleanupObserver'
-        });
-    }, 0);
-}
-
-/**
- * Initialize teacher student grade page customizations
- * Main entry point called from customGradebookInit.js
- */
-export async function initTeacherStudentGradeCustomizer() {
-    logger.debug('Initializing teacher student grade page customizer');
-
-    // Try immediately
-    const success = await runOnce();
-
-    // Start cleanup observers for fraction removal
-    startCleanupObservers();
-
-    if (!success) {
-        logger.trace('Teacher student grade customization not applied (not standards-based or no AVG score)');
-    }
+    // Start cleanup observers with grade data for continuous updates
+    startCleanupObservers(gradeData);
 }
