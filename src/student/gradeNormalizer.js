@@ -50,8 +50,20 @@ export async function removeFractionScores() {
 
     // --- 2b. Inline fraction in grade elements (teacher view) ---
     // <span class="grade">2.55 / 4.00</span> -> <span class="grade">2.55</span>
+    // Skip elements that have been normalized with letter grades (e.g., "2.55 (Approaching Target)")
     document.querySelectorAll("span.grade").forEach(gradeEl => {
+        // Skip if already normalized with letter grade
+        if (gradeEl.dataset.normalized === 'true') {
+            return;
+        }
+
         const txt = gradeEl.textContent.trim();
+
+        // Skip if it contains a letter grade in parentheses
+        if (/\([^)]+\)/.test(txt)) {
+            return;
+        }
+
         // Match "2.55 / 4.00" or "2.55 / 4" pattern
         const match = txt.match(/^(\d+(?:\.\d+)?)\s*\/\s*\d+(?:\.\d+)?$/);
         if (match) {

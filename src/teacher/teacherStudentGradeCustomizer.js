@@ -98,6 +98,8 @@ function updateFinalGradeRow(gradeData) {
     const { score, letterGrade } = gradeData;
     const displayValue = formatGradeDisplay(score, letterGrade);
 
+    logger.trace(`updateFinalGradeRow called with score=${score}, letterGrade=${letterGrade}, displayValue="${displayValue}"`);
+
     // Try multiple selectors to find the final grade row
     const finalGradeRows = [
         ...document.querySelectorAll("tr.student_assignment.hard_coded.final_grade"),
@@ -110,7 +112,9 @@ function updateFinalGradeRow(gradeData) {
         return;
     }
 
-    finalGradeRows.forEach(row => {
+    logger.trace(`Found ${finalGradeRows.length} final grade row(s)`);
+
+    finalGradeRows.forEach((row, index) => {
         // Find grade element - try multiple selectors
         const gradeEl = row.querySelector(".assignment_score .tooltip .grade") ||
                        row.querySelector(".assignment_score .grade") ||
@@ -120,12 +124,36 @@ function updateFinalGradeRow(gradeData) {
         if (gradeEl) {
             const currentText = gradeEl.textContent.trim();
 
-            // Check if it contains a fraction (e.g., "2.55 / 4.00")
-            if (currentText.includes('/') || currentText !== displayValue) {
-                gradeEl.textContent = displayValue;
-                gradeEl.dataset.normalized = 'true';
-                logger.trace(`Updated final grade row: "${currentText}" -> "${displayValue}"`);
+            // Check if there's a separate letter grade element (like sidebar)
+            const letterGradeEl = row.querySelector(".letter_grade") ||
+                                 row.querySelector(".letter-grade");
+
+            if (letterGradeEl) {
+                // Separate elements for score and letter grade (like sidebar)
+                const scoreStr = typeof score === 'number' ? score.toFixed(2) : String(score);
+
+                if (currentText.includes('/') || currentText !== scoreStr) {
+                    gradeEl.textContent = scoreStr;
+                    gradeEl.dataset.normalized = 'true';
+                    logger.trace(`Updated final grade row ${index} score: "${currentText}" -> "${scoreStr}"`);
+                }
+
+                if (letterGrade && letterGradeEl.textContent.trim() !== letterGrade) {
+                    letterGradeEl.textContent = letterGrade;
+                    logger.trace(`Updated final grade row ${index} letter grade: "${letterGradeEl.textContent}" -> "${letterGrade}"`);
+                }
+            } else {
+                // Single element for combined display (score + letter grade)
+                if (currentText.includes('/') || currentText !== displayValue) {
+                    gradeEl.textContent = displayValue;
+                    gradeEl.dataset.normalized = 'true';
+                    logger.trace(`Updated final grade row ${index}: "${currentText}" -> "${displayValue}"`);
+                } else {
+                    logger.trace(`Final grade row ${index} already has correct value: "${currentText}"`);
+                }
             }
+        } else {
+            logger.trace(`Final grade row ${index}: grade element not found`);
         }
 
         // Also remove any separate fraction elements
