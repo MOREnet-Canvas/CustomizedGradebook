@@ -158,6 +158,42 @@ function replaceRightSidebar(gradeData) {
 }
 
 /**
+ * Update the final grade row in the grades table
+ * Uses the same formatting logic as the sidebar for consistency
+ *
+ * @param {Object} gradeData - Grade data object
+ * @param {string} gradeData.score - The mastery score to display
+ * @param {string|null} gradeData.letterGrade - The letter grade
+ */
+function updateBottomGradeRow(gradeData) {
+    const { score, letterGrade } = gradeData;
+    const displayValue = formatGradeDisplay(score, letterGrade);
+
+    document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {
+        const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
+        const possibleEl = row.querySelector(".details .possible.points_possible");
+
+        if (gradeEl) {
+            // Only update if value has changed (prevents flashing and unnecessary DOM updates)
+            if (gradeEl.textContent !== displayValue) {
+                gradeEl.textContent = displayValue;
+                gradeEl.dataset.normalized = 'true';
+            }
+        }
+
+        if (possibleEl) {
+            // Canvas shows "102.50 / 152.00". We don't want that.
+            const txt = possibleEl.textContent.trim();
+            if (/^\d+(\.\d+)?\s*\/\s*\d+(\.\d+)?$/.test(txt)) {
+                possibleEl.textContent = "";
+            }
+        }
+    });
+
+    logger.debug(`Bottom grade row updated to: ${displayValue}`);
+}
+
+/**
  * Apply all customizations to the grades page
  *
  * @param {Object} gradeData - Grade data object
@@ -176,6 +212,9 @@ function applyCustomizations(gradeData) {
 
     // 2) Update the grade display in the right sidebar
     replaceRightSidebar(gradeData);
+
+    // 3) Update the final grade row in the grades table
+    updateBottomGradeRow(gradeData);
 
     processed = true;
     return true;

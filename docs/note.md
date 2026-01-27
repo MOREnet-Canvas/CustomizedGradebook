@@ -19,6 +19,7 @@ TODO: Add Checks for assignments
 - have they had mastery refresh done?
 - do they have points possible set to 0?
 - what grading scheme are they using?
+- are all assignments using same grading scheme?
 
 
 ## Debugging
