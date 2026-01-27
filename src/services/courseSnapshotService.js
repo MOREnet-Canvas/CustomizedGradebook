@@ -39,7 +39,7 @@ import { logger } from '../utils/logger.js';
 import { determineCourseModel } from '../utils/courseDetection.js';
 import { getCourseGrade } from './gradeDataService.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
-import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage } from '../utils/pageDetection.js';
+import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage, isTeacherViewingStudentGrades } from '../utils/pageDetection.js';
 import { percentageToPoints, calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
 import { scoreToGradeLevel } from '../student/gradeExtractor.js';
 import { GRADE_SOURCE } from './gradeDataService.js';
@@ -77,11 +77,12 @@ export const PAGE_CONTEXT = Object.freeze({
  * - Dashboard
  * - All grades page (/grades)
  * - Course grades page (/courses/[courseId]/grades)
+ * - Teacher viewing student grades (/courses/[courseId]/grades/[studentId])
  *
  * @returns {boolean} True if current page is authorized
  */
 function isAuthorizedPage() {
-    return isDashboardPage() || isAllGradesPage() || isSingleCourseGradesPage();
+    return isDashboardPage() || isAllGradesPage() || isSingleCourseGradesPage() || isTeacherViewingStudentGrades();
 }
 
 /**
@@ -400,6 +401,99 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         return null;
     }
 }
+
+/**
+ * Populate course snapshot for teacher-like users (course type only, no grade data)
+ *
+ * This function creates a minimal snapshot containing only course type classification.
+ * It is used by teacher-like users who need to know if a course is standards-based
+ * but don't have their own grade data in the course.
+ *
+ * Security: Validates user ownership and page authorization before writing data.
+ *
+ * @param {string} courseId - Course ID
+ * @param {string} courseName - Course name
+ * @param {Object} apiClient - CanvasApiClient instance
+ * @returns {Promise<Object|null>} Populated snapshot or null if failed
+ *
+ * @example
+ * const snapshot = await populateTeacherCourseSnapshot('12345', 'Math 101', apiClient);
+ * if (snapshot && snapshot.model === 'standards') {
+ *   console.log('This is a standards-based course');
+ * }
+ */
+export async function populateTeacherCourseSnapshot(courseId, courseName, apiClient) {
+    // Validate user ownership first
+    if (!validateUserOwnership()) {
+        logger.warn(`[Snapshot] Cannot populate teacher snapshot - user ownership validation failed`);
+        return null;
+    }
+
+    // Check user role - only teacher-like users can use this function
+    const roleGroup = getUserRoleGroup();
+    if (roleGroup !== 'teacher_like') {
+        logger.trace(`[Snapshot] Skipping teacher snapshot population - user is ${roleGroup}, not teacher_like`);
+        return null;
+    }
+
+    // Check page authorization
+    if (!isAuthorizedPage()) {
+        logger.trace(`[Snapshot] Skipping teacher snapshot population - unauthorized page`);
+        return null;
+    }
+
+    const currentUserId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
+    if (!currentUserId) {
+        logger.warn(`[Snapshot] Cannot populate teacher snapshot - ENV.current_user_id not available`);
+        return null;
+    }
+
+    logger.debug(`[Snapshot] Populating teacher snapshot for course ${courseId} "${courseName}"`);
+
+    try {
+        // Classify course model (SINGLE SOURCE OF TRUTH)
+        logger.trace(`[Snapshot] Teacher snapshot: Classifying course model for ${courseId}...`);
+        const classification = await determineCourseModel(
+            { courseId, courseName },
+            null,
+            { apiClient }
+        );
+        logger.trace(`[Snapshot] Teacher snapshot: Course ${courseId} classification: model=${classification.model}, reason=${classification.reason}`);
+
+        const isStandardsBased = classification.model === 'standards';
+
+        // Create minimal snapshot with course type only (no grade data)
+        const snapshot = {
+            courseId,
+            courseName,
+            model: classification.model,
+            modelReason: classification.reason,
+            isStandardsBased, // DEPRECATED: for backward compatibility
+            score: null,
+            letterGrade: null,
+            gradeSource: null,
+            displayScore: null,
+            displayLetterGrade: null,
+            displayType: null,
+            timestamp: Date.now(),
+            userId: currentUserId,
+            expiresAt: Date.now() + SNAPSHOT_TTL_MS
+        };
+
+        // Write to sessionStorage
+        const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
+        sessionStorage.setItem(key, JSON.stringify(snapshot));
+
+        logger.debug(`[Snapshot] ✅ Populated teacher snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+
+        return snapshot;
+
+    } catch (error) {
+        logger.warn(`[Snapshot] Failed to populate teacher snapshot for course ${courseId}:`, error.message);
+        return null;
+    }
+}
+
 
 /**
  * Determine if a course grade should be refreshed based on page context
