@@ -28,8 +28,19 @@ import { scoreToGradeLevel } from '../student/gradeExtractor.js';
 
 /**
  * Track if customizations have been applied (prevent double-runs)
+ * Keyed by studentId to allow re-initialization when navigating between students
  */
 let processed = false;
+
+/**
+ * Track the current student ID to detect navigation changes
+ */
+let currentStudentId = null;
+
+/**
+ * Track if URL change detection has been set up (prevent multiple intervals)
+ */
+let urlChangeDetectionSetup = false;
 
 /**
  * Fetch AVG assignment score for a specific student
@@ -330,6 +341,15 @@ export async function initTeacherStudentGradeCustomizer() {
         return;
     }
 
+    // Check if we're viewing a different student (navigation change)
+    if (currentStudentId && currentStudentId !== studentId) {
+        logger.debug(`[Teacher] Student ID changed from ${currentStudentId} to ${studentId}, resetting customizations`);
+        processed = false; // Reset flag to allow re-initialization
+    }
+
+    // Update current student ID
+    currentStudentId = studentId;
+
     logger.debug(`[Teacher] Teacher viewing student ${studentId} grades for course ${courseId}`);
 
     // Get course name from DOM
@@ -358,27 +378,16 @@ export async function initTeacherStudentGradeCustomizer() {
         return;
     }
 
-    // Check if snapshot already has grade data for this student
-    // (snapshot population already fetched the student's AVG assignment submission)
-    let gradeData = null;
+    // Fetch student's AVG assignment score
+    // Note: We always fetch fresh data for each student to avoid data leakage
+    // (snapshot is keyed by courseId only, not studentId)
+    logger.debug(`[Teacher] Fetching AVG assignment score for student ${studentId}...`);
+    const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
 
-    if (snapshot.score != null && snapshot.letterGrade != null) {
-        // Reuse grade data from snapshot (already fetched during population)
-        gradeData = {
-            score: snapshot.score,
-            letterGrade: snapshot.letterGrade
-        };
-        logger.debug(`[Teacher] Reusing snapshot grade data for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
-    } else {
-        // Snapshot doesn't have grade data - fetch it using the same working endpoint
-        logger.debug(`[Teacher] Snapshot has no grade data, fetching AVG assignment score for student ${studentId}...`);
-        gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
-
-        if (!gradeData) {
-            logger.warn(`[Teacher] ❌ No AVG assignment score found for student ${studentId} - skipping grade customizations`);
-            startCleanupObservers(); // Still run fraction cleanup
-            return;
-        }
+    if (!gradeData) {
+        logger.warn(`[Teacher] ❌ No AVG assignment score found for student ${studentId} - skipping grade customizations`);
+        startCleanupObservers(); // Still run fraction cleanup
+        return;
     }
 
     logger.debug(`[Teacher] ✅ Applying teacher student grade customizations for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
@@ -388,4 +397,44 @@ export async function initTeacherStudentGradeCustomizer() {
 
     // Start cleanup observers with grade data for continuous updates
     startCleanupObservers(gradeData);
+
+    // Set up URL change detection to handle navigation between students
+    setupUrlChangeDetection();
+}
+
+/**
+ * Set up URL change detection to handle navigation between students
+ * When the URL changes (e.g., from /courses/538/grades/642 to /courses/538/grades/644),
+ * re-initialize the customizer with the new student's data
+ */
+function setupUrlChangeDetection() {
+    // Only set up once to prevent multiple intervals
+    if (urlChangeDetectionSetup) {
+        logger.trace('[Teacher] URL change detection already set up, skipping');
+        return;
+    }
+
+    urlChangeDetectionSetup = true;
+    logger.debug('[Teacher] Setting up URL change detection for student navigation');
+
+    let lastUrl = location.href;
+
+    // Poll for URL changes every second (same pattern as student-side cleanup observer)
+    setInterval(() => {
+        if (location.href !== lastUrl) {
+            const newStudentId = getStudentIdFromUrl();
+
+            // Only re-initialize if we're still on a teacher viewing student grades page
+            // and the student ID has changed
+            if (newStudentId && newStudentId !== currentStudentId) {
+                logger.debug(`[Teacher] URL changed, detected new student: ${newStudentId} (was: ${currentStudentId})`);
+                lastUrl = location.href;
+
+                // Re-initialize with new student
+                initTeacherStudentGradeCustomizer();
+            } else {
+                lastUrl = location.href;
+            }
+        }
+    }, 1000);
 }
