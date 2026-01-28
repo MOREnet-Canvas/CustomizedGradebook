@@ -151,10 +151,10 @@ export async function getCourseGrade(courseId, apiClient) {
 
     if (score !== null && grade !== null) {
 
-        logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${letterGrade}`);
+        logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${score}, letterGrade=${grade}`);
         return {
             score: score,
-            letterGrade,
+            grade,
             source: GRADE_SOURCE.ASSIGNMENT
         };
     }
