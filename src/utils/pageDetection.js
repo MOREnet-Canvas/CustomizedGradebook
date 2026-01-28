@@ -12,6 +12,8 @@
  * - isCoursePageNeedingCleanup: Check if on course page that needs grade cleanup
  */
 
+import {logger} from "./logger.js";
+
 /**
  * Check if current page is the Canvas dashboard
  * 
@@ -118,6 +120,16 @@ export function isTeacherViewingStudentGrades() {
  */
 export function getStudentIdFromUrl() {
     const path = window.location.pathname;
-    const match = path.match(/^\/courses\/\d+\/grades\/(\d+)/);
+
+    // Expected: /courses/:courseId/grades/:studentId  AKA teacher view of a student's grades
+    const pattern = /^\/courses\/\d+\/grades\/(\d+)/;
+    const match = path.match(pattern);
+
+    if (!match) {
+        logger.trace(
+            '[getStudentIdFromUrl] No studentId found in URL',
+            {path, expectedPattern: pattern.toString()}
+        );
+    }
     return match ? match[1] : null;
 }
