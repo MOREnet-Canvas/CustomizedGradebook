@@ -32,8 +32,11 @@ import { scoreToGradeLevel } from '../student/gradeExtractor.js';
 let processed = false;
 
 /**
- * Fetch AVG assignment score for a specific student via Canvas submissions API
- * Uses a single API call to get all student submissions, then filters for AVG assignment
+ * Fetch AVG assignment score for a specific student
+ * Uses the same working endpoint pattern as gradeDataService.js:
+ * 1. Search for AVG assignment by name
+ * 2. Fetch specific student's submission for that assignment
+ *
  * @param {string} courseId - Course ID
  * @param {string} studentId - Student ID
  * @param {CanvasApiClient} apiClient - Canvas API client
@@ -43,44 +46,48 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
     logger.trace(`[Teacher] fetchStudentAvgScore: courseId=${courseId}, studentId=${studentId}`);
 
     try {
-        const snapshot = getCourseSnapshot(courseId);
-        if (!snapshot) {
-            logger.warn(`[Teacher] No snapshot available for course ${courseId} - cannot fetch student grade`);
+        logger.trace(`[Teacher] Searching for AVG assignment "${AVG_ASSIGNMENT_NAME}"...`);
+
+        // Step 1: Search for AVG assignment by name (same as gradeDataService.js)
+        const assignments = await apiClient.get(
+            `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+            {},
+            'fetchAvgAssignment'
+        );
+
+        logger.trace(`[Teacher] Found ${assignments?.length || 0} assignments matching "${AVG_ASSIGNMENT_NAME}"`);
+
+        // Find exact match
+        const avgAssignment = assignments?.find(a => a.name === AVG_ASSIGNMENT_NAME);
+        if (!avgAssignment) {
+            logger.warn(`[Teacher] AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
             return null;
         }
+
+        logger.trace(`[Teacher] Found AVG assignment: id=${avgAssignment.id}, name="${avgAssignment.name}"`);
+
+        // Step 2: Fetch student's submission for AVG assignment (same as gradeDataService.js)
+        logger.trace(`[Teacher] Fetching submission for student ${studentId}, assignment ${avgAssignment.id}...`);
+        const submission = await apiClient.get(
+            `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${studentId}`,
+            {},
+            'fetchAvgSubmission'
+        );
+
         logger.trace(
-            `[Teacher] Stored snapshot for course ${courseId}`,
-            snapshot
-        );
-
-        // logger.trace(`[Teacher] Snapshot found, fetching all submissions for student ${studentId}...`);
-
-        // Fetch all submissions for this student (includes assignment details)
-        const submissions = await apiClient.get(
-            `/api/v1/courses/${courseId}/students/submissions`,
+            `[Teacher] Submission fetched`,
             {
-                student_ids: [studentId],
-                per_page: 100,
-                include: ['assignment']
-            },
-            'fetchStudentSubmissions'
+                courseId,
+                studentId,
+                assignmentId: avgAssignment.id,
+                score: submission?.score,
+                grade: submission?.grade,
+                workflow_state: submission?.workflow_state
+            }
         );
 
-        logger.trace(`[Teacher] Found ${submissions?.length || 0} total submissions for student ${studentId}`);
-
-        // Find the AVG assignment submission by name
-        const avgSubmission = submissions?.find(s => s.assignment?.name === AVG_ASSIGNMENT_NAME);
-
-        if (!avgSubmission) {
-            logger.warn(`[Teacher] AVG assignment "${AVG_ASSIGNMENT_NAME}" submission not found for student ${studentId}`);
-            return null;
-        }
-
-        logger.trace(`[Teacher] Found AVG submission: assignment_id=${avgSubmission.assignment_id}, workflow_state=${avgSubmission.workflow_state}`);
-
-        // Extract score from submission
-        const score = avgSubmission.score ?? avgSubmission.entered_score ?? null;
-
+        // Extract score
+        const score = submission?.score;
         if (score === null || score === undefined) {
             logger.warn(`[Teacher] No score found in AVG assignment submission for student ${studentId}`);
             return null;
@@ -89,7 +96,7 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
         logger.trace(`[Teacher] Student score found: ${score}`);
 
         // Extract letter grade from submission (Canvas stores letter grades in grade/entered_grade fields)
-        let letterGrade = avgSubmission.grade ?? avgSubmission.entered_grade ?? null;
+        let letterGrade = submission?.grade ?? submission?.entered_grade ?? null;
 
         // If letter grade is numeric or missing, calculate from score
         if (!letterGrade || !isNaN(parseFloat(letterGrade))) {
@@ -351,13 +358,27 @@ export async function initTeacherStudentGradeCustomizer() {
         return;
     }
 
-    // Fetch student's AVG assignment score
-    logger.debug(`[Teacher] Fetching AVG assignment score for student ${studentId}...`);
-    const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
-    if (!gradeData) {
-        logger.warn(`[Teacher] ❌ No AVG assignment score found for student ${studentId} - skipping grade customizations`);
-        startCleanupObservers(); // Still run fraction cleanup
-        return;
+    // Check if snapshot already has grade data for this student
+    // (snapshot population already fetched the student's AVG assignment submission)
+    let gradeData = null;
+
+    if (snapshot.score != null && snapshot.letterGrade != null) {
+        // Reuse grade data from snapshot (already fetched during population)
+        gradeData = {
+            score: snapshot.score,
+            letterGrade: snapshot.letterGrade
+        };
+        logger.debug(`[Teacher] Reusing snapshot grade data for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
+    } else {
+        // Snapshot doesn't have grade data - fetch it using the same working endpoint
+        logger.debug(`[Teacher] Snapshot has no grade data, fetching AVG assignment score for student ${studentId}...`);
+        gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
+
+        if (!gradeData) {
+            logger.warn(`[Teacher] ❌ No AVG assignment score found for student ${studentId} - skipping grade customizations`);
+            startCleanupObservers(); // Still run fraction cleanup
+            return;
+        }
     }
 
     logger.debug(`[Teacher] ✅ Applying teacher student grade customizations for student ${studentId}: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}`);
