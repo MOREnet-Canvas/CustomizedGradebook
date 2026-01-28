@@ -133,3 +133,13 @@ export function getStudentIdFromUrl() {
     }
     return match ? match[1] : null;
 }
+
+export function resolveTargetStudentId() {
+    // Teacher viewing a specific student
+    if (isTeacherViewingStudentGrades()) {
+        return getStudentIdFromUrl();
+    }
+
+    // Student (or anyone) viewing "self"
+    return ENV?.current_user_id ? String(ENV.current_user_id) : null;
+}
