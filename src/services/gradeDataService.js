@@ -52,7 +52,7 @@ async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
             return null;
         }
         logger.trace(`AVG assignment found: ${avgAssignment.id}, ${avgAssignment.name}`);
-        logger.trace(`looking for assignment submission for student: ${studentId}}`);
+        logger.trace(`looking for assignment submission for student: ${studentId}`);
 
         // Fetch student's submission for this assignment
         const submission = await apiClient.get(
@@ -148,18 +148,23 @@ export async function getCourseGrade(courseId, apiClient) {
         return null; // or fall back to enrollment
     }
 
-    const { score, grade } = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
+    const avgResult = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
 
+    if (avgResult?.score != null) {
+        const { score, grade } = avgResult;
 
-    if (score !== null && grade !== null) {
+        logger.trace(
+            `[Grade Fetch] Course ${courseId}: AVG assignment found! score=${score}, letterGrade=${grade ?? '(none)'}`
+        );
 
-        logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${score}, letterGrade=${grade}`);
         return {
-            score: score,
-            grade,
+            score,
+            letterGrade: grade ?? null,   // ✅ normalize to the field snapshot expects
             source: GRADE_SOURCE.ASSIGNMENT
         };
     }
+
+
     logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment not found, checking priority 2...`);
 
     // Priority 2: Fallback to enrollment score
