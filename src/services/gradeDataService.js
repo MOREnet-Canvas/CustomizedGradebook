@@ -58,17 +58,33 @@ async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
             {},
             'fetchAvgSubmission'
         );
-        logger.trace(`AVG assignment submission for course ${courseId}:`, submission);
+
+        logger.trace(
+            `[fetchAvgAssignmentScore] Submission fetched`,
+            {
+                courseId,
+                studentId,
+                assignmentId: avgAssignment.id,
+                score: submission?.score,
+                grade: submission?.grade
+            }
+        );
 
         // Extract score
         const score = submission?.score;
+        const grade = submission?.grade;
+
         if (score === null || score === undefined) {
             logger.trace(`No score found for AVG assignment in course ${courseId}`);
             return null;
         }
+        if (grade === null || grade === undefined) {
+            logger.trace(`No grade found for AVG assignment in course ${courseId}`);
 
-        logger.trace(`AVG assignment score for course ${courseId}: ${score}`);
-        return { score };
+        }
+
+        logger.trace(`AVG assignment score for course ${courseId}: ${score}, grade: ${grade}`);
+        return { score, grade };
 
     } catch (error) {
         logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
@@ -122,39 +138,41 @@ async function fetchEnrollmentScore(courseId, apiClient) {
 export async function getCourseGrade(courseId, apiClient) {
     logger.trace(`[Grade Fetch] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
 
-    // Priority 1: Try AVG assignment
+
     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
     const studentId = getStudentIdFromUrl();
-    const avgData = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
-
-    if (avgData !== null) {
-        // Fetch enrollment data to get letter grade
-        const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
-        const letterGrade = enrollmentData?.letterGrade || null;
-
-        logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${letterGrade}`);
-        return {
-            score: avgData.score,
-            letterGrade,
-            source: GRADE_SOURCE.ASSIGNMENT
-        };
-    }
-    logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment not found, checking priority 2...`);
-
-    // Priority 2: Fallback to enrollment score
-    logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 2 - enrollment grade...`);
-    const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
-    if (enrollmentData !== null) {
-        logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
-        return {
-            score: enrollmentData.score,
-            letterGrade: enrollmentData.letterGrade,
-            source: GRADE_SOURCE.ENROLLMENT
-        };
-    }
-    logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade not found`);
-
-    // No grade available
-    logger.trace(`[Grade Fetch] Course ${courseId}: No grade available from any source`);
-    return null;
+    const {score,letterGrade} = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
+    return{score: score, letterGrade, source:GRADE_SOURCE.ASSIGNMENT}
 }
+
+//     if (avgData !== null) {
+//         // Fetch enrollment data to get letter grade
+//         const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
+//         const letterGrade = enrollmentData?.letterGrade || null;
+//
+//         logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment found! score=${avgData.score}, letterGrade=${letterGrade}`);
+//         return {
+//             score: avgData.score,
+//             letterGrade,
+//             source: GRADE_SOURCE.ASSIGNMENT
+//         };
+//     }
+//     logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment not found, checking priority 2...`);
+//
+//     // Priority 2: Fallback to enrollment score
+//     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 2 - enrollment grade...`);
+//     const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
+//     if (enrollmentData !== null) {
+//         logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
+//         return {
+//             score: enrollmentData.score,
+//             letterGrade: enrollmentData.letterGrade,
+//             source: GRADE_SOURCE.ENROLLMENT
+//         };
+//     }
+//     logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade not found`);
+//
+//     // No grade available
+//     logger.trace(`[Grade Fetch] Course ${courseId}: No grade available from any source`);
+//     return null;
+// }
