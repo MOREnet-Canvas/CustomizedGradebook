@@ -51,6 +51,8 @@ async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
             logger.trace(`AVG assignment "${AVG_ASSIGNMENT_NAME}" not found in course ${courseId}`);
             return null;
         }
+        logger.trace(`AVG assignment found: ${avgAssignment.id}, ${avgAssignment.name}`);
+        logger.trace(`looking for assignment submission for student: ${studentId}}`);
 
         // Fetch student's submission for this assignment
         const submission = await apiClient.get(
