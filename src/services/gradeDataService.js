@@ -16,7 +16,7 @@ import { AVG_ASSIGNMENT_NAME } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { parseEnrollmentGrade, fetchSingleEnrollment } from './enrollmentService.js';
-import {getStudentIdFromUrl} from "../utils/pageDetection.js";
+import {getStudentIdFromUrl, resolveTargetStudentId} from "../utils/pageDetection.js";
 
 /**
  * Grade source types
@@ -140,9 +140,15 @@ export async function getCourseGrade(courseId, apiClient) {
 
 
     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
-    const studentId = getStudentIdFromUrl();
-    const {score,letterGrade} = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
-    return{score: score, letterGrade, source:GRADE_SOURCE.ASSIGNMENT}
+    const studentId = resolveTargetStudentId();
+    if (!studentId) {
+        logger.trace(`[Grade Fetch] Course ${courseId}: No target studentId available for submission lookup`);
+        return null; // or fall back to enrollment
+    }
+
+    const { score, grade } = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
+    return { score, letterGrade: grade ?? null, source: GRADE_SOURCE.ASSIGNMENT };
+
 }
 
 //     if (avgData !== null) {
