@@ -116,7 +116,16 @@ export function calculateDisplayValue(options) {
     if (source === DISPLAY_SOURCE.ASSIGNMENT) {
         // AVG assignment: 0-4 scale, show with 2 decimals and letter grade if available
         const scoreStr = score.toFixed(2);
-        if (letterGrade) {
+        const isNumericLetterGrade =
+            typeof letterGrade === 'string' &&
+            /^[0-9]+(\.[0-9]+)?$/.test(letterGrade.trim());
+        if (isNumericLetterGrade) {
+            logger.trace(
+                `[Grade Display] Suppressing numeric letterGrade "${letterGrade}" for assignment source`
+            );
+        }
+
+        if (letterGrade && !isNumericLetterGrade) {
             displayValue = `${scoreStr} (${letterGrade})`;
             ariaLabel = `Grade: ${scoreStr}, letter grade ${letterGrade}`;
         } else {
@@ -177,5 +186,3 @@ export function calculateDisplayValue(options) {
         return { displayValue };
     }
 }
-
-
