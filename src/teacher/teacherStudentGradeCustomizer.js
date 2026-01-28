@@ -48,8 +48,12 @@ async function fetchStudentAvgScore(courseId, studentId, apiClient) {
             logger.warn(`[Teacher] No snapshot available for course ${courseId} - cannot fetch student grade`);
             return null;
         }
+        logger.trace(
+            `[Teacher] Stored snapshot for course ${courseId}`,
+            snapshot
+        );
 
-        logger.trace(`[Teacher] Snapshot found, fetching all submissions for student ${studentId}...`);
+        // logger.trace(`[Teacher] Snapshot found, fetching all submissions for student ${studentId}...`);
 
         // Fetch all submissions for this student (includes assignment details)
         const submissions = await apiClient.get(
