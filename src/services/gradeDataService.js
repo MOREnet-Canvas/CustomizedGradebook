@@ -16,6 +16,7 @@ import { AVG_ASSIGNMENT_NAME } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { parseEnrollmentGrade, fetchSingleEnrollment } from './enrollmentService.js';
+import {getStudentIdFromUrl} from "../utils/pageDetection.js";
 
 /**
  * Grade source types
@@ -28,13 +29,14 @@ export const GRADE_SOURCE = Object.freeze({
 });
 
 /**
- * Fetch AVG assignment score for a course
+ * Fetch a student's AVG assignment score for a course
  *
  * @param {string} courseId - Course ID
+ * @param {string} studentId - Student ID
  * @param {CanvasApiClient} apiClient - Canvas API client
  * @returns {Promise<{score: number}|null>} Assignment score or null if not found
  */
-async function fetchAvgAssignmentScore(courseId, apiClient) {
+async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
     try {
         // Search for the assignment by name
         const assignments = await apiClient.get(
@@ -52,10 +54,11 @@ async function fetchAvgAssignmentScore(courseId, apiClient) {
 
         // Fetch student's submission for this assignment
         const submission = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/self`,
+            `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${studentId}`,
             {},
             'fetchAvgSubmission'
         );
+        logger.trace(`AVG assignment submission for course ${courseId}:`, submission);
 
         // Extract score
         const score = submission?.score;
@@ -121,7 +124,9 @@ export async function getCourseGrade(courseId, apiClient) {
 
     // Priority 1: Try AVG assignment
     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
-    const avgData = await fetchAvgAssignmentScore(courseId, apiClient);
+    const studentId = getStudentIdFromUrl();
+    const avgData = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
+
     if (avgData !== null) {
         // Fetch enrollment data to get letter grade
         const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
