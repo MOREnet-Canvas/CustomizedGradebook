@@ -11,7 +11,7 @@ For checking version in DevTools: CG.version
 
 
 ## Next Steps
-TODO: Fix per student grade page as teacher
+
 TODO: SpeedGrader - Find lowest rubric score and use that for grade override
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Admin dashboard
