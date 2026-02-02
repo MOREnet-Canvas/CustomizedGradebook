@@ -1,4 +1,4 @@
-// src/speedgrader/speedgraderAutoGrade.js
+// src/speedgrader/speedgraderScoreSync.js
 // noinspection SpellCheckingInspection
 
 /**
@@ -291,11 +291,21 @@ async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient) 
             return;
         }
 
-        logger.debug('[ScoreSync] Waiting 800ms for GraphQL commit...');
-        await new Promise(resolve => setTimeout(resolve, 800));
+        logger.debug('[ScoreSync] Waiting briefly for GraphQL commit, then polling rubric assessment...');
 
-        logger.debug('[ScoreSync] Fetching submission with rubric assessment...');
-        const submission = await fetchSubmission(courseId, assignmentId, studentId);
+        const attemptDelaysMs = [200, 250, 350]; // total worst-case ≈800ms, but often faster
+        let submission = null;
+
+        for (let i = 0; i < attemptDelaysMs.length; i++) {
+            await new Promise(r => setTimeout(r, attemptDelaysMs[i]));
+            submission = await fetchSubmission(courseId, assignmentId, studentId);
+
+            const ra = submission?.rubric_assessment;
+            if (ra && Object.keys(ra).length > 0) break;
+        }
+
+        logger.debug('[ScoreSync] Fetching submission with rubric assessment complete');
+
 
         if (!submission) {
             logger.error('[ScoreSync] FAILED - fetchSubmission returned null');

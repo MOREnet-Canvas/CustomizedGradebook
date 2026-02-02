@@ -23,7 +23,7 @@ import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 import { initAssignmentKebabMenuInjection } from "./gradebook/ui/assignmentKebabMenu.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
-import { initSpeedGraderAutoGrade } from "./speedgrader/speedgraderAutoGrade.js";
+import { initSpeedGraderAutoGrade } from "./speedgrader/speedgraderScoreSync.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
 import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGradeCustomizer.js";
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
