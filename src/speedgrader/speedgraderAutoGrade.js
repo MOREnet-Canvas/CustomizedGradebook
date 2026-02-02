@@ -132,24 +132,92 @@ function getCsrfToken() {
  * Update grade input UI (React-controlled)
  */
 function updateGradeInput(score) {
-    const input = document.querySelector('input[data-testid="grade-input"]');
-    if (!input) {
+    // Find all candidate inputs
+    const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
+    logger.debug(`[AutoGrade] Found ${allInputs.length} grade input candidate(s)`);
+
+    if (allInputs.length === 0) {
         logger.debug('[AutoGrade] Grade input not found for update');
         return;
     }
 
+    // Filter to visible, enabled inputs
+    const visibleInputs = allInputs.filter(el => {
+        const visible = el.offsetParent !== null;
+        const enabled = !el.disabled;
+        return visible && enabled;
+    });
+
+    logger.debug(`[AutoGrade] ${visibleInputs.length} visible and enabled input(s)`);
+
+    if (visibleInputs.length === 0) {
+        logger.debug('[AutoGrade] No visible, enabled grade inputs found');
+        return;
+    }
+
+    // Prefer inputs inside grading panel
+    const panelInputs = visibleInputs.filter(el => {
+        return el.closest('[data-testid="speedgrader-grading-panel"]') !== null;
+    });
+
+    let candidates = panelInputs.length > 0 ? panelInputs : visibleInputs;
+
+    // Choose best candidate: largest area or currently focused
+    let bestInput = candidates[0];
+    if (candidates.length > 1) {
+        const focused = candidates.find(el => el === document.activeElement);
+        if (focused) {
+            bestInput = focused;
+            logger.debug('[AutoGrade] Selected focused input');
+        } else {
+            let maxArea = 0;
+            for (const el of candidates) {
+                const rect = el.getBoundingClientRect();
+                const area = rect.width * rect.height;
+                if (area > maxArea) {
+                    maxArea = area;
+                    bestInput = el;
+                }
+            }
+            logger.debug(`[AutoGrade] Selected input with largest area`);
+        }
+    }
+
+    const input = bestInput;
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
 
     const applyValue = () => {
+        // Set input value
+        input.focus();
         nativeInputValueSetter.call(input, String(score));
+
+        // Dispatch events
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
         input.dispatchEvent(new Event('blur', { bubbles: true }));
+
+        // Update facade if present
+        const wrapper = input.parentElement;
+        if (wrapper) {
+            const facade = wrapper.querySelector('span');
+            if (facade && facade.offsetParent !== null) {
+                facade.textContent = String(score);
+                logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
+            }
+        }
+
+        // Read back and log
+        const readBack = input.value;
+        logger.debug(`[AutoGrade] Applied value=${score}, read back value="${readBack}"`);
     };
 
+    // Apply 3 times with delays
     applyValue();
     setTimeout(applyValue, 700);
-    logger.debug(`[AutoGrade] Updated grade input to: ${score}`);
+    setTimeout(applyValue, 1500);
+
+    logger.info(`[AutoGrade] Grade input update scheduled for score: ${score}`);
 }
 
 /**

@@ -4117,21 +4117,69 @@ You may need to refresh the page to see the new scores.`);
     return null;
   }
   function updateGradeInput(score) {
-    const input = document.querySelector('input[data-testid="grade-input"]');
-    if (!input) {
+    const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
+    logger.debug(`[AutoGrade] Found ${allInputs.length} grade input candidate(s)`);
+    if (allInputs.length === 0) {
       logger.debug("[AutoGrade] Grade input not found for update");
       return;
     }
+    const visibleInputs = allInputs.filter((el) => {
+      const visible = el.offsetParent !== null;
+      const enabled = !el.disabled;
+      return visible && enabled;
+    });
+    logger.debug(`[AutoGrade] ${visibleInputs.length} visible and enabled input(s)`);
+    if (visibleInputs.length === 0) {
+      logger.debug("[AutoGrade] No visible, enabled grade inputs found");
+      return;
+    }
+    const panelInputs = visibleInputs.filter((el) => {
+      return el.closest('[data-testid="speedgrader-grading-panel"]') !== null;
+    });
+    let candidates = panelInputs.length > 0 ? panelInputs : visibleInputs;
+    let bestInput = candidates[0];
+    if (candidates.length > 1) {
+      const focused = candidates.find((el) => el === document.activeElement);
+      if (focused) {
+        bestInput = focused;
+        logger.debug("[AutoGrade] Selected focused input");
+      } else {
+        let maxArea = 0;
+        for (const el of candidates) {
+          const rect = el.getBoundingClientRect();
+          const area = rect.width * rect.height;
+          if (area > maxArea) {
+            maxArea = area;
+            bestInput = el;
+          }
+        }
+        logger.debug(`[AutoGrade] Selected input with largest area`);
+      }
+    }
+    const input = bestInput;
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     const applyValue = () => {
+      input.focus();
       nativeInputValueSetter.call(input, String(score));
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
       input.dispatchEvent(new Event("blur", { bubbles: true }));
+      const wrapper = input.parentElement;
+      if (wrapper) {
+        const facade = wrapper.querySelector("span");
+        if (facade && facade.offsetParent !== null) {
+          facade.textContent = String(score);
+          logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
+        }
+      }
+      const readBack = input.value;
+      logger.debug(`[AutoGrade] Applied value=${score}, read back value="${readBack}"`);
     };
     applyValue();
     setTimeout(applyValue, 700);
-    logger.debug(`[AutoGrade] Updated grade input to: ${score}`);
+    setTimeout(applyValue, 1500);
+    logger.info(`[AutoGrade] Grade input update scheduled for score: ${score}`);
   }
   async function submitGrade(courseId, assignmentId, studentId, score) {
     var _a18;
@@ -5546,8 +5594,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 2:20:39 PM (dev, efd2cdd)");
-    exposeVersion("dev", "2026-02-02 2:20:39 PM (dev, efd2cdd)");
+    logBanner("dev", "2026-02-02 2:34:17 PM (dev, d7756b1)");
+    exposeVersion("dev", "2026-02-02 2:34:17 PM (dev, d7756b1)");
     if (true) {
       logger.info("Running in DEV mode");
     }
