@@ -206,7 +206,10 @@ async function submitGrade(courseId, assignmentId, studentId, score) {
  * Fetch submission with rubric assessment
  */
 async function fetchSubmission(courseId, assignmentId, studentId) {
-    const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?include[]=rubric_assessment`;
+    // Build URL with proper query parameters
+    const params = new URLSearchParams();
+    params.append('include[]', 'rubric_assessment');
+    const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?${params.toString()}`;
 
     logger.debug(`[AutoGrade] GET ${url}`);
 
@@ -263,8 +266,8 @@ async function handleRubricSubmit(courseId, assignmentId, studentId) {
             return;
         }
 
-        logger.debug('[AutoGrade] Waiting 400ms for GraphQL commit...');
-        await new Promise(resolve => setTimeout(resolve, 400));
+        logger.debug('[AutoGrade] Waiting 800ms for GraphQL commit...');
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         logger.debug('[AutoGrade] Fetching submission with rubric assessment...');
         const submission = await fetchSubmission(courseId, assignmentId, studentId);
@@ -371,19 +374,15 @@ function hookFetch(courseId, assignmentId, studentId) {
 
         // Detect GraphQL rubric submissions (matches POC logic)
         if (url.includes('/api/graphql') && res.ok) {
-            logger.info(`[AutoGrade] Call #${callId}: 🔍 GraphQL POST detected, response.ok=true`);
-            logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
-
             const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric/i.test(bodyText);
-            logger.info(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${looksLikeRubricSave}`);
 
             if (looksLikeRubricSave) {
                 logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED`);
+                logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
                 logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
                 void handleRubricSubmit(courseId, assignmentId, studentId);
-            } else {
-                logger.warn(`[AutoGrade] Call #${callId}: GraphQL POST but NO rubric pattern found in body`);
             }
+            // Silently ignore non-rubric GraphQL queries (no logging needed)
         }
 
         return res;

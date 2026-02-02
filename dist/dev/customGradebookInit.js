@@ -4174,7 +4174,9 @@ You may need to refresh the page to see the new scores.`);
     }
   }
   async function fetchSubmission(courseId, assignmentId, studentId) {
-    const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?include[]=rubric_assessment`;
+    const params = new URLSearchParams();
+    params.append("include[]", "rubric_assessment");
+    const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?${params.toString()}`;
     logger.debug(`[AutoGrade] GET ${url}`);
     try {
       const response = await fetch(url, {
@@ -4216,8 +4218,8 @@ You may need to refresh the page to see the new scores.`);
         inFlight = false;
         return;
       }
-      logger.debug("[AutoGrade] Waiting 400ms for GraphQL commit...");
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      logger.debug("[AutoGrade] Waiting 800ms for GraphQL commit...");
+      await new Promise((resolve) => setTimeout(resolve, 800));
       logger.debug("[AutoGrade] Fetching submission with rubric assessment...");
       const submission = await fetchSubmission(courseId, assignmentId, studentId);
       if (!submission) {
@@ -4291,16 +4293,12 @@ You may need to refresh the page to see the new scores.`);
         return res;
       }
       if (url.includes("/api/graphql") && res.ok) {
-        logger.info(`[AutoGrade] Call #${callId}: \u{1F50D} GraphQL POST detected, response.ok=true`);
-        logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
         const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric/i.test(bodyText);
-        logger.info(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${looksLikeRubricSave}`);
         if (looksLikeRubricSave) {
           logger.info(`[AutoGrade] Call #${callId}: \u2705 RUBRIC SUBMISSION DETECTED`);
+          logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
           logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
           void handleRubricSubmit(courseId, assignmentId, studentId);
-        } else {
-          logger.warn(`[AutoGrade] Call #${callId}: GraphQL POST but NO rubric pattern found in body`);
         }
       }
       return res;
@@ -5548,8 +5546,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 2:09:35 PM (dev, c1bb9f2)");
-    exposeVersion("dev", "2026-02-02 2:09:35 PM (dev, c1bb9f2)");
+    logBanner("dev", "2026-02-02 2:20:39 PM (dev, efd2cdd)");
+    exposeVersion("dev", "2026-02-02 2:20:39 PM (dev, efd2cdd)");
     if (true) {
       logger.info("Running in DEV mode");
     }
