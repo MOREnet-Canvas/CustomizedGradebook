@@ -4108,7 +4108,11 @@ You may need to refresh the page to see the new scores.`);
     return Math.min(...points);
   }
   function createRubricFingerprint(rubricAssessment) {
-    return Object.entries(rubricAssessment).map(([id, data]) => `${id}:${data.points}`).sort().join("|");
+    return Object.entries(rubricAssessment || {}).map(([id, data]) => {
+      const n = Number(data == null ? void 0 : data.points);
+      if (!Number.isFinite(n)) return null;
+      return `${id}:${n.toFixed(2)}`;
+    }).filter(Boolean).sort().join("|");
   }
   function updateGradeInput(score) {
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
@@ -5581,8 +5585,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 3:52:59 PM (dev, 9d54be1)");
-    exposeVersion("dev", "2026-02-02 3:52:59 PM (dev, 9d54be1)");
+    logBanner("dev", "2026-02-02 3:54:14 PM (dev, bf88da6)");
+    exposeVersion("dev", "2026-02-02 3:54:14 PM (dev, bf88da6)");
     if (true) {
       logger.info("Running in DEV mode");
     }
