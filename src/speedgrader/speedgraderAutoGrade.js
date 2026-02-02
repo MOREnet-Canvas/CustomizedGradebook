@@ -154,14 +154,20 @@ function updateGradeInput(score) {
  * Submit grade to Canvas API
  */
 async function submitGrade(courseId, assignmentId, studentId, score) {
+    logger.debug(`[AutoGrade] submitGrade called with score=${score}`);
+
     const csrfToken = getCsrfToken();
     if (!csrfToken) {
-        logger.error('[AutoGrade] CSRF token not found');
+        logger.error('[AutoGrade] CSRF token not found in cookies');
         return null;
     }
+    logger.trace(`[AutoGrade] CSRF token found: ${csrfToken.substring(0, 10)}...`);
 
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
     const body = `submission[posted_grade]=${encodeURIComponent(score)}`;
+
+    logger.debug(`[AutoGrade] PUT ${url}`);
+    logger.trace(`[AutoGrade] Request body: ${body}`);
 
     try {
         const response = await fetch(url, {
@@ -174,17 +180,22 @@ async function submitGrade(courseId, assignmentId, studentId, score) {
             body
         });
 
+        logger.debug(`[AutoGrade] Response status: ${response.status} ${response.statusText}`);
+
         if (!response.ok) {
-            logger.error('[AutoGrade] Failed to submit grade:', response.status);
+            logger.error(`[AutoGrade] Failed to submit grade: ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            logger.error(`[AutoGrade] Error response: ${errorText.substring(0, 200)}`);
             return null;
         }
 
         const data = await response.json();
+        logger.debug(`[AutoGrade] Response data:`, data);
         const enteredScore = data?.entered_score ?? score;
-        logger.debug(`[AutoGrade] Grade submitted successfully: ${enteredScore}`);
+        logger.info(`[AutoGrade] ✅ Grade submitted successfully: ${enteredScore}`);
         return data;
     } catch (error) {
-        logger.error('[AutoGrade] Error submitting grade:', error);
+        logger.error('[AutoGrade] Exception in submitGrade:', error);
         return null;
     }
 }
@@ -195,15 +206,31 @@ async function submitGrade(courseId, assignmentId, studentId, score) {
 async function fetchSubmission(courseId, assignmentId, studentId) {
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?include[]=rubric_assessment`;
 
+    logger.debug(`[AutoGrade] GET ${url}`);
+
     try {
         const response = await fetch(url, {
             credentials: 'same-origin'
         });
-        if (!response.ok) return null;
 
-        return await response.json();
+        logger.debug(`[AutoGrade] Fetch response status: ${response.status} ${response.statusText}`);
+
+        if (!response.ok) {
+            logger.error(`[AutoGrade] Failed to fetch submission: ${response.status} ${response.statusText}`);
+            return null;
+        }
+
+        const data = await response.json();
+        logger.debug(`[AutoGrade] Submission data: id=${data.id}, user_id=${data.user_id}, rubric_assessment=${!!data.rubric_assessment}`);
+
+        if (data.rubric_assessment) {
+            const criteriaCount = Object.keys(data.rubric_assessment).length;
+            logger.debug(`[AutoGrade] Rubric has ${criteriaCount} criteria`);
+        }
+
+        return data;
     } catch (error) {
-        logger.error('[AutoGrade] Error fetching submission:', error);
+        logger.error('[AutoGrade] Exception in fetchSubmission:', error);
         return null;
     }
 }
@@ -212,51 +239,89 @@ async function fetchSubmission(courseId, assignmentId, studentId) {
  * Handle rubric submission
  */
 async function handleRubricSubmit(courseId, assignmentId, studentId) {
+    logger.info('[AutoGrade] ========== RUBRIC SUBMIT HANDLER CALLED ==========');
+    logger.info(`[AutoGrade] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
+
     if (inFlight) {
-        logger.trace('[AutoGrade] Already processing, skipping');
+        logger.warn('[AutoGrade] Already processing another submission, skipping');
         return;
     }
 
     inFlight = true;
+    logger.debug('[AutoGrade] Set inFlight=true');
 
     try {
+        logger.debug('[AutoGrade] Fetching settings...');
         const settings = await getSettings(courseId, assignmentId);
+        logger.info(`[AutoGrade] Settings: enabled=${settings.enabled}, method=${settings.method}`);
 
         if (!settings.enabled) {
-            logger.debug('[AutoGrade] Auto-grade disabled for this assignment');
+            logger.info('[AutoGrade] SKIPPED - Auto-grade disabled for this assignment');
             inFlight = false;
             return;
         }
 
+        logger.debug('[AutoGrade] Waiting 400ms for GraphQL commit...');
         await new Promise(resolve => setTimeout(resolve, 400));
 
+        logger.debug('[AutoGrade] Fetching submission with rubric assessment...');
         const submission = await fetchSubmission(courseId, assignmentId, studentId);
-        if (!submission || !submission.rubric_assessment) {
-            logger.debug('[AutoGrade] No rubric assessment found');
+
+        if (!submission) {
+            logger.error('[AutoGrade] FAILED - fetchSubmission returned null');
             inFlight = false;
             return;
         }
 
+        logger.debug(`[AutoGrade] Submission fetched: id=${submission.id}, workflow_state=${submission.workflow_state}`);
+        logger.debug(`[AutoGrade] Rubric assessment present: ${!!submission.rubric_assessment}`);
+
+        if (!submission.rubric_assessment) {
+            logger.warn('[AutoGrade] FAILED - No rubric assessment found in submission');
+            inFlight = false;
+            return;
+        }
+
+        const rubricPoints = Object.values(submission.rubric_assessment).map(c => c.points);
+        logger.info(`[AutoGrade] Rubric points: [${rubricPoints.join(', ')}]`);
+
         const fingerprint = createRubricFingerprint(submission.rubric_assessment);
+        logger.debug(`[AutoGrade] Rubric fingerprint: ${fingerprint}`);
+        logger.debug(`[AutoGrade] Last fingerprint: ${lastRubricFingerprint}`);
+
         if (fingerprint === lastRubricFingerprint) {
-            logger.trace('[AutoGrade] Rubric unchanged, skipping');
+            logger.info('[AutoGrade] SKIPPED - Rubric unchanged (fingerprint match)');
             inFlight = false;
             return;
         }
 
         lastRubricFingerprint = fingerprint;
+        logger.debug('[AutoGrade] Fingerprint updated');
 
         const score = calculateGrade(submission.rubric_assessment, settings.method);
-        logger.debug(`[AutoGrade] Calculated score: ${score} (method: ${settings.method})`);
+        logger.info(`[AutoGrade] Calculated score: ${score} (method: ${settings.method})`);
 
+        logger.debug('[AutoGrade] Submitting grade to Canvas API...');
         const result = await submitGrade(courseId, assignmentId, studentId, score);
-        if (result) {
-            const finalScore = result?.entered_score ?? score;
-            updateGradeInput(finalScore);
-            updateAssignmentScoreDisplay(finalScore);
+
+        if (!result) {
+            logger.error('[AutoGrade] FAILED - submitGrade returned null');
+            return;
         }
+
+        logger.info(`[AutoGrade] Grade submission result: entered_score=${result.entered_score}, score=${result.score}, workflow_state=${result.workflow_state}`);
+
+        const finalScore = result?.entered_score ?? score;
+        logger.debug(`[AutoGrade] Updating UI with final score: ${finalScore}`);
+        updateGradeInput(finalScore);
+        updateAssignmentScoreDisplay(finalScore);
+
+        logger.info('[AutoGrade] ✅ AUTO-GRADE COMPLETE');
+    } catch (error) {
+        logger.error('[AutoGrade] ERROR in handleRubricSubmit:', error);
     } finally {
         inFlight = false;
+        logger.debug('[AutoGrade] Set inFlight=false');
     }
 }
 
@@ -264,59 +329,74 @@ async function handleRubricSubmit(courseId, assignmentId, studentId) {
  * Hook window.fetch to detect rubric submissions
  */
 function hookFetch(courseId, assignmentId, studentId) {
+    logger.info('[AutoGrade] Installing fetch hook...');
+
+    if (window.__CG_AUTOGRADE_FETCH_HOOKED__) {
+        logger.warn('[AutoGrade] Fetch hook already installed');
+        return;
+    }
+    window.__CG_AUTOGRADE_FETCH_HOOKED__ = true;
+
     const originalFetch = window.fetch;
+    let fetchCallCount = 0;
 
-    window.fetch = function(...args) {
+    window.fetch = async function(...args) {
+        const callId = ++fetchCallCount;
         const [urlOrRequest, options] = args;
-
-        const promise = originalFetch.apply(this, args);
 
         // Extract URL and method from either string or Request object
         let url = '';
         let method = 'GET';
-        let bodyPromise = null;
+        let body = '';
 
         if (typeof urlOrRequest === 'string') {
             url = urlOrRequest;
             method = options?.method || 'GET';
-            bodyPromise = Promise.resolve(options?.body || '');
+            body = options?.body || '';
         } else if (urlOrRequest instanceof Request) {
             url = urlOrRequest.url;
             method = urlOrRequest.method;
             // Clone request to read body without consuming it
             try {
-                bodyPromise = urlOrRequest.clone().text();
+                body = await urlOrRequest.clone().text();
             } catch (error) {
-                logger.trace('[AutoGrade] Could not read Request body:', error);
-                bodyPromise = Promise.resolve('');
+                logger.trace(`[AutoGrade] Call #${callId}: Could not read Request body:`, error);
+                body = '';
             }
         }
 
+        logger.trace(`[AutoGrade] Call #${callId}: ${method} ${url.substring(0, 100)}${url.length > 100 ? '...' : ''}`);
+
         // Ignore our own submission API calls to prevent loops
         if (url.includes('/api/v1/') && url.includes('/submissions/')) {
-            logger.trace('[AutoGrade] Ignoring own submission fetch');
-            return promise;
+            logger.trace(`[AutoGrade] Call #${callId}: Ignoring own submission fetch`);
+            return originalFetch.apply(this, args);
         }
+
+        // Call original fetch
+        const response = await originalFetch.apply(this, args);
 
         // Detect GraphQL rubric submissions
         if (url.includes('/api/graphql') && method === 'POST') {
-            void bodyPromise.then(body => {
-                const isRubricSave = body.includes('SaveRubricAssessment') ||
-                                    body.includes('rubricAssessment') ||
-                                    body.includes('rubric_assessment');
+            logger.debug(`[AutoGrade] Call #${callId}: GraphQL POST detected, response.ok=${response.ok}`);
+
+            if (response.ok) {
+                const isRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(body);
+                logger.debug(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${isRubricSave}`);
 
                 if (isRubricSave) {
                     const requestType = urlOrRequest instanceof Request ? 'Request object' : 'string URL';
-                    logger.debug(`[AutoGrade] Detected rubric submission (${requestType})`);
+                    logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED (${requestType})`);
+                    logger.debug(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
                     void handleRubricSubmit(courseId, assignmentId, studentId);
                 }
-            }).catch(error => {
-                logger.trace('[AutoGrade] Error reading fetch body:', error);
-            });
+            }
         }
 
-        return promise;
+        return response;
     };
+
+    logger.info('[AutoGrade] ✅ Fetch hook installed successfully');
 }
 
 /**
@@ -333,19 +413,33 @@ function updateAssignmentScoreDisplay(score) {
  * Create UI controls
  */
 async function createUIControls(courseId, assignmentId) {
+    logger.debug('[AutoGrade] createUIControls called');
+
     // Check if UI already exists
-    if (document.querySelector('[data-cg-autograde-ui]')) {
-        logger.trace('[AutoGrade] UI controls already exist');
+    const existing = document.querySelector('[data-cg-autograde-ui]');
+    if (existing) {
+        logger.debug('[AutoGrade] UI controls already exist, skipping creation');
         return true;
     }
 
+    logger.debug('[AutoGrade] Looking for anchor element: span[data-testid="rubric-assessment-instructor-score"]');
     const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
+
     if (!anchor) {
-        logger.trace('[AutoGrade] Instructor score anchor not found');
+        logger.debug('[AutoGrade] Anchor element not found in DOM');
+        // Log what IS in the DOM for debugging
+        const rubricElements = document.querySelectorAll('[data-testid*="rubric"]');
+        logger.trace(`[AutoGrade] Found ${rubricElements.length} elements with data-testid containing "rubric"`);
+        if (rubricElements.length > 0) {
+            const testIds = Array.from(rubricElements).map(el => el.getAttribute('data-testid')).slice(0, 5);
+            logger.trace(`[AutoGrade] Sample rubric testids: ${testIds.join(', ')}`);
+        }
         return false;
     }
 
+    logger.info('[AutoGrade] ✅ Anchor element found, creating UI controls');
     const settings = await getSettings(courseId, assignmentId);
+    logger.debug(`[AutoGrade] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
 
     const container = document.createElement('div');
     container.setAttribute('data-cg-autograde-ui', 'true');
@@ -370,17 +464,18 @@ async function createUIControls(courseId, assignmentId) {
     toggle.addEventListener('change', async () => {
         settings.enabled = toggle.checked;
         await saveSettings(courseId, assignmentId, settings);
-        logger.debug(`[AutoGrade] Auto-grade ${settings.enabled ? 'enabled' : 'disabled'}`);
+        logger.info(`[AutoGrade] Auto-grade ${settings.enabled ? 'enabled' : 'disabled'}`);
     });
 
     methodSelect.addEventListener('change', async () => {
         settings.method = methodSelect.value;
         await saveSettings(courseId, assignmentId, settings);
-        logger.debug(`[AutoGrade] Method changed to: ${settings.method}`);
+        logger.info(`[AutoGrade] Method changed to: ${settings.method}`);
     });
 
+    logger.debug('[AutoGrade] Appending UI container to anchor parent element');
     anchor.parentElement.appendChild(container);
-    logger.debug('[AutoGrade] UI controls created');
+    logger.info('[AutoGrade] ✅ UI controls created and inserted into DOM');
     return true;
 }
 
@@ -388,63 +483,82 @@ async function createUIControls(courseId, assignmentId) {
  * Initialize auto-grade module
  */
 export async function initSpeedGraderAutoGrade() {
-    if (initialized) return;
+    logger.info('[AutoGrade] ========== INITIALIZATION STARTED ==========');
+    logger.info(`[AutoGrade] Current URL: ${window.location.href}`);
+
+    if (initialized) {
+        logger.warn('[AutoGrade] Already initialized, skipping');
+        return;
+    }
     initialized = true;
 
     logger.debug('[AutoGrade] Initializing SpeedGrader auto-grade module');
 
     const roleGroup = getUserRoleGroup();
+    logger.info(`[AutoGrade] User role group: ${roleGroup}`);
     if (roleGroup !== 'teacher_like') {
-        logger.debug(`[AutoGrade] Skipping - user is ${roleGroup}, not teacher_like`);
+        logger.info(`[AutoGrade] SKIPPED - user is ${roleGroup}, not teacher_like`);
         return;
     }
 
     const { courseId, assignmentId, studentId } = parseSpeedGraderUrl();
+    logger.info(`[AutoGrade] Parsed URL - courseId: ${courseId}, assignmentId: ${assignmentId}, studentId: ${studentId}`);
+
     if (!courseId || !assignmentId || !studentId) {
-        logger.warn('[AutoGrade] Missing required IDs from URL:', { courseId, assignmentId, studentId });
+        logger.error('[AutoGrade] FAILED - Missing required IDs from URL:', { courseId, assignmentId, studentId });
         return;
     }
 
-    logger.debug(`[AutoGrade] Parsed IDs: course=${courseId}, assignment=${assignmentId}, student=${studentId}`);
-
+    logger.debug('[AutoGrade] Creating CanvasApiClient...');
     const apiClient = new CanvasApiClient();
+    logger.debug('[AutoGrade] CanvasApiClient created successfully');
+
     let snapshot = getCourseSnapshot(courseId);
+    logger.info(`[AutoGrade] Course snapshot from cache: ${snapshot ? 'FOUND' : 'NOT FOUND'}`);
 
     if (!snapshot) {
-        logger.debug('[AutoGrade] No snapshot found, populating...');
+        logger.info('[AutoGrade] Populating course snapshot...');
         const courseName = document.title.split(':')[0]?.trim() || 'Unknown Course';
+        logger.debug(`[AutoGrade] Course name from title: "${courseName}"`);
         snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+        logger.info(`[AutoGrade] Snapshot population result: ${snapshot ? 'SUCCESS' : 'FAILED'}`);
     }
 
     if (!snapshot) {
-        logger.warn('[AutoGrade] Failed to get course snapshot');
+        logger.error('[AutoGrade] FAILED - Could not get course snapshot');
         return;
     }
+
+    logger.info(`[AutoGrade] Course model: ${snapshot.model} (reason: ${snapshot.modelReason})`);
 
     if (snapshot.model !== 'standards') {
-        logger.debug(`[AutoGrade] Skipping - course is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+        logger.info(`[AutoGrade] SKIPPED - course is ${snapshot.model}, not standards-based`);
         return;
     }
 
-    logger.info('[AutoGrade] Initializing for standards-based course');
+    logger.info('[AutoGrade] ✅ Course is standards-based, proceeding with initialization');
 
+    logger.debug('[AutoGrade] Installing fetch hook...');
     hookFetch(courseId, assignmentId, studentId);
 
     // Try immediate UI creation
+    logger.debug('[AutoGrade] Attempting immediate UI creation...');
     const immediateSuccess = await createUIControls(courseId, assignmentId);
     if (immediateSuccess) {
-        logger.debug('[AutoGrade] UI created immediately');
+        logger.info('[AutoGrade] ✅ UI created immediately - initialization complete');
         return;
     }
 
     // Use MutationObserver to wait for rubric panel to appear
-    logger.debug('[AutoGrade] Waiting for rubric panel to appear...');
+    logger.info('[AutoGrade] UI not ready yet, starting MutationObserver to wait for rubric panel...');
     createConditionalObserver(async () => {
+        logger.trace('[AutoGrade] Observer mutation detected, checking for anchor...');
         const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
         if (anchor) {
+            logger.debug('[AutoGrade] Observer found anchor element, attempting UI creation...');
             const success = await createUIControls(courseId, assignmentId);
             if (success) {
-                logger.debug('[AutoGrade] UI created via observer');
+                logger.info('[AutoGrade] ✅ UI created via observer - initialization complete');
                 return true; // Disconnect observer
             }
         }
@@ -455,4 +569,6 @@ export async function initSpeedGraderAutoGrade() {
         name: 'AutoGradeUIObserver',
         timeout: 30000
     });
+
+    logger.info('[AutoGrade] ========== INITIALIZATION COMPLETE (observer running) ==========');
 }
