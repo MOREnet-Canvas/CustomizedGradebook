@@ -4161,20 +4161,34 @@ You may need to refresh the page to see the new scores.`);
     const applyValue = () => {
       input.focus();
       nativeInputValueSetter.call(input, String(score));
+      input.setAttribute("value", String(score));
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true }));
       input.dispatchEvent(new Event("blur", { bubbles: true }));
-      const wrapper = input.parentElement;
-      if (wrapper) {
-        const facade = wrapper.querySelector("span");
-        if (facade && facade.offsetParent !== null) {
-          facade.textContent = String(score);
-          logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
+      input.dispatchEvent(new Event("focusout", { bubbles: true }));
+      let current = input;
+      let facadeFound = false;
+      while (current && current !== document.body) {
+        current = current.parentElement;
+        if (current) {
+          const facadeEl = Array.from(current.querySelectorAll("*")).find((el) => {
+            return el.className && typeof el.className === "string" && el.className.toLowerCase().includes("facade");
+          });
+          if (facadeEl && facadeEl.offsetParent !== null) {
+            facadeEl.textContent = String(score);
+            logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
+            facadeFound = true;
+            break;
+          }
         }
       }
       const readBack = input.value;
       logger.debug(`[AutoGrade] Applied value=${score}, read back value="${readBack}"`);
+      setTimeout(() => {
+        logger.debug(`[AutoGrade] Post-apply readback (100ms): "${input.value}"`);
+      }, 100);
     };
     applyValue();
     setTimeout(applyValue, 700);
@@ -5594,8 +5608,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 2:34:17 PM (dev, d7756b1)");
-    exposeVersion("dev", "2026-02-02 2:34:17 PM (dev, d7756b1)");
+    logBanner("dev", "2026-02-02 2:40:28 PM (dev, fec860e)");
+    exposeVersion("dev", "2026-02-02 2:40:28 PM (dev, fec860e)");
     if (true) {
       logger.info("Running in DEV mode");
     }
