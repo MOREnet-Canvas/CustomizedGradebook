@@ -114,8 +114,13 @@ function calculateGrade(rubricAssessment, method) {
  * Create rubric fingerprint for loop prevention
  */
 function createRubricFingerprint(rubricAssessment) {
-    return Object.entries(rubricAssessment)
-        .map(([id, data]) => `${id}:${data.points}`)
+    return Object.entries(rubricAssessment || {})
+        .map(([id, data]) => {
+            const n = Number(data?.points);
+            if (!Number.isFinite(n)) return null;
+            return `${id}:${n.toFixed(2)}`;
+        })
+        .filter(Boolean)
         .sort()
         .join('|');
 }
