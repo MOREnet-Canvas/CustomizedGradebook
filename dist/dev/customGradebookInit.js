@@ -4064,12 +4064,15 @@ You may need to refresh the page to see the new scores.`);
   var lastFingerprintByContext = /* @__PURE__ */ new Map();
   var apiClient = null;
   function parseSpeedGraderUrl() {
+    var _a18, _b18;
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     const courseIdMatch = path.match(/\/courses\/(\d+)\//);
     const courseId = courseIdMatch ? courseIdMatch[1] : null;
-    const assignmentId = params.get("assignment_id");
-    const studentId = params.get("student_id");
+    const assignmentIdRaw = params.get("assignment_id");
+    const studentIdRaw = params.get("student_id");
+    const assignmentId = assignmentIdRaw ? ((_a18 = assignmentIdRaw.match(/^\d+/)) == null ? void 0 : _a18[0]) || null : null;
+    const studentId = studentIdRaw ? ((_b18 = studentIdRaw.match(/^\d+/)) == null ? void 0 : _b18[0]) || null : null;
     return { courseId, assignmentId, studentId };
   }
   async function getStorage(key) {
@@ -5580,8 +5583,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 3:39:18 PM (dev, ef1547f)");
-    exposeVersion("dev", "2026-02-02 3:39:18 PM (dev, ef1547f)");
+    logBanner("dev", "2026-02-02 3:46:56 PM (dev, abed7d6)");
+    exposeVersion("dev", "2026-02-02 3:46:56 PM (dev, abed7d6)");
     if (true) {
       logger.info("Running in DEV mode");
     }

@@ -38,8 +38,13 @@ function parseSpeedGraderUrl() {
 
     const courseIdMatch = path.match(/\/courses\/(\d+)\//);
     const courseId = courseIdMatch ? courseIdMatch[1] : null;
-    const assignmentId = params.get('assignment_id');
-    const studentId = params.get('student_id');
+
+    // Extract and sanitize IDs - ensure only numeric values
+    const assignmentIdRaw = params.get('assignment_id');
+    const studentIdRaw = params.get('student_id');
+
+    const assignmentId = assignmentIdRaw ? assignmentIdRaw.match(/^\d+/)?.[0] || null : null;
+    const studentId = studentIdRaw ? studentIdRaw.match(/^\d+/)?.[0] || null : null;
 
     return { courseId, assignmentId, studentId };
 }
