@@ -114,6 +114,19 @@ export function isTeacherViewingStudentGrades() {
 }
 
 /**
+ * Check if current page is SpeedGrader
+ *
+ * Matches:
+ * - /courses/123/gradebook/speed_grader
+ * - /courses/123/gradebook/speed_grader?assignment_id=456&student_id=789
+ *
+ * @returns {boolean} True if on SpeedGrader page
+ */
+export function isSpeedGraderPage() {
+    return window.location.pathname.includes('/speed_grader');
+}
+
+/**
  * Extract student ID from teacher viewing student grades page
  *
  * @returns {string|null} Student ID or null if not on teacher viewing student grades page

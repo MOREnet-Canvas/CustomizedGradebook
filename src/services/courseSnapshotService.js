@@ -39,9 +39,8 @@ import { logger } from '../utils/logger.js';
 import { determineCourseModel } from '../utils/courseDetection.js';
 import { getCourseGrade } from './gradeDataService.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
-import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage, isTeacherViewingStudentGrades } from '../utils/pageDetection.js';
-import { percentageToPoints, calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
-import { scoreToGradeLevel } from '../student/gradeExtractor.js';
+import { isDashboardPage, isAllGradesPage, isSingleCourseGradesPage, isTeacherViewingStudentGrades, isSpeedGraderPage } from '../utils/pageDetection.js';
+import { calculateDisplayValue, DISPLAY_SOURCE } from '../utils/gradeFormatting.js';
 import { GRADE_SOURCE } from './gradeDataService.js';
 
 /**
@@ -78,11 +77,12 @@ export const PAGE_CONTEXT = Object.freeze({
  * - All grades page (/grades)
  * - Course grades page (/courses/[courseId]/grades)
  * - Teacher viewing student grades (/courses/[courseId]/grades/[studentId])
+ * - SpeedGrader (/courses/[courseId]/gradebook/speed_grader)
  *
  * @returns {boolean} True if current page is authorized
  */
 function isAuthorizedPage() {
-    return isDashboardPage() || isAllGradesPage() || isSingleCourseGradesPage() || isTeacherViewingStudentGrades();
+    return isDashboardPage() || isAllGradesPage() || isSingleCourseGradesPage() || isTeacherViewingStudentGrades() || isSpeedGraderPage();
 }
 
 /**
@@ -172,7 +172,6 @@ export function validateAllSnapshots() {
                 logger.debug(`[Snapshot] Removing expired snapshot: ${key}`);
                 sessionStorage.removeItem(key);
                 clearedCount++;
-                return;
             }
         } catch (error) {
             logger.warn(`[Snapshot] Failed to parse snapshot ${key}, removing:`, error.message);
