@@ -4115,7 +4115,7 @@ You may need to refresh the page to see the new scores.`);
     const applyValue = () => {
       const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
       if (allInputs.length === 0) {
-        logger.debug("[ScoreSync] Grade input not found for update");
+        logger.trace("[ScoreSync] Grade input not found for update");
         return;
       }
       const visibleInputs = allInputs.filter((el) => {
@@ -4124,7 +4124,7 @@ You may need to refresh the page to see the new scores.`);
         return visible && enabled;
       });
       if (visibleInputs.length === 0) {
-        logger.debug("[ScoreSync] No visible, enabled grade inputs found");
+        logger.trace("[ScoreSync] No visible, enabled grade inputs found");
         return;
       }
       const panelInputs = visibleInputs.filter((el) => {
@@ -4158,18 +4158,18 @@ You may need to refresh the page to see the new scores.`);
       input.dispatchEvent(new Event("blur", { bubbles: true }));
       input.dispatchEvent(new Event("focusout", { bubbles: true }));
       const readBack = input.value;
-      logger.debug(`[ScoreSync] Applied value=${score}, read back value="${readBack}"`);
+      logger.trace(`[ScoreSync] Applied value=${score}, read back value="${readBack}"`);
     };
     applyValue();
     setTimeout(applyValue, 700);
     setTimeout(applyValue, 1500);
-    logger.info(`[ScoreSync] Grade input update scheduled for score: ${score}`);
+    logger.trace(`[ScoreSync] Grade input update scheduled for score: ${score}`);
   }
   async function submitGrade(courseId, assignmentId, studentId, score, apiClient2) {
     var _a18;
-    logger.debug(`[ScoreSync] submitGrade called with score=${score}`);
+    logger.trace(`[ScoreSync] submitGrade called with score=${score}`);
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
-    logger.debug(`[ScoreSync] PUT ${url}`);
+    logger.trace(`[ScoreSync] PUT ${url}`);
     try {
       const data = await apiClient2.put(
         url,
@@ -4181,7 +4181,7 @@ You may need to refresh the page to see the new scores.`);
         {},
         `submitGrade:${studentId}`
       );
-      logger.debug(`[ScoreSync] Response data:`, data);
+      logger.trace(`[ScoreSync] Response data:`, data);
       const enteredScore = (_a18 = data == null ? void 0 : data.entered_score) != null ? _a18 : score;
       logger.info(`[ScoreSync] \u2705 Grade submitted successfully: ${enteredScore}`);
       return data;
@@ -4194,21 +4194,21 @@ You may need to refresh the page to see the new scores.`);
     const params = new URLSearchParams();
     params.append("include[]", "rubric_assessment");
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?${params.toString()}`;
-    logger.debug(`[ScoreSync] GET ${url}`);
+    logger.trace(`[ScoreSync] GET ${url}`);
     try {
       const response = await fetch(url, {
         credentials: "same-origin"
       });
-      logger.debug(`[ScoreSync] Fetch response status: ${response.status} ${response.statusText}`);
+      logger.trace(`[ScoreSync] Fetch response status: ${response.status} ${response.statusText}`);
       if (!response.ok) {
         logger.error(`[ScoreSync] Failed to fetch submission: ${response.status} ${response.statusText}`);
         return null;
       }
       const data = await response.json();
-      logger.debug(`[ScoreSync] Submission data: id=${data.id}, user_id=${data.user_id}, rubric_assessment=${!!data.rubric_assessment}`);
+      logger.trace(`[ScoreSync] Submission data: id=${data.id}, user_id=${data.user_id}, rubric_assessment=${!!data.rubric_assessment}`);
       if (data.rubric_assessment) {
         const criteriaCount = Object.keys(data.rubric_assessment).length;
-        logger.debug(`[ScoreSync] Rubric has ${criteriaCount} criteria`);
+        logger.trace(`[ScoreSync] Rubric has ${criteriaCount} criteria`);
       }
       return data;
     } catch (error) {
@@ -4219,23 +4219,23 @@ You may need to refresh the page to see the new scores.`);
   async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient2) {
     var _a18;
     logger.info("[ScoreSync] ========== RUBRIC SUBMIT HANDLER CALLED ==========");
-    logger.info(`[ScoreSync] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
+    logger.trace(`[ScoreSync] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
     if (inFlight) {
       logger.warn("[ScoreSync] Already processing another submission, skipping");
       return;
     }
     inFlight = true;
-    logger.debug("[ScoreSync] Set inFlight=true");
+    logger.trace("[ScoreSync] Set inFlight=true");
     try {
-      logger.debug("[ScoreSync] Fetching settings...");
+      logger.trace("[ScoreSync] Fetching settings...");
       const settings = await getSettings(courseId, assignmentId);
-      logger.info(`[ScoreSync] Settings: enabled=${settings.enabled}, method=${settings.method}`);
+      logger.trace(`[ScoreSync] Settings: enabled=${settings.enabled}, method=${settings.method}`);
       if (!settings.enabled) {
         logger.info("[ScoreSync] SKIPPED - Score sync disabled for this assignment");
         inFlight = false;
         return;
       }
-      logger.debug("[ScoreSync] Waiting briefly for GraphQL commit, then polling rubric assessment...");
+      logger.trace("[ScoreSync] Waiting briefly for GraphQL commit, then polling rubric assessment...");
       const attemptDelaysMs = [200, 250, 350];
       let submission = null;
       for (let i = 0; i < attemptDelaysMs.length; i++) {
@@ -4244,45 +4244,45 @@ You may need to refresh the page to see the new scores.`);
         const ra = submission == null ? void 0 : submission.rubric_assessment;
         if (ra && Object.keys(ra).length > 0) break;
       }
-      logger.debug("[ScoreSync] Fetching submission with rubric assessment complete");
+      logger.trace("[ScoreSync] Fetching submission with rubric assessment complete");
       if (!submission) {
         logger.error("[ScoreSync] FAILED - fetchSubmission returned null");
         inFlight = false;
         return;
       }
-      logger.debug(`[ScoreSync] Submission fetched: id=${submission.id}, workflow_state=${submission.workflow_state}`);
-      logger.debug(`[ScoreSync] Rubric assessment present: ${!!submission.rubric_assessment}`);
+      logger.trace(`[ScoreSync] Submission fetched: id=${submission.id}, workflow_state=${submission.workflow_state}`);
+      logger.trace(`[ScoreSync] Rubric assessment present: ${!!submission.rubric_assessment}`);
       if (!submission.rubric_assessment) {
         logger.warn("[ScoreSync] FAILED - No rubric assessment found in submission");
         inFlight = false;
         return;
       }
       const rubricPoints = Object.values(submission.rubric_assessment).map((c) => c.points);
-      logger.info(`[ScoreSync] Rubric points: [${rubricPoints.join(", ")}]`);
+      logger.trace(`[ScoreSync] Rubric points: [${rubricPoints.join(", ")}]`);
       const contextKey = `${courseId}:${assignmentId}:${studentId}`;
       const fingerprint = createRubricFingerprint(submission.rubric_assessment);
       const lastFingerprint = lastFingerprintByContext.get(contextKey);
-      logger.debug(`[ScoreSync] Context: ${contextKey}`);
-      logger.debug(`[ScoreSync] Rubric fingerprint: ${fingerprint}`);
-      logger.debug(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || "none"}`);
+      logger.trace(`[ScoreSync] Context: ${contextKey}`);
+      logger.trace(`[ScoreSync] Rubric fingerprint: ${fingerprint}`);
+      logger.trace(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || "none"}`);
       if (fingerprint === lastFingerprint) {
         logger.info("[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match)");
         inFlight = false;
         return;
       }
       lastFingerprintByContext.set(contextKey, fingerprint);
-      logger.debug("[ScoreSync] Fingerprint updated for context");
+      logger.trace("[ScoreSync] Fingerprint updated for context");
       const score = calculateGrade(submission.rubric_assessment, settings.method);
       logger.info(`[ScoreSync] Calculated score: ${score} (method: ${settings.method})`);
-      logger.debug("[ScoreSync] Submitting grade to Canvas API...");
+      logger.trace("[ScoreSync] Submitting grade to Canvas API...");
       const result = await submitGrade(courseId, assignmentId, studentId, score, apiClient2);
       if (!result) {
         logger.error("[ScoreSync] FAILED - submitGrade returned null");
         return;
       }
-      logger.info(`[ScoreSync] Grade submission result: entered_score=${result.entered_score}, score=${result.score}, workflow_state=${result.workflow_state}`);
+      logger.trace(`[ScoreSync] Grade submission result: entered_score=${result.entered_score}, score=${result.score}, workflow_state=${result.workflow_state}`);
       const finalScore = (_a18 = result == null ? void 0 : result.entered_score) != null ? _a18 : score;
-      logger.debug(`[ScoreSync] Updating UI with final score: ${finalScore}`);
+      logger.trace(`[ScoreSync] Updating UI with final score: ${finalScore}`);
       updateGradeInput(finalScore);
       updateAssignmentScoreDisplay(finalScore);
       logger.info("[ScoreSync] \u2705 SCORE SYNC COMPLETE");
@@ -4290,11 +4290,11 @@ You may need to refresh the page to see the new scores.`);
       logger.error("[ScoreSync] ERROR in handleRubricSubmit:", error);
     } finally {
       inFlight = false;
-      logger.debug("[ScoreSync] Set inFlight=false");
+      logger.trace("[ScoreSync] Set inFlight=false");
     }
   }
   function hookFetch() {
-    logger.info("[ScoreSync] Installing fetch hook...");
+    logger.trace("[ScoreSync] Installing fetch hook...");
     if (window.__CG_SCORESYNC_FETCH_HOOKED__) {
       logger.warn("[ScoreSync] Fetch hook already installed");
       return;
@@ -4326,12 +4326,13 @@ You may need to refresh the page to see the new scores.`);
         }
         const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
         if (looksLikeRubricSave) {
-          logger.info(`[ScoreSync] Call #${callId}: \u2705 RUBRIC SUBMISSION DETECTED (input type: ${isRequest ? "Request" : "string"})`);
-          logger.info(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
+          logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED`);
+          logger.trace(`[ScoreSync] Call #${callId}: input type: ${isRequest ? "Request" : "string"}`);
+          logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
           const parsed = parseSpeedGraderUrl();
-          logger.info(`[ScoreSync] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
+          logger.trace(`[ScoreSync] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
           if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
-            logger.info(`[ScoreSync] Call #${callId}: Triggering handleRubricSubmit...`);
+            logger.trace(`[ScoreSync] Call #${callId}: Triggering handleRubricSubmit...`);
             void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId, apiClient);
           } else {
             logger.warn(`[ScoreSync] Call #${callId}: Missing IDs, cannot handle rubric submit`);
@@ -4341,8 +4342,6 @@ You may need to refresh the page to see the new scores.`);
       return res;
     };
     logger.info("[ScoreSync] \u2705 Fetch hook installed successfully");
-    logger.info("[ScoreSync] Fetch hook verification: window.fetch is now wrapped:", window.fetch !== originalFetch);
-    logger.info("[ScoreSync] To test: Submit a rubric assessment and watch for fetch logs");
   }
   function updateAssignmentScoreDisplay(score) {
     const display = document.querySelector("[data-cg-assignment-score]");
@@ -4351,16 +4350,16 @@ You may need to refresh the page to see the new scores.`);
     }
   }
   async function createUIControls(courseId, assignmentId) {
-    logger.debug("[ScoreSync] createUIControls called");
+    logger.trace("[ScoreSync] createUIControls called");
     const existing = document.querySelector("[data-cg-scoresync-ui]");
     if (existing) {
-      logger.debug("[ScoreSync] UI controls already exist, skipping creation");
+      logger.trace("[ScoreSync] UI controls already exist, skipping creation");
       return true;
     }
-    logger.debug('[ScoreSync] Looking for anchor element: span[data-testid="rubric-assessment-instructor-score"]');
+    logger.trace('[ScoreSync] Looking for anchor element: span[data-testid="rubric-assessment-instructor-score"]');
     const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
     if (!anchor) {
-      logger.debug("[ScoreSync] Anchor element not found in DOM");
+      logger.trace("[ScoreSync] Anchor element not found in DOM");
       const rubricElements = document.querySelectorAll('[data-testid*="rubric"]');
       logger.trace(`[ScoreSync] Found ${rubricElements.length} elements with data-testid containing "rubric"`);
       if (rubricElements.length > 0) {
@@ -4369,9 +4368,9 @@ You may need to refresh the page to see the new scores.`);
       }
       return false;
     }
-    logger.info("[ScoreSync] \u2705 Anchor element found, creating UI controls");
+    logger.trace("[ScoreSync] Anchor element found, creating UI controls");
     const settings = await getSettings(courseId, assignmentId);
-    logger.debug(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
+    logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
     const container = document.createElement("div");
     container.setAttribute("data-cg-scoresync-ui", "true");
     container.style.cssText = "display: inline-flex; align-items: center; gap: 12px; margin-left: 16px; font-size: 14px;";
@@ -4399,7 +4398,7 @@ You may need to refresh the page to see the new scores.`);
       await saveSettings(courseId, assignmentId, settings);
       logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
     });
-    logger.debug("[ScoreSync] Appending UI container to anchor parent element");
+    logger.trace("[ScoreSync] Appending UI container to anchor parent element");
     anchor.parentElement.appendChild(container);
     logger.info("[ScoreSync] \u2705 UI controls created and inserted into DOM");
     return true;
@@ -4407,15 +4406,14 @@ You may need to refresh the page to see the new scores.`);
   async function initSpeedGraderAutoGrade() {
     var _a18;
     logger.info("[ScoreSync] ========== INITIALIZATION STARTED ==========");
-    logger.info(`[ScoreSync] Current URL: ${window.location.href}`);
     if (initialized3) {
       logger.warn("[ScoreSync] Already initialized, skipping");
       return;
     }
     initialized3 = true;
-    logger.debug("[ScoreSync] Initializing SpeedGrader score sync module");
+    logger.trace("[ScoreSync] Initializing SpeedGrader score sync module");
     const roleGroup = getUserRoleGroup();
-    logger.info(`[ScoreSync] User role group: ${roleGroup}`);
+    logger.trace(`[ScoreSync] User role group: ${roleGroup}`);
     if (roleGroup !== "teacher_like") {
       logger.info(`[ScoreSync] SKIPPED - user is ${roleGroup}, not teacher_like`);
       return;
@@ -4428,13 +4426,13 @@ You may need to refresh the page to see the new scores.`);
       courseId = parsed.courseId;
       assignmentId = parsed.assignmentId;
       studentId = parsed.studentId;
-      logger.info(`[ScoreSync] Parse attempt ${parseAttempt}/3 - courseId: ${courseId}, assignmentId: ${assignmentId}, studentId: ${studentId}`);
+      logger.trace(`[ScoreSync] Parse attempt ${parseAttempt}/3 - courseId: ${courseId}, assignmentId: ${assignmentId}, studentId: ${studentId}`);
       if (courseId && assignmentId && studentId) {
-        logger.info("[ScoreSync] \u2705 All required IDs extracted successfully");
+        logger.trace("[ScoreSync] All required IDs extracted successfully");
         break;
       }
       if (parseAttempt < 3) {
-        logger.debug(`[ScoreSync] Missing IDs, waiting 500ms before retry...`);
+        logger.trace(`[ScoreSync] Missing IDs, waiting 500ms before retry...`);
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
@@ -4445,17 +4443,17 @@ You may need to refresh the page to see the new scores.`);
       initialized3 = false;
       return;
     }
-    logger.debug("[ScoreSync] Creating CanvasApiClient...");
+    logger.trace("[ScoreSync] Creating CanvasApiClient...");
     apiClient = new CanvasApiClient();
-    logger.debug("[ScoreSync] CanvasApiClient created successfully");
+    logger.trace("[ScoreSync] CanvasApiClient created successfully");
     let snapshot = getCourseSnapshot(courseId);
-    logger.info(`[ScoreSync] Course snapshot from cache: ${snapshot ? "FOUND" : "NOT FOUND"}`);
+    logger.trace(`[ScoreSync] Course snapshot from cache: ${snapshot ? "FOUND" : "NOT FOUND"}`);
     if (!snapshot) {
-      logger.info("[ScoreSync] Populating course snapshot...");
+      logger.trace("[ScoreSync] Populating course snapshot...");
       const courseName = ((_a18 = document.title.split(":")[0]) == null ? void 0 : _a18.trim()) || "Unknown Course";
-      logger.debug(`[ScoreSync] Course name from title: "${courseName}"`);
+      logger.trace(`[ScoreSync] Course name from title: "${courseName}"`);
       snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
-      logger.info(`[ScoreSync] Snapshot population result: ${snapshot ? "SUCCESS" : "FAILED"}`);
+      logger.trace(`[ScoreSync] Snapshot population result: ${snapshot ? "SUCCESS" : "FAILED"}`);
     }
     if (!snapshot) {
       logger.error("[ScoreSync] FAILED - Could not get course snapshot");
@@ -4467,20 +4465,20 @@ You may need to refresh the page to see the new scores.`);
       return;
     }
     logger.info("[ScoreSync] \u2705 Course is standards-based, proceeding with initialization");
-    logger.debug("[ScoreSync] Installing fetch hook...");
+    logger.trace("[ScoreSync] Installing fetch hook...");
     hookFetch();
-    logger.debug("[ScoreSync] Attempting immediate UI creation...");
+    logger.trace("[ScoreSync] Attempting immediate UI creation...");
     const immediateSuccess = await createUIControls(courseId, assignmentId);
     if (immediateSuccess) {
       logger.info("[ScoreSync] \u2705 UI created immediately - initialization complete");
       return;
     }
-    logger.info("[ScoreSync] UI not ready yet, starting MutationObserver to wait for rubric panel...");
+    logger.trace("[ScoreSync] UI not ready yet, starting MutationObserver to wait for rubric panel...");
     createConditionalObserver(async () => {
       logger.trace("[ScoreSync] Observer mutation detected, checking for anchor...");
       const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
       if (anchor) {
-        logger.debug("[ScoreSync] Observer found anchor element, attempting UI creation...");
+        logger.trace("[ScoreSync] Observer found anchor element, attempting UI creation...");
         const success = await createUIControls(courseId, assignmentId);
         if (success) {
           logger.info("[ScoreSync] \u2705 UI created via observer - initialization complete");
@@ -5583,8 +5581,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 3:46:56 PM (dev, abed7d6)");
-    exposeVersion("dev", "2026-02-02 3:46:56 PM (dev, abed7d6)");
+    logBanner("dev", "2026-02-02 3:52:59 PM (dev, 9d54be1)");
+    exposeVersion("dev", "2026-02-02 3:52:59 PM (dev, 9d54be1)");
     if (true) {
       logger.info("Running in DEV mode");
     }
