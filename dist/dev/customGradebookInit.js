@@ -4081,8 +4081,8 @@ You may need to refresh the page to see the new scores.`);
   }
   async function getSettings(courseId, assignmentId) {
     const host = window.location.hostname;
-    const assignmentKey = `cg_speedgrader_autograde_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
-    const courseKey = `cg_speedgrader_autograde_default::${host}::course::${courseId}`;
+    const assignmentKey = `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
+    const courseKey = `cg_speedgrader_scoresync_default::${host}::course::${courseId}`;
     const assignmentSettings = await getStorage(assignmentKey);
     if (assignmentSettings) return assignmentSettings;
     const courseSettings = await getStorage(courseKey);
@@ -4091,8 +4091,8 @@ You may need to refresh the page to see the new scores.`);
   }
   async function saveSettings(courseId, assignmentId, settings) {
     const host = window.location.hostname;
-    const assignmentKey = `cg_speedgrader_autograde_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
-    const courseKey = `cg_speedgrader_autograde_default::${host}::course::${courseId}`;
+    const assignmentKey = `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
+    const courseKey = `cg_speedgrader_scoresync_default::${host}::course::${courseId}`;
     await setStorage(assignmentKey, settings);
     await setStorage(courseKey, settings);
   }
@@ -5574,8 +5574,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 3:25:34 PM (dev, 08d420e)");
-    exposeVersion("dev", "2026-02-02 3:25:34 PM (dev, 08d420e)");
+    logBanner("dev", "2026-02-02 3:27:10 PM (dev, 4e64926)");
+    exposeVersion("dev", "2026-02-02 3:27:10 PM (dev, 4e64926)");
     if (true) {
       logger.info("Running in DEV mode");
     }

@@ -64,8 +64,8 @@ async function setStorage(key, value) {
  */
 async function getSettings(courseId, assignmentId) {
     const host = window.location.hostname;
-    const assignmentKey = `cg_speedgrader_autograde_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
-    const courseKey = `cg_speedgrader_autograde_default::${host}::course::${courseId}`;
+    const assignmentKey = `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
+    const courseKey = `cg_speedgrader_scoresync_default::${host}::course::${courseId}`;
 
     const assignmentSettings = await getStorage(assignmentKey);
     if (assignmentSettings) return assignmentSettings;
@@ -81,8 +81,8 @@ async function getSettings(courseId, assignmentId) {
  */
 async function saveSettings(courseId, assignmentId, settings) {
     const host = window.location.hostname;
-    const assignmentKey = `cg_speedgrader_autograde_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
-    const courseKey = `cg_speedgrader_autograde_default::${host}::course::${courseId}`;
+    const assignmentKey = `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
+    const courseKey = `cg_speedgrader_scoresync_default::${host}::course::${courseId}`;
 
     await setStorage(assignmentKey, settings);
     await setStorage(courseKey, settings);
