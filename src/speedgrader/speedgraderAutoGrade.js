@@ -28,6 +28,8 @@ let lastRubricFingerprint = null;
 
 /**
  * Parse SpeedGrader URL to extract IDs
+ *
+ * @returns {Object} { courseId, assignmentId, studentId }
  */
 function parseSpeedGraderUrl() {
     const path = window.location.pathname;
@@ -501,11 +503,35 @@ export async function initSpeedGraderAutoGrade() {
         return;
     }
 
-    const { courseId, assignmentId, studentId } = parseSpeedGraderUrl();
-    logger.info(`[AutoGrade] Parsed URL - courseId: ${courseId}, assignmentId: ${assignmentId}, studentId: ${studentId}`);
+    // Try to parse URL with retries (SpeedGrader uses client-side routing)
+    let parseAttempt = 0;
+    let courseId, assignmentId, studentId;
+
+    while (parseAttempt < 3) {
+        parseAttempt++;
+        const parsed = parseSpeedGraderUrl();
+        courseId = parsed.courseId;
+        assignmentId = parsed.assignmentId;
+        studentId = parsed.studentId;
+
+        logger.info(`[AutoGrade] Parse attempt ${parseAttempt}/3 - courseId: ${courseId}, assignmentId: ${assignmentId}, studentId: ${studentId}`);
+
+        if (courseId && assignmentId && studentId) {
+            logger.info('[AutoGrade] ✅ All required IDs extracted successfully');
+            break;
+        }
+
+        if (parseAttempt < 3) {
+            logger.debug(`[AutoGrade] Missing IDs, waiting 500ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
 
     if (!courseId || !assignmentId || !studentId) {
-        logger.error('[AutoGrade] FAILED - Missing required IDs from URL:', { courseId, assignmentId, studentId });
+        logger.error('[AutoGrade] FAILED - Missing required IDs after 3 attempts:', { courseId, assignmentId, studentId });
+        logger.error('[AutoGrade] Full URL:', window.location.href);
+        logger.error('[AutoGrade] Query params:', window.location.search);
+        initialized = false; // Allow retry on next navigation
         return;
     }
 
