@@ -24,7 +24,7 @@ import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHe
 
 let initialized = false;
 let inFlight = false;
-let lastRubricFingerprint = null;
+const lastFingerprintByContext = new Map();
 
 /**
  * Parse SpeedGrader URL to extract IDs
@@ -132,61 +132,55 @@ function getCsrfToken() {
  * Update grade input UI (React-controlled)
  */
 function updateGradeInput(score) {
-    // Find all candidate inputs
-    const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
-    logger.debug(`[AutoGrade] Found ${allInputs.length} grade input candidate(s)`);
-
-    if (allInputs.length === 0) {
-        logger.debug('[AutoGrade] Grade input not found for update');
-        return;
-    }
-
-    // Filter to visible, enabled inputs
-    const visibleInputs = allInputs.filter(el => {
-        const visible = el.offsetParent !== null;
-        const enabled = !el.disabled;
-        return visible && enabled;
-    });
-
-    logger.debug(`[AutoGrade] ${visibleInputs.length} visible and enabled input(s)`);
-
-    if (visibleInputs.length === 0) {
-        logger.debug('[AutoGrade] No visible, enabled grade inputs found');
-        return;
-    }
-
-    // Prefer inputs inside grading panel
-    const panelInputs = visibleInputs.filter(el => {
-        return el.closest('[data-testid="speedgrader-grading-panel"]') !== null;
-    });
-
-    let candidates = panelInputs.length > 0 ? panelInputs : visibleInputs;
-
-    // Choose best candidate: largest area or currently focused
-    let bestInput = candidates[0];
-    if (candidates.length > 1) {
-        const focused = candidates.find(el => el === document.activeElement);
-        if (focused) {
-            bestInput = focused;
-            logger.debug('[AutoGrade] Selected focused input');
-        } else {
-            let maxArea = 0;
-            for (const el of candidates) {
-                const rect = el.getBoundingClientRect();
-                const area = rect.width * rect.height;
-                if (area > maxArea) {
-                    maxArea = area;
-                    bestInput = el;
-                }
-            }
-            logger.debug(`[AutoGrade] Selected input with largest area`);
-        }
-    }
-
-    const input = bestInput;
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
 
     const applyValue = () => {
+        // Re-query input each time (may be replaced on navigation)
+        const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
+
+        if (allInputs.length === 0) {
+            logger.debug('[AutoGrade] Grade input not found for update');
+            return;
+        }
+
+        // Filter to visible, enabled inputs
+        const visibleInputs = allInputs.filter(el => {
+            const visible = el.offsetParent !== null;
+            const enabled = !el.disabled;
+            return visible && enabled;
+        });
+
+        if (visibleInputs.length === 0) {
+            logger.debug('[AutoGrade] No visible, enabled grade inputs found');
+            return;
+        }
+
+        // Prefer inputs inside grading panel
+        const panelInputs = visibleInputs.filter(el => {
+            return el.closest('[data-testid="speedgrader-grading-panel"]') !== null;
+        });
+
+        let candidates = panelInputs.length > 0 ? panelInputs : visibleInputs;
+
+        // Choose best candidate: largest area or currently focused
+        let input = candidates[0];
+        if (candidates.length > 1) {
+            const focused = candidates.find(el => el === document.activeElement);
+            if (focused) {
+                input = focused;
+            } else {
+                let maxArea = 0;
+                for (const el of candidates) {
+                    const rect = el.getBoundingClientRect();
+                    const area = rect.width * rect.height;
+                    if (area > maxArea) {
+                        maxArea = area;
+                        input = el;
+                    }
+                }
+            }
+        }
+
         // Set input value
         input.focus();
         nativeInputValueSetter.call(input, String(score));
@@ -200,32 +194,9 @@ function updateGradeInput(score) {
         input.dispatchEvent(new Event('blur', { bubbles: true }));
         input.dispatchEvent(new Event('focusout', { bubbles: true }));
 
-        // Update facade if present (targeted search)
-        let current = input;
-        let facadeFound = false;
-        while (current && current !== document.body) {
-            current = current.parentElement;
-            if (current) {
-                const facadeEl = Array.from(current.querySelectorAll('*')).find(el => {
-                    return el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('facade');
-                });
-                if (facadeEl && facadeEl.offsetParent !== null) {
-                    facadeEl.textContent = String(score);
-                    logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
-                    facadeFound = true;
-                    break;
-                }
-            }
-        }
-
         // Read back and log
         const readBack = input.value;
         logger.debug(`[AutoGrade] Applied value=${score}, read back value="${readBack}"`);
-
-        // Delayed readback to check if React overwrote it
-        setTimeout(() => {
-            logger.debug(`[AutoGrade] Post-apply readback (100ms): "${input.value}"`);
-        }, 100);
     };
 
     // Apply 3 times with delays
@@ -374,18 +345,22 @@ async function handleRubricSubmit(courseId, assignmentId, studentId) {
         const rubricPoints = Object.values(submission.rubric_assessment).map(c => c.points);
         logger.info(`[AutoGrade] Rubric points: [${rubricPoints.join(', ')}]`);
 
+        const contextKey = `${courseId}:${assignmentId}:${studentId}`;
         const fingerprint = createRubricFingerprint(submission.rubric_assessment);
-        logger.debug(`[AutoGrade] Rubric fingerprint: ${fingerprint}`);
-        logger.debug(`[AutoGrade] Last fingerprint: ${lastRubricFingerprint}`);
+        const lastFingerprint = lastFingerprintByContext.get(contextKey);
 
-        if (fingerprint === lastRubricFingerprint) {
+        logger.debug(`[AutoGrade] Context: ${contextKey}`);
+        logger.debug(`[AutoGrade] Rubric fingerprint: ${fingerprint}`);
+        logger.debug(`[AutoGrade] Last fingerprint for context: ${lastFingerprint || 'none'}`);
+
+        if (fingerprint === lastFingerprint) {
             logger.info('[AutoGrade] SKIPPED - Rubric unchanged (fingerprint match)');
             inFlight = false;
             return;
         }
 
-        lastRubricFingerprint = fingerprint;
-        logger.debug('[AutoGrade] Fingerprint updated');
+        lastFingerprintByContext.set(contextKey, fingerprint);
+        logger.debug('[AutoGrade] Fingerprint updated for context');
 
         const score = calculateGrade(submission.rubric_assessment, settings.method);
         logger.info(`[AutoGrade] Calculated score: ${score} (method: ${settings.method})`);
@@ -417,7 +392,7 @@ async function handleRubricSubmit(courseId, assignmentId, studentId) {
 /**
  * Hook window.fetch to detect rubric submissions
  */
-function hookFetch(courseId, assignmentId, studentId) {
+function hookFetch() {
     logger.info('[AutoGrade] Installing fetch hook...');
 
     if (window.__CG_AUTOGRADE_FETCH_HOOKED__) {
@@ -463,8 +438,17 @@ function hookFetch(courseId, assignmentId, studentId) {
             if (looksLikeRubricSave) {
                 logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED`);
                 logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
-                logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
-                void handleRubricSubmit(courseId, assignmentId, studentId);
+
+                // Re-parse URL to get current context (handles navigation)
+                const parsed = parseSpeedGraderUrl();
+                logger.info(`[AutoGrade] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
+
+                if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
+                    logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
+                    void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId);
+                } else {
+                    logger.warn(`[AutoGrade] Call #${callId}: Missing IDs, cannot handle rubric submit`);
+                }
             }
             // Silently ignore non-rubric GraphQL queries (no logging needed)
         }
@@ -641,7 +625,7 @@ export async function initSpeedGraderAutoGrade() {
     logger.info('[AutoGrade] ✅ Course is standards-based, proceeding with initialization');
 
     logger.debug('[AutoGrade] Installing fetch hook...');
-    hookFetch(courseId, assignmentId, studentId);
+    hookFetch();
 
     // Try immediate UI creation
     logger.debug('[AutoGrade] Attempting immediate UI creation...');
