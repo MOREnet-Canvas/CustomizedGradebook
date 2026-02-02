@@ -1,4 +1,6 @@
 // src/speedgrader/speedgraderAutoGrade.js
+// noinspection SpellCheckingInspection
+
 /**
  * SpeedGrader Auto-Grade Module
  *
@@ -18,6 +20,7 @@ import { logger } from '../utils/logger.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
 import { getCourseSnapshot, populateCourseSnapshot } from '../services/courseSnapshotService.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 
 let initialized = false;
 let inFlight = false;
@@ -39,26 +42,17 @@ function parseSpeedGraderUrl() {
 }
 
 /**
- * Get storage (chrome.storage.local with localStorage fallback)
+ * Get storage from localStorage
  */
 async function getStorage(key) {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        return new Promise((resolve) => {
-            chrome.storage.local.get([key], (result) => {
-                resolve(result[key] || null);
-            });
-        });
-    }
     const value = localStorage.getItem(key);
     return value ? JSON.parse(value) : null;
 }
 
+/**
+ * Set storage in localStorage
+ */
 async function setStorage(key, value) {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        return new Promise((resolve) => {
-            chrome.storage.local.set({ [key]: value }, resolve);
-        });
-    }
     localStorage.setItem(key, JSON.stringify(value));
 }
 
@@ -137,12 +131,15 @@ function getCsrfToken() {
  */
 function updateGradeInput(score) {
     const input = document.querySelector('input[data-testid="grade-input"]');
-    if (!input) return;
+    if (!input) {
+        logger.debug('[AutoGrade] Grade input not found for update');
+        return;
+    }
 
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
 
     const applyValue = () => {
-        nativeInputValueSetter.call(input, score);
+        nativeInputValueSetter.call(input, String(score));
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         input.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -150,6 +147,7 @@ function updateGradeInput(score) {
 
     applyValue();
     setTimeout(applyValue, 700);
+    logger.debug(`[AutoGrade] Updated grade input to: ${score}`);
 }
 
 /**
@@ -172,6 +170,7 @@ async function submitGrade(courseId, assignmentId, studentId, score) {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-CSRF-Token': csrfToken
             },
+            credentials: 'same-origin',
             body
         });
 
@@ -181,7 +180,8 @@ async function submitGrade(courseId, assignmentId, studentId, score) {
         }
 
         const data = await response.json();
-        logger.debug('[AutoGrade] Grade submitted successfully:', data.entered_score);
+        const enteredScore = data?.entered_score ?? score;
+        logger.debug(`[AutoGrade] Grade submitted successfully: ${enteredScore}`);
         return data;
     } catch (error) {
         logger.error('[AutoGrade] Error submitting grade:', error);
@@ -196,7 +196,9 @@ async function fetchSubmission(courseId, assignmentId, studentId) {
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}?include[]=rubric_assessment`;
 
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            credentials: 'same-origin'
+        });
         if (!response.ok) return null;
 
         return await response.json();
@@ -249,8 +251,9 @@ async function handleRubricSubmit(courseId, assignmentId, studentId) {
 
         const result = await submitGrade(courseId, assignmentId, studentId, score);
         if (result) {
-            updateGradeInput(result.entered_score || score);
-            updateAssignmentScoreDisplay(result.entered_score || score);
+            const finalScore = result?.entered_score ?? score;
+            updateGradeInput(finalScore);
+            updateAssignmentScoreDisplay(finalScore);
         }
     } finally {
         inFlight = false;
@@ -264,30 +267,52 @@ function hookFetch(courseId, assignmentId, studentId) {
     const originalFetch = window.fetch;
 
     window.fetch = function(...args) {
-        const [url, options] = args;
+        const [urlOrRequest, options] = args;
 
         const promise = originalFetch.apply(this, args);
 
-        if (typeof url === 'string' && url.includes('/api/graphql') && options?.method === 'POST') {
-            promise.then(async (response) => {
-                if (!response.ok) return response;
+        // Extract URL and method from either string or Request object
+        let url = '';
+        let method = 'GET';
+        let bodyPromise = null;
 
-                const body = options.body || '';
+        if (typeof urlOrRequest === 'string') {
+            url = urlOrRequest;
+            method = options?.method || 'GET';
+            bodyPromise = Promise.resolve(options?.body || '');
+        } else if (urlOrRequest instanceof Request) {
+            url = urlOrRequest.url;
+            method = urlOrRequest.method;
+            // Clone request to read body without consuming it
+            try {
+                bodyPromise = urlOrRequest.clone().text();
+            } catch (error) {
+                logger.trace('[AutoGrade] Could not read Request body:', error);
+                bodyPromise = Promise.resolve('');
+            }
+        }
+
+        // Ignore our own submission API calls to prevent loops
+        if (url.includes('/api/v1/') && url.includes('/submissions/')) {
+            logger.trace('[AutoGrade] Ignoring own submission fetch');
+            return promise;
+        }
+
+        // Detect GraphQL rubric submissions
+        if (url.includes('/api/graphql') && method === 'POST') {
+            void bodyPromise.then(body => {
                 const isRubricSave = body.includes('SaveRubricAssessment') ||
                                     body.includes('rubricAssessment') ||
                                     body.includes('rubric_assessment');
 
                 if (isRubricSave) {
-                    logger.debug('[AutoGrade] Detected rubric submission');
-                    handleRubricSubmit(courseId, assignmentId, studentId);
+                    const requestType = urlOrRequest instanceof Request ? 'Request object' : 'string URL';
+                    logger.debug(`[AutoGrade] Detected rubric submission (${requestType})`);
+                    void handleRubricSubmit(courseId, assignmentId, studentId);
                 }
-
-                return response;
+            }).catch(error => {
+                logger.trace('[AutoGrade] Error reading fetch body:', error);
             });
-        }
-
-        if (typeof url === 'string' && url.includes('/api/v1/') && url.includes('/submissions/')) {
-            logger.trace('[AutoGrade] Ignoring own submission fetch');
         }
 
         return promise;
@@ -308,14 +333,16 @@ function updateAssignmentScoreDisplay(score) {
  * Create UI controls
  */
 async function createUIControls(courseId, assignmentId) {
-    const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
-    if (!anchor) {
-        logger.trace('[AutoGrade] Instructor score anchor not found, will retry');
-        return false;
+    // Check if UI already exists
+    if (document.querySelector('[data-cg-autograde-ui]')) {
+        logger.trace('[AutoGrade] UI controls already exist');
+        return true;
     }
 
-    if (document.querySelector('[data-cg-autograde-ui]')) {
-        return true;
+    const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
+    if (!anchor) {
+        logger.trace('[AutoGrade] Instructor score anchor not found');
+        return false;
     }
 
     const settings = await getSettings(courseId, assignmentId);
@@ -341,15 +368,15 @@ async function createUIControls(courseId, assignmentId) {
     const methodSelect = container.querySelector('[data-cg-method]');
 
     toggle.addEventListener('change', async () => {
-        const newSettings = { ...settings, enabled: toggle.checked };
-        await saveSettings(courseId, assignmentId, newSettings);
-        logger.debug('[AutoGrade] Settings updated:', newSettings);
+        settings.enabled = toggle.checked;
+        await saveSettings(courseId, assignmentId, settings);
+        logger.debug(`[AutoGrade] Auto-grade ${settings.enabled ? 'enabled' : 'disabled'}`);
     });
 
     methodSelect.addEventListener('change', async () => {
-        const newSettings = { ...settings, method: methodSelect.value };
-        await saveSettings(courseId, assignmentId, newSettings);
-        logger.debug('[AutoGrade] Settings updated:', newSettings);
+        settings.method = methodSelect.value;
+        await saveSettings(courseId, assignmentId, settings);
+        logger.debug(`[AutoGrade] Method changed to: ${settings.method}`);
     });
 
     anchor.parentElement.appendChild(container);
@@ -403,12 +430,29 @@ export async function initSpeedGraderAutoGrade() {
 
     hookFetch(courseId, assignmentId, studentId);
 
-    const tryCreateUI = async () => {
-        const success = await createUIControls(courseId, assignmentId);
-        if (!success) {
-            setTimeout(tryCreateUI, 1000);
-        }
-    };
+    // Try immediate UI creation
+    const immediateSuccess = await createUIControls(courseId, assignmentId);
+    if (immediateSuccess) {
+        logger.debug('[AutoGrade] UI created immediately');
+        return;
+    }
 
-    setTimeout(tryCreateUI, 500);
+    // Use MutationObserver to wait for rubric panel to appear
+    logger.debug('[AutoGrade] Waiting for rubric panel to appear...');
+    createConditionalObserver(async () => {
+        const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
+        if (anchor) {
+            const success = await createUIControls(courseId, assignmentId);
+            if (success) {
+                logger.debug('[AutoGrade] UI created via observer');
+                return true; // Disconnect observer
+            }
+        }
+        return false; // Keep observing
+    }, {
+        config: OBSERVER_CONFIGS.CHILD_LIST,
+        target: document.body,
+        name: 'AutoGradeUIObserver',
+        timeout: 30000
+    });
 }
