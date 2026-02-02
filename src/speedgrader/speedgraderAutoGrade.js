@@ -344,64 +344,49 @@ function hookFetch(courseId, assignmentId, studentId) {
 
     window.fetch = async function(...args) {
         const callId = ++fetchCallCount;
-        const [urlOrRequest, options] = args;
+        const input = args[0];
+        const init = args[1] || {};
 
-        // Extract URL and method from either string or Request object
-        let url = '';
-        let method = 'GET';
-        let body = '';
+        // Extract URL (matches POC approach)
+        const url = String(input instanceof Request ? input.url : input);
 
-        if (typeof urlOrRequest === 'string') {
-            url = urlOrRequest;
-            method = options?.method || 'GET';
-            body = options?.body || '';
-        } else if (urlOrRequest instanceof Request) {
-            url = urlOrRequest.url;
-            method = urlOrRequest.method;
-            // Clone request to read body without consuming it
-            try {
-                body = await urlOrRequest.clone().text();
-            } catch (error) {
-                logger.trace(`[AutoGrade] Call #${callId}: Could not read Request body:`, error);
-                body = '';
-            }
+        // Extract body from init.body (matches POC - NOT from Request object)
+        let bodyText = '';
+        if (typeof init.body === 'string') {
+            bodyText = init.body;
         }
 
         // Log ALL fetch calls at INFO level for debugging
         if (callId <= 5 || url.includes('/api/graphql') || url.includes('/submissions/')) {
-            logger.info(`[AutoGrade] Fetch #${callId}: ${method} ${url.substring(0, 150)}`);
+            logger.info(`[AutoGrade] Fetch #${callId}: ${url.substring(0, 150)}`);
         }
+
+        // Call original fetch FIRST (matches POC)
+        const res = await originalFetch(...args);
 
         // Ignore our own submission API calls to prevent loops
         if (url.includes('/api/v1/') && url.includes('/submissions/')) {
-            logger.debug(`[AutoGrade] Call #${callId}: Ignoring own submission fetch`);
-            return originalFetch.apply(this, args);
+            return res;
         }
 
-        // Call original fetch
-        const response = await originalFetch.apply(this, args);
+        // Detect GraphQL rubric submissions (matches POC logic)
+        if (url.includes('/api/graphql') && res.ok) {
+            logger.info(`[AutoGrade] Call #${callId}: 🔍 GraphQL POST detected, response.ok=true`);
+            logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
 
-        // Detect GraphQL rubric submissions
-        if (url.includes('/api/graphql') && method === 'POST') {
-            logger.info(`[AutoGrade] Call #${callId}: 🔍 GraphQL POST detected, response.ok=${response.ok}`);
-            logger.info(`[AutoGrade] Call #${callId}: Body preview: ${body.substring(0, 200)}`);
+            const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric/i.test(bodyText);
+            logger.info(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${looksLikeRubricSave}`);
 
-            if (response.ok) {
-                const isRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(body);
-                logger.info(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${isRubricSave}`);
-
-                if (isRubricSave) {
-                    const requestType = urlOrRequest instanceof Request ? 'Request object' : 'string URL';
-                    logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED (${requestType})`);
-                    logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
-                    void handleRubricSubmit(courseId, assignmentId, studentId);
-                } else {
-                    logger.warn(`[AutoGrade] Call #${callId}: GraphQL POST but NO rubric pattern found in body`);
-                }
+            if (looksLikeRubricSave) {
+                logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED`);
+                logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
+                void handleRubricSubmit(courseId, assignmentId, studentId);
+            } else {
+                logger.warn(`[AutoGrade] Call #${callId}: GraphQL POST but NO rubric pattern found in body`);
             }
         }
 
-        return response;
+        return res;
     };
 
     logger.info('[AutoGrade] ✅ Fetch hook installed successfully');
