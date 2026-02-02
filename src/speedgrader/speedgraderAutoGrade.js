@@ -25,6 +25,7 @@ import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHe
 let initialized = false;
 let inFlight = false;
 const lastFingerprintByContext = new Map();
+let apiClient = null;
 
 /**
  * Parse SpeedGrader URL to extract IDs
@@ -114,19 +115,7 @@ function createRubricFingerprint(rubricAssessment) {
         .join('|');
 }
 
-/**
- * Get CSRF token from cookie
- */
-function getCsrfToken() {
-    const cookies = document.cookie.split(';').map(c => c.trim());
-    for (const cookie of cookies) {
-        const [key, value] = cookie.split('=', 2);
-        if (key === '_csrf_token') {
-            return decodeURIComponent(value);
-        }
-    }
-    return null;
-}
+
 
 /**
  * Update grade input UI (React-controlled)
@@ -210,43 +199,24 @@ function updateGradeInput(score) {
 /**
  * Submit grade to Canvas API
  */
-async function submitGrade(courseId, assignmentId, studentId, score) {
+async function submitGrade(courseId, assignmentId, studentId, score, apiClient) {
     logger.debug(`[AutoGrade] submitGrade called with score=${score}`);
 
-    const csrfToken = getCsrfToken();
-    if (!csrfToken) {
-        logger.error('[AutoGrade] CSRF token not found in cookies');
-        return null;
-    }
-    logger.trace(`[AutoGrade] CSRF token found: ${csrfToken.substring(0, 10)}...`);
-
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
-    const body = `submission[posted_grade]=${encodeURIComponent(score)}`;
-
     logger.debug(`[AutoGrade] PUT ${url}`);
-    logger.trace(`[AutoGrade] Request body: ${body}`);
 
     try {
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRF-Token': csrfToken
+        const data = await apiClient.put(
+            url,
+            {
+                submission: {
+                    posted_grade: score.toString()
+                }
             },
-            credentials: 'same-origin',
-            body
-        });
+            {},
+            `submitGrade:${studentId}`
+        );
 
-        logger.debug(`[AutoGrade] Response status: ${response.status} ${response.statusText}`);
-
-        if (!response.ok) {
-            logger.error(`[AutoGrade] Failed to submit grade: ${response.status} ${response.statusText}`);
-            const errorText = await response.text();
-            logger.error(`[AutoGrade] Error response: ${errorText.substring(0, 200)}`);
-            return null;
-        }
-
-        const data = await response.json();
         logger.debug(`[AutoGrade] Response data:`, data);
         const enteredScore = data?.entered_score ?? score;
         logger.info(`[AutoGrade] ✅ Grade submitted successfully: ${enteredScore}`);
@@ -298,7 +268,7 @@ async function fetchSubmission(courseId, assignmentId, studentId) {
 /**
  * Handle rubric submission
  */
-async function handleRubricSubmit(courseId, assignmentId, studentId) {
+async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient) {
     logger.info('[AutoGrade] ========== RUBRIC SUBMIT HANDLER CALLED ==========');
     logger.info(`[AutoGrade] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
 
@@ -366,7 +336,7 @@ async function handleRubricSubmit(courseId, assignmentId, studentId) {
         logger.info(`[AutoGrade] Calculated score: ${score} (method: ${settings.method})`);
 
         logger.debug('[AutoGrade] Submitting grade to Canvas API...');
-        const result = await submitGrade(courseId, assignmentId, studentId, score);
+        const result = await submitGrade(courseId, assignmentId, studentId, score, apiClient);
 
         if (!result) {
             logger.error('[AutoGrade] FAILED - submitGrade returned null');
@@ -407,23 +377,18 @@ function hookFetch() {
     window.fetch = async function(...args) {
         const callId = ++fetchCallCount;
         const input = args[0];
-        const init = args[1] || {};
+        const init = args[1];
 
-        // Extract URL (matches POC approach)
-        const url = String(input instanceof Request ? input.url : input);
+        // Detect whether input is a Request object
+        const isRequest = input instanceof Request;
 
-        // Extract body from init.body (matches POC - NOT from Request object)
-        let bodyText = '';
-        if (typeof init.body === 'string') {
-            bodyText = init.body;
-        }
+        // Extract URL safely
+        const url = isRequest ? input.url : String(input);
 
-        // Log ALL fetch calls at INFO level for debugging
-        if (callId <= 5 || url.includes('/api/graphql') || url.includes('/submissions/')) {
-            logger.info(`[AutoGrade] Fetch #${callId}: ${url.substring(0, 150)}`);
-        }
+        // Extract HTTP method
+        const method = (isRequest ? input.method : init?.method || 'GET').toUpperCase();
 
-        // Call original fetch FIRST (matches POC)
+        // Call original fetch FIRST
         const res = await originalFetch(...args);
 
         // Ignore our own submission API calls to prevent loops
@@ -431,12 +396,26 @@ function hookFetch() {
             return res;
         }
 
-        // Detect GraphQL rubric submissions (matches POC logic)
-        if (url.includes('/api/graphql') && res.ok) {
-            const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric/i.test(bodyText);
+        // Detect GraphQL rubric submissions
+        if (url.includes('/api/graphql') && res.ok && method === 'POST') {
+            // Extract body text robustly
+            let bodyText = '';
+
+            if (typeof init?.body === 'string') {
+                bodyText = init.body;
+            } else if (isRequest) {
+                try {
+                    bodyText = await input.clone().text();
+                } catch (error) {
+                    logger.trace(`[AutoGrade] Could not read Request body: ${error.message}`);
+                }
+            }
+
+            // Check for rubric save patterns
+            const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
 
             if (looksLikeRubricSave) {
-                logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED`);
+                logger.info(`[AutoGrade] Call #${callId}: ✅ RUBRIC SUBMISSION DETECTED (input type: ${isRequest ? 'Request' : 'string'})`);
                 logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
 
                 // Re-parse URL to get current context (handles navigation)
@@ -445,12 +424,11 @@ function hookFetch() {
 
                 if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
                     logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
-                    void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId);
+                    void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId, apiClient);
                 } else {
                     logger.warn(`[AutoGrade] Call #${callId}: Missing IDs, cannot handle rubric submit`);
                 }
             }
-            // Silently ignore non-rubric GraphQL queries (no logging needed)
         }
 
         return res;
@@ -596,7 +574,7 @@ export async function initSpeedGraderAutoGrade() {
     }
 
     logger.debug('[AutoGrade] Creating CanvasApiClient...');
-    const apiClient = new CanvasApiClient();
+    apiClient = new CanvasApiClient();
     logger.debug('[AutoGrade] CanvasApiClient created successfully');
 
     let snapshot = getCourseSnapshot(courseId);

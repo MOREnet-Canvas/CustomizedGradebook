@@ -764,14 +764,14 @@
   };
 
   // src/services/gradeOverrideVerification.js
-  async function enableCourseOverride(courseId, apiClient) {
+  async function enableCourseOverride(courseId, apiClient2) {
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping");
       return false;
     }
     try {
       logger.debug("Enabling final grade override for course");
-      await apiClient.put(
+      await apiClient2.put(
         `/api/v1/courses/${courseId}/settings`,
         {
           allow_final_grade_override: true
@@ -786,14 +786,14 @@
       throw error;
     }
   }
-  async function fetchOverrideGrades(courseId, apiClient) {
+  async function fetchOverrideGrades(courseId, apiClient2) {
     var _a18;
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping fetch");
       return /* @__PURE__ */ new Map();
     }
     try {
-      const response = await apiClient.get(
+      const response = await apiClient2.get(
         `/courses/${courseId}/gradebook/final_grade_overrides`,
         {},
         "fetchOverrideGrades"
@@ -814,13 +814,13 @@
       throw error;
     }
   }
-  async function verifyOverrideScores(courseId, averages, enrollmentMap, apiClient, tolerance = 0.01) {
+  async function verifyOverrideScores(courseId, averages, enrollmentMap, apiClient2, tolerance = 0.01) {
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping verification");
       return [];
     }
     try {
-      const overrideGrades = await fetchOverrideGrades(courseId, apiClient);
+      const overrideGrades = await fetchOverrideGrades(courseId, apiClient2);
       const mismatches = [];
       let matchCount = 0;
       logger.debug(`Verifying ${averages.length} students' override grades...`);
@@ -940,17 +940,17 @@
       logger.trace(`  \u2717 Skipping user ${userId}: no updates needed`);
     }
   }
-  async function calculateStudentAverages(data, outcomeId, courseId, apiClient) {
+  async function calculateStudentAverages(data, outcomeId, courseId, apiClient2) {
     var _a18, _b18, _c, _d;
     logger.info("Calculating student averages...");
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     const outcomeMap = buildOutcomeMap(data);
     const excludedOutcomeIds = /* @__PURE__ */ new Set([String(outcomeId)]);
     let overrideGrades = /* @__PURE__ */ new Map();
-    if (ENABLE_GRADE_OVERRIDE && courseId && apiClient) {
+    if (ENABLE_GRADE_OVERRIDE && courseId && apiClient2) {
       try {
         logger.debug("Fetching current override grades for initial check...");
-        overrideGrades = await fetchOverrideGrades(courseId, apiClient);
+        overrideGrades = await fetchOverrideGrades(courseId, apiClient2);
         logger.debug(`Fetched ${overrideGrades.size} override grades for comparison`);
       } catch (error) {
         logger.warn("Failed to fetch override grades for initial check, continuing without override checking:", error);
@@ -1046,7 +1046,7 @@
 
   // src/services/gradeOverride.js
   var __enrollmentMapCache = /* @__PURE__ */ new Map();
-  async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) {
+  async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient2) {
     var _a18, _b18, _c, _d, _e;
     const query = `
     mutation SetOverride($enrollmentId: ID!, $overrideScore: Float!) {
@@ -1055,7 +1055,7 @@
         __typename
       }
     }`;
-    const json = await apiClient.graphql(
+    const json = await apiClient2.graphql(
       query,
       {
         enrollmentId: String(enrollmentId),
@@ -1070,7 +1070,7 @@
     }
     return (_e = (_d = (_c = (_b18 = (_a18 = json.data) == null ? void 0 : _a18.setOverrideScore) == null ? void 0 : _b18.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
   }
-  async function getAllEnrollmentIds(courseId, apiClient) {
+  async function getAllEnrollmentIds(courseId, apiClient2) {
     const courseKey = String(courseId);
     if (__enrollmentMapCache.has(courseKey)) {
       return __enrollmentMapCache.get(courseKey);
@@ -1078,7 +1078,7 @@
     const map = /* @__PURE__ */ new Map();
     let url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment&per_page=100`;
     while (url) {
-      const data = await apiClient.get(url, {}, "getAllEnrollmentIds");
+      const data = await apiClient2.get(url, {}, "getAllEnrollmentIds");
       for (const e of data) {
         if ((e == null ? void 0 : e.user_id) && (e == null ? void 0 : e.id)) map.set(String(e.user_id), String(e.id));
       }
@@ -1087,13 +1087,13 @@
     __enrollmentMapCache.set(courseKey, map);
     return map;
   }
-  async function getEnrollmentIdForUser(courseId, userId, apiClient) {
-    const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+  async function getEnrollmentIdForUser(courseId, userId, apiClient2) {
+    const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient2);
     return enrollmentMap.get(String(userId)) || null;
   }
 
   // src/services/gradeSubmission.js
-  async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient) {
+  async function submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, score, apiClient2) {
     if (!ENABLE_OUTCOME_UPDATES) {
       logger.trace(`Outcome updates disabled, skipping rubric score submission for user ${userId}`);
       return;
@@ -1117,7 +1117,7 @@
       }
     };
     logger.trace("Submitting rubric score for student", userId, payload);
-    await apiClient.put(
+    await apiClient2.put(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}`,
       payload,
       {},
@@ -1125,7 +1125,7 @@
     );
     logger.trace("Score submitted successfully for user", userId);
   }
-  async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient) {
+  async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient2) {
     if (!ENABLE_OUTCOME_UPDATES) {
       logger.debug("Outcome updates disabled, skipping bulk update");
       return "SKIPPED_NO_OUTCOME_UPDATES";
@@ -1146,7 +1146,7 @@
       };
     }
     logger.debug("bulk gradeData payload:", gradeData);
-    const result = await apiClient.post(
+    const result = await apiClient2.post(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/update_grades`,
       {
         grade_data: gradeData
@@ -1159,14 +1159,14 @@
     logger.info("Waiting for grading to complete progress ID:", progressId);
     return progressId;
   }
-  async function waitForBulkGrading(box, apiClient, stateMachine, timeout = 12e5, interval = 2e3) {
+  async function waitForBulkGrading(box, apiClient2, stateMachine, timeout = 12e5, interval = 2e3) {
     const loopStartTime = Date.now();
     let state = "beginning upload";
     const courseId = getCourseId();
     const progressId = localStorage.getItem(`progressId_${courseId}`);
     startElapsedTimer(stateMachine, box);
     while (Date.now() - loopStartTime < timeout) {
-      const progress = await apiClient.get(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
+      const progress = await apiClient2.get(`/api/v1/progress/${progressId}`, {}, "waitForBulkGrading");
       let elapsed = getElapsedTimeSinceStart(stateMachine);
       state = progress.workflow_state;
       logger.debug(`Bulk Uploading Status: ${state} (elapsed: ${elapsed}s)`);
@@ -1194,7 +1194,7 @@
       timeout
     );
   }
-  async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, apiClient, testing = false) {
+  async function postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, box, apiClient2, testing = false) {
     const updateInterval = 1;
     const numberOfUpdates = averages.length;
     logger.debug(`Per-student grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
@@ -1208,13 +1208,13 @@
       let lastError = null;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          await submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, average, apiClient);
+          await submitRubricScore(courseId, assignmentId, userId, rubricCriterionId, average, apiClient2);
           if (ENABLE_GRADE_OVERRIDE) {
             try {
-              const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
+              const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient2);
               if (enrollmentId) {
                 const override = OVERRIDE_SCALE(average);
-                await setOverrideScoreGQL(enrollmentId, override, apiClient);
+                await setOverrideScoreGQL(enrollmentId, override, apiClient2);
                 logger.debug(`[override] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
               } else {
                 logger.warn(`[override] no enrollmentId for user ${userId}`);
@@ -1314,13 +1314,13 @@
   }
 
   // src/services/avgOutcomeVerification.js
-  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient, stateMachine, waitTimeMs = 5e3, maxRetries = 50) {
+  async function verifyUIScores(courseId, averages, outcomeId, box, apiClient2, stateMachine, waitTimeMs = 5e3, maxRetries = 50) {
     let state = "verifying";
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       let elapsed = getElapsedTimeSinceStart(stateMachine);
       box.soft(`Status ${state.toUpperCase()}. (Elapsed time: ${elapsed}s)`);
       startElapsedTimer(stateMachine, box);
-      const newRollupData = await apiClient.get(
+      const newRollupData = await apiClient2.get(
         `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=outcomes&include[]=users&per_page=100`,
         {},
         "verifyUIScores"
@@ -1361,8 +1361,8 @@
   }
 
   // src/services/outcomeService.js
-  async function getRollup(courseId, apiClient) {
-    const rollupData = await apiClient.get(
+  async function getRollup(courseId, apiClient2) {
+    const rollupData = await apiClient2.get(
       `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
       {},
       "getRollup"
@@ -1388,14 +1388,14 @@
     }
     return match != null ? match : null;
   }
-  async function createOutcome(courseId, apiClient) {
+  async function createOutcome(courseId, apiClient2) {
     const randomSuffix = Math.random().toString(36).substring(2, 10);
     const vendorGuid = `MOREnet_${randomSuffix}`;
     const ratingsCsv = OUTCOME_AND_RUBRIC_RATINGS.map((r) => `${r.points},"${r.description}"`).join(",");
     const csvContent = `vendor_guid,object_type,title,description,calculation_method,mastery_points
 "${vendorGuid}",outcome,"${AVG_OUTCOME_NAME}","Auto-generated outcome: ${AVG_OUTCOME_NAME}",latest,"${DEFAULT_MASTERY_THRESHOLD}",${ratingsCsv}`;
     logger.debug("Importing outcome via CSV...");
-    const importData = await apiClient.post(
+    const importData = await apiClient2.post(
       `/api/v1/courses/${courseId}/outcome_imports?import_type=instructure_csv`,
       csvContent,
       {
@@ -1413,7 +1413,7 @@
     const pollIntervalMs = 2e3;
     while (attempts++ < maxAttempts) {
       await new Promise((r) => setTimeout(r, pollIntervalMs));
-      const pollData = await apiClient.get(
+      const pollData = await apiClient2.get(
         `/api/v1/courses/${courseId}/outcome_imports/${importId}`,
         {},
         "createOutcome:poll"
@@ -1437,14 +1437,14 @@
   }
 
   // src/services/assignmentService.js
-  async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient) {
+  async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient2) {
     var _a18;
     const alignments = (_a18 = outcomeObject.alignments) != null ? _a18 : [];
     for (const alignment of alignments) {
       if (!alignment.startsWith("assignment_")) continue;
       const assignmentId = alignment.split("_")[1];
       try {
-        const assignment = await apiClient.get(
+        const assignment = await apiClient2.get(
           `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
           {},
           "getAssignment"
@@ -1461,7 +1461,7 @@
     logger.warn(`Assignment "${AVG_ASSIGNMENT_NAME}" not found in alignments`);
     return null;
   }
-  async function createAssignment(courseId, apiClient) {
+  async function createAssignment(courseId, apiClient2) {
     const payload = {
       assignment: {
         name: AVG_ASSIGNMENT_NAME,
@@ -1475,7 +1475,7 @@
         omit_from_final_grade: true
       }
     };
-    const assignment = await apiClient.post(
+    const assignment = await apiClient2.post(
       `/api/v1/courses/${courseId}/assignments`,
       payload,
       {},
@@ -1486,8 +1486,8 @@
   }
 
   // src/services/rubricService.js
-  async function getRubricForAssignment(courseId, assignmentId, apiClient) {
-    const assignment = await apiClient.get(
+  async function getRubricForAssignment(courseId, assignmentId, apiClient2) {
+    const assignment = await apiClient2.get(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
       {},
       "getRubric"
@@ -1505,7 +1505,7 @@
     logger.debug("Found rubric and first criterion ID:", { rubricId, criterionId });
     return { rubricId, criterionId };
   }
-  async function createRubric(courseId, assignmentId, outcomeId, apiClient) {
+  async function createRubric(courseId, assignmentId, outcomeId, apiClient2) {
     const rubricRatings = {};
     OUTCOME_AND_RUBRIC_RATINGS.forEach((rating, index) => {
       rubricRatings[index] = {
@@ -1536,7 +1536,7 @@
         hide_points: true
       }
     };
-    const rubric = await apiClient.post(
+    const rubric = await apiClient2.post(
       `/api/v1/courses/${courseId}/rubrics`,
       rubricPayload,
       {},
@@ -1557,11 +1557,11 @@
   // src/gradebook/stateHandlers.js
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     const setupMessage = ENABLE_OUTCOME_UPDATES ? `Checking setup for "${AVG_OUTCOME_NAME}"...` : "Checking setup for grade overrides...";
     banner.setText(setupMessage);
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
-    const data = await getRollup(courseId, apiClient);
+    const data = await getRollup(courseId, apiClient2);
     stateMachine.updateContext({ rollupData: data });
     if (ENABLE_OUTCOME_UPDATES) {
       const outcomeObj = getOutcomeObjectByName(data);
@@ -1573,11 +1573,11 @@ Would you like to create it?`);
         return STATES.CREATING_OUTCOME;
       }
       stateMachine.updateContext({ outcomeId });
-      let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
+      let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient2);
       if (!assignmentObj) {
         const assignmentIdFromName = await getAssignmentId(courseId);
         if (assignmentIdFromName) {
-          assignmentObj = await apiClient.get(
+          assignmentObj = await apiClient2.get(
             `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
             {},
             "getAssignment:fallback"
@@ -1593,7 +1593,7 @@ Would you like to create it?`);
         return STATES.CREATING_ASSIGNMENT;
       }
       stateMachine.updateContext({ assignmentId });
-      const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
+      const result = await getRubricForAssignment(courseId, assignmentId, apiClient2);
       const rubricId = result == null ? void 0 : result.rubricId;
       const rubricCriterionId = result == null ? void 0 : result.criterionId;
       if (!rubricId) {
@@ -1616,7 +1616,7 @@ Would you like to create it?`);
     }
     if (ENABLE_GRADE_OVERRIDE) {
       try {
-        await enableCourseOverride(courseId, apiClient);
+        await enableCourseOverride(courseId, apiClient2);
       } catch (error) {
         logger.warn("Failed to enable course override, continuing anyway:", error);
       }
@@ -1625,33 +1625,33 @@ Would you like to create it?`);
   }
   async function handleCreatingOutcome(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     banner.setText(`Creating "${AVG_OUTCOME_NAME}" Outcome...`);
-    await createOutcome(courseId, apiClient);
+    await createOutcome(courseId, apiClient2);
     return STATES.CHECKING_SETUP;
   }
   async function handleCreatingAssignment(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     banner.setText(`Creating "${AVG_ASSIGNMENT_NAME}" Assignment...`);
-    const assignmentId = await createAssignment(courseId, apiClient);
+    const assignmentId = await createAssignment(courseId, apiClient2);
     stateMachine.updateContext({ assignmentId });
     return STATES.CHECKING_SETUP;
   }
   async function handleCreatingRubric(stateMachine) {
     const { courseId, assignmentId, outcomeId, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     banner.setText(`Creating "${AVG_RUBRIC_NAME}" Rubric...`);
-    const rubricId = await createRubric(courseId, assignmentId, outcomeId, apiClient);
+    const rubricId = await createRubric(courseId, assignmentId, outcomeId, apiClient2);
     stateMachine.updateContext({ rubricId });
     return STATES.CHECKING_SETUP;
   }
   async function handleCalculating(stateMachine) {
     const { rollupData, outcomeId, courseId, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     const calculatingMessage = ENABLE_OUTCOME_UPDATES ? `Calculating "${AVG_OUTCOME_NAME}" scores...` : "Calculating student averages for grade overrides...";
     banner.setText(calculatingMessage);
-    const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
+    const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient2);
     const numberOfUpdates = averages.length;
     stateMachine.updateContext({
       averages,
@@ -1666,7 +1666,7 @@ Would you like to create it?`);
   }
   async function handleUpdatingGrades(stateMachine) {
     const { averages, courseId, assignmentId, rubricCriterionId, numberOfUpdates, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     if (!ENABLE_OUTCOME_UPDATES) {
       logger.debug("Outcome updates disabled, skipping UPDATING_GRADES state");
       return STATES.VERIFYING;
@@ -1678,14 +1678,14 @@ Would you like to create it?`);
       const message = `Detected ${numberOfUpdates} changes - updating scores one at a time for quicker processing.`;
       banner.hold(message, 3e3);
       logger.debug("Per student update...");
-      await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, apiClient, false);
+      await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, apiClient2, false);
       logger.debug(`handleUpdatingGrades complete, transitioning to VERIFYING`);
       return STATES.VERIFYING;
     } else {
       const message = `Detected ${numberOfUpdates} changes - using bulk update`;
       banner.hold(message, 3e3);
       logger.debug(`Bulk update, detected ${numberOfUpdates} changes`);
-      const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient);
+      const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient2);
       stateMachine.updateContext({ progressId });
       logger.debug(`progressId: ${progressId}`);
       logger.debug(`handleUpdatingGrades complete, transitioning to POLLING_PROGRESS`);
@@ -1694,27 +1694,27 @@ Would you like to create it?`);
   }
   async function handlePollingProgress(stateMachine) {
     const { banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     logger.debug("Starting bulk update polling...");
-    await waitForBulkGrading(banner, apiClient, stateMachine);
+    await waitForBulkGrading(banner, apiClient2, stateMachine);
     logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
   }
   async function handleVerifying(stateMachine) {
     const { courseId, averages, outcomeId, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     if (!ENABLE_OUTCOME_UPDATES) {
       logger.debug("Outcome updates disabled, skipping VERIFYING state");
       return STATES.VERIFYING_OVERRIDES;
     }
     logger.debug("Starting outcome score verification...");
-    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient, stateMachine);
+    await verifyUIScores(courseId, averages, outcomeId, banner, apiClient2, stateMachine);
     logger.debug(`handleVerifying complete, transitioning to VERIFYING_OVERRIDES`);
     return STATES.VERIFYING_OVERRIDES;
   }
   async function handleVerifyingOverrides(stateMachine) {
     const { courseId, averages, banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override disabled, skipping VERIFYING_OVERRIDES state");
       return STATES.COMPLETE;
@@ -1725,14 +1725,14 @@ Would you like to create it?`);
     let failCount = 0;
     for (const { userId, average } of averages) {
       try {
-        const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
+        const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient2);
         if (!enrollmentId) {
           logger.warn(`[override] No enrollmentId for user ${userId}`);
           failCount++;
           continue;
         }
         const override = OVERRIDE_SCALE(average);
-        await setOverrideScoreGQL(enrollmentId, override, apiClient);
+        await setOverrideScoreGQL(enrollmentId, override, apiClient2);
         logger.trace(`[override] user ${userId} \u2192 enrollment ${enrollmentId}: ${override}`);
         successCount++;
       } catch (e) {
@@ -1745,11 +1745,11 @@ Would you like to create it?`);
     const retryDelayMs = 2e3;
     let overrideMismatches = [];
     try {
-      const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+      const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient2);
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         banner.soft(`Verifying grade overrides... (attempt ${attempt}/${maxRetries})`);
         logger.debug(`Override verification attempt ${attempt}/${maxRetries}...`);
-        overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+        overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient2);
         if (overrideMismatches.length === 0) {
           logger.info(`All override scores verified successfully on attempt ${attempt}`);
           break;
@@ -2141,8 +2141,8 @@ You may need to refresh the page to see the new scores.`);
 
   // src/services/masteryRefreshService.js
   var activeLocks = /* @__PURE__ */ new Set();
-  async function fetchAssignmentWithRubric(courseId, assignmentId, apiClient) {
-    const assignment = await apiClient.get(
+  async function fetchAssignmentWithRubric(courseId, assignmentId, apiClient2) {
+    const assignment = await apiClient2.get(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
       { include: ["rubric"] },
       "fetchAssignmentWithRubric"
@@ -2173,8 +2173,8 @@ You may need to refresh the page to see the new scores.`);
     logger.debug(`[RefreshMastery] Using fallback max points: ${DEFAULT_MAX_POINTS}`);
     return DEFAULT_MAX_POINTS;
   }
-  async function updateAssignmentPoints(courseId, assignmentId, points, apiClient) {
-    const assignment = await apiClient.put(
+  async function updateAssignmentPoints(courseId, assignmentId, points, apiClient2) {
+    const assignment = await apiClient2.put(
       `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
       { assignment: { points_possible: points } },
       `updatePoints_${points}`
@@ -2190,11 +2190,11 @@ You may need to refresh the page to see the new scores.`);
     }
     activeLocks.add(lockKey);
     try {
-      const apiClient = new CanvasApiClient();
+      const apiClient2 = new CanvasApiClient();
       const delay = (_a18 = options.delay) != null ? _a18 : MASTERY_REFRESH_DELAY_MS;
       const skipRevert = (_b18 = options.skipRevert) != null ? _b18 : false;
       logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId} in course ${courseId}`);
-      const assignment = await fetchAssignmentWithRubric(courseId, assignmentId, apiClient);
+      const assignment = await fetchAssignmentWithRubric(courseId, assignmentId, apiClient2);
       const tempPoints = deriveTempPoints(assignment);
       logger.debug(`[RefreshMastery] Determined temp points: ${tempPoints}`, {
         courseId,
@@ -2202,12 +2202,12 @@ You may need to refresh the page to see the new scores.`);
         tempPoints
       });
       logger.debug(`[RefreshMastery] Setting points_possible to ${tempPoints}`);
-      await updateAssignmentPoints(courseId, assignmentId, tempPoints, apiClient);
+      await updateAssignmentPoints(courseId, assignmentId, tempPoints, apiClient2);
       logger.debug(`[RefreshMastery] Waiting ${delay}ms for Canvas to propagate changes`);
       await new Promise((resolve) => setTimeout(resolve, delay));
       if (!skipRevert) {
         logger.debug(`[RefreshMastery] Reverting points_possible to 0`);
-        await updateAssignmentPoints(courseId, assignmentId, 0, apiClient);
+        await updateAssignmentPoints(courseId, assignmentId, 0, apiClient2);
       }
       logger.info(`[RefreshMastery] Successfully refreshed mastery for assignment ${assignmentId}`);
     } catch (error) {
@@ -2499,7 +2499,7 @@ You may need to refresh the page to see the new scores.`);
   async function updateGradebookSettings(courseId, assignmentId) {
     try {
       logger.debug(`[RefreshMastery] Updating gradebook settings for assignment ${assignmentId}`);
-      const apiClient = new CanvasApiClient();
+      const apiClient2 = new CanvasApiClient();
       const payload = {
         gradebook_settings: {
           enter_grades_as: {
@@ -2508,7 +2508,7 @@ You may need to refresh the page to see the new scores.`);
         }
       };
       logger.debug("[RefreshMastery] Sending gradebook settings update:", payload);
-      await apiClient.put(
+      await apiClient2.put(
         `/api/v1/courses/${courseId}/gradebook_settings`,
         payload,
         {},
@@ -2686,9 +2686,9 @@ You may need to refresh the page to see the new scores.`);
     );
     return rating !== void 0;
   }
-  async function hasAvgAssignment(courseId, apiClient) {
+  async function hasAvgAssignment(courseId, apiClient2) {
     try {
-      const assignments = await apiClient.get(
+      const assignments = await apiClient2.get(
         `/api/v1/courses/${courseId}/assignments`,
         { search_term: AVG_ASSIGNMENT_NAME },
         "checkAvgAssignment"
@@ -2701,7 +2701,7 @@ You may need to refresh the page to see the new scores.`);
   }
   async function determineCourseModel(course, sessionData, options) {
     const { courseId, courseName } = course;
-    const { apiClient } = options;
+    const { apiClient: apiClient2 } = options;
     if (!courseId || !courseName) {
       logger.warn("[CourseModel] determineCourseModel called without required courseId or courseName");
       return { model: "traditional", reason: "invalid-input" };
@@ -2713,12 +2713,12 @@ You may need to refresh the page to see the new scores.`);
       logger.debug(`[CourseModel] \u2705 Course "${courseName}" \u2192 standards (name-pattern)`);
       return { model: "standards", reason: "name-pattern" };
     }
-    if (!apiClient) {
+    if (!apiClient2) {
       logger.warn(`[CourseModel] No apiClient provided for course ${courseId}, defaulting to traditional`);
       return { model: "traditional", reason: "no-api-client" };
     }
     logger.trace(`[CourseModel] Rule 2 - Checking AVG Assignment presence...`);
-    const hasAvg = await hasAvgAssignment(courseId, apiClient);
+    const hasAvg = await hasAvgAssignment(courseId, apiClient2);
     logger.trace(`[CourseModel] Rule 2 - AVG Assignment: ${hasAvg ? "FOUND" : "NOT FOUND"}`);
     if (hasAvg) {
       logger.debug(`[CourseModel] \u2705 Course "${courseName}" \u2192 standards (avg-assignment)`);
@@ -2751,9 +2751,9 @@ You may need to refresh the page to see the new scores.`);
     }
     return { score, letterGrade };
   }
-  async function fetchSingleEnrollment(courseId, apiClient) {
+  async function fetchSingleEnrollment(courseId, apiClient2) {
     try {
-      const enrollments = await apiClient.get(
+      const enrollments = await apiClient2.get(
         `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
         {},
         "fetchSingleEnrollment"
@@ -2824,9 +2824,9 @@ You may need to refresh the page to see the new scores.`);
     ASSIGNMENT: "assignment",
     ENROLLMENT: "enrollment"
   });
-  async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
+  async function fetchAvgAssignmentScore(courseId, studentId, apiClient2) {
     try {
-      const assignments = await apiClient.get(
+      const assignments = await apiClient2.get(
         `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
         {},
         "fetchAvgAssignment"
@@ -2838,7 +2838,7 @@ You may need to refresh the page to see the new scores.`);
       }
       logger.trace(`AVG assignment found: ${avgAssignment.id}, ${avgAssignment.name}`);
       logger.trace(`looking for assignment submission for student: ${studentId}`);
-      const submission = await apiClient.get(
+      const submission = await apiClient2.get(
         `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${studentId}`,
         {},
         "fetchAvgSubmission"
@@ -2869,8 +2869,8 @@ You may need to refresh the page to see the new scores.`);
       return null;
     }
   }
-  async function fetchEnrollmentScore(courseId, apiClient) {
-    const studentEnrollment = await fetchSingleEnrollment(courseId, apiClient);
+  async function fetchEnrollmentScore(courseId, apiClient2) {
+    const studentEnrollment = await fetchSingleEnrollment(courseId, apiClient2);
     if (!studentEnrollment) {
       return null;
     }
@@ -2885,7 +2885,7 @@ You may need to refresh the page to see the new scores.`);
       letterGrade: gradeData.letterGrade
     };
   }
-  async function getCourseGrade(courseId, apiClient) {
+  async function getCourseGrade(courseId, apiClient2) {
     logger.trace(`[Grade Fetch] Course ${courseId}: Starting grade fetch with fallback hierarchy`);
     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
     const studentId = resolveTargetStudentId();
@@ -2893,7 +2893,7 @@ You may need to refresh the page to see the new scores.`);
       logger.trace(`[Grade Fetch] Course ${courseId}: No target studentId available for submission lookup`);
       return null;
     }
-    const avgResult = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
+    const avgResult = await fetchAvgAssignmentScore(courseId, studentId, apiClient2);
     if ((avgResult == null ? void 0 : avgResult.score) != null) {
       const { score, grade } = avgResult;
       logger.trace(
@@ -2908,7 +2908,7 @@ You may need to refresh the page to see the new scores.`);
     }
     logger.trace(`[Grade Fetch] Course ${courseId}: AVG assignment not found, checking priority 2...`);
     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 2 - enrollment grade...`);
-    const enrollmentData = await fetchEnrollmentScore(courseId, apiClient);
+    const enrollmentData = await fetchEnrollmentScore(courseId, apiClient2);
     if (enrollmentData !== null) {
       logger.trace(`[Grade Fetch] Course ${courseId}: Enrollment grade found! score=${enrollmentData.score}, letterGrade=${enrollmentData.letterGrade}`);
       return {
@@ -3116,7 +3116,7 @@ You may need to refresh the page to see the new scores.`);
       return null;
     }
   }
-  async function populateCourseSnapshot(courseId, courseName, apiClient) {
+  async function populateCourseSnapshot(courseId, courseName, apiClient2) {
     if (!validateUserOwnership()) {
       logger.warn(`[Snapshot] Cannot populate snapshot - user ownership validation failed`);
       return null;
@@ -3134,7 +3134,7 @@ You may need to refresh the page to see the new scores.`);
     logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}" (user role: ${roleGroup})`);
     try {
       logger.trace(`[Snapshot] Step 1: Fetching grade for ${courseId}...`);
-      const gradeData = await getCourseGrade(courseId, apiClient);
+      const gradeData = await getCourseGrade(courseId, apiClient2);
       if (gradeData) {
         logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
       } else {
@@ -3144,7 +3144,7 @@ You may need to refresh the page to see the new scores.`);
       const classification = await determineCourseModel(
         { courseId, courseName },
         null,
-        { apiClient }
+        { apiClient: apiClient2 }
       );
       logger.trace(`[Snapshot] Course ${courseId} classification: model=${classification.model}, reason=${classification.reason}`);
       const isStandardsBased = classification.model === "standards";
@@ -3240,7 +3240,7 @@ You may need to refresh the page to see the new scores.`);
     logger.trace(`[Refresh] Course ${courseId}: Non-standards-based, ${reason}`);
     return shouldRefresh;
   }
-  async function refreshCourseSnapshot(courseId, courseName, apiClient, pageContext, force = false) {
+  async function refreshCourseSnapshot(courseId, courseName, apiClient2, pageContext, force = false) {
     if (!validateUserOwnership()) {
       logger.warn(`[Refresh] Cannot refresh snapshot - user ownership validation failed`);
       return null;
@@ -3251,12 +3251,12 @@ You may need to refresh the page to see the new scores.`);
     }
     if (force) {
       logger.debug(`[Refresh] Force refresh for course ${courseId} (page=${pageContext})`);
-      return await populateCourseSnapshot(courseId, courseName, apiClient);
+      return await populateCourseSnapshot(courseId, courseName, apiClient2);
     }
     const needsRefresh = shouldRefreshGrade(courseId, pageContext);
     if (needsRefresh) {
       logger.debug(`[Refresh] Refreshing snapshot for course ${courseId} (page=${pageContext})`);
-      return await populateCourseSnapshot(courseId, courseName, apiClient);
+      return await populateCourseSnapshot(courseId, courseName, apiClient2);
     } else {
       logger.trace(`[Refresh] Using existing snapshot for course ${courseId} (page=${pageContext})`);
       return getCourseSnapshot(courseId);
@@ -3693,10 +3693,10 @@ You may need to refresh the page to see the new scores.`);
   var initialized = false;
   var dashboardObserver = null;
   var CONCURRENT_WORKERS = 3;
-  async function fetchActiveCourses(apiClient) {
+  async function fetchActiveCourses(apiClient2) {
     var _a18;
     try {
-      const courses = await apiClient.get(
+      const courses = await apiClient2.get(
         "/api/v1/courses?enrollment_state=active&include[]=total_scores",
         {},
         "fetchActiveCourses"
@@ -3742,7 +3742,7 @@ You may need to refresh the page to see the new scores.`);
       return [];
     }
   }
-  async function updateCourseCard(courseId, courseName, apiClient) {
+  async function updateCourseCard(courseId, courseName, apiClient2) {
     try {
       const cardElement = findCourseCard(courseId);
       if (!cardElement) {
@@ -3752,7 +3752,7 @@ You may need to refresh the page to see the new scores.`);
       let snapshot = getCourseSnapshot(courseId);
       if (!snapshot) {
         logger.trace(`No snapshot for course ${courseId}, populating...`);
-        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
       }
       if (!snapshot) {
         logger.trace(`No grade available for course ${courseId}, skipping`);
@@ -3774,8 +3774,8 @@ You may need to refresh the page to see the new scores.`);
   async function updateAllCourseCards() {
     try {
       const startTime = performance.now();
-      const apiClient = new CanvasApiClient();
-      const courses = await fetchActiveCourses(apiClient);
+      const apiClient2 = new CanvasApiClient();
+      const courses = await fetchActiveCourses(apiClient2);
       if (courses.length === 0) {
         logger.info("No active student courses found");
         return;
@@ -3791,7 +3791,7 @@ You may need to refresh the page to see the new scores.`);
           const course = queue.shift();
           if (!course) break;
           try {
-            await updateCourseCard(course.id, course.name, apiClient);
+            await updateCourseCard(course.id, course.name, apiClient2);
             processedCount++;
             successCount++;
             if (processedCount % 5 === 0) {
@@ -3928,8 +3928,8 @@ You may need to refresh the page to see the new scores.`);
   async function testConcurrentPerformance() {
     try {
       logger.info("=== Performance Test: Sequential vs Concurrent Processing ===");
-      const apiClient = new CanvasApiClient();
-      const courses = await fetchActiveCourses(apiClient);
+      const apiClient2 = new CanvasApiClient();
+      const courses = await fetchActiveCourses(apiClient2);
       if (courses.length === 0) {
         logger.warn("No courses found for performance testing");
         return { error: "No courses found" };
@@ -3939,7 +3939,7 @@ You may need to refresh the page to see the new scores.`);
       const sequentialStart = performance.now();
       for (const course of courses) {
         try {
-          await populateCourseSnapshot(course.id, course.name, apiClient);
+          await populateCourseSnapshot(course.id, course.name, apiClient2);
         } catch (error) {
           logger.trace(`Sequential test error for course ${course.id}:`, error.message);
         }
@@ -3955,7 +3955,7 @@ You may need to refresh the page to see the new scores.`);
           const course = queue.shift();
           if (!course) break;
           try {
-            await populateCourseSnapshot(course.id, course.name, apiClient);
+            await populateCourseSnapshot(course.id, course.name, apiClient2);
           } catch (error) {
             logger.trace(`Concurrent test error for course ${course.id}:`, error.message);
           }
@@ -4062,6 +4062,7 @@ You may need to refresh the page to see the new scores.`);
   var initialized3 = false;
   var inFlight = false;
   var lastFingerprintByContext = /* @__PURE__ */ new Map();
+  var apiClient = null;
   function parseSpeedGraderUrl() {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
@@ -4105,16 +4106,6 @@ You may need to refresh the page to see the new scores.`);
   }
   function createRubricFingerprint(rubricAssessment) {
     return Object.entries(rubricAssessment).map(([id, data]) => `${id}:${data.points}`).sort().join("|");
-  }
-  function getCsrfToken() {
-    const cookies = document.cookie.split(";").map((c) => c.trim());
-    for (const cookie of cookies) {
-      const [key, value] = cookie.split("=", 2);
-      if (key === "_csrf_token") {
-        return decodeURIComponent(value);
-      }
-    }
-    return null;
   }
   function updateGradeInput(score) {
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
@@ -4171,37 +4162,22 @@ You may need to refresh the page to see the new scores.`);
     setTimeout(applyValue, 1500);
     logger.info(`[AutoGrade] Grade input update scheduled for score: ${score}`);
   }
-  async function submitGrade(courseId, assignmentId, studentId, score) {
+  async function submitGrade(courseId, assignmentId, studentId, score, apiClient2) {
     var _a18;
     logger.debug(`[AutoGrade] submitGrade called with score=${score}`);
-    const csrfToken = getCsrfToken();
-    if (!csrfToken) {
-      logger.error("[AutoGrade] CSRF token not found in cookies");
-      return null;
-    }
-    logger.trace(`[AutoGrade] CSRF token found: ${csrfToken.substring(0, 10)}...`);
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
-    const body = `submission[posted_grade]=${encodeURIComponent(score)}`;
     logger.debug(`[AutoGrade] PUT ${url}`);
-    logger.trace(`[AutoGrade] Request body: ${body}`);
     try {
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRF-Token": csrfToken
+      const data = await apiClient2.put(
+        url,
+        {
+          submission: {
+            posted_grade: score.toString()
+          }
         },
-        credentials: "same-origin",
-        body
-      });
-      logger.debug(`[AutoGrade] Response status: ${response.status} ${response.statusText}`);
-      if (!response.ok) {
-        logger.error(`[AutoGrade] Failed to submit grade: ${response.status} ${response.statusText}`);
-        const errorText = await response.text();
-        logger.error(`[AutoGrade] Error response: ${errorText.substring(0, 200)}`);
-        return null;
-      }
-      const data = await response.json();
+        {},
+        `submitGrade:${studentId}`
+      );
       logger.debug(`[AutoGrade] Response data:`, data);
       const enteredScore = (_a18 = data == null ? void 0 : data.entered_score) != null ? _a18 : score;
       logger.info(`[AutoGrade] \u2705 Grade submitted successfully: ${enteredScore}`);
@@ -4237,7 +4213,7 @@ You may need to refresh the page to see the new scores.`);
       return null;
     }
   }
-  async function handleRubricSubmit(courseId, assignmentId, studentId) {
+  async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient2) {
     var _a18;
     logger.info("[AutoGrade] ========== RUBRIC SUBMIT HANDLER CALLED ==========");
     logger.info(`[AutoGrade] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
@@ -4290,7 +4266,7 @@ You may need to refresh the page to see the new scores.`);
       const score = calculateGrade(submission.rubric_assessment, settings.method);
       logger.info(`[AutoGrade] Calculated score: ${score} (method: ${settings.method})`);
       logger.debug("[AutoGrade] Submitting grade to Canvas API...");
-      const result = await submitGrade(courseId, assignmentId, studentId, score);
+      const result = await submitGrade(courseId, assignmentId, studentId, score, apiClient2);
       if (!result) {
         logger.error("[AutoGrade] FAILED - submitGrade returned null");
         return;
@@ -4320,29 +4296,34 @@ You may need to refresh the page to see the new scores.`);
     window.fetch = async function(...args) {
       const callId = ++fetchCallCount;
       const input = args[0];
-      const init2 = args[1] || {};
-      const url = String(input instanceof Request ? input.url : input);
-      let bodyText = "";
-      if (typeof init2.body === "string") {
-        bodyText = init2.body;
-      }
-      if (callId <= 5 || url.includes("/api/graphql") || url.includes("/submissions/")) {
-        logger.info(`[AutoGrade] Fetch #${callId}: ${url.substring(0, 150)}`);
-      }
+      const init2 = args[1];
+      const isRequest = input instanceof Request;
+      const url = isRequest ? input.url : String(input);
+      const method = (isRequest ? input.method : (init2 == null ? void 0 : init2.method) || "GET").toUpperCase();
       const res = await originalFetch(...args);
       if (url.includes("/api/v1/") && url.includes("/submissions/")) {
         return res;
       }
-      if (url.includes("/api/graphql") && res.ok) {
-        const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric/i.test(bodyText);
+      if (url.includes("/api/graphql") && res.ok && method === "POST") {
+        let bodyText = "";
+        if (typeof (init2 == null ? void 0 : init2.body) === "string") {
+          bodyText = init2.body;
+        } else if (isRequest) {
+          try {
+            bodyText = await input.clone().text();
+          } catch (error) {
+            logger.trace(`[AutoGrade] Could not read Request body: ${error.message}`);
+          }
+        }
+        const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
         if (looksLikeRubricSave) {
-          logger.info(`[AutoGrade] Call #${callId}: \u2705 RUBRIC SUBMISSION DETECTED`);
+          logger.info(`[AutoGrade] Call #${callId}: \u2705 RUBRIC SUBMISSION DETECTED (input type: ${isRequest ? "Request" : "string"})`);
           logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
           const parsed = parseSpeedGraderUrl();
           logger.info(`[AutoGrade] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
           if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
             logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
-            void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId);
+            void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId, apiClient);
           } else {
             logger.warn(`[AutoGrade] Call #${callId}: Missing IDs, cannot handle rubric submit`);
           }
@@ -4456,7 +4437,7 @@ You may need to refresh the page to see the new scores.`);
       return;
     }
     logger.debug("[AutoGrade] Creating CanvasApiClient...");
-    const apiClient = new CanvasApiClient();
+    apiClient = new CanvasApiClient();
     logger.debug("[AutoGrade] CanvasApiClient created successfully");
     let snapshot = getCourseSnapshot(courseId);
     logger.info(`[AutoGrade] Course snapshot from cache: ${snapshot ? "FOUND" : "NOT FOUND"}`);
@@ -4624,8 +4605,8 @@ You may need to refresh the page to see the new scores.`);
     let snapshot = getCourseSnapshot(courseId);
     if (!snapshot || shouldRefreshGrade(courseId, PAGE_CONTEXT.COURSE_GRADES)) {
       logger.trace(`Fetching grade data from API for course ${courseId}...`);
-      const apiClient = new CanvasApiClient();
-      snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.COURSE_GRADES);
+      const apiClient2 = new CanvasApiClient();
+      snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient2, PAGE_CONTEXT.COURSE_GRADES);
     }
     if (!snapshot) {
       logger.trace("No grade data available from snapshot");
@@ -4663,10 +4644,10 @@ You may need to refresh the page to see the new scores.`);
 
   // src/student/allGradesPageCustomizer.js
   var processed2 = false;
-  async function fetchActiveCourses2(apiClient) {
+  async function fetchActiveCourses2(apiClient2) {
     var _a18;
     try {
-      const courses = await apiClient.get(
+      const courses = await apiClient2.get(
         "/api/v1/courses?enrollment_state=active&include[]=total_scores",
         {},
         "fetchActiveCourses"
@@ -4711,7 +4692,7 @@ You may need to refresh the page to see the new scores.`);
       return [];
     }
   }
-  async function enrichCoursesWithSnapshots(courses, apiClient) {
+  async function enrichCoursesWithSnapshots(courses, apiClient2) {
     const startTime = performance.now();
     const enrichedPromises = courses.map(async (course) => {
       const { id: courseId, name: courseName } = course;
@@ -4719,7 +4700,7 @@ You may need to refresh the page to see the new scores.`);
       let snapshot = getCourseSnapshot(courseId);
       if (!snapshot || needsRefresh) {
         logger.trace(`[All-Grades] ${!snapshot ? "Populating" : "Refreshing"} snapshot for course ${courseId}...`);
-        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient, PAGE_CONTEXT.ALL_GRADES);
+        snapshot = await refreshCourseSnapshot(courseId, courseName, apiClient2, PAGE_CONTEXT.ALL_GRADES);
       }
       if (!snapshot) {
         logger.trace(`[All-Grades] No snapshot available for course ${courseId}, skipping`);
@@ -4747,17 +4728,17 @@ You may need to refresh the page to see the new scores.`);
   }
   async function fetchCourseGrades() {
     const startTime = performance.now();
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     try {
       logger.trace("[All-Grades] Step 1: Fetching active courses from API...");
-      const courses = await fetchActiveCourses2(apiClient);
+      const courses = await fetchActiveCourses2(apiClient2);
       if (courses.length === 0) {
         logger.warn("[All-Grades] No active student courses found");
         return [];
       }
       logger.trace(`[All-Grades] Found ${courses.length} active student courses`);
       logger.trace(`[All-Grades] Step 2: Enriching courses with snapshots...`);
-      const enrichedCourses = await enrichCoursesWithSnapshots(courses, apiClient);
+      const enrichedCourses = await enrichCoursesWithSnapshots(courses, apiClient2);
       logger.trace(`[All-Grades] Total processing time: ${(performance.now() - startTime).toFixed(2)}ms`);
       const withGrades = enrichedCourses.filter((c) => c.displayScore !== null).length;
       const withoutGrades = enrichedCourses.length - withGrades;
@@ -5096,12 +5077,12 @@ You may need to refresh the page to see the new scores.`);
   var processed3 = false;
   var currentStudentId = null;
   var urlChangeDetectionSetup = false;
-  async function fetchStudentAvgScore(courseId, studentId, apiClient) {
+  async function fetchStudentAvgScore(courseId, studentId, apiClient2) {
     var _a18, _b18;
     logger.trace(`[Teacher] fetchStudentAvgScore: courseId=${courseId}, studentId=${studentId}`);
     try {
       logger.trace(`[Teacher] Searching for AVG assignment "${AVG_ASSIGNMENT_NAME}"...`);
-      const assignments = await apiClient.get(
+      const assignments = await apiClient2.get(
         `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
         {},
         "fetchAvgAssignment"
@@ -5114,7 +5095,7 @@ You may need to refresh the page to see the new scores.`);
       }
       logger.trace(`[Teacher] Found AVG assignment: id=${avgAssignment.id}, name="${avgAssignment.name}"`);
       logger.trace(`[Teacher] Fetching submission for student ${studentId}, assignment ${avgAssignment.id}...`);
-      const submission = await apiClient.get(
+      const submission = await apiClient2.get(
         `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${studentId}`,
         {},
         "fetchAvgSubmission"
@@ -5292,11 +5273,11 @@ You may need to refresh the page to see the new scores.`);
     currentStudentId = studentId;
     logger.debug(`[Teacher] Teacher viewing student ${studentId} grades for course ${courseId}`);
     const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
-    const apiClient = new CanvasApiClient();
+    const apiClient2 = new CanvasApiClient();
     let snapshot = getCourseSnapshot(courseId);
     if (!snapshot) {
       logger.debug(`[Teacher] No snapshot for course ${courseId}, populating snapshot...`);
-      snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+      snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
     }
     if (!snapshot) {
       logger.warn(`[Teacher] Failed to create snapshot for course ${courseId}`);
@@ -5310,7 +5291,7 @@ You may need to refresh the page to see the new scores.`);
       return;
     }
     logger.debug(`[Teacher] Fetching AVG assignment score for student ${studentId}...`);
-    const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient);
+    const gradeData = await fetchStudentAvgScore(courseId, studentId, apiClient2);
     if (!gradeData) {
       logger.warn(`[Teacher] \u274C No AVG assignment score found for student ${studentId} - skipping grade customizations`);
       startCleanupObservers2();
@@ -5358,10 +5339,10 @@ You may need to refresh the page to see the new scores.`);
         throw new Error("Grades table not found or has no rows");
       }
       logger.info(`[DOM Approach] Found ${rows.length} course rows`);
-      const apiClient = new CanvasApiClient();
+      const apiClient2 = new CanvasApiClient();
       const coursePromises = [];
       for (const row of rows) {
-        coursePromises.push(extractCourseFromRow(row, apiClient));
+        coursePromises.push(extractCourseFromRow(row, apiClient2));
       }
       const courseResults = await Promise.allSettled(coursePromises);
       for (const result of courseResults) {
@@ -5384,12 +5365,12 @@ You may need to refresh the page to see the new scores.`);
     };
     return results;
   }
-  async function extractCourseFromRow(row, apiClient) {
+  async function extractCourseFromRow(row, apiClient2) {
     const courseData = extractCourseDataFromRow(row);
     if (!courseData) return null;
     const { courseId, courseName, percentage } = courseData;
     const detectionStart = performance.now();
-    const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient);
+    const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient2);
     const detectionTime = performance.now() - detectionStart;
     return {
       courseId,
@@ -5409,9 +5390,9 @@ You may need to refresh the page to see the new scores.`);
       metrics: {}
     };
     try {
-      const apiClient = new CanvasApiClient();
+      const apiClient2 = new CanvasApiClient();
       const apiCallStart = performance.now();
-      const enrollments = await apiClient.get(
+      const enrollments = await apiClient2.get(
         "/api/v1/users/self/enrollments",
         {
           "type[]": "StudentEnrollment",
@@ -5423,7 +5404,7 @@ You may need to refresh the page to see the new scores.`);
       const apiCallTime = performance.now() - apiCallStart;
       logger.info(`[API Approach] Fetched ${enrollments.length} enrollments in ${apiCallTime.toFixed(2)}ms`);
       const coursePromises = enrollments.map(
-        (enrollment) => processCourseFromEnrollment(enrollment, apiClient)
+        (enrollment) => processCourseFromEnrollment(enrollment, apiClient2)
       );
       const courseResults = await Promise.allSettled(coursePromises);
       for (const result of courseResults) {
@@ -5446,7 +5427,7 @@ You may need to refresh the page to see the new scores.`);
     };
     return results;
   }
-  async function processCourseFromEnrollment(enrollment, apiClient) {
+  async function processCourseFromEnrollment(enrollment, apiClient2) {
     var _a18, _b18, _c, _d, _e, _f;
     const courseId = (_a18 = enrollment.course_id) == null ? void 0 : _a18.toString();
     if (!courseId) return null;
@@ -5455,7 +5436,7 @@ You may need to refresh the page to see the new scores.`);
     let courseName = (_d = enrollment.course) == null ? void 0 : _d.name;
     if (!courseName) {
       try {
-        const course = await apiClient.get(
+        const course = await apiClient2.get(
           `/api/v1/courses/${courseId}`,
           {},
           "getCourseDetails"
@@ -5467,7 +5448,7 @@ You may need to refresh the page to see the new scores.`);
       }
     }
     const detectionStart = performance.now();
-    const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient);
+    const isStandardsBased = await detectStandardsBasedCourse(courseId, courseName, apiClient2);
     const detectionTime = performance.now() - detectionStart;
     return {
       courseId,
@@ -5479,11 +5460,11 @@ You may need to refresh the page to see the new scores.`);
       letterGrade: (_f = (_e = grades.current_grade) != null ? _e : grades.final_grade) != null ? _f : null
     };
   }
-  async function detectStandardsBasedCourse(courseId, courseName, apiClient) {
+  async function detectStandardsBasedCourse(courseId, courseName, apiClient2) {
     const classification = await determineCourseModel(
       { courseId, courseName },
       null,
-      { apiClient }
+      { apiClient: apiClient2 }
     );
     return classification.model === "standards";
   }
@@ -5593,8 +5574,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 2:51:25 PM (dev, a8a76d3)");
-    exposeVersion("dev", "2026-02-02 2:51:25 PM (dev, a8a76d3)");
+    logBanner("dev", "2026-02-02 3:07:47 PM (dev, e314264)");
+    exposeVersion("dev", "2026-02-02 3:07:47 PM (dev, e314264)");
     if (true) {
       logger.info("Running in DEV mode");
     }
