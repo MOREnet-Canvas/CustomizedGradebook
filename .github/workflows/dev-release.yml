@@ -2,7 +2,7 @@ name: Build dev and upload to Release (no Pages)
 
 on:
   push:
-    branches: [ main ]
+#    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -30,5 +30,3 @@ jobs:
           allowUpdates: true
           replacesArtifacts: true
           artifacts: "dist/dev/customGradebookInit.js,dist/dev/customGradebookInit.js.map"
-
-
