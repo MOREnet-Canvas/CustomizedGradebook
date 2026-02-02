@@ -23,6 +23,7 @@ import { injectButtons } from "./gradebook/ui/buttonInjection.js";
 import { initAssignmentKebabMenuInjection } from "./gradebook/ui/assignmentKebabMenu.js";
 import { initDashboardGradeDisplay } from "./dashboard/gradeDisplay.js";
 import { initSpeedGraderDropdown } from "./speedgrader/gradingDropdown.js";
+import { initSpeedGraderAutoGrade } from "./speedgrader/speedgraderAutoGrade.js";
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
 import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGradeCustomizer.js";
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
@@ -77,6 +78,11 @@ function isSpeedGraderPage() {
     // SpeedGrader grading dropdown auto-activator (teacher-side)
     if (isSpeedGraderPage()) {
         initSpeedGraderDropdown();
+
+        // SpeedGrader auto-grade module (teacher-like only)
+        if (getUserRoleGroup() === 'teacher_like') {
+            initSpeedGraderAutoGrade();
+        }
     }
 
     // Student grade customization (student-side)
