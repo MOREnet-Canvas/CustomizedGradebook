@@ -190,26 +190,42 @@ function updateGradeInput(score) {
         // Set input value
         input.focus();
         nativeInputValueSetter.call(input, String(score));
+        input.setAttribute('value', String(score));
 
         // Dispatch events
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
         input.dispatchEvent(new Event('blur', { bubbles: true }));
+        input.dispatchEvent(new Event('focusout', { bubbles: true }));
 
-        // Update facade if present
-        const wrapper = input.parentElement;
-        if (wrapper) {
-            const facade = wrapper.querySelector('span');
-            if (facade && facade.offsetParent !== null) {
-                facade.textContent = String(score);
-                logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
+        // Update facade if present (targeted search)
+        let current = input;
+        let facadeFound = false;
+        while (current && current !== document.body) {
+            current = current.parentElement;
+            if (current) {
+                const facadeEl = Array.from(current.querySelectorAll('*')).find(el => {
+                    return el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('facade');
+                });
+                if (facadeEl && facadeEl.offsetParent !== null) {
+                    facadeEl.textContent = String(score);
+                    logger.trace(`[AutoGrade] Updated facade text to: ${score}`);
+                    facadeFound = true;
+                    break;
+                }
             }
         }
 
         // Read back and log
         const readBack = input.value;
         logger.debug(`[AutoGrade] Applied value=${score}, read back value="${readBack}"`);
+
+        // Delayed readback to check if React overwrote it
+        setTimeout(() => {
+            logger.debug(`[AutoGrade] Post-apply readback (100ms): "${input.value}"`);
+        }, 100);
     };
 
     // Apply 3 times with delays
