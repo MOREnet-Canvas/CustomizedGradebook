@@ -4276,49 +4276,34 @@ You may need to refresh the page to see the new scores.`);
     let fetchCallCount = 0;
     window.fetch = async function(...args) {
       const callId = ++fetchCallCount;
-      const [urlOrRequest, options] = args;
-      let url = "";
-      let method = "GET";
-      let body = "";
-      if (typeof urlOrRequest === "string") {
-        url = urlOrRequest;
-        method = (options == null ? void 0 : options.method) || "GET";
-        body = (options == null ? void 0 : options.body) || "";
-      } else if (urlOrRequest instanceof Request) {
-        url = urlOrRequest.url;
-        method = urlOrRequest.method;
-        try {
-          body = await urlOrRequest.clone().text();
-        } catch (error) {
-          logger.trace(`[AutoGrade] Call #${callId}: Could not read Request body:`, error);
-          body = "";
-        }
+      const input = args[0];
+      const init2 = args[1] || {};
+      const url = String(input instanceof Request ? input.url : input);
+      let bodyText = "";
+      if (typeof init2.body === "string") {
+        bodyText = init2.body;
       }
       if (callId <= 5 || url.includes("/api/graphql") || url.includes("/submissions/")) {
-        logger.info(`[AutoGrade] Fetch #${callId}: ${method} ${url.substring(0, 150)}`);
+        logger.info(`[AutoGrade] Fetch #${callId}: ${url.substring(0, 150)}`);
       }
+      const res = await originalFetch(...args);
       if (url.includes("/api/v1/") && url.includes("/submissions/")) {
-        logger.debug(`[AutoGrade] Call #${callId}: Ignoring own submission fetch`);
-        return originalFetch.apply(this, args);
+        return res;
       }
-      const response = await originalFetch.apply(this, args);
-      if (url.includes("/api/graphql") && method === "POST") {
-        logger.info(`[AutoGrade] Call #${callId}: \u{1F50D} GraphQL POST detected, response.ok=${response.ok}`);
-        logger.info(`[AutoGrade] Call #${callId}: Body preview: ${body.substring(0, 200)}`);
-        if (response.ok) {
-          const isRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(body);
-          logger.info(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${isRubricSave}`);
-          if (isRubricSave) {
-            const requestType = urlOrRequest instanceof Request ? "Request object" : "string URL";
-            logger.info(`[AutoGrade] Call #${callId}: \u2705 RUBRIC SUBMISSION DETECTED (${requestType})`);
-            logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
-            void handleRubricSubmit(courseId, assignmentId, studentId);
-          } else {
-            logger.warn(`[AutoGrade] Call #${callId}: GraphQL POST but NO rubric pattern found in body`);
-          }
+      if (url.includes("/api/graphql") && res.ok) {
+        logger.info(`[AutoGrade] Call #${callId}: \u{1F50D} GraphQL POST detected, response.ok=true`);
+        logger.info(`[AutoGrade] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
+        const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric/i.test(bodyText);
+        logger.info(`[AutoGrade] Call #${callId}: Rubric save pattern match: ${looksLikeRubricSave}`);
+        if (looksLikeRubricSave) {
+          logger.info(`[AutoGrade] Call #${callId}: \u2705 RUBRIC SUBMISSION DETECTED`);
+          logger.info(`[AutoGrade] Call #${callId}: Triggering handleRubricSubmit...`);
+          void handleRubricSubmit(courseId, assignmentId, studentId);
+        } else {
+          logger.warn(`[AutoGrade] Call #${callId}: GraphQL POST but NO rubric pattern found in body`);
         }
       }
-      return response;
+      return res;
     };
     logger.info("[AutoGrade] \u2705 Fetch hook installed successfully");
     logger.info("[AutoGrade] Fetch hook verification: window.fetch is now wrapped:", window.fetch !== originalFetch);
@@ -5563,8 +5548,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-02 2:02:13 PM (dev, 6dc48c5)");
-    exposeVersion("dev", "2026-02-02 2:02:13 PM (dev, 6dc48c5)");
+    logBanner("dev", "2026-02-02 2:09:35 PM (dev, c1bb9f2)");
+    exposeVersion("dev", "2026-02-02 2:09:35 PM (dev, c1bb9f2)");
     if (true) {
       logger.info("Running in DEV mode");
     }
