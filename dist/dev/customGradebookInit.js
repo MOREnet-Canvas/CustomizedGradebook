@@ -4059,10 +4059,41 @@ You may need to refresh the page to see the new scores.`);
   }
 
   // src/speedgrader/speedgraderScoreSync.js
+  var TIMING_CONSTANTS = {
+    GRADE_INPUT_UPDATE_DELAYS: [0, 700, 1500],
+    RUBRIC_FETCH_DELAYS: [200, 250, 350],
+    UI_KEEPALIVE_INTERVAL: 600,
+    UI_KEEPALIVE_DURATION: 12e3,
+    NAVIGATION_RECHECK_DELAY: 250,
+    URL_PARSE_RETRY_DELAY: 500,
+    URL_PARSE_MAX_ATTEMPTS: 3,
+    SUBMIT_GRADE_TIMEOUT: 1e4,
+    SUBMIT_GRADE_MAX_RETRIES: 2
+  };
+  var UI_COLORS = {
+    CONTAINER_BG: "rgb(245, 245, 245)",
+    CONTAINER_BORDER: "rgb(245, 245, 245)",
+    LABEL_BG: "rgb(245, 245, 245)",
+    SCORE_BG: "rgb(0, 142, 83)"
+  };
+  var FEATURE_FLAGS = {
+    UI_KEEPALIVE_ENABLED: true
+  };
   var initialized3 = false;
   var inFlight = false;
   var lastFingerprintByContext = /* @__PURE__ */ new Map();
   var apiClient = null;
+  var uiKeepaliveInterval = null;
+  var metrics = {
+    attempts: 0,
+    successes: 0,
+    failures: 0,
+    skipped: 0
+  };
+  var nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value"
+  ).set;
   function parseSpeedGraderUrl() {
     var _a18, _b18;
     const path = window.location.pathname;
@@ -4075,29 +4106,57 @@ You may need to refresh the page to see the new scores.`);
     const studentId = studentIdRaw ? ((_b18 = studentIdRaw.match(/^\d+/)) == null ? void 0 : _b18[0]) || null : null;
     return { courseId, assignmentId, studentId };
   }
-  async function getStorage(key) {
+  async function parseSpeedGraderUrlWithRetry(maxAttempts = TIMING_CONSTANTS.URL_PARSE_MAX_ATTEMPTS, delayMs = TIMING_CONSTANTS.URL_PARSE_RETRY_DELAY) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const parsed = parseSpeedGraderUrl();
+      logger.trace(`[ScoreSync] Parse attempt ${attempt}/${maxAttempts} - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
+      if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
+        return parsed;
+      }
+      if (attempt < maxAttempts) {
+        logger.trace(`[ScoreSync] Missing IDs, waiting ${delayMs}ms before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    return { courseId: null, assignmentId: null, studentId: null };
+  }
+  function getStorage(key) {
     const value = localStorage.getItem(key);
     return value ? JSON.parse(value) : null;
   }
-  async function setStorage(key, value) {
+  function setStorage(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   }
-  async function getSettings(courseId, assignmentId) {
+  function getStorageKeys(courseId, assignmentId) {
     const host = window.location.hostname;
-    const assignmentKey = `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
-    const courseKey = `cg_speedgrader_scoresync_default::${host}::course::${courseId}`;
-    const assignmentSettings = await getStorage(assignmentKey);
-    if (assignmentSettings) return assignmentSettings;
-    const courseSettings = await getStorage(courseKey);
-    if (courseSettings) return courseSettings;
+    return {
+      assignment: `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`,
+      course: `cg_speedgrader_scoresync_default::${host}::course::${courseId}`
+    };
+  }
+  function getContextKey(courseId, assignmentId, studentId) {
+    return `${courseId}:${assignmentId}:${studentId}`;
+  }
+  function validateSettings(settings) {
+    const defaults = { enabled: true, method: "min" };
+    if (!settings || typeof settings !== "object") return defaults;
+    return {
+      enabled: typeof settings.enabled === "boolean" ? settings.enabled : defaults.enabled,
+      method: ["min", "avg", "max"].includes(settings.method) ? settings.method : defaults.method
+    };
+  }
+  function getSettings(courseId, assignmentId) {
+    const keys = getStorageKeys(courseId, assignmentId);
+    const assignmentSettings = getStorage(keys.assignment);
+    if (assignmentSettings) return validateSettings(assignmentSettings);
+    const courseSettings = getStorage(keys.course);
+    if (courseSettings) return validateSettings(courseSettings);
     return { enabled: true, method: "min" };
   }
-  async function saveSettings(courseId, assignmentId, settings) {
-    const host = window.location.hostname;
-    const assignmentKey = `cg_speedgrader_scoresync_settings::${host}::course::${courseId}::assignment::${assignmentId}`;
-    const courseKey = `cg_speedgrader_scoresync_default::${host}::course::${courseId}`;
-    await setStorage(assignmentKey, settings);
-    await setStorage(courseKey, settings);
+  function saveSettings(courseId, assignmentId, settings) {
+    const keys = getStorageKeys(courseId, assignmentId);
+    setStorage(keys.assignment, settings);
+    setStorage(keys.course, settings);
   }
   function calculateGrade(rubricAssessment, method) {
     const points = Object.values(rubricAssessment).map((criterion) => criterion.points).filter((p) => typeof p === "number" && !isNaN(p));
@@ -4114,43 +4173,31 @@ You may need to refresh the page to see the new scores.`);
       return `${id}:${n.toFixed(2)}`;
     }).filter(Boolean).sort().join("|");
   }
+  function findBestGradeInput() {
+    const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
+    if (allInputs.length === 0) return null;
+    const visibleInputs = allInputs.filter((el) => el.offsetParent !== null && !el.disabled);
+    if (visibleInputs.length === 0) return null;
+    const panelInputs = visibleInputs.filter(
+      (el) => el.closest('[data-testid="speedgrader-grading-panel"]') !== null
+    );
+    const candidates = panelInputs.length > 0 ? panelInputs : visibleInputs;
+    const focused = candidates.find((el) => el === document.activeElement);
+    if (focused) return focused;
+    return candidates.reduce((best, el) => {
+      const rect = el.getBoundingClientRect();
+      const area = rect.width * rect.height;
+      const bestRect = best.getBoundingClientRect();
+      const bestArea = bestRect.width * bestRect.height;
+      return area > bestArea ? el : best;
+    }, candidates[0]);
+  }
   function updateGradeInput(score) {
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
     const applyValue = () => {
-      const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
-      if (allInputs.length === 0) {
+      const input = findBestGradeInput();
+      if (!input) {
         logger.trace("[ScoreSync] Grade input not found for update");
         return;
-      }
-      const visibleInputs = allInputs.filter((el) => {
-        const visible = el.offsetParent !== null;
-        const enabled = !el.disabled;
-        return visible && enabled;
-      });
-      if (visibleInputs.length === 0) {
-        logger.trace("[ScoreSync] No visible, enabled grade inputs found");
-        return;
-      }
-      const panelInputs = visibleInputs.filter((el) => {
-        return el.closest('[data-testid="speedgrader-grading-panel"]') !== null;
-      });
-      let candidates = panelInputs.length > 0 ? panelInputs : visibleInputs;
-      let input = candidates[0];
-      if (candidates.length > 1) {
-        const focused = candidates.find((el) => el === document.activeElement);
-        if (focused) {
-          input = focused;
-        } else {
-          let maxArea = 0;
-          for (const el of candidates) {
-            const rect = el.getBoundingClientRect();
-            const area = rect.width * rect.height;
-            if (area > maxArea) {
-              maxArea = area;
-              input = el;
-            }
-          }
-        }
       }
       input.focus();
       nativeInputValueSetter.call(input, String(score));
@@ -4164,35 +4211,43 @@ You may need to refresh the page to see the new scores.`);
       const readBack = input.value;
       logger.trace(`[ScoreSync] Applied value=${score}, read back value="${readBack}"`);
     };
-    applyValue();
-    setTimeout(applyValue, 700);
-    setTimeout(applyValue, 1500);
+    TIMING_CONSTANTS.GRADE_INPUT_UPDATE_DELAYS.forEach((delay) => {
+      setTimeout(applyValue, delay);
+    });
     logger.trace(`[ScoreSync] Grade input update scheduled for score: ${score}`);
   }
-  async function submitGrade(courseId, assignmentId, studentId, score, apiClient2) {
+  async function submitGrade(courseId, assignmentId, studentId, score, apiClient2, retries = TIMING_CONSTANTS.SUBMIT_GRADE_MAX_RETRIES) {
     var _a18;
-    logger.trace(`[ScoreSync] submitGrade called with score=${score}`);
+    logger.trace(`[ScoreSync] submitGrade called with score=${score}, retries=${retries}`);
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
-    logger.trace(`[ScoreSync] PUT ${url}`);
-    try {
-      const data = await apiClient2.put(
-        url,
-        {
-          submission: {
-            posted_grade: score.toString()
-          }
-        },
-        {},
-        `submitGrade:${studentId}`
-      );
-      logger.trace(`[ScoreSync] Response data:`, data);
-      const enteredScore = (_a18 = data == null ? void 0 : data.entered_score) != null ? _a18 : score;
-      logger.info(`[ScoreSync] \u2705 Grade submitted successfully: ${enteredScore}`);
-      return data;
-    } catch (error) {
-      logger.error("[ScoreSync] Exception in submitGrade:", error);
-      return null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        logger.trace(`[ScoreSync] PUT ${url} (attempt ${attempt + 1}/${retries + 1})`);
+        const data = await apiClient2.put(
+          url,
+          {
+            submission: {
+              posted_grade: score.toString()
+            }
+          },
+          {},
+          `submitGrade:${studentId}`
+        );
+        logger.trace(`[ScoreSync] Response data:`, data);
+        const enteredScore = (_a18 = data == null ? void 0 : data.entered_score) != null ? _a18 : score;
+        logger.info(`[ScoreSync] \u2705 Grade submitted successfully: ${enteredScore}`);
+        return data;
+      } catch (error) {
+        logger.error(`[ScoreSync] Submit attempt ${attempt + 1}/${retries + 1} failed:`, error);
+        if (attempt < retries) {
+          const backoffMs = 1e3 * (attempt + 1);
+          logger.trace(`[ScoreSync] Retrying in ${backoffMs}ms...`);
+          await new Promise((r) => setTimeout(r, backoffMs));
+        }
+      }
     }
+    logger.error("[ScoreSync] All submit attempts failed");
+    return null;
   }
   async function fetchSubmission(courseId, assignmentId, studentId) {
     const params = new URLSearchParams();
@@ -4220,30 +4275,32 @@ You may need to refresh the page to see the new scores.`);
       return null;
     }
   }
-  async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient2) {
+  async function handleRubricSubmitInternal(courseId, assignmentId, studentId, apiClient2) {
     var _a18;
     logger.info("[ScoreSync] ========== RUBRIC SUBMIT HANDLER CALLED ==========");
     logger.trace(`[ScoreSync] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
     if (inFlight) {
       logger.warn("[ScoreSync] Already processing another submission, skipping");
+      metrics.skipped++;
       return;
     }
     inFlight = true;
+    metrics.attempts++;
     logger.trace("[ScoreSync] Set inFlight=true");
     try {
       logger.trace("[ScoreSync] Fetching settings...");
-      const settings = await getSettings(courseId, assignmentId);
+      const settings = getSettings(courseId, assignmentId);
       logger.trace(`[ScoreSync] Settings: enabled=${settings.enabled}, method=${settings.method}`);
       if (!settings.enabled) {
         logger.info("[ScoreSync] SKIPPED - Score sync disabled for this assignment");
+        metrics.skipped++;
         inFlight = false;
         return;
       }
       logger.trace("[ScoreSync] Waiting briefly for GraphQL commit, then polling rubric assessment...");
-      const attemptDelaysMs = [200, 250, 350];
       let submission = null;
-      for (let i = 0; i < attemptDelaysMs.length; i++) {
-        await new Promise((r) => setTimeout(r, attemptDelaysMs[i]));
+      for (let i = 0; i < TIMING_CONSTANTS.RUBRIC_FETCH_DELAYS.length; i++) {
+        await new Promise((r) => setTimeout(r, TIMING_CONSTANTS.RUBRIC_FETCH_DELAYS[i]));
         submission = await fetchSubmission(courseId, assignmentId, studentId);
         const ra = submission == null ? void 0 : submission.rubric_assessment;
         if (ra && Object.keys(ra).length > 0) break;
@@ -4251,6 +4308,7 @@ You may need to refresh the page to see the new scores.`);
       logger.trace("[ScoreSync] Fetching submission with rubric assessment complete");
       if (!submission) {
         logger.error("[ScoreSync] FAILED - fetchSubmission returned null");
+        metrics.failures++;
         inFlight = false;
         return;
       }
@@ -4258,12 +4316,13 @@ You may need to refresh the page to see the new scores.`);
       logger.trace(`[ScoreSync] Rubric assessment present: ${!!submission.rubric_assessment}`);
       if (!submission.rubric_assessment) {
         logger.warn("[ScoreSync] FAILED - No rubric assessment found in submission");
+        metrics.failures++;
         inFlight = false;
         return;
       }
       const rubricPoints = Object.values(submission.rubric_assessment).map((c) => c.points);
       logger.trace(`[ScoreSync] Rubric points: [${rubricPoints.join(", ")}]`);
-      const contextKey = `${courseId}:${assignmentId}:${studentId}`;
+      const contextKey = getContextKey(courseId, assignmentId, studentId);
       const fingerprint = createRubricFingerprint(submission.rubric_assessment);
       const lastFingerprint = lastFingerprintByContext.get(contextKey);
       logger.trace(`[ScoreSync] Context: ${contextKey}`);
@@ -4271,6 +4330,7 @@ You may need to refresh the page to see the new scores.`);
       logger.trace(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || "none"}`);
       if (fingerprint === lastFingerprint) {
         logger.info("[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match)");
+        metrics.skipped++;
         inFlight = false;
         return;
       }
@@ -4282,6 +4342,7 @@ You may need to refresh the page to see the new scores.`);
       const result = await submitGrade(courseId, assignmentId, studentId, score, apiClient2);
       if (!result) {
         logger.error("[ScoreSync] FAILED - submitGrade returned null");
+        metrics.failures++;
         return;
       }
       logger.trace(`[ScoreSync] Grade submission result: entered_score=${result.entered_score}, score=${result.score}, workflow_state=${result.workflow_state}`);
@@ -4289,13 +4350,48 @@ You may need to refresh the page to see the new scores.`);
       logger.trace(`[ScoreSync] Updating UI with final score: ${finalScore}`);
       updateGradeInput(finalScore);
       updateAssignmentScoreDisplay(finalScore);
+      metrics.successes++;
       logger.info("[ScoreSync] \u2705 SCORE SYNC COMPLETE");
     } catch (error) {
-      logger.error("[ScoreSync] ERROR in handleRubricSubmit:", error);
+      logger.error("[ScoreSync] ERROR in handleRubricSubmitInternal:", error);
+      metrics.failures++;
     } finally {
       inFlight = false;
       logger.trace("[ScoreSync] Set inFlight=false");
     }
+  }
+  async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient2) {
+    const timeoutPromise = new Promise(
+      (_, reject) => setTimeout(() => reject(new Error("Rubric submit handler timeout")), TIMING_CONSTANTS.SUBMIT_GRADE_TIMEOUT)
+    );
+    try {
+      await Promise.race([
+        handleRubricSubmitInternal(courseId, assignmentId, studentId, apiClient2),
+        timeoutPromise
+      ]);
+    } catch (error) {
+      logger.error("[ScoreSync] Timeout or error in handleRubricSubmit:", error);
+      metrics.failures++;
+      inFlight = false;
+    }
+  }
+  function isRubricSubmission(url, method, bodyText) {
+    if (!url.includes("/api/graphql")) return false;
+    if (method !== "POST") return false;
+    return /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
+  }
+  async function extractRequestBody(input, init2) {
+    if (typeof (init2 == null ? void 0 : init2.body) === "string") {
+      return init2.body;
+    }
+    if (input instanceof Request) {
+      try {
+        return await input.clone().text();
+      } catch (error) {
+        logger.trace(`[ScoreSync] Could not read Request body: ${error.message}`);
+      }
+    }
+    return "";
   }
   function hookFetch() {
     logger.trace("[ScoreSync] Installing fetch hook...");
@@ -4317,19 +4413,9 @@ You may need to refresh the page to see the new scores.`);
       if (url.includes("/api/v1/") && url.includes("/submissions/")) {
         return res;
       }
-      if (url.includes("/api/graphql") && res.ok && method === "POST") {
-        let bodyText = "";
-        if (typeof (init2 == null ? void 0 : init2.body) === "string") {
-          bodyText = init2.body;
-        } else if (isRequest) {
-          try {
-            bodyText = await input.clone().text();
-          } catch (error) {
-            logger.trace(`[ScoreSync] Could not read Request body: ${error.message}`);
-          }
-        }
-        const looksLikeRubricSave = /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
-        if (looksLikeRubricSave) {
+      if (res.ok) {
+        const bodyText = await extractRequestBody(input, init2);
+        if (isRubricSubmission(url, method, bodyText)) {
           logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED`);
           logger.trace(`[ScoreSync] Call #${callId}: input type: ${isRequest ? "Request" : "string"}`);
           logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
@@ -4353,99 +4439,127 @@ You may need to refresh the page to see the new scores.`);
       display.textContent = score;
     }
   }
-  async function createUIControls(courseId, assignmentId) {
-    logger.trace("[ScoreSync] createUIControls called");
-    logger.trace('[ScoreSync] Looking for Canvas flex container: span[dir="ltr"][wrap="wrap"]');
-    const flexContainer = document.querySelector('span[dir="ltr"][wrap="wrap"][direction="row"]');
-    if (!flexContainer) {
-      logger.trace("[ScoreSync] Flex container not found, trying fallback selector");
-      const fallbackContainer = document.querySelector("span.css-jf6rsx-view--flex-flex");
-      if (!fallbackContainer) {
-        logger.trace("[ScoreSync] Canvas flex container not found in DOM");
-        return false;
+  function createUIControls(courseId, assignmentId) {
+    try {
+      logger.trace("[ScoreSync] createUIControls called");
+      logger.trace('[ScoreSync] Looking for Canvas flex container: span[dir="ltr"][wrap="wrap"]');
+      const flexContainer = document.querySelector('span[dir="ltr"][wrap="wrap"][direction="row"]');
+      if (!flexContainer) {
+        logger.trace("[ScoreSync] Flex container not found, trying fallback selector");
+        const fallbackContainer = document.querySelector("span.css-jf6rsx-view--flex-flex");
+        if (!fallbackContainer) {
+          logger.trace("[ScoreSync] Canvas flex container not found in DOM");
+          return false;
+        }
+        logger.trace("[ScoreSync] Found flex container via fallback selector");
       }
-      logger.trace("[ScoreSync] Found flex container via fallback selector");
-    }
-    const targetContainer = flexContainer || document.querySelector("span.css-jf6rsx-view--flex-flex");
-    const existing = document.querySelector("[data-cg-scoresync-ui]");
-    if (existing) {
-      logger.trace("[ScoreSync] Removing existing UI controls before re-creation");
-      existing.remove();
-    }
-    logger.trace("[ScoreSync] Canvas flex container found, creating UI controls");
-    const settings = await getSettings(courseId, assignmentId);
-    logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
-    const container = document.createElement("div");
-    container.setAttribute("data-cg-scoresync-ui", "true");
-    container.setAttribute("data-cg-enabled", settings.enabled ? "true" : "false");
-    container.style.cssText = `
-        display: inline-flex;
-        align-items: stretch;
-        gap: 0.75rem;
-        margin-left: 0.75rem;
-        padding-left: 0.75rem;
-        padding-right: 0;
-        height: 3rem;
-        border-radius: 0.35rem;
-        background: rgb(245, 245, 245);
-        border: 1px solid rgb(245, 245, 245);
-        flex-shrink: 0;
-        font: inherit;
-        color: inherit;
-        transition: opacity 0.2s ease;
-        opacity: ${settings.enabled ? "1" : "0.6"};
-        overflow: hidden;
-    `;
-    container.innerHTML = `
-        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; white-space: nowrap;">
-            <input type="checkbox" data-cg-toggle ${settings.enabled ? "checked" : ""}
-                   style="margin: 0; transform: scale(1.25); transform-origin: center; cursor: pointer;">
-            <span style="font-weight: 600;">Score Sync</span>
-        </label>
-        <select class="ic-Input" data-cg-method ${settings.enabled ? "" : "disabled"}
-                style="width: auto; min-width: 4rem; height: 2.375rem; min-height: 2.375rem; padding-top: 0.25rem; padding-bottom: 0.25rem; align-self: center;">
-            <option value="min" ${settings.method === "min" ? "selected" : ""}>MIN</option>
-            <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
-            <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
-        </select>
-        <div style="display: flex; height: 100%; flex-shrink: 0; margin: 0;">
-            <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; height: 100%; background-color: rgb(245, 245, 245);">
-                <span style="font-weight: 600; white-space: nowrap;">Assignment Score</span>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 100%; background-color: rgb(0, 142, 83);">
-                <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
-            </div>
-        </div>
-    `;
-    const toggle = container.querySelector("[data-cg-toggle]");
-    const methodSelect = container.querySelector("[data-cg-method]");
-    toggle.addEventListener("change", async () => {
-      settings.enabled = toggle.checked;
-      await saveSettings(courseId, assignmentId, settings);
+      const targetContainer = flexContainer || document.querySelector("span.css-jf6rsx-view--flex-flex");
+      const existing = document.querySelector("[data-cg-scoresync-ui]");
+      if (existing) {
+        logger.trace("[ScoreSync] Removing existing UI controls before re-creation");
+        existing.remove();
+      }
+      logger.trace("[ScoreSync] Canvas flex container found, creating UI controls");
+      const settings = getSettings(courseId, assignmentId);
+      logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
+      const container = document.createElement("div");
+      container.setAttribute("data-cg-scoresync-ui", "true");
       container.setAttribute("data-cg-enabled", settings.enabled ? "true" : "false");
-      container.style.opacity = settings.enabled ? "1" : "0.6";
-      methodSelect.disabled = !settings.enabled;
-      methodSelect.style.cursor = settings.enabled ? "pointer" : "not-allowed";
-      logger.info(`[ScoreSync] Score sync ${settings.enabled ? "enabled" : "disabled"}`);
-    });
-    methodSelect.addEventListener("change", async () => {
-      settings.method = methodSelect.value;
-      await saveSettings(courseId, assignmentId, settings);
-      logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
-    });
-    logger.trace("[ScoreSync] Appending UI container as flex item");
-    targetContainer.appendChild(container);
-    logger.info("[ScoreSync] \u2705 UI controls created and inserted into DOM");
-    return true;
+      container.style.cssText = `
+            display: inline-flex;
+            align-items: stretch;
+            gap: 0.75rem;
+            margin-left: 0.75rem;
+            padding-left: 0.75rem;
+            padding-right: 0;
+            height: 3rem;
+            border-radius: 0.35rem;
+            background: ${UI_COLORS.CONTAINER_BG};
+            border: 1px solid ${UI_COLORS.CONTAINER_BORDER};
+            flex-shrink: 0;
+            font: inherit;
+            color: inherit;
+            transition: opacity 0.2s ease;
+            opacity: ${settings.enabled ? "1" : "0.6"};
+            overflow: hidden;
+        `;
+      container.innerHTML = `
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; white-space: nowrap;">
+                <input type="checkbox" data-cg-toggle ${settings.enabled ? "checked" : ""}
+                       style="margin: 0; transform: scale(1.25); transform-origin: center; cursor: pointer;">
+                <span style="font-weight: 600;">Score Sync</span>
+            </label>
+            <select class="ic-Input" data-cg-method ${settings.enabled ? "" : "disabled"}
+                    style="width: auto; min-width: 4rem; height: 2.375rem; min-height: 2.375rem; padding-top: 0.25rem; padding-bottom: 0.25rem; align-self: center;">
+                <option value="min" ${settings.method === "min" ? "selected" : ""}>MIN</option>
+                <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
+                <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
+            </select>
+            <div style="display: flex; height: 100%; flex-shrink: 0; margin: 0;">
+                <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; height: 100%; background-color: ${UI_COLORS.LABEL_BG};">
+                    <span style="font-weight: 600; white-space: nowrap;">Assignment Score</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 100%; background-color: ${UI_COLORS.SCORE_BG};">
+                    <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
+                </div>
+            </div>
+        `;
+      const toggle = container.querySelector("[data-cg-toggle]");
+      const methodSelect = container.querySelector("[data-cg-method]");
+      toggle.addEventListener("change", () => {
+        settings.enabled = toggle.checked;
+        saveSettings(courseId, assignmentId, settings);
+        container.setAttribute("data-cg-enabled", settings.enabled ? "true" : "false");
+        container.style.opacity = settings.enabled ? "1" : "0.6";
+        methodSelect.disabled = !settings.enabled;
+        methodSelect.style.cursor = settings.enabled ? "pointer" : "not-allowed";
+        logger.info(`[ScoreSync] Score sync ${settings.enabled ? "enabled" : "disabled"}`);
+      });
+      methodSelect.addEventListener("change", () => {
+        settings.method = methodSelect.value;
+        saveSettings(courseId, assignmentId, settings);
+        logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
+      });
+      logger.trace("[ScoreSync] Appending UI container as flex item");
+      targetContainer.appendChild(container);
+      logger.info("[ScoreSync] \u2705 UI controls created and inserted into DOM");
+      return true;
+    } catch (error) {
+      logger.error("[ScoreSync] Failed to create UI controls:", error);
+      return false;
+    }
   }
-  async function ensureScoreSyncUiPresent() {
+  function ensureScoreSyncUiPresent() {
     const { courseId, assignmentId } = parseSpeedGraderUrl();
-    if (!courseId || !assignmentId) return;
+    if (!courseId || !assignmentId) {
+      logger.trace("[ScoreSync] Cannot ensure UI: missing IDs");
+      return;
+    }
     if (document.querySelector("[data-cg-scoresync-ui]")) return;
-    const ok = await createUIControls(courseId, assignmentId);
+    const ok = createUIControls(courseId, assignmentId);
     if (ok) {
       logger.info(`[ScoreSync] UI re-injected for course=${courseId}, assignment=${assignmentId}`);
+    } else {
+      logger.warn("[ScoreSync] Failed to re-inject UI (container not found)");
     }
+  }
+  function scheduleUiRecheck() {
+    setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+    setTimeout(() => void ensureScoreSyncUiPresent(), TIMING_CONSTANTS.NAVIGATION_RECHECK_DELAY);
+  }
+  function startTemporaryUiKeepalive() {
+    if (uiKeepaliveInterval) {
+      clearInterval(uiKeepaliveInterval);
+    }
+    uiKeepaliveInterval = setInterval(() => void ensureScoreSyncUiPresent(), TIMING_CONSTANTS.UI_KEEPALIVE_INTERVAL);
+    logger.trace(`[ScoreSync] Temporary UI keepalive started (${TIMING_CONSTANTS.UI_KEEPALIVE_INTERVAL}ms checks for ${TIMING_CONSTANTS.UI_KEEPALIVE_DURATION}ms)`);
+    setTimeout(() => {
+      if (uiKeepaliveInterval) {
+        clearInterval(uiKeepaliveInterval);
+        uiKeepaliveInterval = null;
+        logger.trace("[ScoreSync] Temporary UI keepalive stopped (duration expired)");
+      }
+    }, TIMING_CONSTANTS.UI_KEEPALIVE_DURATION);
   }
   function hookHistoryApi() {
     if (window.__CG_SCORESYNC_HISTORY_HOOKED__) return;
@@ -4454,23 +4568,19 @@ You may need to refresh the page to see the new scores.`);
     const originalReplaceState = history.replaceState;
     history.pushState = function(...args) {
       originalPushState.apply(this, args);
-      setTimeout(() => void ensureScoreSyncUiPresent(), 0);
-      setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+      scheduleUiRecheck();
+      startTemporaryUiKeepalive();
     };
     history.replaceState = function(...args) {
       originalReplaceState.apply(this, args);
-      setTimeout(() => void ensureScoreSyncUiPresent(), 0);
-      setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+      scheduleUiRecheck();
+      startTemporaryUiKeepalive();
     };
     window.addEventListener("popstate", () => {
-      setTimeout(() => void ensureScoreSyncUiPresent(), 0);
-      setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+      scheduleUiRecheck();
+      startTemporaryUiKeepalive();
     });
     logger.trace("[ScoreSync] History API hooks installed");
-  }
-  function startUiKeepalive() {
-    setInterval(() => void ensureScoreSyncUiPresent(), 600);
-    logger.trace("[ScoreSync] UI keepalive interval started (600ms)");
   }
   async function initSpeedGraderAutoGrade() {
     var _a18;
@@ -4487,26 +4597,9 @@ You may need to refresh the page to see the new scores.`);
       logger.info(`[ScoreSync] SKIPPED - user is ${roleGroup}, not teacher_like`);
       return;
     }
-    let parseAttempt = 0;
-    let courseId, assignmentId, studentId;
-    while (parseAttempt < 3) {
-      parseAttempt++;
-      const parsed = parseSpeedGraderUrl();
-      courseId = parsed.courseId;
-      assignmentId = parsed.assignmentId;
-      studentId = parsed.studentId;
-      logger.trace(`[ScoreSync] Parse attempt ${parseAttempt}/3 - courseId: ${courseId}, assignmentId: ${assignmentId}, studentId: ${studentId}`);
-      if (courseId && assignmentId && studentId) {
-        logger.trace("[ScoreSync] All required IDs extracted successfully");
-        break;
-      }
-      if (parseAttempt < 3) {
-        logger.trace(`[ScoreSync] Missing IDs, waiting 500ms before retry...`);
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-    }
+    const { courseId, assignmentId, studentId } = await parseSpeedGraderUrlWithRetry();
     if (!courseId || !assignmentId || !studentId) {
-      logger.error("[ScoreSync] FAILED - Missing required IDs after 3 attempts:", { courseId, assignmentId, studentId });
+      logger.error("[ScoreSync] FAILED - Missing required IDs after retries:", { courseId, assignmentId, studentId });
       logger.error("[ScoreSync] Full URL:", window.location.href);
       logger.error("[ScoreSync] Query params:", window.location.search);
       initialized3 = false;
@@ -4538,10 +4631,12 @@ You may need to refresh the page to see the new scores.`);
     hookFetch();
     logger.trace("[ScoreSync] Installing history API hooks...");
     hookHistoryApi();
-    logger.trace("[ScoreSync] Starting UI keepalive interval...");
-    startUiKeepalive();
+    if (FEATURE_FLAGS.UI_KEEPALIVE_ENABLED) {
+      logger.trace("[ScoreSync] Starting temporary UI keepalive...");
+      startTemporaryUiKeepalive();
+    }
     logger.trace("[ScoreSync] Attempting immediate UI creation...");
-    await createUIControls(courseId, assignmentId);
+    createUIControls(courseId, assignmentId);
     logger.info("[ScoreSync] ========== INITIALIZATION COMPLETE ==========");
   }
 
@@ -5631,8 +5726,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 10:30:48 AM (dev, a24bd19)");
-    exposeVersion("dev", "2026-02-03 10:30:48 AM (dev, a24bd19)");
+    logBanner("dev", "2026-02-03 11:12:36 AM (dev, fee7a08)");
+    exposeVersion("dev", "2026-02-03 11:12:36 AM (dev, fee7a08)");
     if (true) {
       logger.info("Running in DEV mode");
     }
