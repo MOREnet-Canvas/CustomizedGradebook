@@ -502,50 +502,31 @@ async function createUIControls(courseId, assignmentId) {
     const settings = await getSettings(courseId, assignmentId);
     logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
 
-    const container = document.createElement('span');
+    const container = document.createElement('div');
     container.setAttribute('data-cg-scoresync-ui', 'true');
+    container.className = 'ic-Form-control';
     container.style.cssText = `
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        margin-left: 12px;
-        padding: 0 12px;
-        background: rgb(245, 245, 245);
-        border: 1px solid #d1d5db;
-        border-radius: 0.35rem;
-        font-size: 0.875rem;
-        height: 3rem;
-        line-height: 3rem;
+        gap: 0.75rem;
+        margin-left: 0.75rem;
         flex-shrink: 0;
-        font-family: LatoWeb, Lato, "Helvetica Neue", Helvetica, Arial, sans-serif;
-        font-weight: normal;
-        letter-spacing: normal;
+        font: inherit;
+        color: inherit;
     `;
 
     container.innerHTML = `
-        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; user-select: none; line-height: normal;">
-            <input type="checkbox" data-cg-toggle ${settings.enabled ? 'checked' : ''}
-                   style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
-            <span style="color: #2d3748; font-weight: normal;">Score Sync</span>
+        <label class="ic-Label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0;">
+            <input type="checkbox" class="ic-Input" data-cg-toggle ${settings.enabled ? 'checked' : ''} style="margin: 0;">
+            <span>Score Sync</span>
         </label>
-        <select data-cg-method
-                style="padding: 4px 8px;
-                       border: 1px solid #d1d5db;
-                       border-radius: 0.35rem;
-                       background: white;
-                       cursor: pointer;
-                       font-size: 0.875rem;
-                       color: #2d3748;
-                       font-weight: normal;
-                       height: 2rem;
-                       font-family: inherit;">
+        <select class="ic-Input" data-cg-method style="width: auto;">
             <option value="min" ${settings.method === 'min' ? 'selected' : ''}>MIN</option>
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
         </select>
-        <span style="width: 1px; height: 2rem; background: #d1d5db; margin: 0 4px;"></span>
-        <span style="color: #2d3748; font-weight: normal; white-space: nowrap; line-height: normal;">
-            Assignment Score: <span data-cg-assignment-score style="color: #0374b5; font-weight: 700;">--</span>
+        <span class="ic-Label" style="margin: 0;">
+            Assignment Score: <strong data-cg-assignment-score>--</strong>
         </span>
     `;
 
