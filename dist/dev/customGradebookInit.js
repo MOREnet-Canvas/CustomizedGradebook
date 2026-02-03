@@ -2370,299 +2370,6 @@ You may need to refresh the page to see the new scores.`);
     return div.innerHTML;
   }
 
-  // src/gradebook/ui/assignmentKebabMenu.js
-  var MENU_ITEM_ID = "cg-refresh-mastery-menuitem";
-  var STYLE_ID = "cg-refresh-mastery-style";
-  var lastKebabButton = null;
-  function isVisible(element) {
-    const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }
-  function isAssignmentActionsMenu(menuElement) {
-    const menuItems = [...menuElement.querySelectorAll('[role="menuitem"]')];
-    const texts = menuItems.map((item) => (item.innerText || item.textContent || "").trim());
-    return texts.includes("SpeedGrader");
-  }
-  function extractAssignmentIdFromHeader(kebabButton) {
-    var _a18;
-    if (!kebabButton) {
-      logger.warn("[RefreshMastery] No kebab button reference available");
-      return null;
-    }
-    const headerColumn = kebabButton.closest(".slick-header-column.assignment");
-    if (!headerColumn) {
-      logger.warn("[RefreshMastery] Could not find parent .slick-header-column.assignment");
-      return null;
-    }
-    const classMatch = headerColumn.className.match(/\bassignment_(\d+)\b/);
-    if (classMatch) {
-      return Number(classMatch[1]);
-    }
-    const assignmentLink = headerColumn.querySelector('a[href*="/assignments/"]');
-    if (assignmentLink) {
-      const hrefMatch = (_a18 = assignmentLink.getAttribute("href")) == null ? void 0 : _a18.match(/\/assignments\/(\d+)/);
-      if (hrefMatch) {
-        return Number(hrefMatch[1]);
-      }
-    }
-    logger.warn("[RefreshMastery] Could not extract assignment ID from header column");
-    return null;
-  }
-  function resetMenuFocus(menuElement) {
-    try {
-      menuElement.setAttribute("tabindex", "-1");
-      menuElement.focus({ preventScroll: true });
-    } catch (error) {
-    }
-    const firstMenuItem = menuElement.querySelector('[role="menuitem"]');
-    if (firstMenuItem) {
-      try {
-        firstMenuItem.focus({ preventScroll: true });
-      } catch (error) {
-      }
-    }
-  }
-  function createMenuItemLike(menuElement) {
-    const template = menuElement.querySelector('a[role="menuitem"].css-1kq4kmj-menuItem') || menuElement.querySelector('button[role="menuitem"].css-1kq4kmj-menuItem') || menuElement.querySelector('span[role="menuitem"].css-1kq4kmj-menuItem');
-    if (!template) {
-      logger.warn("[RefreshMastery] Could not find menu item template to clone");
-      return null;
-    }
-    const menuItem = template.cloneNode(true);
-    menuItem.id = MENU_ITEM_ID;
-    menuItem.removeAttribute("href");
-    if (menuItem.tagName.toLowerCase() === "a") {
-      menuItem.setAttribute("href", "#");
-    }
-    if (menuItem.tagName.toLowerCase() === "button") {
-      menuItem.type = "button";
-    }
-    const walker = document.createTreeWalker(menuItem, NodeFilter.SHOW_TEXT);
-    let textNode = null;
-    while (walker.nextNode()) {
-      const text = walker.currentNode.nodeValue;
-      if (text && text.trim().length > 0) {
-        textNode = walker.currentNode;
-        break;
-      }
-    }
-    if (textNode) {
-      textNode.nodeValue = "Refresh Mastery";
-      const { iconContainer } = createInfoIconWithTooltip({
-        tooltipId: "cg-refresh-mastery-tooltip",
-        ariaLabel: "About Refresh Mastery",
-        title: "Refresh Mastery",
-        bodyParagraphs: [
-          "Temporarily gives this assignment points so Canvas recalculates mastery results.",
-          "Does not change student grades.",
-          "Points possible are automatically set back to zero.",
-          "This does not update rubric scores, so outcome results are unchanged."
-        ],
-        footer: "MOREnet Gradebook Customization",
-        iconSize: 14,
-        position: "right",
-        offset: 8
-      });
-      const textParent = textNode.parentElement;
-      if (textParent) {
-        textParent.appendChild(iconContainer);
-      }
-    }
-    return menuItem;
-  }
-  function createInlineSpinner() {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", "16");
-    svg.setAttribute("height", "16");
-    svg.setAttribute("viewBox", "0 0 16 16");
-    svg.setAttribute("role", "status");
-    svg.setAttribute("aria-label", "Loading");
-    svg.style.cssText = `
-        display: inline-block;
-        vertical-align: middle;
-        margin-left: 6px;
-        animation: cg-spinner-rotate 0.8s linear infinite;
-    `;
-    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    circle.setAttribute("cx", "8");
-    circle.setAttribute("cy", "8");
-    circle.setAttribute("r", "6");
-    circle.setAttribute("fill", "none");
-    circle.setAttribute("stroke", "currentColor");
-    circle.setAttribute("stroke-width", "2");
-    circle.setAttribute("stroke-linecap", "round");
-    circle.setAttribute("stroke-dasharray", "28");
-    circle.setAttribute("stroke-dashoffset", "10");
-    svg.appendChild(circle);
-    return svg;
-  }
-  async function updateGradebookSettings(courseId, assignmentId) {
-    try {
-      logger.debug(`[RefreshMastery] Updating gradebook settings for assignment ${assignmentId}`);
-      const apiClient2 = new CanvasApiClient();
-      const payload = {
-        gradebook_settings: {
-          enter_grades_as: {
-            [assignmentId]: "gradingScheme"
-          }
-        }
-      };
-      logger.debug("[RefreshMastery] Sending gradebook settings update:", payload);
-      await apiClient2.put(
-        `/api/v1/courses/${courseId}/gradebook_settings`,
-        payload,
-        {},
-        // options
-        "updateGradebookSettings"
-        // context
-      );
-      logger.info(`[RefreshMastery] Successfully updated gradebook settings for assignment ${assignmentId}`);
-    } catch (error) {
-      logger.warn("[RefreshMastery] Failed to update gradebook settings (non-critical):", error);
-    }
-  }
-  function injectRefreshMasteryMenuItem(menuElement) {
-    if (!menuElement || !isAssignmentActionsMenu(menuElement)) {
-      return;
-    }
-    resetMenuFocus(menuElement);
-    if (menuElement.querySelector(`#${MENU_ITEM_ID}`)) {
-      return;
-    }
-    const menuItem = createMenuItemLike(menuElement);
-    if (!menuItem) {
-      return;
-    }
-    menuItem.setAttribute("tabindex", "0");
-    menuItem.addEventListener("mouseenter", () => {
-      try {
-        menuItem.focus({ preventScroll: true });
-      } catch (error) {
-        menuItem.focus();
-      }
-    });
-    menuItem.addEventListener("click", async (e) => {
-      var _a18;
-      e.preventDefault();
-      const courseId = getCourseId();
-      const assignmentId = extractAssignmentIdFromHeader(lastKebabButton);
-      if (!courseId || !assignmentId) {
-        logger.error("[RefreshMastery] Missing courseId or assignmentId", { courseId, assignmentId });
-        showFloatingBanner({
-          text: "Refresh Mastery failed (missing context)",
-          duration: 3e3
-        });
-        return;
-      }
-      const originalLabel = ((_a18 = menuItem.querySelector("span")) == null ? void 0 : _a18.textContent) || "Refresh Mastery";
-      const labelSpan = menuItem.querySelector("span");
-      menuItem.setAttribute("aria-disabled", "true");
-      menuItem.setAttribute("aria-busy", "true");
-      menuItem.style.pointerEvents = "none";
-      if (labelSpan) {
-        labelSpan.textContent = "Refreshing";
-        const spinner = createInlineSpinner();
-        labelSpan.appendChild(spinner);
-      }
-      try {
-        logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId}`);
-        await refreshMasteryForAssignment(courseId, assignmentId);
-        logger.info(`[RefreshMastery] Successfully refreshed assignment ${assignmentId}`);
-        await updateGradebookSettings(courseId, assignmentId);
-        showFloatingBanner({
-          text: "\u2713 Mastery Levels updated - Reload the page in ~30 seconds to see changes",
-          duration: 5e3
-        });
-      } catch (error) {
-        logger.error("[RefreshMastery] Refresh failed:", error);
-        showFloatingBanner({
-          text: "\u2717 Refresh Mastery failed - Please try again",
-          duration: 3500
-        });
-      } finally {
-        if (labelSpan) {
-          labelSpan.textContent = originalLabel;
-        }
-        menuItem.removeAttribute("aria-disabled");
-        menuItem.removeAttribute("aria-busy");
-        menuItem.style.pointerEvents = "";
-      }
-    });
-    menuElement.appendChild(menuItem);
-    logger.debug("[RefreshMastery] Injected menu item");
-  }
-  function injectStyles() {
-    if (document.getElementById(STYLE_ID)) {
-      return;
-    }
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-        #${MENU_ITEM_ID}:hover,
-        #${MENU_ITEM_ID}:focus {
-            color: white !important;
-        }
-        #${MENU_ITEM_ID}:hover *,
-        #${MENU_ITEM_ID}:focus * {
-            color: white !important;
-        }
-
-        /* Info icon visibility on hover/focus */
-        #${MENU_ITEM_ID}:hover .cg-info-icon-container,
-        #${MENU_ITEM_ID}:focus .cg-info-icon-container,
-        .cg-info-icon-container:hover,
-        .cg-info-icon-container:focus {
-            opacity: 1 !important;
-        }
-
-        /* Info icon focus outline */
-        .cg-info-icon-container:focus {
-            outline: 2px solid rgba(255, 255, 255, 0.5);
-            outline-offset: 2px;
-            border-radius: 50%;
-        }
-
-        /* Spinner rotation animation */
-        @keyframes cg-spinner-rotate {
-            from {
-                transform: rotate(0deg);
-            }
-            to {
-                transform: rotate(360deg);
-            }
-        }
-    `;
-    document.head.appendChild(style);
-    logger.debug("[RefreshMastery] Injected CSS styles");
-  }
-  function initAssignmentKebabMenuInjection() {
-    if (!MASTERY_REFRESH_ENABLED) {
-      logger.debug("[RefreshMastery] Feature disabled via config");
-      return;
-    }
-    logger.info("[RefreshMastery] Initializing kebab menu injection");
-    injectStyles();
-    document.addEventListener("click", (e) => {
-      const kebabButton = e.target.closest('button[aria-haspopup="true"][data-popover-trigger="true"]');
-      if (kebabButton) {
-        lastKebabButton = kebabButton;
-        logger.debug("[RefreshMastery] Tracked kebab button click");
-      }
-    }, true);
-    const observer = new MutationObserver(() => {
-      const allMenus = [...document.querySelectorAll('[role="menu"]')].filter(isVisible);
-      const menu = allMenus[allMenus.length - 1];
-      if (menu) {
-        injectRefreshMasteryMenuItem(menu);
-      }
-    });
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    logger.info("[RefreshMastery] Kebab menu injection initialized");
-  }
-
   // src/utils/courseDetection.js
   function matchesCourseNamePattern(courseName) {
     if (!courseName) return false;
@@ -3300,6 +3007,328 @@ You may need to refresh the page to see the new scores.`);
     });
     logger.info("[Snapshot] Statistics:", stats);
     return snapshots;
+  }
+
+  // src/gradebook/ui/assignmentKebabMenu.js
+  var MENU_ITEM_ID = "cg-refresh-mastery-menuitem";
+  var STYLE_ID = "cg-refresh-mastery-style";
+  var lastKebabButton = null;
+  var isStandardsBasedCourse = null;
+  function isVisible(element) {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+  function isAssignmentActionsMenu(menuElement) {
+    const menuItems = [...menuElement.querySelectorAll('[role="menuitem"]')];
+    const texts = menuItems.map((item) => (item.innerText || item.textContent || "").trim());
+    return texts.includes("SpeedGrader");
+  }
+  function extractAssignmentIdFromHeader(kebabButton) {
+    var _a18;
+    if (!kebabButton) {
+      logger.warn("[RefreshMastery] No kebab button reference available");
+      return null;
+    }
+    const headerColumn = kebabButton.closest(".slick-header-column.assignment");
+    if (!headerColumn) {
+      logger.warn("[RefreshMastery] Could not find parent .slick-header-column.assignment");
+      return null;
+    }
+    const classMatch = headerColumn.className.match(/\bassignment_(\d+)\b/);
+    if (classMatch) {
+      return Number(classMatch[1]);
+    }
+    const assignmentLink = headerColumn.querySelector('a[href*="/assignments/"]');
+    if (assignmentLink) {
+      const hrefMatch = (_a18 = assignmentLink.getAttribute("href")) == null ? void 0 : _a18.match(/\/assignments\/(\d+)/);
+      if (hrefMatch) {
+        return Number(hrefMatch[1]);
+      }
+    }
+    logger.warn("[RefreshMastery] Could not extract assignment ID from header column");
+    return null;
+  }
+  function resetMenuFocus(menuElement) {
+    try {
+      menuElement.setAttribute("tabindex", "-1");
+      menuElement.focus({ preventScroll: true });
+    } catch (error) {
+    }
+    const firstMenuItem = menuElement.querySelector('[role="menuitem"]');
+    if (firstMenuItem) {
+      try {
+        firstMenuItem.focus({ preventScroll: true });
+      } catch (error) {
+      }
+    }
+  }
+  function createMenuItemLike(menuElement) {
+    const template = menuElement.querySelector('a[role="menuitem"].css-1kq4kmj-menuItem') || menuElement.querySelector('button[role="menuitem"].css-1kq4kmj-menuItem') || menuElement.querySelector('span[role="menuitem"].css-1kq4kmj-menuItem');
+    if (!template) {
+      logger.warn("[RefreshMastery] Could not find menu item template to clone");
+      return null;
+    }
+    const menuItem = template.cloneNode(true);
+    menuItem.id = MENU_ITEM_ID;
+    menuItem.removeAttribute("href");
+    if (menuItem.tagName.toLowerCase() === "a") {
+      menuItem.setAttribute("href", "#");
+    }
+    if (menuItem.tagName.toLowerCase() === "button") {
+      menuItem.type = "button";
+    }
+    const walker = document.createTreeWalker(menuItem, NodeFilter.SHOW_TEXT);
+    let textNode = null;
+    while (walker.nextNode()) {
+      const text = walker.currentNode.nodeValue;
+      if (text && text.trim().length > 0) {
+        textNode = walker.currentNode;
+        break;
+      }
+    }
+    if (textNode) {
+      textNode.nodeValue = "Refresh Mastery";
+      const { iconContainer } = createInfoIconWithTooltip({
+        tooltipId: "cg-refresh-mastery-tooltip",
+        ariaLabel: "About Refresh Mastery",
+        title: "Refresh Mastery",
+        bodyParagraphs: [
+          "Temporarily gives this assignment points so Canvas recalculates mastery results.",
+          "Does not change student grades.",
+          "Points possible are automatically set back to zero.",
+          "This does not update rubric scores, so outcome results are unchanged."
+        ],
+        footer: "MOREnet Gradebook Customization",
+        iconSize: 14,
+        position: "right",
+        offset: 8
+      });
+      const textParent = textNode.parentElement;
+      if (textParent) {
+        textParent.appendChild(iconContainer);
+      }
+    }
+    return menuItem;
+  }
+  function createInlineSpinner() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("role", "status");
+    svg.setAttribute("aria-label", "Loading");
+    svg.style.cssText = `
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 6px;
+        animation: cg-spinner-rotate 0.8s linear infinite;
+    `;
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", "8");
+    circle.setAttribute("cy", "8");
+    circle.setAttribute("r", "6");
+    circle.setAttribute("fill", "none");
+    circle.setAttribute("stroke", "currentColor");
+    circle.setAttribute("stroke-width", "2");
+    circle.setAttribute("stroke-linecap", "round");
+    circle.setAttribute("stroke-dasharray", "28");
+    circle.setAttribute("stroke-dashoffset", "10");
+    svg.appendChild(circle);
+    return svg;
+  }
+  async function updateGradebookSettings(courseId, assignmentId) {
+    try {
+      logger.debug(`[RefreshMastery] Updating gradebook settings for assignment ${assignmentId}`);
+      const apiClient2 = new CanvasApiClient();
+      const payload = {
+        gradebook_settings: {
+          enter_grades_as: {
+            [assignmentId]: "gradingScheme"
+          }
+        }
+      };
+      logger.debug("[RefreshMastery] Sending gradebook settings update:", payload);
+      await apiClient2.put(
+        `/api/v1/courses/${courseId}/gradebook_settings`,
+        payload,
+        {},
+        // options
+        "updateGradebookSettings"
+        // context
+      );
+      logger.info(`[RefreshMastery] Successfully updated gradebook settings for assignment ${assignmentId}`);
+    } catch (error) {
+      logger.warn("[RefreshMastery] Failed to update gradebook settings (non-critical):", error);
+    }
+  }
+  async function injectRefreshMasteryMenuItem(menuElement) {
+    var _a18, _b18;
+    if (!menuElement || !isAssignmentActionsMenu(menuElement)) {
+      return;
+    }
+    if (isStandardsBasedCourse === null) {
+      const courseId = getCourseId();
+      if (!courseId) {
+        logger.warn("[RefreshMastery] Cannot get course ID, skipping menu injection");
+        return;
+      }
+      let snapshot = getCourseSnapshot(courseId);
+      if (!snapshot) {
+        logger.debug("[RefreshMastery] No snapshot found, populating for course filtering...");
+        const apiClient2 = new CanvasApiClient();
+        const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
+      }
+      if (snapshot) {
+        isStandardsBasedCourse = snapshot.model === "standards";
+        logger.debug(`[RefreshMastery] Course ${courseId} is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+      } else {
+        isStandardsBasedCourse = false;
+        logger.warn("[RefreshMastery] Could not determine course type, defaulting to non-standards-based");
+      }
+    }
+    if (!isStandardsBasedCourse) {
+      logger.trace("[RefreshMastery] Skipping menu injection - course is not standards-based");
+      return;
+    }
+    resetMenuFocus(menuElement);
+    if (menuElement.querySelector(`#${MENU_ITEM_ID}`)) {
+      return;
+    }
+    const menuItem = createMenuItemLike(menuElement);
+    if (!menuItem) {
+      return;
+    }
+    menuItem.setAttribute("tabindex", "0");
+    menuItem.addEventListener("mouseenter", () => {
+      try {
+        menuItem.focus({ preventScroll: true });
+      } catch (error) {
+        menuItem.focus();
+      }
+    });
+    menuItem.addEventListener("click", async (e) => {
+      var _a19;
+      e.preventDefault();
+      const courseId = getCourseId();
+      const assignmentId = extractAssignmentIdFromHeader(lastKebabButton);
+      if (!courseId || !assignmentId) {
+        logger.error("[RefreshMastery] Missing courseId or assignmentId", { courseId, assignmentId });
+        showFloatingBanner({
+          text: "Refresh Mastery failed (missing context)",
+          duration: 3e3
+        });
+        return;
+      }
+      const originalLabel = ((_a19 = menuItem.querySelector("span")) == null ? void 0 : _a19.textContent) || "Refresh Mastery";
+      const labelSpan = menuItem.querySelector("span");
+      menuItem.setAttribute("aria-disabled", "true");
+      menuItem.setAttribute("aria-busy", "true");
+      menuItem.style.pointerEvents = "none";
+      if (labelSpan) {
+        labelSpan.textContent = "Refreshing";
+        const spinner = createInlineSpinner();
+        labelSpan.appendChild(spinner);
+      }
+      try {
+        logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId}`);
+        await refreshMasteryForAssignment(courseId, assignmentId);
+        logger.info(`[RefreshMastery] Successfully refreshed assignment ${assignmentId}`);
+        await updateGradebookSettings(courseId, assignmentId);
+        showFloatingBanner({
+          text: "\u2713 Mastery Levels updated - Reload the page in ~30 seconds to see changes",
+          duration: 5e3
+        });
+      } catch (error) {
+        logger.error("[RefreshMastery] Refresh failed:", error);
+        showFloatingBanner({
+          text: "\u2717 Refresh Mastery failed - Please try again",
+          duration: 3500
+        });
+      } finally {
+        if (labelSpan) {
+          labelSpan.textContent = originalLabel;
+        }
+        menuItem.removeAttribute("aria-disabled");
+        menuItem.removeAttribute("aria-busy");
+        menuItem.style.pointerEvents = "";
+      }
+    });
+    menuElement.appendChild(menuItem);
+    logger.debug("[RefreshMastery] Injected menu item");
+  }
+  function injectStyles() {
+    if (document.getElementById(STYLE_ID)) {
+      return;
+    }
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+        #${MENU_ITEM_ID}:hover,
+        #${MENU_ITEM_ID}:focus {
+            color: white !important;
+        }
+        #${MENU_ITEM_ID}:hover *,
+        #${MENU_ITEM_ID}:focus * {
+            color: white !important;
+        }
+
+        /* Info icon visibility on hover/focus */
+        #${MENU_ITEM_ID}:hover .cg-info-icon-container,
+        #${MENU_ITEM_ID}:focus .cg-info-icon-container,
+        .cg-info-icon-container:hover,
+        .cg-info-icon-container:focus {
+            opacity: 1 !important;
+        }
+
+        /* Info icon focus outline */
+        .cg-info-icon-container:focus {
+            outline: 2px solid rgba(255, 255, 255, 0.5);
+            outline-offset: 2px;
+            border-radius: 50%;
+        }
+
+        /* Spinner rotation animation */
+        @keyframes cg-spinner-rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    logger.debug("[RefreshMastery] Injected CSS styles");
+  }
+  function initAssignmentKebabMenuInjection() {
+    if (!MASTERY_REFRESH_ENABLED) {
+      logger.debug("[RefreshMastery] Feature disabled via config");
+      return;
+    }
+    logger.info("[RefreshMastery] Initializing kebab menu injection");
+    injectStyles();
+    document.addEventListener("click", (e) => {
+      const kebabButton = e.target.closest('button[aria-haspopup="true"][data-popover-trigger="true"]');
+      if (kebabButton) {
+        lastKebabButton = kebabButton;
+        logger.debug("[RefreshMastery] Tracked kebab button click");
+      }
+    }, true);
+    const observer = new MutationObserver(() => {
+      const allMenus = [...document.querySelectorAll('[role="menu"]')].filter(isVisible);
+      const menu = allMenus[allMenus.length - 1];
+      if (menu) {
+        injectRefreshMasteryMenuItem(menu).catch((err) => {
+          logger.warn("[RefreshMastery] Error injecting menu item:", err);
+        });
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    logger.info("[RefreshMastery] Kebab menu injection initialized");
   }
 
   // src/utils/domExtractors.js
@@ -5733,8 +5762,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 12:06:53 PM (dev, 2b3d214)");
-    exposeVersion("dev", "2026-02-03 12:06:53 PM (dev, 2b3d214)");
+    logBanner("dev", "2026-02-03 1:10:36 PM (dev, 80e70c7)");
+    exposeVersion("dev", "2026-02-03 1:10:36 PM (dev, 80e70c7)");
     if (true) {
       logger.info("Running in DEV mode");
     }
