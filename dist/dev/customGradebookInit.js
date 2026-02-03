@@ -4380,10 +4380,11 @@ You may need to refresh the page to see the new scores.`);
     container.setAttribute("data-cg-enabled", settings.enabled ? "true" : "false");
     container.style.cssText = `
         display: inline-flex;
-        align-items: center;
+        align-items: stretch;
         gap: 0.75rem;
         margin-left: 0.75rem;
-        padding: 0 0.75rem;
+        padding-left: 0.75rem;
+        padding-right: 0;
         height: 3rem;
         border-radius: 0.35rem;
         background: #f5f5f5;
@@ -4393,6 +4394,7 @@ You may need to refresh the page to see the new scores.`);
         color: inherit;
         transition: opacity 0.2s ease;
         opacity: ${settings.enabled ? "1" : "0.6"};
+        overflow: hidden;
     `;
     container.innerHTML = `
         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; white-space: nowrap;">
@@ -4406,11 +4408,11 @@ You may need to refresh the page to see the new scores.`);
             <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
             <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
         </select>
-        <div style="display: inline-flex; height: 3rem; flex-shrink: 0;">
-            <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; height: 3rem; background-color: rgb(245, 245, 245); border-radius: 0.35rem 0px 0px 0.35rem;">
+        <div style="display: flex; height: 100%; flex-shrink: 0; margin: 0;">
+            <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; height: 100%; background-color: rgb(245, 245, 245);">
                 <span style="font-weight: 600; white-space: nowrap;">Assignment Score</span>
             </div>
-            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 3rem; background-color: rgb(0, 142, 83); border-radius: 0px 0.35rem 0.35rem 0px;">
+            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 100%; background-color: rgb(0, 142, 83);">
                 <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
             </div>
         </div>
@@ -5629,8 +5631,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 10:19:58 AM (dev, 7fce4d4)");
-    exposeVersion("dev", "2026-02-03 10:19:58 AM (dev, 7fce4d4)");
+    logBanner("dev", "2026-02-03 10:23:50 AM (dev, 80f0b18)");
+    exposeVersion("dev", "2026-02-03 10:23:50 AM (dev, 80f0b18)");
     if (true) {
       logger.info("Running in DEV mode");
     }
