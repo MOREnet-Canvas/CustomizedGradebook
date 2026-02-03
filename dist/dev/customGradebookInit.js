@@ -4406,14 +4406,10 @@ You may need to refresh the page to see the new scores.`);
             <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
             <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
         </select>
-        <div data-cg-scoresync-scorebox style="display: inline-flex; height: 3rem; border-radius: 0.35rem; overflow: hidden; font: inherit; max-width: 100%;">
-            <span data-cg-score-label style="display: flex; align-items: center; padding: 0 0.75rem; background: #e0e0e0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 8rem;">
-                Assignment Score
-            </span>
-            <span style="display: flex; align-items: center; padding: 0 1rem; background: #0b6a2b; color: #fff; font-weight: 700; white-space: nowrap;">
-                <span data-cg-assignment-score>--</span>&nbsp;pts
-            </span>
-        </div>
+        <span style="width: 1px; height: 1.75rem; background: #c7cdd1; margin-inline: 0.75rem;"></span>
+        <span style="display: inline-flex; align-items: center; padding: 0.5rem 1rem; background: #0b6a2b; color: #fff; font-weight: 700; border-radius: 0.35rem; white-space: nowrap;">
+            <strong data-cg-assignment-score>--</strong>&nbsp;pts
+        </span>
     `;
     const toggle = container.querySelector("[data-cg-toggle]");
     const methodSelect = container.querySelector("[data-cg-method]");
@@ -4431,16 +4427,6 @@ You may need to refresh the page to see the new scores.`);
       await saveSettings(courseId, assignmentId, settings);
       logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
     });
-    const scoreLabel = container.querySelector("[data-cg-score-label]");
-    const updateLabelText = () => {
-      const containerWidth = container.getBoundingClientRect().width;
-      if (scoreLabel) {
-        scoreLabel.textContent = containerWidth < 500 ? "Score" : "Assignment Score";
-      }
-    };
-    setTimeout(updateLabelText, 0);
-    const resizeObserver = new ResizeObserver(updateLabelText);
-    resizeObserver.observe(container);
     logger.trace("[ScoreSync] Appending UI container as flex item");
     targetContainer.appendChild(container);
     logger.info("[ScoreSync] \u2705 UI controls created and inserted into DOM");
@@ -5639,8 +5625,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 9:38:42 AM (dev, da2e49e)");
-    exposeVersion("dev", "2026-02-03 9:38:42 AM (dev, da2e49e)");
+    logBanner("dev", "2026-02-03 9:45:01 AM (dev, 682d0ea)");
+    exposeVersion("dev", "2026-02-03 9:45:01 AM (dev, 682d0ea)");
     if (true) {
       logger.info("Running in DEV mode");
     }

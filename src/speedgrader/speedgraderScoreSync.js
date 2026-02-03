@@ -20,7 +20,6 @@ import { logger } from '../utils/logger.js';
 import { getUserRoleGroup } from '../utils/canvas.js';
 import { getCourseSnapshot, populateCourseSnapshot } from '../services/courseSnapshotService.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 
 let initialized = false;
 let inFlight = false;
@@ -534,14 +533,10 @@ async function createUIControls(courseId, assignmentId) {
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
         </select>
-        <div data-cg-scoresync-scorebox style="display: inline-flex; height: 3rem; border-radius: 0.35rem; overflow: hidden; font: inherit; max-width: 100%;">
-            <span data-cg-score-label style="display: flex; align-items: center; padding: 0 0.75rem; background: #e0e0e0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 8rem;">
-                Assignment Score
-            </span>
-            <span style="display: flex; align-items: center; padding: 0 1rem; background: #0b6a2b; color: #fff; font-weight: 700; white-space: nowrap;">
-                <span data-cg-assignment-score>--</span>&nbsp;pts
-            </span>
-        </div>
+        <span style="width: 1px; height: 1.75rem; background: #c7cdd1; margin-inline: 0.75rem;"></span>
+        <span style="display: inline-flex; align-items: center; padding: 0.5rem 1rem; background: #0b6a2b; color: #fff; font-weight: 700; border-radius: 0.35rem; white-space: nowrap;">
+            <strong data-cg-assignment-score>--</strong>&nbsp;pts
+        </span>
     `;
 
     const toggle = container.querySelector('[data-cg-toggle]');
@@ -565,22 +560,6 @@ async function createUIControls(courseId, assignmentId) {
         await saveSettings(courseId, assignmentId, settings);
         logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
     });
-
-    // Responsive label: shorten on smaller widths
-    const scoreLabel = container.querySelector('[data-cg-score-label]');
-    const updateLabelText = () => {
-        const containerWidth = container.getBoundingClientRect().width;
-        if (scoreLabel) {
-            scoreLabel.textContent = containerWidth < 500 ? 'Score' : 'Assignment Score';
-        }
-    };
-
-    // Initial check
-    setTimeout(updateLabelText, 0);
-
-    // Update on window resize
-    const resizeObserver = new ResizeObserver(updateLabelText);
-    resizeObserver.observe(container);
 
     logger.trace('[ScoreSync] Appending UI container as flex item');
     targetContainer.appendChild(container);
