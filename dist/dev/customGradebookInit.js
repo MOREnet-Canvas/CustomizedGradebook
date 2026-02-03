@@ -4388,7 +4388,7 @@ You may need to refresh the page to see the new scores.`);
         height: 3rem;
         border-radius: 0.35rem;
         background: rgb(245, 245, 245);
-        border: none;
+        border: 1px solid rgb(245, 245, 245);
         flex-shrink: 0;
         font: inherit;
         color: inherit;
@@ -5631,8 +5631,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 10:27:30 AM (dev, 27aebe6)");
-    exposeVersion("dev", "2026-02-03 10:27:30 AM (dev, 27aebe6)");
+    logBanner("dev", "2026-02-03 10:30:48 AM (dev, a24bd19)");
+    exposeVersion("dev", "2026-02-03 10:30:48 AM (dev, a24bd19)");
     if (true) {
       logger.info("Running in DEV mode");
     }

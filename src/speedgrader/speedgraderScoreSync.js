@@ -514,7 +514,7 @@ async function createUIControls(courseId, assignmentId) {
         height: 3rem;
         border-radius: 0.35rem;
         background: rgb(245, 245, 245);
-        border: none;
+        border: 1px solid rgb(245, 245, 245);
         flex-shrink: 0;
         font: inherit;
         color: inherit;
