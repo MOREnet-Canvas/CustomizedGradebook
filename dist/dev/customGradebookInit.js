@@ -4390,17 +4390,15 @@ You may need to refresh the page to see the new scores.`);
         height: 3rem;
         line-height: 3rem;
         flex-shrink: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
+        font-family: LatoWeb, Lato, "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-weight: normal;
+        letter-spacing: normal;
     `;
     container.innerHTML = `
-        <span style="color: #2d3748; font-weight: 500; white-space: nowrap; line-height: normal;">
-            Assignment Score: <span data-cg-assignment-score style="color: #0374b5; font-weight: 600;">--</span>
-        </span>
-        <span style="width: 1px; height: 2rem; background: #d1d5db; margin: 0 4px;"></span>
         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; user-select: none; line-height: normal;">
             <input type="checkbox" data-cg-toggle ${settings.enabled ? "checked" : ""}
                    style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
-            <span style="color: #2d3748; font-weight: 500;">Score Sync</span>
+            <span style="color: #2d3748; font-weight: normal;">Score Sync</span>
         </label>
         <select data-cg-method
                 style="padding: 4px 8px;
@@ -4410,12 +4408,17 @@ You may need to refresh the page to see the new scores.`);
                        cursor: pointer;
                        font-size: 0.875rem;
                        color: #2d3748;
-                       font-weight: 500;
-                       height: 2rem;">
+                       font-weight: normal;
+                       height: 2rem;
+                       font-family: inherit;">
             <option value="min" ${settings.method === "min" ? "selected" : ""}>MIN</option>
             <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
             <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
         </select>
+        <span style="width: 1px; height: 2rem; background: #d1d5db; margin: 0 4px;"></span>
+        <span style="color: #2d3748; font-weight: normal; white-space: nowrap; line-height: normal;">
+            Assignment Score: <span data-cg-assignment-score style="color: #0374b5; font-weight: 700;">--</span>
+        </span>
     `;
     const toggle = container.querySelector("[data-cg-toggle]");
     const methodSelect = container.querySelector("[data-cg-method]");
@@ -5627,8 +5630,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 9:00:05 AM (dev, a9b4415)");
-    exposeVersion("dev", "2026-02-03 9:00:05 AM (dev, a9b4415)");
+    logBanner("dev", "2026-02-03 9:06:38 AM (dev, 0c813b5)");
+    exposeVersion("dev", "2026-02-03 9:06:38 AM (dev, 0c813b5)");
     if (true) {
       logger.info("Running in DEV mode");
     }
