@@ -13,6 +13,7 @@ import { refreshMasteryForAssignment } from '../../services/masteryRefreshServic
 import { showFloatingBanner } from '../../ui/banner.js';
 import { createInfoIconWithTooltip } from '../../ui/infoTooltip.js';
 import { MASTERY_REFRESH_ENABLED } from '../../config.js';
+import { getCourseSnapshot, populateCourseSnapshot } from '../../services/courseSnapshotService.js';
 
 /**
  * Constants
@@ -24,6 +25,11 @@ const STYLE_ID = 'cg-refresh-mastery-style';
  * Track the last clicked kebab button to extract assignment ID
  */
 let lastKebabButton = null;
+
+/**
+ * Track if course snapshot has been checked (cached for session)
+ */
+let isStandardsBasedCourse = null;
 
 /**
  * Check if an element is visible
@@ -272,9 +278,48 @@ async function updateGradebookSettings(courseId, assignmentId) {
  *
  * @param {HTMLElement} menuElement - The menu element
  */
-function injectRefreshMasteryMenuItem(menuElement) {
+async function injectRefreshMasteryMenuItem(menuElement) {
     // Validate this is an assignment actions menu
     if (!menuElement || !isAssignmentActionsMenu(menuElement)) {
+        return;
+    }
+
+    // Check if course is standards-based (only show menu item for standards-based courses)
+    if (isStandardsBasedCourse === null) {
+        // First time - check course snapshot
+        const courseId = getCourseId();
+        if (!courseId) {
+            logger.warn('[RefreshMastery] Cannot get course ID, skipping menu injection');
+            return;
+        }
+
+        let snapshot = getCourseSnapshot(courseId);
+
+        // If no snapshot exists, populate it
+        if (!snapshot) {
+            logger.debug('[RefreshMastery] No snapshot found, populating for course filtering...');
+            const apiClient = new CanvasApiClient();
+
+            // Get course name from DOM (try multiple selectors)
+            const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
+
+            snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+        }
+
+        // Cache the result for this session
+        if (snapshot) {
+            isStandardsBasedCourse = snapshot.model === 'standards';
+            logger.debug(`[RefreshMastery] Course ${courseId} is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+        } else {
+            // If we can't determine course type, default to false (don't show menu item)
+            isStandardsBasedCourse = false;
+            logger.warn('[RefreshMastery] Could not determine course type, defaulting to non-standards-based');
+        }
+    }
+
+    // Only show menu item for standards-based courses
+    if (!isStandardsBasedCourse) {
+        logger.trace('[RefreshMastery] Skipping menu injection - course is not standards-based');
         return;
     }
 
@@ -462,7 +507,10 @@ export function initAssignmentKebabMenuInjection() {
         const menu = allMenus[allMenus.length - 1];
 
         if (menu) {
-            injectRefreshMasteryMenuItem(menu);
+            // Call async function without awaiting (fire and forget)
+            injectRefreshMasteryMenuItem(menu).catch(err => {
+                logger.warn('[RefreshMastery] Error injecting menu item:', err);
+            });
         }
     });
 
