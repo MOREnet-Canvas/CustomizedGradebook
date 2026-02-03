@@ -547,15 +547,27 @@ function isRubricSubmission(url, method, bodyText) {
     if (!url.includes('/api/graphql')) return false;
     if (method !== 'POST') return false;
 
-    // Only match SaveRubricAssessment mutation, not queries or other operations
-    // This prevents false positives when Canvas fetches existing rubric data during navigation
-    const isSaveMutation = /mutation\s+SaveRubricAssessment|"operationName"\s*:\s*"SaveRubricAssessment"/i.test(bodyText);
+    // Match various patterns for SaveRubricAssessment mutation
+    // Canvas may use different GraphQL formats (operation name, mutation keyword, etc.)
+    const patterns = [
+        // Pattern 1: mutation SaveRubricAssessment
+        /mutation\s+SaveRubricAssessment/i,
+        // Pattern 2: "operationName":"SaveRubricAssessment"
+        /"operationName"\s*:\s*"SaveRubricAssessment"/i,
+        // Pattern 3: saveRubricAssessment (camelCase field name in mutation)
+        /mutation[^{]*\{[^}]*saveRubricAssessment/i,
+        // Pattern 4: Just check for mutation + rubric_assessment variables (fallback)
+        /mutation.*rubric_assessment/is
+    ];
 
-    if (isSaveMutation) {
-        logger.trace('[ScoreSync] GraphQL operation matched: SaveRubricAssessment mutation');
+    for (let i = 0; i < patterns.length; i++) {
+        if (patterns[i].test(bodyText)) {
+            logger.trace(`[ScoreSync] GraphQL operation matched SaveRubricAssessment (pattern ${i + 1})`);
+            return true;
+        }
     }
 
-    return isSaveMutation;
+    return false;
 }
 
 /**
@@ -628,6 +640,16 @@ function hookFetch() {
             const isQuery = /query\s+\w+/.test(bodyText);
 
             logger.trace(`[ScoreSync] GraphQL ${isMutation ? 'mutation' : isQuery ? 'query' : 'operation'}: ${operationName}`);
+
+            // DEBUG: Log full body for rubric-related operations to diagnose detection issues
+            if (bodyText.toLowerCase().includes('rubric')) {
+                logger.debug(`[ScoreSync] RUBRIC-RELATED GraphQL detected - Operation: ${operationName}`);
+                logger.debug(`[ScoreSync] Full request body (first 500 chars): ${bodyText.substring(0, 500)}`);
+                logger.debug(`[ScoreSync] Body contains "mutation": ${bodyText.includes('mutation')}`);
+                logger.debug(`[ScoreSync] Body contains "SaveRubricAssessment": ${bodyText.includes('SaveRubricAssessment')}`);
+                logger.debug(`[ScoreSync] Body contains "saveRubricAssessment": ${bodyText.includes('saveRubricAssessment')}`);
+                logger.debug(`[ScoreSync] isRubricSubmission() result: ${isRubricSubmission(url, method, bodyText)}`);
+            }
 
             if (isRubricSubmission(url, method, bodyText)) {
                 logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED (mutation: SaveRubricAssessment)`);
