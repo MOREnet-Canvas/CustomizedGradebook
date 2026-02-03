@@ -67,7 +67,10 @@ function isSpeedGraderPage() {
     // Gradebook functionality (teacher-side)
     if (window.location.pathname.includes("/gradebook")) {
         injectButtons();
-        initAssignmentKebabMenuInjection();
+        // Async initialization - fire and forget with error handling
+        initAssignmentKebabMenuInjection().catch(err => {
+            logger.warn('[Init] Failed to initialize assignment kebab menu injection:', err);
+        });
     }
 
     // Dashboard grade display (student-side)
