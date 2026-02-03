@@ -5639,8 +5639,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 9:24:42 AM (dev, dfd4902)");
-    exposeVersion("dev", "2026-02-03 9:24:42 AM (dev, dfd4902)");
+    logBanner("dev", "2026-02-03 9:38:42 AM (dev, da2e49e)");
+    exposeVersion("dev", "2026-02-03 9:38:42 AM (dev, da2e49e)");
     if (true) {
       logger.info("Running in DEV mode");
     }
