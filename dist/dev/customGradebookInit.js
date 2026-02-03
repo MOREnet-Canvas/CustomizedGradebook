@@ -4355,39 +4355,40 @@ You may need to refresh the page to see the new scores.`);
   }
   async function createUIControls(courseId, assignmentId) {
     logger.trace("[ScoreSync] createUIControls called");
-    logger.trace('[ScoreSync] Looking for anchor element: span[data-testid="rubric-assessment-instructor-score"]');
-    const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
-    if (!anchor) {
-      logger.trace("[ScoreSync] Anchor element not found in DOM");
-      const rubricElements = document.querySelectorAll('[data-testid*="rubric"]');
-      logger.trace(`[ScoreSync] Found ${rubricElements.length} elements with data-testid containing "rubric"`);
-      if (rubricElements.length > 0) {
-        const testIds = Array.from(rubricElements).map((el) => el.getAttribute("data-testid")).slice(0, 5);
-        logger.trace(`[ScoreSync] Sample rubric testids: ${testIds.join(", ")}`);
+    logger.trace('[ScoreSync] Looking for Canvas flex container: span[dir="ltr"][wrap="wrap"]');
+    const flexContainer = document.querySelector('span[dir="ltr"][wrap="wrap"][direction="row"]');
+    if (!flexContainer) {
+      logger.trace("[ScoreSync] Flex container not found, trying fallback selector");
+      const fallbackContainer = document.querySelector("span.css-jf6rsx-view--flex-flex");
+      if (!fallbackContainer) {
+        logger.trace("[ScoreSync] Canvas flex container not found in DOM");
+        return false;
       }
-      return false;
+      logger.trace("[ScoreSync] Found flex container via fallback selector");
     }
+    const targetContainer = flexContainer || document.querySelector("span.css-jf6rsx-view--flex-flex");
     const existing = document.querySelector("[data-cg-scoresync-ui]");
     if (existing) {
       logger.trace("[ScoreSync] Removing existing UI controls before re-creation");
       existing.remove();
     }
-    logger.trace("[ScoreSync] Anchor element found, creating UI controls");
+    logger.trace("[ScoreSync] Canvas flex container found, creating UI controls");
     const settings = await getSettings(courseId, assignmentId);
     logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
-    const container = document.createElement("div");
+    const container = document.createElement("span");
     container.setAttribute("data-cg-scoresync-ui", "true");
     container.style.cssText = `
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        margin-left: 48px;
-        margin-top: -8px;
+        margin-left: auto;
         padding: 3px 10px;
         background: #f5f5f5;
         border: 1px solid #d1d5db;
         border-radius: 3px;
         font-size: 12px;
+        line-height: 1.5;
+        flex-shrink: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
     `;
     container.innerHTML = `
@@ -4406,7 +4407,7 @@ You may need to refresh the page to see the new scores.`);
                        border-radius: 3px;
                        background: white;
                        cursor: pointer;
-                       font-size: 13px;
+                       font-size: 12px;
                        color: #2d3748;
                        font-weight: 500;">
             <option value="min" ${settings.method === "min" ? "selected" : ""}>MIN</option>
@@ -4426,8 +4427,8 @@ You may need to refresh the page to see the new scores.`);
       await saveSettings(courseId, assignmentId, settings);
       logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
     });
-    logger.trace("[ScoreSync] Appending UI container to anchor parent element");
-    anchor.parentElement.appendChild(container);
+    logger.trace("[ScoreSync] Appending UI container as flex item");
+    targetContainer.appendChild(container);
     logger.info("[ScoreSync] \u2705 UI controls created and inserted into DOM");
     return true;
   }
@@ -5624,8 +5625,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 8:50:04 AM (dev, 5ec8450)");
-    exposeVersion("dev", "2026-02-03 8:50:04 AM (dev, 5ec8450)");
+    logBanner("dev", "2026-02-03 8:55:55 AM (dev, 6929f05)");
+    exposeVersion("dev", "2026-02-03 8:55:55 AM (dev, 6929f05)");
     if (true) {
       logger.info("Running in DEV mode");
     }
