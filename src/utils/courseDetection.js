@@ -73,12 +73,19 @@ export function isValidLetterGrade(letterGrade) {
  */
 export async function hasAvgAssignment(courseId, apiClient) {
     try {
+        // Build URL with query parameters
+        // Note: search_term searches for assignments that START with the term
+        // We use per_page=100 to ensure we get enough results to find the assignment
+        const searchTerm = encodeURIComponent(AVG_ASSIGNMENT_NAME);
+        const url = `/api/v1/courses/${courseId}/assignments?search_term=${searchTerm}&per_page=100`;
+
         const assignments = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: AVG_ASSIGNMENT_NAME },
+            url,
+            {},
             'checkAvgAssignment'
         );
-        
+
+        // Exact match check (search_term only filters by prefix)
         return assignments.some(a => a.name === AVG_ASSIGNMENT_NAME);
     } catch (error) {
         logger.warn(`Could not check assignments for course ${courseId}:`, error.message);
