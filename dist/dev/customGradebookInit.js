@@ -655,12 +655,17 @@
     }
     /**
      * Make a GET request to the Canvas API
+     * Automatically appends per_page=100 to avoid pagination limits (Canvas default is 10)
      * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
      * @param {Object} options - Additional fetch options
      * @param {string} context - Context for error logging (optional)
      * @returns {Promise<any>} Parsed JSON response
      */
     async get(url, options = {}, context = "get") {
+      if (!url.includes("per_page=")) {
+        const separator = url.includes("?") ? "&" : "?";
+        url = `${url}${separator}per_page=100`;
+      }
       return __privateMethod(this, _CanvasApiClient_instances, makeRequest_fn).call(this, url, "GET", null, options, context);
     }
     /**
@@ -5762,8 +5767,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 2:09:37 PM (dev, 164cc15)");
-    exposeVersion("dev", "2026-02-03 2:09:37 PM (dev, 164cc15)");
+    logBanner("dev", "2026-02-03 2:25:49 PM (dev, 66cc057)");
+    exposeVersion("dev", "2026-02-03 2:25:49 PM (dev, 66cc057)");
     if (true) {
       logger.info("Running in DEV mode");
     }

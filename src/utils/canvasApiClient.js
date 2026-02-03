@@ -39,12 +39,20 @@ export class CanvasApiClient {
 
     /**
      * Make a GET request to the Canvas API
+     * Automatically appends per_page=100 to avoid pagination limits (Canvas default is 10)
      * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/assignments')
      * @param {Object} options - Additional fetch options
      * @param {string} context - Context for error logging (optional)
      * @returns {Promise<any>} Parsed JSON response
      */
     async get(url, options = {}, context = 'get') {
+        // Add per_page=100 to avoid Canvas API pagination limits (default is 10 items)
+        // Only add if not already present in the URL
+        if (!url.includes('per_page=')) {
+            const separator = url.includes('?') ? '&' : '?';
+            url = `${url}${separator}per_page=100`;
+        }
+
         return this.#makeRequest(url, 'GET', null, options, context);
     }
 
@@ -180,4 +188,3 @@ export class CanvasApiClient {
         return await safeJsonParse(response, context);
     }
 }
-
