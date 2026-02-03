@@ -5767,8 +5767,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 2:46:45 PM (dev, b6c8c16)");
-    exposeVersion("dev", "2026-02-03 2:46:45 PM (dev, b6c8c16)");
+    logBanner("dev", "2026-02-03 3:11:56 PM (dev, 060a982)");
+    exposeVersion("dev", "2026-02-03 3:11:56 PM (dev, 060a982)");
     if (true) {
       logger.info("Running in DEV mode");
     }

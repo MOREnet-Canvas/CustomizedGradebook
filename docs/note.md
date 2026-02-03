@@ -12,7 +12,7 @@ For checking version in DevTools: CG.version
 
 ## Next Steps
 
-TODO: SpeedGrader - Find lowest rubric score and use that for grade override
+~~TODO: SpeedGrader - Find lowest rubric score and use that for grade override~~
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Admin dashboard
 TODO: Add Checks for assignments
@@ -35,7 +35,7 @@ TODO: Mastery Refresh: This does not update rubric scores, so outcome results ar
 
 ## Refactoring
 TODO: remove canvasHelpers.js?
-TODO: get rid of all references to current score
+~~TODO: get rid of all references to current score~~
 TODO: remove legacy code
 
 ## Admin Dashboard
