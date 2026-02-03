@@ -537,7 +537,7 @@ async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient) 
 }
 
 /**
- * Check if request is a rubric submission mutation (Fixed: only match mutations, not queries)
+ * Check if request is a rubric submission mutation (only matches mutations, not queries)
  * @param {string} url - Request URL
  * @param {string} method - HTTP method
  * @param {string} bodyText - Request body text
@@ -547,27 +547,14 @@ function isRubricSubmission(url, method, bodyText) {
     if (!url.includes('/api/graphql')) return false;
     if (method !== 'POST') return false;
 
-    // Match various patterns for SaveRubricAssessment mutation
-    // Canvas may use different GraphQL formats (operation name, mutation keyword, etc.)
-    const patterns = [
-        // Pattern 1: mutation SaveRubricAssessment
-        /mutation\s+SaveRubricAssessment/i,
-        // Pattern 2: "operationName":"SaveRubricAssessment"
-        /"operationName"\s*:\s*"SaveRubricAssessment"/i,
-        // Pattern 3: saveRubricAssessment (camelCase field name in mutation)
-        /mutation[^{]*\{[^}]*saveRubricAssessment/i,
-        // Pattern 4: Just check for mutation + rubric_assessment variables (fallback)
-        /mutation.*rubric_assessment/is
-    ];
+    // Match SaveRubricAssessment mutation patterns
+    // Canvas uses operation names like "SpeedGrader_SaveRubricAssessment"
+    // This matches mutations but excludes queries like "SpeedGrader_RubricAssessmentsQuery"
+    const isSaveMutation =
+        /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText) ||
+        /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
 
-    for (let i = 0; i < patterns.length; i++) {
-        if (patterns[i].test(bodyText)) {
-            logger.trace(`[ScoreSync] GraphQL operation matched SaveRubricAssessment (pattern ${i + 1})`);
-            return true;
-        }
-    }
-
-    return false;
+    return isSaveMutation;
 }
 
 /**
@@ -633,28 +620,14 @@ function hookFetch() {
         if (res.ok && url.includes('/api/graphql') && method === 'POST') {
             const bodyText = await extractRequestBody(input, init);
 
-            // Log all GraphQL operations for debugging (trace level)
+            // Log GraphQL operations at trace level
             const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
             const operationName = operationMatch ? operationMatch[1] : 'unknown';
-            const isMutation = /mutation\s+\w+/.test(bodyText);
-            const isQuery = /query\s+\w+/.test(bodyText);
-
-            logger.trace(`[ScoreSync] GraphQL ${isMutation ? 'mutation' : isQuery ? 'query' : 'operation'}: ${operationName}`);
-
-            // DEBUG: Log full body for rubric-related operations to diagnose detection issues
-            if (bodyText.toLowerCase().includes('rubric')) {
-                logger.debug(`[ScoreSync] RUBRIC-RELATED GraphQL detected - Operation: ${operationName}`);
-                logger.debug(`[ScoreSync] Full request body (first 500 chars): ${bodyText.substring(0, 500)}`);
-                logger.debug(`[ScoreSync] Body contains "mutation": ${bodyText.includes('mutation')}`);
-                logger.debug(`[ScoreSync] Body contains "SaveRubricAssessment": ${bodyText.includes('SaveRubricAssessment')}`);
-                logger.debug(`[ScoreSync] Body contains "saveRubricAssessment": ${bodyText.includes('saveRubricAssessment')}`);
-                logger.debug(`[ScoreSync] isRubricSubmission() result: ${isRubricSubmission(url, method, bodyText)}`);
-            }
+            logger.trace(`[ScoreSync] GraphQL operation: ${operationName}`);
 
             if (isRubricSubmission(url, method, bodyText)) {
-                logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED (mutation: SaveRubricAssessment)`);
-                logger.trace(`[ScoreSync] Call #${callId}: input type: ${isRequest ? 'Request' : 'string'}`);
-                logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 300)}`);
+                logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED`);
+                logger.trace(`[ScoreSync] Call #${callId}: Operation: ${operationName}`);
 
                 // Re-parse URL to get current context (handles navigation)
                 const parsed = parseSpeedGraderUrl();

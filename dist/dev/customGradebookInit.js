@@ -4380,23 +4380,8 @@ You may need to refresh the page to see the new scores.`);
   function isRubricSubmission(url, method, bodyText) {
     if (!url.includes("/api/graphql")) return false;
     if (method !== "POST") return false;
-    const patterns = [
-      // Pattern 1: mutation SaveRubricAssessment
-      /mutation\s+SaveRubricAssessment/i,
-      // Pattern 2: "operationName":"SaveRubricAssessment"
-      /"operationName"\s*:\s*"SaveRubricAssessment"/i,
-      // Pattern 3: saveRubricAssessment (camelCase field name in mutation)
-      /mutation[^{]*\{[^}]*saveRubricAssessment/i,
-      // Pattern 4: Just check for mutation + rubric_assessment variables (fallback)
-      new RegExp("mutation.*rubric_assessment", "is")
-    ];
-    for (let i = 0; i < patterns.length; i++) {
-      if (patterns[i].test(bodyText)) {
-        logger.trace(`[ScoreSync] GraphQL operation matched SaveRubricAssessment (pattern ${i + 1})`);
-        return true;
-      }
-    }
-    return false;
+    const isSaveMutation = /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText) || /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
+    return isSaveMutation;
   }
   async function extractRequestBody(input, init2) {
     if (typeof (init2 == null ? void 0 : init2.body) === "string") {
@@ -4435,21 +4420,10 @@ You may need to refresh the page to see the new scores.`);
         const bodyText = await extractRequestBody(input, init2);
         const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
         const operationName = operationMatch ? operationMatch[1] : "unknown";
-        const isMutation = /mutation\s+\w+/.test(bodyText);
-        const isQuery = /query\s+\w+/.test(bodyText);
-        logger.trace(`[ScoreSync] GraphQL ${isMutation ? "mutation" : isQuery ? "query" : "operation"}: ${operationName}`);
-        if (bodyText.toLowerCase().includes("rubric")) {
-          logger.debug(`[ScoreSync] RUBRIC-RELATED GraphQL detected - Operation: ${operationName}`);
-          logger.debug(`[ScoreSync] Full request body (first 500 chars): ${bodyText.substring(0, 500)}`);
-          logger.debug(`[ScoreSync] Body contains "mutation": ${bodyText.includes("mutation")}`);
-          logger.debug(`[ScoreSync] Body contains "SaveRubricAssessment": ${bodyText.includes("SaveRubricAssessment")}`);
-          logger.debug(`[ScoreSync] Body contains "saveRubricAssessment": ${bodyText.includes("saveRubricAssessment")}`);
-          logger.debug(`[ScoreSync] isRubricSubmission() result: ${isRubricSubmission(url, method, bodyText)}`);
-        }
+        logger.trace(`[ScoreSync] GraphQL operation: ${operationName}`);
         if (isRubricSubmission(url, method, bodyText)) {
-          logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED (mutation: SaveRubricAssessment)`);
-          logger.trace(`[ScoreSync] Call #${callId}: input type: ${isRequest ? "Request" : "string"}`);
-          logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 300)}`);
+          logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED`);
+          logger.trace(`[ScoreSync] Call #${callId}: Operation: ${operationName}`);
           const parsed = parseSpeedGraderUrl();
           logger.trace(`[ScoreSync] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
           if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
@@ -5757,8 +5731,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 11:26:43 AM (dev, 8812594)");
-    exposeVersion("dev", "2026-02-03 11:26:43 AM (dev, 8812594)");
+    logBanner("dev", "2026-02-03 11:32:39 AM (dev, cbbab64)");
+    exposeVersion("dev", "2026-02-03 11:32:39 AM (dev, cbbab64)");
     if (true) {
       logger.info("Running in DEV mode");
     }
