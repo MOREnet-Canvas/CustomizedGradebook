@@ -4406,9 +4406,13 @@ You may need to refresh the page to see the new scores.`);
             <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
             <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
         </select>
-        <span style="margin: 0 0.5rem; white-space: nowrap; font-weight: 600;">Assignment Score</span>
-        <div style="display: inline-flex; align-items: center; justify-content: center; padding: 0 0.5rem; height: 2rem; background-color: rgb(0, 142, 83); border-radius: 0.35rem;">
-            <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
+        <div style="display: inline-flex; height: 3rem;">
+            <div style="display: flex; align-items: center; padding-left: 0.75rem; width: 11rem; height: 3rem; background-color: rgb(245, 245, 245); border-radius: 0.35rem 0px 0px 0.35rem;">
+                <span style="font-weight: 600; white-space: nowrap;">Assignment Score</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: center; width: 4.5rem; height: 3rem; background-color: rgb(0, 142, 83); border-radius: 0px 0.35rem 0.35rem 0px;">
+                <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
+            </div>
         </div>
     `;
     const toggle = container.querySelector("[data-cg-toggle]");
@@ -5625,8 +5629,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 10:07:31 AM (dev, cb66101)");
-    exposeVersion("dev", "2026-02-03 10:07:31 AM (dev, cb66101)");
+    logBanner("dev", "2026-02-03 10:16:08 AM (dev, 047d825)");
+    exposeVersion("dev", "2026-02-03 10:16:08 AM (dev, 047d825)");
     if (true) {
       logger.info("Running in DEV mode");
     }
