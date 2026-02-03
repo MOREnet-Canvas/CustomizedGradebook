@@ -74,8 +74,8 @@ export function isValidLetterGrade(letterGrade) {
 export async function hasAvgAssignment(courseId, apiClient) {
     try {
         const assignments = await apiClient.get(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: AVG_ASSIGNMENT_NAME },
+            `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+            {},
             'checkAvgAssignment'
         );
 
