@@ -32,10 +32,9 @@ const activeLocks = new Set();
  * @returns {Promise<object>} Assignment object with rubric
  */
 async function fetchAssignmentWithRubric(courseId, assignmentId, apiClient) {
-    // Build URL with query parameters
     const assignment = await apiClient.get(
-        `/api/v1/courses/${courseId}/assignments/${assignmentId}?include[]=rubric`,
-        {},
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+        { include: ['rubric'] },
         'fetchAssignmentWithRubric'
     );
     return assignment;

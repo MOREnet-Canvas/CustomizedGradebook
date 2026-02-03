@@ -2143,8 +2143,8 @@ You may need to refresh the page to see the new scores.`);
   var activeLocks = /* @__PURE__ */ new Set();
   async function fetchAssignmentWithRubric(courseId, assignmentId, apiClient2) {
     const assignment = await apiClient2.get(
-      `/api/v1/courses/${courseId}/assignments/${assignmentId}?include[]=rubric`,
-      {},
+      `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+      { include: ["rubric"] },
       "fetchAssignmentWithRubric"
     );
     return assignment;
@@ -2395,11 +2395,9 @@ You may need to refresh the page to see the new scores.`);
   }
   async function hasAvgAssignment(courseId, apiClient2) {
     try {
-      const searchTerm = encodeURIComponent(AVG_ASSIGNMENT_NAME);
-      const url = `/api/v1/courses/${courseId}/assignments?search_term=${searchTerm}&per_page=100`;
       const assignments = await apiClient2.get(
-        url,
-        {},
+        `/api/v1/courses/${courseId}/assignments`,
+        { search_term: AVG_ASSIGNMENT_NAME },
         "checkAvgAssignment"
       );
       return assignments.some((a) => a.name === AVG_ASSIGNMENT_NAME);
@@ -5583,8 +5581,12 @@ You may need to refresh the page to see the new scores.`);
       const apiClient2 = new CanvasApiClient();
       const apiCallStart = performance.now();
       const enrollments = await apiClient2.get(
-        "/api/v1/users/self/enrollments?type[]=StudentEnrollment&state[]=active&include[]=total_scores&per_page=100",
-        {},
+        "/api/v1/users/self/enrollments",
+        {
+          "type[]": "StudentEnrollment",
+          "state[]": "active",
+          "include[]": "total_scores"
+        },
         "testEnrollmentsAPI"
       );
       const apiCallTime = performance.now() - apiCallStart;
@@ -5760,8 +5762,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 1:50:24 PM (dev, bc88bcc)");
-    exposeVersion("dev", "2026-02-03 1:50:24 PM (dev, bc88bcc)");
+    logBanner("dev", "2026-02-03 2:09:37 PM (dev, 164cc15)");
+    exposeVersion("dev", "2026-02-03 2:09:37 PM (dev, 164cc15)");
     if (true) {
       logger.info("Running in DEV mode");
     }
