@@ -4430,6 +4430,40 @@ You may need to refresh the page to see the new scores.`);
     logger.info("[ScoreSync] \u2705 UI controls created and inserted into DOM");
     return true;
   }
+  async function ensureScoreSyncUiPresent() {
+    const { courseId, assignmentId } = parseSpeedGraderUrl();
+    if (!courseId || !assignmentId) return;
+    if (document.querySelector("[data-cg-scoresync-ui]")) return;
+    const ok = await createUIControls(courseId, assignmentId);
+    if (ok) {
+      logger.info(`[ScoreSync] UI re-injected for course=${courseId}, assignment=${assignmentId}`);
+    }
+  }
+  function hookHistoryApi() {
+    if (window.__CG_SCORESYNC_HISTORY_HOOKED__) return;
+    window.__CG_SCORESYNC_HISTORY_HOOKED__ = true;
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+      setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+    };
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+      setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+    };
+    window.addEventListener("popstate", () => {
+      setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+      setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+    });
+    logger.trace("[ScoreSync] History API hooks installed");
+  }
+  function startUiKeepalive() {
+    setInterval(() => void ensureScoreSyncUiPresent(), 600);
+    logger.trace("[ScoreSync] UI keepalive interval started (600ms)");
+  }
   async function initSpeedGraderAutoGrade() {
     var _a18;
     logger.info("[ScoreSync] ========== INITIALIZATION STARTED ==========");
@@ -4494,26 +4528,13 @@ You may need to refresh the page to see the new scores.`);
     logger.info("[ScoreSync] \u2705 Course is standards-based, proceeding with initialization");
     logger.trace("[ScoreSync] Installing fetch hook...");
     hookFetch();
+    logger.trace("[ScoreSync] Installing history API hooks...");
+    hookHistoryApi();
+    logger.trace("[ScoreSync] Starting UI keepalive interval...");
+    startUiKeepalive();
     logger.trace("[ScoreSync] Attempting immediate UI creation...");
     await createUIControls(courseId, assignmentId);
-    logger.trace("[ScoreSync] Starting persistent MutationObserver to monitor rubric panel...");
-    createConditionalObserver(async () => {
-      logger.trace("[ScoreSync] Observer mutation detected, checking for anchor...");
-      const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
-      const existing = document.querySelector("[data-cg-scoresync-ui]");
-      if (anchor && !existing) {
-        logger.trace("[ScoreSync] Anchor found but UI missing, re-creating controls...");
-        await createUIControls(courseId, assignmentId);
-      }
-      return false;
-    }, {
-      config: OBSERVER_CONFIGS.CHILD_LIST,
-      target: document.body,
-      name: "ScoreSyncUIObserver",
-      timeout: 0
-      // No timeout - run indefinitely
-    });
-    logger.info("[ScoreSync] ========== INITIALIZATION COMPLETE (observer running) ==========");
+    logger.info("[ScoreSync] ========== INITIALIZATION COMPLETE ==========");
   }
 
   // src/student/gradePageCustomizer.js
@@ -5602,8 +5623,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 8:19:24 AM (dev, 653b9e1)");
-    exposeVersion("dev", "2026-02-03 8:19:24 AM (dev, 653b9e1)");
+    logBanner("dev", "2026-02-03 8:45:27 AM (dev, a431f95)");
+    exposeVersion("dev", "2026-02-03 8:45:27 AM (dev, a431f95)");
     if (true) {
       logger.info("Running in DEV mode");
     }
