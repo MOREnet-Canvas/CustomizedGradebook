@@ -513,8 +513,8 @@ async function createUIControls(courseId, assignmentId) {
         padding-right: 0;
         height: 3rem;
         border-radius: 0.35rem;
-        background: #f5f5f5;
-        border: 1px solid #d1d5db;
+        background: rgb(245, 245, 245);
+        border: none;
         flex-shrink: 0;
         font: inherit;
         color: inherit;
@@ -530,7 +530,7 @@ async function createUIControls(courseId, assignmentId) {
             <span style="font-weight: 600;">Score Sync</span>
         </label>
         <select class="ic-Input" data-cg-method ${settings.enabled ? '' : 'disabled'}
-                style="width: auto; min-width: 4rem;">
+                style="width: auto; min-width: 4rem; height: 2.375rem; min-height: 2.375rem; padding-top: 0.25rem; padding-bottom: 0.25rem; align-self: center;">
             <option value="min" ${settings.method === 'min' ? 'selected' : ''}>MIN</option>
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
