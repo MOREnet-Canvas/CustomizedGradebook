@@ -5762,8 +5762,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 1:18:30 PM (dev, 9040f07)");
-    exposeVersion("dev", "2026-02-03 1:18:30 PM (dev, 9040f07)");
+    logBanner("dev", "2026-02-03 1:33:06 PM (dev, 2c3da02)");
+    exposeVersion("dev", "2026-02-03 1:33:06 PM (dev, 2c3da02)");
     if (true) {
       logger.info("Running in DEV mode");
     }
@@ -5774,7 +5774,26 @@ You may need to refresh the page to see the new scores.`);
     validateAllSnapshots();
     if (window.location.pathname.includes("/gradebook")) {
       injectButtons();
-      initAssignmentKebabMenuInjection().catch((err) => {
+      (async () => {
+        var _a18, _b18;
+        const courseId = getCourseId();
+        if (!courseId) {
+          logger.debug("[Init] Cannot get course ID, skipping Refresh Mastery initialization");
+          return;
+        }
+        let snapshot = getCourseSnapshot(courseId);
+        if (!snapshot) {
+          const apiClient2 = new CanvasApiClient();
+          const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+          snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
+        }
+        if (!snapshot || snapshot.model !== "standards") {
+          logger.debug("[Init] Course is traditional, skipping Refresh Mastery initialization");
+          return;
+        }
+        logger.debug("[Init] Course is standards-based, initializing Refresh Mastery");
+        await initAssignmentKebabMenuInjection();
+      })().catch((err) => {
         logger.warn("[Init] Failed to initialize assignment kebab menu injection:", err);
       });
     }
