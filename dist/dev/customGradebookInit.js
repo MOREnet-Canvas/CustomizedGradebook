@@ -4380,13 +4380,14 @@ You may need to refresh the page to see the new scores.`);
     container.style.cssText = `
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        margin-left: 24px;
-        padding: 4px 12px;
+        gap: 6px;
+        margin-left: 48px;
+        margin-top: -8px;
+        padding: 3px 10px;
         background: #f5f5f5;
         border: 1px solid #d1d5db;
-        border-radius: 4px;
-        font-size: 13px;
+        border-radius: 3px;
+        font-size: 12px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
     `;
     container.innerHTML = `
@@ -5623,8 +5624,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 8:45:27 AM (dev, a431f95)");
-    exposeVersion("dev", "2026-02-03 8:45:27 AM (dev, a431f95)");
+    logBanner("dev", "2026-02-03 8:50:04 AM (dev, 5ec8450)");
+    exposeVersion("dev", "2026-02-03 8:50:04 AM (dev, 5ec8450)");
     if (true) {
       logger.info("Running in DEV mode");
     }
