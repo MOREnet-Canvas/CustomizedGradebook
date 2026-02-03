@@ -122,13 +122,13 @@ async function testEnrollmentsAPIApproach() {
 
         // Fetch all enrollments with total scores
         const apiCallStart = performance.now();
+        const params = new URLSearchParams();
+        params.append('type[]', 'StudentEnrollment');
+        params.append('state[]', 'active');
+        params.append('include[]', 'total_scores');
         const enrollments = await apiClient.get(
-            '/api/v1/users/self/enrollments',
-            {
-                'type[]': 'StudentEnrollment',
-                'state[]': 'active',
-                'include[]': 'total_scores'
-            },
+            `/api/v1/users/self/enrollments?${params.toString()}`,
+            {},
             'testEnrollmentsAPI'
         );
         const apiCallTime = performance.now() - apiCallStart;

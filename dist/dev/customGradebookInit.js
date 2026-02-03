@@ -2148,8 +2148,8 @@ You may need to refresh the page to see the new scores.`);
   var activeLocks = /* @__PURE__ */ new Set();
   async function fetchAssignmentWithRubric(courseId, assignmentId, apiClient2) {
     const assignment = await apiClient2.get(
-      `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
-      { include: ["rubric"] },
+      `/api/v1/courses/${courseId}/assignments/${assignmentId}?include[]=rubric`,
+      {},
       "fetchAssignmentWithRubric"
     );
     return assignment;
@@ -2401,8 +2401,8 @@ You may need to refresh the page to see the new scores.`);
   async function hasAvgAssignment(courseId, apiClient2) {
     try {
       const assignments = await apiClient2.get(
-        `/api/v1/courses/${courseId}/assignments`,
-        { search_term: AVG_ASSIGNMENT_NAME },
+        `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+        {},
         "checkAvgAssignment"
       );
       return assignments.some((a) => a.name === AVG_ASSIGNMENT_NAME);
@@ -5585,13 +5585,13 @@ You may need to refresh the page to see the new scores.`);
     try {
       const apiClient2 = new CanvasApiClient();
       const apiCallStart = performance.now();
+      const params = new URLSearchParams();
+      params.append("type[]", "StudentEnrollment");
+      params.append("state[]", "active");
+      params.append("include[]", "total_scores");
       const enrollments = await apiClient2.get(
-        "/api/v1/users/self/enrollments",
-        {
-          "type[]": "StudentEnrollment",
-          "state[]": "active",
-          "include[]": "total_scores"
-        },
+        `/api/v1/users/self/enrollments?${params.toString()}`,
+        {},
         "testEnrollmentsAPI"
       );
       const apiCallTime = performance.now() - apiCallStart;
@@ -5767,8 +5767,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 2:25:49 PM (dev, 66cc057)");
-    exposeVersion("dev", "2026-02-03 2:25:49 PM (dev, 66cc057)");
+    logBanner("dev", "2026-02-03 2:46:45 PM (dev, b6c8c16)");
+    exposeVersion("dev", "2026-02-03 2:46:45 PM (dev, b6c8c16)");
     if (true) {
       logger.info("Running in DEV mode");
     }
