@@ -527,15 +527,15 @@ async function createUIControls(courseId, assignmentId) {
                    style="margin: 0; transform: scale(1.25); transform-origin: center; cursor: pointer;">
             <strong style="font-weight: 600;">Score Sync</strong>
         </label>
-        <select data-cg-method ${settings.enabled ? '' : 'disabled'}
-                style="width: auto; min-width: 4rem; padding: 0.25rem 0.5rem; cursor: ${settings.enabled ? 'pointer' : 'not-allowed'};">
+        <select class="ic-Input" data-cg-method ${settings.enabled ? '' : 'disabled'}
+                style="width: auto; min-width: 4rem;">
             <option value="min" ${settings.method === 'min' ? 'selected' : ''}>MIN</option>
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
         </select>
-        <span style="width: 1px; height: 1.75rem; background: #c7cdd1; margin-inline: 0.75rem;"></span>
-        <span style="display: inline-flex; align-items: center; padding: 0.5rem 1rem; background: #0b6a2b; color: #fff; font-weight: 700; border-radius: 0.35rem; white-space: nowrap;">
-            <strong data-cg-assignment-score>--</strong>&nbsp;pts
+        <span style="width: 1px; height: 1.75rem; background: rgb(209, 213, 219); margin: 0 0.25rem;"></span>
+        <span class="cg-score-chip" style="display: inline-flex; align-items: center; padding: 0 0.75rem; height: 2.25rem; background: #0b6a2b; color: #fff; font-weight: 700; border-radius: 0.35rem; white-space: nowrap;">
+            <span data-cg-assignment-score>--</span> pts
         </span>
     `;
 
