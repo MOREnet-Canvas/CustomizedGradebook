@@ -507,24 +507,25 @@ async function createUIControls(courseId, assignmentId) {
     container.style.cssText = `
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        margin-left: auto;
-        padding: 3px 10px;
-        background: #f5f5f5;
+        gap: 8px;
+        margin-left: 12px;
+        padding: 0 12px;
+        background: rgb(245, 245, 245);
         border: 1px solid #d1d5db;
-        border-radius: 3px;
-        font-size: 12px;
-        line-height: 1.5;
+        border-radius: 0.35rem;
+        font-size: 0.875rem;
+        height: 3rem;
+        line-height: 3rem;
         flex-shrink: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
     `;
 
     container.innerHTML = `
-        <span style="color: #2d3748; font-weight: 500; white-space: nowrap;">
+        <span style="color: #2d3748; font-weight: 500; white-space: nowrap; line-height: normal;">
             Assignment Score: <span data-cg-assignment-score style="color: #0374b5; font-weight: 600;">--</span>
         </span>
-        <span style="width: 1px; height: 20px; background: #d1d5db; margin: 0 4px;"></span>
-        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; user-select: none;">
+        <span style="width: 1px; height: 2rem; background: #d1d5db; margin: 0 4px;"></span>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; user-select: none; line-height: normal;">
             <input type="checkbox" data-cg-toggle ${settings.enabled ? 'checked' : ''}
                    style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
             <span style="color: #2d3748; font-weight: 500;">Score Sync</span>
@@ -532,12 +533,13 @@ async function createUIControls(courseId, assignmentId) {
         <select data-cg-method
                 style="padding: 4px 8px;
                        border: 1px solid #d1d5db;
-                       border-radius: 3px;
+                       border-radius: 0.35rem;
                        background: white;
                        cursor: pointer;
-                       font-size: 12px;
+                       font-size: 0.875rem;
                        color: #2d3748;
-                       font-weight: 500;">
+                       font-weight: 500;
+                       height: 2rem;">
             <option value="min" ${settings.method === 'min' ? 'selected' : ''}>MIN</option>
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
