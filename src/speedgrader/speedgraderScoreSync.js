@@ -562,6 +562,59 @@ async function createUIControls(courseId, assignmentId) {
 }
 
 /**
+ * Ensure ScoreSync UI is present (keepalive for React rerenders)
+ */
+async function ensureScoreSyncUiPresent() {
+    const { courseId, assignmentId } = parseSpeedGraderUrl();
+    if (!courseId || !assignmentId) return;
+
+    if (document.querySelector('[data-cg-scoresync-ui]')) return;
+
+    const ok = await createUIControls(courseId, assignmentId);
+    if (ok) {
+        logger.info(`[ScoreSync] UI re-injected for course=${courseId}, assignment=${assignmentId}`);
+    }
+}
+
+/**
+ * Hook History API to detect SpeedGrader navigation
+ */
+function hookHistoryApi() {
+    if (window.__CG_SCORESYNC_HISTORY_HOOKED__) return;
+    window.__CG_SCORESYNC_HISTORY_HOOKED__ = true;
+
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    history.pushState = function(...args) {
+        originalPushState.apply(this, args);
+        setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+        setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+    };
+
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(this, args);
+        setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+        setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+    };
+
+    window.addEventListener('popstate', () => {
+        setTimeout(() => void ensureScoreSyncUiPresent(), 0);
+        setTimeout(() => void ensureScoreSyncUiPresent(), 250);
+    });
+
+    logger.trace('[ScoreSync] History API hooks installed');
+}
+
+/**
+ * Start UI keepalive interval
+ */
+function startUiKeepalive() {
+    setInterval(() => void ensureScoreSyncUiPresent(), 600);
+    logger.trace('[ScoreSync] UI keepalive interval started (600ms)');
+}
+
+/**
  * Initialize score sync module
  */
 export async function initSpeedGraderAutoGrade() {
@@ -646,30 +699,15 @@ export async function initSpeedGraderAutoGrade() {
     logger.trace('[ScoreSync] Installing fetch hook...');
     hookFetch();
 
+    logger.trace('[ScoreSync] Installing history API hooks...');
+    hookHistoryApi();
+
+    logger.trace('[ScoreSync] Starting UI keepalive interval...');
+    startUiKeepalive();
+
     // Try immediate UI creation
     logger.trace('[ScoreSync] Attempting immediate UI creation...');
     await createUIControls(courseId, assignmentId);
 
-    // Use MutationObserver to continuously monitor for rubric panel (handles navigation)
-    logger.trace('[ScoreSync] Starting persistent MutationObserver to monitor rubric panel...');
-    createConditionalObserver(async () => {
-        logger.trace('[ScoreSync] Observer mutation detected, checking for anchor...');
-        const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
-        const existing = document.querySelector('[data-cg-scoresync-ui]');
-
-        // Re-create UI if anchor exists but UI is missing (navigation occurred)
-        if (anchor && !existing) {
-            logger.trace('[ScoreSync] Anchor found but UI missing, re-creating controls...');
-            await createUIControls(courseId, assignmentId);
-        }
-
-        return false; // Never disconnect - keep monitoring for navigation
-    }, {
-        config: OBSERVER_CONFIGS.CHILD_LIST,
-        target: document.body,
-        name: 'ScoreSyncUIObserver',
-        timeout: 0 // No timeout - run indefinitely
-    });
-
-    logger.info('[ScoreSync] ========== INITIALIZATION COMPLETE (observer running) ==========');
+    logger.info('[ScoreSync] ========== INITIALIZATION COMPLETE ==========');
 }
