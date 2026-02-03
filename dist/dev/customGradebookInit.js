@@ -4142,7 +4142,7 @@ You may need to refresh the page to see the new scores.`);
     if (!settings || typeof settings !== "object") return defaults;
     return {
       enabled: typeof settings.enabled === "boolean" ? settings.enabled : defaults.enabled,
-      method: ["min", "avg", "max"].includes(settings.method) ? settings.method : defaults.method
+      method: ["min", "avg", "max", "sum"].includes(settings.method) ? settings.method : defaults.method
     };
   }
   function getSettings(courseId, assignmentId) {
@@ -4164,6 +4164,7 @@ You may need to refresh the page to see the new scores.`);
     if (method === "min") return Math.min(...points);
     if (method === "max") return Math.max(...points);
     if (method === "avg") return points.reduce((a, b) => a + b, 0) / points.length;
+    if (method === "sum") return points.reduce((a, b) => a + b, 0);
     return Math.min(...points);
   }
   function createRubricFingerprint(rubricAssessment) {
@@ -4499,6 +4500,7 @@ You may need to refresh the page to see the new scores.`);
                 <option value="min" ${settings.method === "min" ? "selected" : ""}>MIN</option>
                 <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
                 <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
+                <option value="sum" ${settings.method === "sum" ? "selected" : ""}>SUM</option>
             </select>
             <div style="display: flex; height: 100%; flex-shrink: 0; margin: 0;">
                 <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; height: 100%; background-color: ${UI_COLORS.LABEL_BG};">
@@ -5731,8 +5733,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 12:01:28 PM (dev, b9a54b8)");
-    exposeVersion("dev", "2026-02-03 12:01:28 PM (dev, b9a54b8)");
+    logBanner("dev", "2026-02-03 12:06:53 PM (dev, 2b3d214)");
+    exposeVersion("dev", "2026-02-03 12:06:53 PM (dev, 2b3d214)");
     if (true) {
       logger.info("Running in DEV mode");
     }
