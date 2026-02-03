@@ -466,16 +466,18 @@ async function handleRubricSubmitInternal(courseId, assignmentId, studentId, api
         const lastFingerprint = lastFingerprintByContext.get(contextKey);
 
         logger.trace(`[ScoreSync] Context: ${contextKey}`);
-        logger.trace(`[ScoreSync] Rubric fingerprint: ${fingerprint}`);
+        logger.trace(`[ScoreSync] Current rubric fingerprint: ${fingerprint}`);
         logger.trace(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || 'none'}`);
 
         if (fingerprint === lastFingerprint) {
-            logger.info('[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match)');
+            logger.info('[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match - prevents duplicate submission)');
+            logger.trace('[ScoreSync] This is likely a navigation event or Canvas fetching existing rubric data');
             metrics.skipped++;
             inFlight = false;
             return;
         }
 
+        logger.trace('[ScoreSync] Fingerprint differs from last - this is a NEW or CHANGED rubric assessment');
         lastFingerprintByContext.set(contextKey, fingerprint);
         logger.trace('[ScoreSync] Fingerprint updated for context');
 
@@ -535,16 +537,25 @@ async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient) 
 }
 
 /**
- * Check if request is a rubric submission (Suggestion #17)
+ * Check if request is a rubric submission mutation (Fixed: only match mutations, not queries)
  * @param {string} url - Request URL
  * @param {string} method - HTTP method
  * @param {string} bodyText - Request body text
- * @returns {boolean} True if rubric submission
+ * @returns {boolean} True if rubric submission mutation
  */
 function isRubricSubmission(url, method, bodyText) {
     if (!url.includes('/api/graphql')) return false;
     if (method !== 'POST') return false;
-    return /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
+
+    // Only match SaveRubricAssessment mutation, not queries or other operations
+    // This prevents false positives when Canvas fetches existing rubric data during navigation
+    const isSaveMutation = /mutation\s+SaveRubricAssessment|"operationName"\s*:\s*"SaveRubricAssessment"/i.test(bodyText);
+
+    if (isSaveMutation) {
+        logger.trace('[ScoreSync] GraphQL operation matched: SaveRubricAssessment mutation');
+    }
+
+    return isSaveMutation;
 }
 
 /**
@@ -607,13 +618,21 @@ function hookFetch() {
         }
 
         // Detect GraphQL rubric submissions
-        if (res.ok) {
+        if (res.ok && url.includes('/api/graphql') && method === 'POST') {
             const bodyText = await extractRequestBody(input, init);
 
+            // Log all GraphQL operations for debugging (trace level)
+            const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
+            const operationName = operationMatch ? operationMatch[1] : 'unknown';
+            const isMutation = /mutation\s+\w+/.test(bodyText);
+            const isQuery = /query\s+\w+/.test(bodyText);
+
+            logger.trace(`[ScoreSync] GraphQL ${isMutation ? 'mutation' : isQuery ? 'query' : 'operation'}: ${operationName}`);
+
             if (isRubricSubmission(url, method, bodyText)) {
-                logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED`);
+                logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED (mutation: SaveRubricAssessment)`);
                 logger.trace(`[ScoreSync] Call #${callId}: input type: ${isRequest ? 'Request' : 'string'}`);
-                logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
+                logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 300)}`);
 
                 // Re-parse URL to get current context (handles navigation)
                 const parsed = parseSpeedGraderUrl();

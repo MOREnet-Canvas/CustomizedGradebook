@@ -4326,14 +4326,16 @@ You may need to refresh the page to see the new scores.`);
       const fingerprint = createRubricFingerprint(submission.rubric_assessment);
       const lastFingerprint = lastFingerprintByContext.get(contextKey);
       logger.trace(`[ScoreSync] Context: ${contextKey}`);
-      logger.trace(`[ScoreSync] Rubric fingerprint: ${fingerprint}`);
+      logger.trace(`[ScoreSync] Current rubric fingerprint: ${fingerprint}`);
       logger.trace(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || "none"}`);
       if (fingerprint === lastFingerprint) {
-        logger.info("[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match)");
+        logger.info("[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match - prevents duplicate submission)");
+        logger.trace("[ScoreSync] This is likely a navigation event or Canvas fetching existing rubric data");
         metrics.skipped++;
         inFlight = false;
         return;
       }
+      logger.trace("[ScoreSync] Fingerprint differs from last - this is a NEW or CHANGED rubric assessment");
       lastFingerprintByContext.set(contextKey, fingerprint);
       logger.trace("[ScoreSync] Fingerprint updated for context");
       const score = calculateGrade(submission.rubric_assessment, settings.method);
@@ -4378,7 +4380,11 @@ You may need to refresh the page to see the new scores.`);
   function isRubricSubmission(url, method, bodyText) {
     if (!url.includes("/api/graphql")) return false;
     if (method !== "POST") return false;
-    return /SaveRubricAssessment|rubricAssessment|rubric_assessment/i.test(bodyText);
+    const isSaveMutation = /mutation\s+SaveRubricAssessment|"operationName"\s*:\s*"SaveRubricAssessment"/i.test(bodyText);
+    if (isSaveMutation) {
+      logger.trace("[ScoreSync] GraphQL operation matched: SaveRubricAssessment mutation");
+    }
+    return isSaveMutation;
   }
   async function extractRequestBody(input, init2) {
     if (typeof (init2 == null ? void 0 : init2.body) === "string") {
@@ -4413,12 +4419,17 @@ You may need to refresh the page to see the new scores.`);
       if (url.includes("/api/v1/") && url.includes("/submissions/")) {
         return res;
       }
-      if (res.ok) {
+      if (res.ok && url.includes("/api/graphql") && method === "POST") {
         const bodyText = await extractRequestBody(input, init2);
+        const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
+        const operationName = operationMatch ? operationMatch[1] : "unknown";
+        const isMutation = /mutation\s+\w+/.test(bodyText);
+        const isQuery = /query\s+\w+/.test(bodyText);
+        logger.trace(`[ScoreSync] GraphQL ${isMutation ? "mutation" : isQuery ? "query" : "operation"}: ${operationName}`);
         if (isRubricSubmission(url, method, bodyText)) {
-          logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED`);
+          logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED (mutation: SaveRubricAssessment)`);
           logger.trace(`[ScoreSync] Call #${callId}: input type: ${isRequest ? "Request" : "string"}`);
-          logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 200)}`);
+          logger.trace(`[ScoreSync] Call #${callId}: Body preview: ${bodyText.substring(0, 300)}`);
           const parsed = parseSpeedGraderUrl();
           logger.trace(`[ScoreSync] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
           if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
@@ -5726,8 +5737,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 11:12:36 AM (dev, fee7a08)");
-    exposeVersion("dev", "2026-02-03 11:12:36 AM (dev, fee7a08)");
+    logBanner("dev", "2026-02-03 11:18:29 AM (dev, d6321ad)");
+    exposeVersion("dev", "2026-02-03 11:18:29 AM (dev, d6321ad)");
     if (true) {
       logger.info("Running in DEV mode");
     }
