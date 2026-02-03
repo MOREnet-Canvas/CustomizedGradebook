@@ -1551,14 +1551,6 @@
     return rubric.id;
   }
 
-  // src/utils/canvasHelpers.js
-  async function getAssignmentId(courseId) {
-    const response = await fetch(`/api/v1/courses/${courseId}/assignments?per_page=100`);
-    const assignments = await response.json();
-    const avgAssignment = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
-    return avgAssignment ? avgAssignment.id : null;
-  }
-
   // src/gradebook/stateHandlers.js
   async function handleCheckingSetup(stateMachine) {
     const { courseId, banner } = stateMachine.getContext();
@@ -1580,13 +1572,13 @@ Would you like to create it?`);
       stateMachine.updateContext({ outcomeId });
       let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient2);
       if (!assignmentObj) {
-        const assignmentIdFromName = await getAssignmentId(courseId);
-        if (assignmentIdFromName) {
-          assignmentObj = await apiClient2.get(
-            `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
-            {},
-            "getAssignment:fallback"
-          );
+        const assignments = await apiClient2.get(
+          `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+          {},
+          "getAssignment:fallback"
+        );
+        assignmentObj = assignments.find((a) => a.name === AVG_ASSIGNMENT_NAME);
+        if (assignmentObj) {
           logger.debug("Fallback assignment found by name:", assignmentObj);
         }
       }
@@ -5767,8 +5759,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 3:11:56 PM (dev, 060a982)");
-    exposeVersion("dev", "2026-02-03 3:11:56 PM (dev, 060a982)");
+    logBanner("dev", "2026-02-03 3:31:14 PM (dev, 9903bf5)");
+    exposeVersion("dev", "2026-02-03 3:31:14 PM (dev, 9903bf5)");
     if (true) {
       logger.info("Running in DEV mode");
     }
