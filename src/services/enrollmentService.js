@@ -112,18 +112,17 @@ export async function fetchAllEnrollments(apiClient, options = {}) {
     } = options;
 
     try {
-        const params = {
-            'type[]': 'StudentEnrollment',
-            'state[]': state
-        };
+        const params = new URLSearchParams();
+        params.append('type[]', 'StudentEnrollment');
+        params.append('state[]', state);
 
         if (includeTotalScores) {
-            params['include[]'] = 'total_scores';
+            params.append('include[]', 'total_scores');
         }
 
         const enrollments = await apiClient.get(
-            '/api/v1/users/self/enrollments',
-            params,
+            `/api/v1/users/self/enrollments?${params.toString()}`,
+            {},
             'fetchAllEnrollments'
         );
 
