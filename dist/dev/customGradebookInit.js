@@ -4407,12 +4407,12 @@ You may need to refresh the page to see the new scores.`);
             <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
         </select>
         <span style="width: 1px; height: 1.75rem; background: rgb(209, 213, 219); margin: 0 0.25rem;"></span>
-        <div style="display: inline-flex; height: 3rem;">
-            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 3rem; line-height: 3rem; background-color: rgb(245, 245, 245); border-radius: 0.35rem 0px 0px 0.35rem;">
-                <span style="white-space: nowrap;">Assignment Score</span>
+        <div style="display: inline-flex; height: 2.25rem; align-self: center;">
+            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 2.25rem; background-color: rgb(245, 245, 245); border-radius: 0.35rem 0px 0px 0.35rem;">
+                <span style="white-space: nowrap; font-size: 0.875rem;">Assignment Score</span>
             </div>
-            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 3rem; line-height: 3rem; background-color: rgb(3, 137, 61); border-radius: 0px 0.35rem 0.35rem 0px;">
-                <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
+            <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 2.25rem; background-color: rgb(0, 142, 83); border-radius: 0px 0.35rem 0.35rem 0px;">
+                <span style="color: #fff; font-weight: 700; white-space: nowrap; font-size: 0.875rem;"><span data-cg-assignment-score>--</span> pts</span>
             </div>
         </div>
     `;
@@ -5630,8 +5630,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 9:57:36 AM (dev, b21d1a0)");
-    exposeVersion("dev", "2026-02-03 9:57:36 AM (dev, b21d1a0)");
+    logBanner("dev", "2026-02-03 10:00:10 AM (dev, 6898508)");
+    exposeVersion("dev", "2026-02-03 10:00:10 AM (dev, 6898508)");
     if (true) {
       logger.info("Running in DEV mode");
     }
