@@ -112,18 +112,17 @@ export async function fetchAllEnrollments(apiClient, options = {}) {
     } = options;
 
     try {
-        const params = {
-            'type[]': 'StudentEnrollment',
-            'state[]': state
-        };
+        // Build URL with query parameters
+        // Note: CanvasApiClient.get() doesn't handle query params automatically - they must be in the URL
+        let url = `/api/v1/users/self/enrollments?type[]=StudentEnrollment&state[]=${state}&per_page=100`;
 
         if (includeTotalScores) {
-            params['include[]'] = 'total_scores';
+            url += '&include[]=total_scores';
         }
 
         const enrollments = await apiClient.get(
-            '/api/v1/users/self/enrollments',
-            params,
+            url,
+            {},
             'fetchAllEnrollments'
         );
 
