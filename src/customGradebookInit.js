@@ -27,9 +27,10 @@ import { initSpeedGraderAutoGrade } from "./speedgrader/speedgraderScoreSync.js"
 import { initStudentGradeCustomization } from "./student/studentGradeCustomization.js";
 import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGradeCustomizer.js";
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
-import { clearAllSnapshots, debugSnapshots, validateAllSnapshots } from "./services/courseSnapshotService.js";
-import { getUserRoleGroup } from "./utils/canvas.js";
+import { clearAllSnapshots, debugSnapshots, validateAllSnapshots, getCourseSnapshot, populateCourseSnapshot } from "./services/courseSnapshotService.js";
+import { getUserRoleGroup, getCourseId } from "./utils/canvas.js";
 import { isTeacherViewingStudentGrades } from "./utils/pageDetection.js";
+import { CanvasApiClient } from "./utils/canvasApiClient.js";
 
 /**
  * Check if current page is the dashboard
@@ -66,9 +67,37 @@ function isSpeedGraderPage() {
 
     // Gradebook functionality (teacher-side)
     if (window.location.pathname.includes("/gradebook")) {
-        injectButtons();
-        // Async initialization - fire and forget with error handling
-        initAssignmentKebabMenuInjection().catch(err => {
+        injectButtons(); // Always run for all courses
+
+        // Async block for Refresh Mastery initialization (standards-based courses only)
+        (async () => {
+            // Early course type detection - only initialize Refresh Mastery for standards-based courses
+            const courseId = getCourseId();
+            if (!courseId) {
+                logger.debug('[Init] Cannot get course ID, skipping Refresh Mastery initialization');
+                return;
+            }
+
+            // Check for existing snapshot
+            let snapshot = getCourseSnapshot(courseId);
+
+            // If no snapshot exists, populate it
+            if (!snapshot) {
+                const apiClient = new CanvasApiClient();
+                const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
+                snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+            }
+
+            // Skip initialization for traditional courses
+            if (!snapshot || snapshot.model !== 'standards') {
+                logger.debug('[Init] Course is traditional, skipping Refresh Mastery initialization');
+                return;
+            }
+
+            // Course is standards-based - proceed with initialization
+            logger.debug('[Init] Course is standards-based, initializing Refresh Mastery');
+            await initAssignmentKebabMenuInjection();
+        })().catch(err => {
             logger.warn('[Init] Failed to initialize assignment kebab menu injection:', err);
         });
     }
