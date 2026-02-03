@@ -31,7 +31,6 @@ import { getElapsedTimeSinceStart, stopElapsedTimer } from "../utils/uiHelpers.j
 import { getRollup, getOutcomeObjectByName, createOutcome } from "../services/outcomeService.js";
 import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services/assignmentService.js";
 import { getRubricForAssignment, createRubric } from "../services/rubricService.js";
-import { getAssignmentId } from "../utils/canvasHelpers.js";
 import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOverrideVerification.js";
 import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from "../services/gradeOverride.js";
 
@@ -79,13 +78,13 @@ export async function handleCheckingSetup(stateMachine) {
 
         // Fallback: try to find by name
         if (!assignmentObj) {
-            const assignmentIdFromName = await getAssignmentId(courseId);
-            if (assignmentIdFromName) {
-                assignmentObj = await apiClient.get(
-                    `/api/v1/courses/${courseId}/assignments/${assignmentIdFromName}`,
-                    {},
-                    "getAssignment:fallback"
-                );
+            const assignments = await apiClient.get(
+                `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(AVG_ASSIGNMENT_NAME)}`,
+                {},
+                "getAssignment:fallback"
+            );
+            assignmentObj = assignments.find(a => a.name === AVG_ASSIGNMENT_NAME);
+            if (assignmentObj) {
                 logger.debug("Fallback assignment found by name:", assignmentObj);
             }
         }
