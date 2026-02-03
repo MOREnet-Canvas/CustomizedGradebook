@@ -121,11 +121,14 @@ async function testEnrollmentsAPIApproach() {
         const apiClient = new CanvasApiClient();
 
         // Fetch all enrollments with total scores
-        // Build URL with query parameters (CanvasApiClient.get() doesn't handle query params automatically)
         const apiCallStart = performance.now();
         const enrollments = await apiClient.get(
-            '/api/v1/users/self/enrollments?type[]=StudentEnrollment&state[]=active&include[]=total_scores&per_page=100',
-            {},
+            '/api/v1/users/self/enrollments',
+            {
+                'type[]': 'StudentEnrollment',
+                'state[]': 'active',
+                'include[]': 'total_scores'
+            },
             'testEnrollmentsAPI'
         );
         const apiCallTime = performance.now() - apiCallStart;
