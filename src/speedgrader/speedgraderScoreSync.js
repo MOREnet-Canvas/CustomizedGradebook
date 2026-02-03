@@ -474,13 +474,6 @@ function updateAssignmentScoreDisplay(score) {
 async function createUIControls(courseId, assignmentId) {
     logger.trace('[ScoreSync] createUIControls called');
 
-    // Check if UI already exists
-    const existing = document.querySelector('[data-cg-scoresync-ui]');
-    if (existing) {
-        logger.trace('[ScoreSync] UI controls already exist, skipping creation');
-        return true;
-    }
-
     logger.trace('[ScoreSync] Looking for anchor element: span[data-testid="rubric-assessment-instructor-score"]');
     const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
 
@@ -496,21 +489,51 @@ async function createUIControls(courseId, assignmentId) {
         return false;
     }
 
+    // Remove existing UI if present (handles navigation)
+    const existing = document.querySelector('[data-cg-scoresync-ui]');
+    if (existing) {
+        logger.trace('[ScoreSync] Removing existing UI controls before re-creation');
+        existing.remove();
+    }
+
     logger.trace('[ScoreSync] Anchor element found, creating UI controls');
     const settings = await getSettings(courseId, assignmentId);
     logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
 
     const container = document.createElement('div');
     container.setAttribute('data-cg-scoresync-ui', 'true');
-    container.style.cssText = 'display: inline-flex; align-items: center; gap: 12px; margin-left: 16px; font-size: 14px;';
+    container.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 24px;
+        padding: 4px 12px;
+        background: #f5f5f5;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 13px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
+    `;
 
     container.innerHTML = `
-        <span style="font-weight: 500;">Assignment Score: <span data-cg-assignment-score>--</span></span>
-        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <input type="checkbox" data-cg-toggle ${settings.enabled ? 'checked' : ''} style="cursor: pointer;">
-            <span>Score Sync</span>
+        <span style="color: #2d3748; font-weight: 500; white-space: nowrap;">
+            Assignment Score: <span data-cg-assignment-score style="color: #0374b5; font-weight: 600;">--</span>
+        </span>
+        <span style="width: 1px; height: 20px; background: #d1d5db; margin: 0 4px;"></span>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; user-select: none;">
+            <input type="checkbox" data-cg-toggle ${settings.enabled ? 'checked' : ''}
+                   style="cursor: pointer; width: 16px; height: 16px; margin: 0;">
+            <span style="color: #2d3748; font-weight: 500;">Score Sync</span>
         </label>
-        <select data-cg-method style="padding: 2px 4px; cursor: pointer;">
+        <select data-cg-method
+                style="padding: 4px 8px;
+                       border: 1px solid #d1d5db;
+                       border-radius: 3px;
+                       background: white;
+                       cursor: pointer;
+                       font-size: 13px;
+                       color: #2d3748;
+                       font-weight: 500;">
             <option value="min" ${settings.method === 'min' ? 'selected' : ''}>MIN</option>
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
@@ -625,31 +648,27 @@ export async function initSpeedGraderAutoGrade() {
 
     // Try immediate UI creation
     logger.trace('[ScoreSync] Attempting immediate UI creation...');
-    const immediateSuccess = await createUIControls(courseId, assignmentId);
-    if (immediateSuccess) {
-        logger.info('[ScoreSync] ✅ UI created immediately - initialization complete');
-        return;
-    }
+    await createUIControls(courseId, assignmentId);
 
-    // Use MutationObserver to wait for rubric panel to appear
-    logger.trace('[ScoreSync] UI not ready yet, starting MutationObserver to wait for rubric panel...');
+    // Use MutationObserver to continuously monitor for rubric panel (handles navigation)
+    logger.trace('[ScoreSync] Starting persistent MutationObserver to monitor rubric panel...');
     createConditionalObserver(async () => {
         logger.trace('[ScoreSync] Observer mutation detected, checking for anchor...');
         const anchor = document.querySelector('span[data-testid="rubric-assessment-instructor-score"]');
-        if (anchor) {
-            logger.trace('[ScoreSync] Observer found anchor element, attempting UI creation...');
-            const success = await createUIControls(courseId, assignmentId);
-            if (success) {
-                logger.info('[ScoreSync] ✅ UI created via observer - initialization complete');
-                return true; // Disconnect observer
-            }
+        const existing = document.querySelector('[data-cg-scoresync-ui]');
+
+        // Re-create UI if anchor exists but UI is missing (navigation occurred)
+        if (anchor && !existing) {
+            logger.trace('[ScoreSync] Anchor found but UI missing, re-creating controls...');
+            await createUIControls(courseId, assignmentId);
         }
-        return false; // Keep observing
+
+        return false; // Never disconnect - keep monitoring for navigation
     }, {
         config: OBSERVER_CONFIGS.CHILD_LIST,
         target: document.body,
         name: 'ScoreSyncUIObserver',
-        timeout: 30000
+        timeout: 0 // No timeout - run indefinitely
     });
 
     logger.info('[ScoreSync] ========== INITIALIZATION COMPLETE (observer running) ==========');
