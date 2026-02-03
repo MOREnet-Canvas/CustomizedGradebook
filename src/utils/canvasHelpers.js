@@ -26,7 +26,7 @@ export async function getAssignmentId(courseId) {
 }
 
 /**
- * Extract the raw numeric score from the Current Score assignment row in the DOM
+ * Extract the raw numeric score from the AVG assignment row in the DOM
  * Searches for the assignment by name and extracts the score from various possible DOM locations
  * @returns {string|null} Raw numeric score (not a percentage) or null if not found
  */
@@ -36,28 +36,27 @@ export function extractCurrentScoreFromPage() {
         if (link.textContent.trim() === AVG_ASSIGNMENT_NAME) {
             const row = link.closest('tr');
             if (!row) continue;
-            
+
             // Try multiple possible locations for the score
             const candidates = [
                 row.querySelector('.original_score'),
                 row.querySelector('.original_points'),
                 row.querySelector('.assignment_score .grade')
             ];
-            
+
             for (const el of candidates) {
                 const txt = el?.textContent?.trim();
                 if (!txt) continue;
-                
+
                 const m = txt.match(/(\d+(?:\.\d+)?)/);
                 if (m) {
-                    logger.debug(`Found Current Score Assignment in table: ${m[1]} (from ${el.className})`);
+                    logger.debug(`Found ${AVG_ASSIGNMENT_NAME} in table: ${m[1]} (from ${el.className})`);
                     return m[1]; // raw numeric, not a %
                 }
             }
         }
     }
 
-    logger.debug('No Current Score Assignment found');
+    logger.debug(`No ${AVG_ASSIGNMENT_NAME} found`);
     return null;
 }
-
