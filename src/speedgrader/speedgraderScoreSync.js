@@ -525,7 +525,7 @@ async function createUIControls(courseId, assignmentId) {
         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; white-space: nowrap;">
             <input type="checkbox" data-cg-toggle ${settings.enabled ? 'checked' : ''}
                    style="margin: 0; transform: scale(1.25); transform-origin: center; cursor: pointer;">
-            <strong style="font-weight: 600;">Score Sync</strong>
+            <span style="font-weight: 600;">Score Sync</span>
         </label>
         <select class="ic-Input" data-cg-method ${settings.enabled ? '' : 'disabled'}
                 style="width: auto; min-width: 4rem;">
@@ -533,8 +533,8 @@ async function createUIControls(courseId, assignmentId) {
             <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
             <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
         </select>
-        <span style="margin: 0 0.5rem; white-space: nowrap;">Assignment Score</span>
-        <div style="display: inline-flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 2.25rem; background-color: rgb(0, 142, 83); border-radius: 0.25rem;">
+        <span style="margin: 0 0.5rem; white-space: nowrap; font-weight: 600;">Assignment Score</span>
+        <div style="display: inline-flex; align-items: center; justify-content: center; padding: 0 0.5rem; height: 2rem; background-color: rgb(0, 142, 83); border-radius: 0.35rem;">
             <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
         </div>
     `;
