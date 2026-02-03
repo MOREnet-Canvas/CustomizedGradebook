@@ -4390,16 +4390,21 @@ You may need to refresh the page to see the new scores.`);
     container.innerHTML = `
         <label class="ic-Label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0;">
             <input type="checkbox" class="ic-Input" data-cg-toggle ${settings.enabled ? "checked" : ""} style="margin: 0;">
-            <span>Score Sync</span>
+            <strong>Score Sync</strong>
         </label>
         <select class="ic-Input" data-cg-method style="width: auto;">
             <option value="min" ${settings.method === "min" ? "selected" : ""}>MIN</option>
             <option value="avg" ${settings.method === "avg" ? "selected" : ""}>AVG</option>
             <option value="max" ${settings.method === "max" ? "selected" : ""}>MAX</option>
         </select>
-        <span class="ic-Label" style="margin: 0;">
-            Assignment Score: <strong data-cg-assignment-score>--</strong>
-        </span>
+        <div data-cg-scoresync-scorebox style="display: inline-flex; height: 3rem; border-radius: 0.35rem; overflow: hidden; font: inherit;">
+            <span style="display: flex; align-items: center; padding: 0 0.75rem; background: #f5f5f5; font-weight: 600;">
+                Assignment Score
+            </span>
+            <span style="display: flex; align-items: center; padding: 0 0.75rem; background: #e8f5e9; font-weight: 700;">
+                <span data-cg-assignment-score>--</span> pts
+            </span>
+        </div>
     `;
     const toggle = container.querySelector("[data-cg-toggle]");
     const methodSelect = container.querySelector("[data-cg-method]");
@@ -5611,8 +5616,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 9:11:47 AM (dev, 2110238)");
-    exposeVersion("dev", "2026-02-03 9:11:47 AM (dev, 2110238)");
+    logBanner("dev", "2026-02-03 9:17:17 AM (dev, 09c2ebb)");
+    exposeVersion("dev", "2026-02-03 9:17:17 AM (dev, 09c2ebb)");
     if (true) {
       logger.info("Running in DEV mode");
     }
