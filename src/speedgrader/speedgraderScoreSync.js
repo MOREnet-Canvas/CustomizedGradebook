@@ -465,21 +465,22 @@ async function handleRubricSubmitInternal(courseId, assignmentId, studentId, api
         const fingerprint = createRubricFingerprint(submission.rubric_assessment);
         const lastFingerprint = lastFingerprintByContext.get(contextKey);
 
-        logger.trace(`[ScoreSync] Context: ${contextKey}`);
-        logger.trace(`[ScoreSync] Current rubric fingerprint: ${fingerprint}`);
-        logger.trace(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || 'none'}`);
+        logger.debug(`[ScoreSync] DEBUG Fingerprint Check - Context: ${contextKey}`);
+        logger.debug(`[ScoreSync] DEBUG - Current rubric fingerprint: ${fingerprint}`);
+        logger.debug(`[ScoreSync] DEBUG - Last fingerprint for context: ${lastFingerprint || 'none'}`);
+        logger.debug(`[ScoreSync] DEBUG - Fingerprints match: ${fingerprint === lastFingerprint}`);
 
         if (fingerprint === lastFingerprint) {
             logger.info('[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match - prevents duplicate submission)');
-            logger.trace('[ScoreSync] This is likely a navigation event or Canvas fetching existing rubric data');
+            logger.debug('[ScoreSync] DEBUG - This is likely a navigation event or Canvas fetching existing rubric data');
             metrics.skipped++;
             inFlight = false;
             return;
         }
 
-        logger.trace('[ScoreSync] Fingerprint differs from last - this is a NEW or CHANGED rubric assessment');
+        logger.debug('[ScoreSync] DEBUG - Fingerprint differs from last - this is a NEW or CHANGED rubric assessment');
         lastFingerprintByContext.set(contextKey, fingerprint);
-        logger.trace('[ScoreSync] Fingerprint updated for context');
+        logger.debug('[ScoreSync] DEBUG - Fingerprint updated for context');
 
         const score = calculateGrade(submission.rubric_assessment, settings.method);
         logger.info(`[ScoreSync] Calculated score: ${score} (method: ${settings.method})`);
@@ -550,9 +551,20 @@ function isRubricSubmission(url, method, bodyText) {
     // Match SaveRubricAssessment mutation patterns
     // Canvas uses operation names like "SpeedGrader_SaveRubricAssessment"
     // This matches mutations but excludes queries like "SpeedGrader_RubricAssessmentsQuery"
-    const isSaveMutation =
-        /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText) ||
-        /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
+    const pattern1Match = /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText);
+    const pattern2Match = /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
+
+    // DEBUG: Log pattern matching details for rubric-related operations
+    if (bodyText.toLowerCase().includes('rubric')) {
+        const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
+        const operationName = operationMatch ? operationMatch[1] : 'unknown';
+        logger.debug(`[ScoreSync] DEBUG isRubricSubmission() - Operation: ${operationName}`);
+        logger.debug(`[ScoreSync] DEBUG - Pattern 1 (operationName contains SaveRubricAssessment): ${pattern1Match}`);
+        logger.debug(`[ScoreSync] DEBUG - Pattern 2 (mutation keyword + SaveRubricAssessment): ${pattern2Match}`);
+        logger.debug(`[ScoreSync] DEBUG - Body preview (first 300 chars): ${bodyText.substring(0, 300)}`);
+    }
+
+    const isSaveMutation = pattern1Match || pattern2Match;
 
     return isSaveMutation;
 }
@@ -625,16 +637,23 @@ function hookFetch() {
             const operationName = operationMatch ? operationMatch[1] : 'unknown';
             logger.trace(`[ScoreSync] GraphQL operation: ${operationName}`);
 
+            // DEBUG: Check if this is rubric-related before calling isRubricSubmission
+            const isRubricRelated = bodyText.toLowerCase().includes('rubric');
+            if (isRubricRelated) {
+                logger.debug(`[ScoreSync] DEBUG - Rubric-related GraphQL detected, calling isRubricSubmission()...`);
+            }
+
             if (isRubricSubmission(url, method, bodyText)) {
                 logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED`);
-                logger.trace(`[ScoreSync] Call #${callId}: Operation: ${operationName}`);
+                logger.debug(`[ScoreSync] DEBUG - Call #${callId}: Operation: ${operationName}`);
+                logger.debug(`[ScoreSync] DEBUG - This detection will trigger handleRubricSubmit()`);
 
                 // Re-parse URL to get current context (handles navigation)
                 const parsed = parseSpeedGraderUrl();
-                logger.trace(`[ScoreSync] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
+                logger.debug(`[ScoreSync] DEBUG - Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
 
                 if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
-                    logger.trace(`[ScoreSync] Call #${callId}: Triggering handleRubricSubmit...`);
+                    logger.debug(`[ScoreSync] DEBUG - Call #${callId}: Triggering handleRubricSubmit...`);
                     void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId, apiClient);
                 } else {
                     logger.warn(`[ScoreSync] Call #${callId}: Missing IDs, cannot handle rubric submit`);
