@@ -4325,19 +4325,20 @@ You may need to refresh the page to see the new scores.`);
       const contextKey = getContextKey(courseId, assignmentId, studentId);
       const fingerprint = createRubricFingerprint(submission.rubric_assessment);
       const lastFingerprint = lastFingerprintByContext.get(contextKey);
-      logger.trace(`[ScoreSync] Context: ${contextKey}`);
-      logger.trace(`[ScoreSync] Current rubric fingerprint: ${fingerprint}`);
-      logger.trace(`[ScoreSync] Last fingerprint for context: ${lastFingerprint || "none"}`);
+      logger.debug(`[ScoreSync] DEBUG Fingerprint Check - Context: ${contextKey}`);
+      logger.debug(`[ScoreSync] DEBUG - Current rubric fingerprint: ${fingerprint}`);
+      logger.debug(`[ScoreSync] DEBUG - Last fingerprint for context: ${lastFingerprint || "none"}`);
+      logger.debug(`[ScoreSync] DEBUG - Fingerprints match: ${fingerprint === lastFingerprint}`);
       if (fingerprint === lastFingerprint) {
         logger.info("[ScoreSync] SKIPPED - Rubric unchanged (fingerprint match - prevents duplicate submission)");
-        logger.trace("[ScoreSync] This is likely a navigation event or Canvas fetching existing rubric data");
+        logger.debug("[ScoreSync] DEBUG - This is likely a navigation event or Canvas fetching existing rubric data");
         metrics.skipped++;
         inFlight = false;
         return;
       }
-      logger.trace("[ScoreSync] Fingerprint differs from last - this is a NEW or CHANGED rubric assessment");
+      logger.debug("[ScoreSync] DEBUG - Fingerprint differs from last - this is a NEW or CHANGED rubric assessment");
       lastFingerprintByContext.set(contextKey, fingerprint);
-      logger.trace("[ScoreSync] Fingerprint updated for context");
+      logger.debug("[ScoreSync] DEBUG - Fingerprint updated for context");
       const score = calculateGrade(submission.rubric_assessment, settings.method);
       logger.info(`[ScoreSync] Calculated score: ${score} (method: ${settings.method})`);
       logger.trace("[ScoreSync] Submitting grade to Canvas API...");
@@ -4380,7 +4381,17 @@ You may need to refresh the page to see the new scores.`);
   function isRubricSubmission(url, method, bodyText) {
     if (!url.includes("/api/graphql")) return false;
     if (method !== "POST") return false;
-    const isSaveMutation = /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText) || /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
+    const pattern1Match = /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText);
+    const pattern2Match = /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
+    if (bodyText.toLowerCase().includes("rubric")) {
+      const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
+      const operationName = operationMatch ? operationMatch[1] : "unknown";
+      logger.debug(`[ScoreSync] DEBUG isRubricSubmission() - Operation: ${operationName}`);
+      logger.debug(`[ScoreSync] DEBUG - Pattern 1 (operationName contains SaveRubricAssessment): ${pattern1Match}`);
+      logger.debug(`[ScoreSync] DEBUG - Pattern 2 (mutation keyword + SaveRubricAssessment): ${pattern2Match}`);
+      logger.debug(`[ScoreSync] DEBUG - Body preview (first 300 chars): ${bodyText.substring(0, 300)}`);
+    }
+    const isSaveMutation = pattern1Match || pattern2Match;
     return isSaveMutation;
   }
   async function extractRequestBody(input, init2) {
@@ -4421,13 +4432,18 @@ You may need to refresh the page to see the new scores.`);
         const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
         const operationName = operationMatch ? operationMatch[1] : "unknown";
         logger.trace(`[ScoreSync] GraphQL operation: ${operationName}`);
+        const isRubricRelated = bodyText.toLowerCase().includes("rubric");
+        if (isRubricRelated) {
+          logger.debug(`[ScoreSync] DEBUG - Rubric-related GraphQL detected, calling isRubricSubmission()...`);
+        }
         if (isRubricSubmission(url, method, bodyText)) {
           logger.info(`[ScoreSync] \u2705 RUBRIC SUBMISSION DETECTED`);
-          logger.trace(`[ScoreSync] Call #${callId}: Operation: ${operationName}`);
+          logger.debug(`[ScoreSync] DEBUG - Call #${callId}: Operation: ${operationName}`);
+          logger.debug(`[ScoreSync] DEBUG - This detection will trigger handleRubricSubmit()`);
           const parsed = parseSpeedGraderUrl();
-          logger.trace(`[ScoreSync] Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
+          logger.debug(`[ScoreSync] DEBUG - Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
           if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
-            logger.trace(`[ScoreSync] Call #${callId}: Triggering handleRubricSubmit...`);
+            logger.debug(`[ScoreSync] DEBUG - Call #${callId}: Triggering handleRubricSubmit...`);
             void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId, apiClient);
           } else {
             logger.warn(`[ScoreSync] Call #${callId}: Missing IDs, cannot handle rubric submit`);
@@ -5731,8 +5747,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 11:32:39 AM (dev, cbbab64)");
-    exposeVersion("dev", "2026-02-03 11:32:39 AM (dev, cbbab64)");
+    logBanner("dev", "2026-02-03 11:38:00 AM (dev, 580221a)");
+    exposeVersion("dev", "2026-02-03 11:38:00 AM (dev, 580221a)");
     if (true) {
       logger.info("Running in DEV mode");
     }
