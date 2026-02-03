@@ -276,6 +276,9 @@ async function updateGradebookSettings(courseId, assignmentId) {
 /**
  * Inject "Refresh Mastery" menu item into a kebab menu
  *
+ * Note: This function is only called if the course is standards-based,
+ * as determined during initialization.
+ *
  * @param {HTMLElement} menuElement - The menu element
  */
 async function injectRefreshMasteryMenuItem(menuElement) {
@@ -284,44 +287,9 @@ async function injectRefreshMasteryMenuItem(menuElement) {
         return;
     }
 
-    // Check if course is standards-based (only show menu item for standards-based courses)
-    if (isStandardsBasedCourse === null) {
-        // First time - check course snapshot
-        const courseId = getCourseId();
-        if (!courseId) {
-            logger.warn('[RefreshMastery] Cannot get course ID, skipping menu injection');
-            return;
-        }
-
-        let snapshot = getCourseSnapshot(courseId);
-
-        // If no snapshot exists, populate it
-        if (!snapshot) {
-            logger.debug('[RefreshMastery] No snapshot found, populating for course filtering...');
-            const apiClient = new CanvasApiClient();
-
-            // Get course name from DOM (try multiple selectors)
-            const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
-
-            snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
-        }
-
-        // Cache the result for this session
-        if (snapshot) {
-            isStandardsBasedCourse = snapshot.model === 'standards';
-            logger.debug(`[RefreshMastery] Course ${courseId} is ${snapshot.model} (reason: ${snapshot.modelReason})`);
-        } else {
-            // If we can't determine course type, default to false (don't show menu item)
-            isStandardsBasedCourse = false;
-            logger.warn('[RefreshMastery] Could not determine course type, defaulting to non-standards-based');
-        }
-    }
-
-    // Only show menu item for standards-based courses
-    if (!isStandardsBasedCourse) {
-        logger.trace('[RefreshMastery] Skipping menu injection - course is not standards-based');
-        return;
-    }
+    // Course type is already determined during initialization
+    // If this function is called, the course is standards-based
+    // (initialization would have returned early for traditional courses)
 
     // Reset focus to prevent stale highlights
     resetMenuFocus(menuElement);
@@ -476,14 +444,57 @@ function injectStyles() {
  *
  * Sets up event listeners and MutationObserver to detect when kebab menus are opened
  * and injects the "Refresh Mastery" menu item.
+ *
+ * Only initializes for standards-based courses to avoid unnecessary overhead.
  */
-export function initAssignmentKebabMenuInjection() {
+export async function initAssignmentKebabMenuInjection() {
     if (!MASTERY_REFRESH_ENABLED) {
         logger.debug('[RefreshMastery] Feature disabled via config');
         return;
     }
 
     logger.info('[RefreshMastery] Initializing kebab menu injection');
+
+    // Early course type detection - skip initialization for traditional courses
+    const courseId = getCourseId();
+    if (!courseId) {
+        logger.warn('[RefreshMastery] Cannot get course ID, skipping initialization');
+        return;
+    }
+
+    // Check if course is standards-based
+    let snapshot = getCourseSnapshot(courseId);
+
+    // If no snapshot exists, populate it
+    if (!snapshot) {
+        logger.debug('[RefreshMastery] No snapshot found, populating for course type detection...');
+        const apiClient = new CanvasApiClient();
+
+        // Get course name from DOM (try multiple selectors)
+        const courseName = document.querySelector('.course-title, h1, #breadcrumbs li:last-child')?.textContent?.trim() || 'Course';
+
+        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
+    }
+
+    // Determine and cache course type
+    if (snapshot) {
+        isStandardsBasedCourse = snapshot.model === 'standards';
+        logger.debug(`[RefreshMastery] Course ${courseId} is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+    } else {
+        // If we can't determine course type, default to false (don't initialize)
+        isStandardsBasedCourse = false;
+        logger.warn('[RefreshMastery] Could not determine course type, skipping initialization');
+        return;
+    }
+
+    // Skip initialization for traditional courses
+    if (!isStandardsBasedCourse) {
+        logger.debug('[RefreshMastery] Course is traditional, skipping initialization');
+        return;
+    }
+
+    // Course is standards-based - proceed with full initialization
+    logger.info('[RefreshMastery] Course is standards-based, proceeding with initialization');
 
     // Inject CSS styles
     injectStyles();
@@ -520,5 +531,5 @@ export function initAssignmentKebabMenuInjection() {
         subtree: true
     });
 
-    logger.info('[RefreshMastery] Kebab menu injection initialized');
+    logger.info('[RefreshMastery] Kebab menu injection initialized successfully');
 }

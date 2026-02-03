@@ -3162,33 +3162,7 @@ You may need to refresh the page to see the new scores.`);
     }
   }
   async function injectRefreshMasteryMenuItem(menuElement) {
-    var _a18, _b18;
     if (!menuElement || !isAssignmentActionsMenu(menuElement)) {
-      return;
-    }
-    if (isStandardsBasedCourse === null) {
-      const courseId = getCourseId();
-      if (!courseId) {
-        logger.warn("[RefreshMastery] Cannot get course ID, skipping menu injection");
-        return;
-      }
-      let snapshot = getCourseSnapshot(courseId);
-      if (!snapshot) {
-        logger.debug("[RefreshMastery] No snapshot found, populating for course filtering...");
-        const apiClient2 = new CanvasApiClient();
-        const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
-        snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
-      }
-      if (snapshot) {
-        isStandardsBasedCourse = snapshot.model === "standards";
-        logger.debug(`[RefreshMastery] Course ${courseId} is ${snapshot.model} (reason: ${snapshot.modelReason})`);
-      } else {
-        isStandardsBasedCourse = false;
-        logger.warn("[RefreshMastery] Could not determine course type, defaulting to non-standards-based");
-      }
-    }
-    if (!isStandardsBasedCourse) {
-      logger.trace("[RefreshMastery] Skipping menu injection - course is not standards-based");
       return;
     }
     resetMenuFocus(menuElement);
@@ -3208,7 +3182,7 @@ You may need to refresh the page to see the new scores.`);
       }
     });
     menuItem.addEventListener("click", async (e) => {
-      var _a19;
+      var _a18;
       e.preventDefault();
       const courseId = getCourseId();
       const assignmentId = extractAssignmentIdFromHeader(lastKebabButton);
@@ -3220,7 +3194,7 @@ You may need to refresh the page to see the new scores.`);
         });
         return;
       }
-      const originalLabel = ((_a19 = menuItem.querySelector("span")) == null ? void 0 : _a19.textContent) || "Refresh Mastery";
+      const originalLabel = ((_a18 = menuItem.querySelector("span")) == null ? void 0 : _a18.textContent) || "Refresh Mastery";
       const labelSpan = menuItem.querySelector("span");
       menuItem.setAttribute("aria-disabled", "true");
       menuItem.setAttribute("aria-busy", "true");
@@ -3301,12 +3275,38 @@ You may need to refresh the page to see the new scores.`);
     document.head.appendChild(style);
     logger.debug("[RefreshMastery] Injected CSS styles");
   }
-  function initAssignmentKebabMenuInjection() {
+  async function initAssignmentKebabMenuInjection() {
+    var _a18, _b18;
     if (!MASTERY_REFRESH_ENABLED) {
       logger.debug("[RefreshMastery] Feature disabled via config");
       return;
     }
     logger.info("[RefreshMastery] Initializing kebab menu injection");
+    const courseId = getCourseId();
+    if (!courseId) {
+      logger.warn("[RefreshMastery] Cannot get course ID, skipping initialization");
+      return;
+    }
+    let snapshot = getCourseSnapshot(courseId);
+    if (!snapshot) {
+      logger.debug("[RefreshMastery] No snapshot found, populating for course type detection...");
+      const apiClient2 = new CanvasApiClient();
+      const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+      snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
+    }
+    if (snapshot) {
+      isStandardsBasedCourse = snapshot.model === "standards";
+      logger.debug(`[RefreshMastery] Course ${courseId} is ${snapshot.model} (reason: ${snapshot.modelReason})`);
+    } else {
+      isStandardsBasedCourse = false;
+      logger.warn("[RefreshMastery] Could not determine course type, skipping initialization");
+      return;
+    }
+    if (!isStandardsBasedCourse) {
+      logger.debug("[RefreshMastery] Course is traditional, skipping initialization");
+      return;
+    }
+    logger.info("[RefreshMastery] Course is standards-based, proceeding with initialization");
     injectStyles();
     document.addEventListener("click", (e) => {
       const kebabButton = e.target.closest('button[aria-haspopup="true"][data-popover-trigger="true"]');
@@ -3328,7 +3328,7 @@ You may need to refresh the page to see the new scores.`);
       childList: true,
       subtree: true
     });
-    logger.info("[RefreshMastery] Kebab menu injection initialized");
+    logger.info("[RefreshMastery] Kebab menu injection initialized successfully");
   }
 
   // src/utils/domExtractors.js
@@ -5762,8 +5762,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 1:10:36 PM (dev, 80e70c7)");
-    exposeVersion("dev", "2026-02-03 1:10:36 PM (dev, 80e70c7)");
+    logBanner("dev", "2026-02-03 1:18:30 PM (dev, 9040f07)");
+    exposeVersion("dev", "2026-02-03 1:18:30 PM (dev, 9040f07)");
     if (true) {
       logger.info("Running in DEV mode");
     }
@@ -5774,7 +5774,9 @@ You may need to refresh the page to see the new scores.`);
     validateAllSnapshots();
     if (window.location.pathname.includes("/gradebook")) {
       injectButtons();
-      initAssignmentKebabMenuInjection();
+      initAssignmentKebabMenuInjection().catch((err) => {
+        logger.warn("[Init] Failed to initialize assignment kebab menu injection:", err);
+      });
     }
     if (isDashboardPage2()) {
       initDashboardGradeDisplay();
