@@ -53,3 +53,17 @@ TODO: remove legacy code
  - outcome name
  - assignment name
  - rubric name
+
+## Agent Recommendations
+### Recommendations
+### For v1.0.2 (Next Patch):
+    Consider adding:
+    1. Version selector UI in loader generator panel
+    2. Configuration editors for outcome/assignment/rubric names
+    3. Excluded keywords editor with add/remove functionality
+### For v1.1.0 (Next Minor):
+    Consider adding API-based features:
+    1. Grading scheme detector (read-only API call)
+    2. Rubric ratings inspector (read-only API call)
+    3. Override settings checker (read-only API call)
+These would require careful API integration but would provide valuable diagnostic information.
