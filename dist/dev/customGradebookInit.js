@@ -6498,8 +6498,8 @@ ${cgBlock}
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-04 9:31:04 AM (dev, ecc57d1)");
-    exposeVersion("dev", "2026-02-04 9:31:04 AM (dev, ecc57d1)");
+    logBanner("dev", "2026-02-04 9:45:41 AM (dev, 950428e)");
+    exposeVersion("dev", "2026-02-04 9:45:41 AM (dev, 950428e)");
     if (true) {
       logger.info("Running in DEV mode");
     }

@@ -1,18 +1,21 @@
+/* BEGIN CG MANAGED CODE */
+
 /**
  * ============================================================================
  * CustomizedGradebook - DEV Loader
  * ============================================================================
  * This loader snippet injects the CustomizedGradebook script into Canvas.
+ * 
+ * File: loader_dev.js
  */
 
 (function () {
-    // ========================================================================
-    // GLOBAL CONFIGURATION CONSTANTS
-    // ========================================================================
-    // ⚠️  Last synced: 2026-01-07
-    // ========================================================================
 
-    window.CG_CONFIG = {
+    // Initialize CG_CONFIG if not already present (allows pre-configuration)
+    window.CG_CONFIG = window.CG_CONFIG || {};
+
+    // Define defaults
+    const defaults = {
         // Feature flags
         ENABLE_STUDENT_GRADE_CUSTOMIZATION: true,
         REMOVE_ASSIGNMENT_TAB: false,
@@ -20,7 +23,6 @@
         // Grading mode configuration
         ENABLE_OUTCOME_UPDATES: true,
         ENABLE_GRADE_OVERRIDE: true,
-
 
         // UI labels and resource names
         UPDATE_AVG_BUTTON_LABEL: "Update Current Score",
@@ -49,6 +51,13 @@
         EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
     };
 
+    // Apply defaults only where keys are undefined
+    for (const key in defaults) {
+        if (window.CG_CONFIG[key] === undefined) {
+            window.CG_CONFIG[key] = defaults[key];
+        }
+    }
+
     // Hide the Canvas /grades table ASAP to prevent flash (Theme CSS uses this gate)
     const addGradesGate = () => {
         if (document.body
@@ -61,8 +70,10 @@
     addGradesGate();
     document.addEventListener('DOMContentLoaded', addGradesGate, { once: true });
 
-
-    console.log("[CG] Configuration loaded:", window.CG_CONFIG);
+    // Debug logging (gated)
+    if (window.CG_CONFIG.DEBUG) {
+        console.log("[CG] Configuration loaded:", window.CG_CONFIG);
+    }
 
     // ========================================================================
     // SCRIPT LOADER
@@ -84,3 +95,6 @@
     script.onerror = () => console.error("[CG] Failed to load customGradebookInit.js (DEV) from GitHub");
     document.head.appendChild(script);
 })();
+
+
+/* END CG MANAGED CODE */
