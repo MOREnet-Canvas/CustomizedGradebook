@@ -6392,28 +6392,32 @@ ${cgBlock}
   // src/admin/dashboardRenderer.js
   function renderAdminDashboardPage() {
     logger.info("[DashboardRenderer] Rendering admin dashboard page");
-    document.documentElement.innerHTML = "";
-    const head = document.createElement("head");
-    const body = document.createElement("body");
-    head.innerHTML = `
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>CG Admin Dashboard</title>
-        <style>
-            /* Reset and ensure clean slate */
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body {
-                width: 100%;
-                height: 100%;
-                overflow-x: hidden;
-                background: #f5f5f5;
-            }
-            /* Hide any Canvas content that might appear */
-            #content, #application, .ic-app-main-content { display: none !important; }
-        </style>
+    document.body.innerHTML = "";
+    const style = document.createElement("style");
+    style.textContent = `
+        /* Hide all Canvas content */
+        #content, #application, .ic-app-main-content,
+        #header, #main, .ic-app-header, .ic-app-nav-toggle-and-crumbs,
+        .ic-app-course-menu, .ic-app-footer {
+            display: none !important;
+        }
+
+        /* Reset body styles */
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #f5f5f5 !important;
+            overflow-x: hidden !important;
+        }
+
+        /* Ensure admin dashboard is visible */
+        #cg-admin-root {
+            display: block !important;
+            visibility: visible !important;
+        }
     `;
-    document.documentElement.appendChild(head);
-    document.documentElement.appendChild(body);
+    document.head.appendChild(style);
+    document.title = "CG Admin Dashboard";
     const root = createElement("div", {
       attrs: { id: "cg-admin-root" },
       style: {
@@ -6422,7 +6426,8 @@ ${cgBlock}
         maxWidth: "1100px",
         margin: "0 auto",
         background: "#fff",
-        minHeight: "100vh"
+        minHeight: "100vh",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
       }
     });
     const header = createElement("h1", {
@@ -6450,7 +6455,7 @@ ${cgBlock}
     root.appendChild(banner);
     renderThemeStatusPanels(root);
     renderLoaderGeneratorPanel(root);
-    body.appendChild(root);
+    document.body.appendChild(root);
     logger.debug("[DashboardRenderer] Admin dashboard page rendered successfully");
   }
 
@@ -6493,8 +6498,8 @@ ${cgBlock}
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-04 9:21:05 AM (dev, 460864d)");
-    exposeVersion("dev", "2026-02-04 9:21:05 AM (dev, 460864d)");
+    logBanner("dev", "2026-02-04 9:31:04 AM (dev, ecc57d1)");
+    exposeVersion("dev", "2026-02-04 9:31:04 AM (dev, ecc57d1)");
     if (true) {
       logger.info("Running in DEV mode");
     }
