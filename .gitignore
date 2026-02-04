@@ -15,3 +15,5 @@ node_modules/
 
 # Reference code (not for version control)
 old_code/
+
+dist/prod
