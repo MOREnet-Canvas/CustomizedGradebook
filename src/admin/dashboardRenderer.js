@@ -16,14 +16,40 @@ import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
 
 /**
  * Render the Admin Dashboard virtual page
- * 
+ *
  * Clears the page and renders a full-page admin dashboard UI.
  */
 export function renderAdminDashboardPage() {
     logger.info('[DashboardRenderer] Rendering admin dashboard page');
 
-    // Clear page
+    // Clear page completely
     document.documentElement.innerHTML = '';
+
+    // Create new head and body elements
+    const head = document.createElement('head');
+    const body = document.createElement('body');
+
+    // Add basic meta tags
+    head.innerHTML = `
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CG Admin Dashboard</title>
+        <style>
+            /* Reset and ensure clean slate */
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body {
+                width: 100%;
+                height: 100%;
+                overflow-x: hidden;
+                background: #f5f5f5;
+            }
+            /* Hide any Canvas content that might appear */
+            #content, #application, .ic-app-main-content { display: none !important; }
+        </style>
+    `;
+
+    document.documentElement.appendChild(head);
+    document.documentElement.appendChild(body);
 
     // Create root container
     const root = createElement('div', {
@@ -33,7 +59,8 @@ export function renderAdminDashboardPage() {
             padding: '32px',
             maxWidth: '1100px',
             margin: '0 auto',
-            background: '#fff'
+            background: '#fff',
+            minHeight: '100vh'
         }
     });
 
@@ -74,8 +101,7 @@ export function renderAdminDashboardPage() {
     renderLoaderGeneratorPanel(root);
 
     // Append to body
-    document.body.appendChild(root);
+    body.appendChild(root);
 
     logger.debug('[DashboardRenderer] Admin dashboard page rendered successfully');
 }
-
