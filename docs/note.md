@@ -34,7 +34,7 @@ TODO: Mastery Refresh: This does not update rubric scores, so outcome results ar
 
 
 ## Refactoring
-TODO: remove canvasHelpers.js?
+~~TODO: remove canvasHelpers.js?~~
 ~~TODO: get rid of all references to current score~~
 TODO: remove legacy code
 
