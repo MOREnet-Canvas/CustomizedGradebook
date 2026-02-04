@@ -113,7 +113,7 @@ window.CG_MANAGED = window.CG_MANAGED || {};
 // Release configuration
 window.CG_MANAGED.release = {
     channel: "prod",
-    version: "v1.0.0",
+    version: "v1.0.1",
     source: "github_release"
 };
 
