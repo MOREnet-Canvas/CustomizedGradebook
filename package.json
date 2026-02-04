@@ -1,6 +1,6 @@
 {
   "name": "customized-gradebook",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "build:dev": "node esbuild.config.js dev",
@@ -9,8 +9,6 @@
     "test": "vitest",
     "deploy:dev": "npm run build:dev && gh release upload dev dist/dev/customGradebookInit.js dist/dev/customGradebookInit.js.map --clobber",
     "deploy:prod": "npm run build:prod && node buildScripts/deploy-prod.js"
-
-
   },
   "devDependencies": {
     "esbuild": "^0.27.0",
