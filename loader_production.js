@@ -81,7 +81,7 @@
     // Read release configuration from managed block
     const release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
         channel: "prod",
-        version: "v1.0.1",
+        version: "v1.0.2",
         source: "github_release"
     };
 
@@ -113,7 +113,7 @@ window.CG_MANAGED = window.CG_MANAGED || {};
 // Release configuration
 window.CG_MANAGED.release = {
     channel: "prod",
-    version: "v1.0.1",
+    version: "v1.0.2",
     source: "github_release"
 };
 
