@@ -9,7 +9,7 @@
  * RUNTIME OVERRIDE SUPPORT:
  * -------------------------
  * All constants can be overridden at runtime via window.CG_CONFIG, which is
- * set by the loader files (upload_dev.js or upload_production.js).
+ * set by the loader files (upload_dev.js or loader_production.js).
  *
  * This allows users to customize configuration by editing only the loader
  * files without needing to rebuild the bundle. The values in this file serve
@@ -18,7 +18,7 @@
  *
  * EXECUTION ORDER:
  * ----------------
- * 1. Loader file (upload_dev.js or upload_production.js) runs first
+ * 1. Loader file (upload_dev.js or loader_production.js) runs first
  * 2. Loader sets window.CG_CONFIG with user-customized values
  * 3. Loader injects the main bundle script
  * 4. Main bundle loads and this config.js module is imported
@@ -27,7 +27,7 @@
  * CUSTOMIZATION WORKFLOW:
  * -----------------------
  * To customize configuration:
- * 1. Edit window.CG_CONFIG in upload_dev.js or upload_production.js
+ * 1. Edit window.CG_CONFIG in upload_dev.js or loader_production.js
  * 2. Inject the updated loader into Canvas (no rebuild needed)
  * 3. The main bundle will automatically use the customized values
  *
