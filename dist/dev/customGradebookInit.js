@@ -6393,6 +6393,27 @@ ${cgBlock}
   function renderAdminDashboardPage() {
     logger.info("[DashboardRenderer] Rendering admin dashboard page");
     document.documentElement.innerHTML = "";
+    const head = document.createElement("head");
+    const body = document.createElement("body");
+    head.innerHTML = `
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CG Admin Dashboard</title>
+        <style>
+            /* Reset and ensure clean slate */
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body {
+                width: 100%;
+                height: 100%;
+                overflow-x: hidden;
+                background: #f5f5f5;
+            }
+            /* Hide any Canvas content that might appear */
+            #content, #application, .ic-app-main-content { display: none !important; }
+        </style>
+    `;
+    document.documentElement.appendChild(head);
+    document.documentElement.appendChild(body);
     const root = createElement("div", {
       attrs: { id: "cg-admin-root" },
       style: {
@@ -6400,7 +6421,8 @@ ${cgBlock}
         padding: "32px",
         maxWidth: "1100px",
         margin: "0 auto",
-        background: "#fff"
+        background: "#fff",
+        minHeight: "100vh"
       }
     });
     const header = createElement("h1", {
@@ -6428,7 +6450,7 @@ ${cgBlock}
     root.appendChild(banner);
     renderThemeStatusPanels(root);
     renderLoaderGeneratorPanel(root);
-    document.body.appendChild(root);
+    body.appendChild(root);
     logger.debug("[DashboardRenderer] Admin dashboard page rendered successfully");
   }
 
@@ -6471,8 +6493,8 @@ ${cgBlock}
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-04 8:46:49 AM (dev, 0c9970f)");
-    exposeVersion("dev", "2026-02-04 8:46:49 AM (dev, 0c9970f)");
+    logBanner("dev", "2026-02-04 9:21:05 AM (dev, 460864d)");
+    exposeVersion("dev", "2026-02-04 9:21:05 AM (dev, 460864d)");
     if (true) {
       logger.info("Running in DEV mode");
     }
