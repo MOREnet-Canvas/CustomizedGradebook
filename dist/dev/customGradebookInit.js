@@ -560,10 +560,10 @@
      * @throws {Error} If transition is invalid
      */
     transition(toState, contextUpdates = {}) {
-      var _a18;
+      var _a19;
       if (!this.canTransition(toState)) {
         throw new Error(
-          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a18 = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a18.join(", ")) || "none"}`
+          `Invalid transition from ${this.currentState} to ${toState}. Valid transitions: ${((_a19 = VALID_TRANSITIONS[this.currentState]) == null ? void 0 : _a19.join(", ")) || "none"}`
         );
       }
       const fromState = this.currentState;
@@ -754,7 +754,7 @@
         body = data;
       }
     }
-    const _a18 = options, { headers: _optionsHeaders } = _a18, restOptions = __objRest(_a18, ["headers"]);
+    const _a19 = options, { headers: _optionsHeaders } = _a19, restOptions = __objRest(_a19, ["headers"]);
     const response = await safeFetch(
       url,
       __spreadValues({
@@ -792,7 +792,7 @@
     }
   }
   async function fetchOverrideGrades(courseId, apiClient2) {
-    var _a18;
+    var _a19;
     if (!ENABLE_GRADE_OVERRIDE) {
       logger.debug("Grade override is disabled in config, skipping fetch");
       return /* @__PURE__ */ new Map();
@@ -806,7 +806,7 @@
       const overrideMap = /* @__PURE__ */ new Map();
       const overrides = response.final_grade_overrides || {};
       for (const [userId, data] of Object.entries(overrides)) {
-        const percentage = (_a18 = data == null ? void 0 : data.course_grade) == null ? void 0 : _a18.percentage;
+        const percentage = (_a19 = data == null ? void 0 : data.course_grade) == null ? void 0 : _a19.percentage;
         if (percentage !== null && percentage !== void 0) {
           overrideMap.set(userId, percentage);
           logger.trace(`Override grade for user ${userId}: ${percentage}%`);
@@ -878,25 +878,25 @@
 
   // src/services/gradeCalculator.js
   function buildOutcomeMap(data) {
-    var _a18, _b18;
+    var _a19, _b18;
     const map = {};
-    ((_b18 = (_a18 = data == null ? void 0 : data.linked) == null ? void 0 : _a18.outcomes) != null ? _b18 : []).forEach((o) => {
+    ((_b18 = (_a19 = data == null ? void 0 : data.linked) == null ? void 0 : _a19.outcomes) != null ? _b18 : []).forEach((o) => {
       map[String(o.id)] = o.title;
     });
     return map;
   }
   function getCurrentOutcomeScore(scores, outcomeId) {
-    var _a18;
+    var _a19;
     const match = scores.find((s) => {
-      var _a19;
-      return String((_a19 = s.links) == null ? void 0 : _a19.outcome) === String(outcomeId);
+      var _a20;
+      return String((_a20 = s.links) == null ? void 0 : _a20.outcome) === String(outcomeId);
     });
-    return (_a18 = match == null ? void 0 : match.score) != null ? _a18 : null;
+    return (_a19 = match == null ? void 0 : match.score) != null ? _a19 : null;
   }
   function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywords) {
     return scores.filter((s) => {
-      var _a18;
-      const id = String((_a18 = s.links) == null ? void 0 : _a18.outcome);
+      var _a19;
+      const id = String((_a19 = s.links) == null ? void 0 : _a19.outcome);
       const title = (outcomeMap[id] || "").toLowerCase();
       return typeof s.score === "number" && !excludedOutcomeIds.has(id) && !excludedKeywords.some((keyword) => title.includes(keyword.toLowerCase()));
     });
@@ -946,7 +946,7 @@
     }
   }
   async function calculateStudentAverages(data, outcomeId, courseId, apiClient2) {
-    var _a18, _b18, _c, _d;
+    var _a19, _b18, _c, _d;
     logger.info("Calculating student averages...");
     logger.debug(`Grading mode: ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}, ENABLE_GRADE_OVERRIDE=${ENABLE_GRADE_OVERRIDE}`);
     const outcomeMap = buildOutcomeMap(data);
@@ -962,7 +962,7 @@
       }
     }
     const results = [];
-    for (const rollup of (_a18 = data == null ? void 0 : data.rollups) != null ? _a18 : []) {
+    for (const rollup of (_a19 = data == null ? void 0 : data.rollups) != null ? _a19 : []) {
       const userId = (_b18 = rollup.links) == null ? void 0 : _b18.user;
       if (!userId) continue;
       const oldAverage = getCurrentOutcomeScore((_c = rollup.scores) != null ? _c : [], outcomeId);
@@ -1052,7 +1052,7 @@
   // src/services/gradeOverride.js
   var __enrollmentMapCache = /* @__PURE__ */ new Map();
   async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient2) {
-    var _a18, _b18, _c, _d, _e;
+    var _a19, _b18, _c, _d, _e;
     const query = `
     mutation SetOverride($enrollmentId: ID!, $overrideScore: Float!) {
       setOverrideScore(input: { enrollmentId: $enrollmentId, overrideScore: $overrideScore }) {
@@ -1073,7 +1073,7 @@
       logError(error, "setOverrideScoreGQL", { enrollmentId, overrideScore });
       throw error;
     }
-    return (_e = (_d = (_c = (_b18 = (_a18 = json.data) == null ? void 0 : _a18.setOverrideScore) == null ? void 0 : _b18.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
+    return (_e = (_d = (_c = (_b18 = (_a19 = json.data) == null ? void 0 : _a19.setOverrideScore) == null ? void 0 : _b18.grades) == null ? void 0 : _c[0]) == null ? void 0 : _d.overrideScore) != null ? _e : null;
   }
   async function getAllEnrollmentIds(courseId, apiClient2) {
     const courseKey = String(courseId);
@@ -1300,8 +1300,8 @@
       retryCounts.map((r) => [r.userId, r.attempts])
     );
     const rows = Array.from(allUserIds).map((userId) => {
-      var _a18, _b18;
-      const attempts = (_a18 = retryCountsById[userId]) != null ? _a18 : "";
+      var _a19, _b18;
+      const attempts = (_a19 = retryCountsById[userId]) != null ? _a19 : "";
       const failed = failedById[userId];
       const average = (_b18 = failed == null ? void 0 : failed.average) != null ? _b18 : "";
       const status = failed ? "UPDATE FAILED" : "";
@@ -1376,11 +1376,11 @@
     return rollupData;
   }
   function getOutcomeObjectByName(data) {
-    var _a18, _b18;
+    var _a19, _b18;
     const outcomeTitle = AVG_OUTCOME_NAME;
     logger.debug("Outcome Title:", outcomeTitle);
     logger.debug("data:", data);
-    const outcomes = (_b18 = (_a18 = data == null ? void 0 : data.linked) == null ? void 0 : _a18.outcomes) != null ? _b18 : [];
+    const outcomes = (_b18 = (_a19 = data == null ? void 0 : data.linked) == null ? void 0 : _a19.outcomes) != null ? _b18 : [];
     logger.debug("outcomes: ", outcomes);
     if (outcomes.length === 0) {
       logger.warn("No outcomes found in rollup data.");
@@ -1443,8 +1443,8 @@
 
   // src/services/assignmentService.js
   async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject, apiClient2) {
-    var _a18;
-    const alignments = (_a18 = outcomeObject.alignments) != null ? _a18 : [];
+    var _a19;
+    const alignments = (_a19 = outcomeObject.alignments) != null ? _a19 : [];
     for (const alignment of alignments) {
       if (!alignment.startsWith("assignment_")) continue;
       const assignmentId = alignment.split("_")[1];
@@ -2026,7 +2026,7 @@ You may need to refresh the page to see the new scores.`);
 
   // src/gradebook/updateFlowOrchestrator.js
   async function startUpdateFlow(button = null) {
-    var _a18;
+    var _a19;
     const courseId = getCourseId();
     if (!courseId) throw new ValidationError("Course ID not found", "courseId");
     const stateMachine = new UpdateFlowStateMachine();
@@ -2054,7 +2054,7 @@ You may need to refresh the page to see the new scores.`);
         }
         updateDebugUI(stateMachine);
       }
-      const buttonWrapper = (_a18 = document.querySelector("#update-scores-button")) == null ? void 0 : _a18.parentElement;
+      const buttonWrapper = (_a19 = document.querySelector("#update-scores-button")) == null ? void 0 : _a19.parentElement;
       if (buttonWrapper) renderLastUpdateNotice(buttonWrapper, courseId);
       resetButtonToNormal(button);
       removeDebugUI();
@@ -2179,7 +2179,7 @@ You may need to refresh the page to see the new scores.`);
     return assignment;
   }
   async function refreshMasteryForAssignment(courseId, assignmentId, options = {}) {
-    var _a18, _b18;
+    var _a19, _b18;
     const lockKey = `${courseId}_${assignmentId}`;
     if (activeLocks.has(lockKey)) {
       logger.warn(`[RefreshMastery] Already running for assignment ${assignmentId}`);
@@ -2188,7 +2188,7 @@ You may need to refresh the page to see the new scores.`);
     activeLocks.add(lockKey);
     try {
       const apiClient2 = new CanvasApiClient();
-      const delay = (_a18 = options.delay) != null ? _a18 : MASTERY_REFRESH_DELAY_MS;
+      const delay = (_a19 = options.delay) != null ? _a19 : MASTERY_REFRESH_DELAY_MS;
       const skipRevert = (_b18 = options.skipRevert) != null ? _b18 : false;
       logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId} in course ${courseId}`);
       const assignment = await fetchAssignmentWithRubric(courseId, assignmentId, apiClient2);
@@ -2434,14 +2434,14 @@ You may need to refresh the page to see the new scores.`);
 
   // src/services/enrollmentService.js
   function parseEnrollmentGrade(enrollmentData) {
-    var _a18, _b18, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a19, _b18, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (!enrollmentData) {
       return null;
     }
     let score = null;
     let letterGrade = null;
     if (enrollmentData.grades) {
-      score = (_a18 = enrollmentData.grades.current_score) != null ? _a18 : enrollmentData.grades.final_score;
+      score = (_a19 = enrollmentData.grades.current_score) != null ? _a19 : enrollmentData.grades.final_score;
       letterGrade = (_e = (_d = (_c = (_b18 = enrollmentData.grades.current_grade) != null ? _b18 : enrollmentData.grades.final_grade) != null ? _c : null) == null ? void 0 : _d.trim()) != null ? _e : null;
     }
     if (score === null || score === void 0) {
@@ -3021,7 +3021,7 @@ You may need to refresh the page to see the new scores.`);
     return texts.includes("SpeedGrader");
   }
   function extractAssignmentIdFromHeader(kebabButton) {
-    var _a18;
+    var _a19;
     if (!kebabButton) {
       logger.warn("[RefreshMastery] No kebab button reference available");
       return null;
@@ -3037,7 +3037,7 @@ You may need to refresh the page to see the new scores.`);
     }
     const assignmentLink = headerColumn.querySelector('a[href*="/assignments/"]');
     if (assignmentLink) {
-      const hrefMatch = (_a18 = assignmentLink.getAttribute("href")) == null ? void 0 : _a18.match(/\/assignments\/(\d+)/);
+      const hrefMatch = (_a19 = assignmentLink.getAttribute("href")) == null ? void 0 : _a19.match(/\/assignments\/(\d+)/);
       if (hrefMatch) {
         return Number(hrefMatch[1]);
       }
@@ -3179,7 +3179,7 @@ You may need to refresh the page to see the new scores.`);
       }
     });
     menuItem.addEventListener("click", async (e) => {
-      var _a18;
+      var _a19;
       e.preventDefault();
       const courseId = getCourseId();
       const assignmentId = extractAssignmentIdFromHeader(lastKebabButton);
@@ -3191,7 +3191,7 @@ You may need to refresh the page to see the new scores.`);
         });
         return;
       }
-      const originalLabel = ((_a18 = menuItem.querySelector("span")) == null ? void 0 : _a18.textContent) || "Refresh Mastery";
+      const originalLabel = ((_a19 = menuItem.querySelector("span")) == null ? void 0 : _a19.textContent) || "Refresh Mastery";
       const labelSpan = menuItem.querySelector("span");
       menuItem.setAttribute("aria-disabled", "true");
       menuItem.setAttribute("aria-busy", "true");
@@ -3273,7 +3273,7 @@ You may need to refresh the page to see the new scores.`);
     logger.debug("[RefreshMastery] Injected CSS styles");
   }
   async function initAssignmentKebabMenuInjection() {
-    var _a18, _b18;
+    var _a19, _b18;
     if (!MASTERY_REFRESH_ENABLED) {
       logger.debug("[RefreshMastery] Feature disabled via config");
       return;
@@ -3288,7 +3288,7 @@ You may need to refresh the page to see the new scores.`);
     if (!snapshot) {
       logger.debug("[RefreshMastery] No snapshot found, populating for course type detection...");
       const apiClient2 = new CanvasApiClient();
-      const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+      const courseName = ((_b18 = (_a19 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a19.textContent) == null ? void 0 : _b18.trim()) || "Course";
       snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
     }
     if (snapshot) {
@@ -3419,10 +3419,10 @@ You may need to refresh the page to see the new scores.`);
     return CARD_SELECTORS;
   }
   function looksLikeDashboardCard(node) {
-    var _a18, _b18;
+    var _a19, _b18;
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
     const element = node;
-    if ((_a18 = element.hasAttribute) == null ? void 0 : _a18.call(element, "data-course-id")) return true;
+    if ((_a19 = element.hasAttribute) == null ? void 0 : _a19.call(element, "data-course-id")) return true;
     const className = element.className || "";
     if (typeof className === "string") {
       if (className.includes("DashboardCard") || className.includes("CourseCard") || className.includes("course-list-item") || className.includes("dashboard-card")) {
@@ -3720,7 +3720,7 @@ You may need to refresh the page to see the new scores.`);
   var dashboardObserver = null;
   var CONCURRENT_WORKERS = 3;
   async function fetchActiveCourses(apiClient2) {
-    var _a18;
+    var _a19;
     try {
       const courses = await apiClient2.get(
         "/api/v1/courses?enrollment_state=active&include[]=total_scores",
@@ -3758,7 +3758,7 @@ You may need to refresh the page to see the new scores.`);
       if (logger.isTraceEnabled() && coursesWithEnrollmentData.length > 0) {
         const firstCourse = coursesWithEnrollmentData[0];
         logger.trace(`First course enrollment data:`, firstCourse.enrollmentData);
-        if ((_a18 = firstCourse.enrollmentData) == null ? void 0 : _a18.grades) {
+        if ((_a19 = firstCourse.enrollmentData) == null ? void 0 : _a19.grades) {
           logger.trace(`First course grades object:`, firstCourse.enrollmentData.grades);
         }
       }
@@ -3885,8 +3885,8 @@ You may need to refresh the page to see the new scores.`);
     dashboardObserver = createPersistentObserver((mutations) => {
       const cardsAdded = mutations.some((mutation) => {
         return Array.from(mutation.addedNodes).some((node) => {
-          var _a18;
-          return looksLikeDashboardCard(node) || ((_a18 = node.querySelector) == null ? void 0 : _a18.call(node, getDashboardCardSelectors().join(",")));
+          var _a19;
+          return looksLikeDashboardCard(node) || ((_a19 = node.querySelector) == null ? void 0 : _a19.call(node, getDashboardCardSelectors().join(",")));
         });
       });
       if (cardsAdded) {
@@ -4121,14 +4121,14 @@ You may need to refresh the page to see the new scores.`);
     "value"
   ).set;
   function parseSpeedGraderUrl() {
-    var _a18, _b18;
+    var _a19, _b18;
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     const courseIdMatch = path.match(/\/courses\/(\d+)\//);
     const courseId = courseIdMatch ? courseIdMatch[1] : null;
     const assignmentIdRaw = params.get("assignment_id");
     const studentIdRaw = params.get("student_id");
-    const assignmentId = assignmentIdRaw ? ((_a18 = assignmentIdRaw.match(/^\d+/)) == null ? void 0 : _a18[0]) || null : null;
+    const assignmentId = assignmentIdRaw ? ((_a19 = assignmentIdRaw.match(/^\d+/)) == null ? void 0 : _a19[0]) || null : null;
     const studentId = studentIdRaw ? ((_b18 = studentIdRaw.match(/^\d+/)) == null ? void 0 : _b18[0]) || null : null;
     return { courseId, assignmentId, studentId };
   }
@@ -4244,7 +4244,7 @@ You may need to refresh the page to see the new scores.`);
     logger.trace(`[ScoreSync] Grade input update scheduled for score: ${score}`);
   }
   async function submitGrade(courseId, assignmentId, studentId, score, apiClient2, retries = TIMING_CONSTANTS.SUBMIT_GRADE_MAX_RETRIES) {
-    var _a18;
+    var _a19;
     logger.trace(`[ScoreSync] submitGrade called with score=${score}, retries=${retries}`);
     const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -4261,7 +4261,7 @@ You may need to refresh the page to see the new scores.`);
           `submitGrade:${studentId}`
         );
         logger.trace(`[ScoreSync] Response data:`, data);
-        const enteredScore = (_a18 = data == null ? void 0 : data.entered_score) != null ? _a18 : score;
+        const enteredScore = (_a19 = data == null ? void 0 : data.entered_score) != null ? _a19 : score;
         logger.info(`[ScoreSync] \u2705 Grade submitted successfully: ${enteredScore}`);
         return data;
       } catch (error) {
@@ -4303,7 +4303,7 @@ You may need to refresh the page to see the new scores.`);
     }
   }
   async function handleRubricSubmitInternal(courseId, assignmentId, studentId, apiClient2) {
-    var _a18;
+    var _a19;
     logger.info("[ScoreSync] ========== RUBRIC SUBMIT HANDLER CALLED ==========");
     logger.trace(`[ScoreSync] Parameters: courseId=${courseId}, assignmentId=${assignmentId}, studentId=${studentId}`);
     if (inFlight) {
@@ -4375,7 +4375,7 @@ You may need to refresh the page to see the new scores.`);
         return;
       }
       logger.trace(`[ScoreSync] Grade submission result: entered_score=${result.entered_score}, score=${result.score}, workflow_state=${result.workflow_state}`);
-      const finalScore = (_a18 = result == null ? void 0 : result.entered_score) != null ? _a18 : score;
+      const finalScore = (_a19 = result == null ? void 0 : result.entered_score) != null ? _a19 : score;
       logger.trace(`[ScoreSync] Updating UI with final score: ${finalScore}`);
       updateGradeInput(finalScore);
       updateAssignmentScoreDisplay(finalScore);
@@ -4616,7 +4616,7 @@ You may need to refresh the page to see the new scores.`);
     logger.trace("[ScoreSync] History API hooks installed");
   }
   async function initSpeedGraderAutoGrade() {
-    var _a18;
+    var _a19;
     logger.info("[ScoreSync] ========== INITIALIZATION STARTED ==========");
     if (initialized3) {
       logger.warn("[ScoreSync] Already initialized, skipping");
@@ -4645,7 +4645,7 @@ You may need to refresh the page to see the new scores.`);
     logger.trace(`[ScoreSync] Course snapshot from cache: ${snapshot ? "FOUND" : "NOT FOUND"}`);
     if (!snapshot) {
       logger.trace("[ScoreSync] Populating course snapshot...");
-      const courseName = ((_a18 = document.title.split(":")[0]) == null ? void 0 : _a18.trim()) || "Unknown Course";
+      const courseName = ((_a19 = document.title.split(":")[0]) == null ? void 0 : _a19.trim()) || "Unknown Course";
       logger.trace(`[ScoreSync] Course name from title: "${courseName}"`);
       snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
       logger.trace(`[ScoreSync] Snapshot population result: ${snapshot ? "SUCCESS" : "FAILED"}`);
@@ -4779,14 +4779,14 @@ You may need to refresh the page to see the new scores.`);
     return true;
   }
   async function runOnce() {
-    var _a18, _b18;
+    var _a19, _b18;
     if (processed) return true;
     const courseId = getCourseId();
     if (!courseId) {
       logger.warn("Cannot get course ID from URL");
       return false;
     }
-    const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+    const courseName = ((_b18 = (_a19 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a19.textContent) == null ? void 0 : _b18.trim()) || "Course";
     let snapshot = getCourseSnapshot(courseId);
     if (!snapshot || shouldRefreshGrade(courseId, PAGE_CONTEXT.COURSE_GRADES)) {
       logger.trace(`Fetching grade data from API for course ${courseId}...`);
@@ -4830,7 +4830,7 @@ You may need to refresh the page to see the new scores.`);
   // src/student/allGradesPageCustomizer.js
   var processed2 = false;
   async function fetchActiveCourses2(apiClient2) {
-    var _a18;
+    var _a19;
     try {
       const courses = await apiClient2.get(
         "/api/v1/courses?enrollment_state=active&include[]=total_scores",
@@ -4867,7 +4867,7 @@ You may need to refresh the page to see the new scores.`);
       if (logger.isTraceEnabled() && coursesWithEnrollmentData.length > 0) {
         const firstCourse = coursesWithEnrollmentData[0];
         logger.trace(`[All-Grades] First course enrollment data:`, firstCourse.enrollmentData);
-        if ((_a18 = firstCourse.enrollmentData) == null ? void 0 : _a18.grades) {
+        if ((_a19 = firstCourse.enrollmentData) == null ? void 0 : _a19.grades) {
           logger.trace(`[All-Grades] First course grades object:`, firstCourse.enrollmentData.grades);
         }
       }
@@ -5243,7 +5243,7 @@ You may need to refresh the page to see the new scores.`);
 
   // src/student/gradeExtractor.js
   function scoreToGradeLevel(score) {
-    var _a18;
+    var _a19;
     const numScore = typeof score === "string" ? parseFloat(score) : score;
     if (isNaN(numScore)) {
       logger.trace(`Invalid score for grade level conversion: ${score}`);
@@ -5255,7 +5255,7 @@ You may need to refresh the page to see the new scores.`);
         return rating.description;
       }
     }
-    return ((_a18 = sortedRatings[sortedRatings.length - 1]) == null ? void 0 : _a18.description) || null;
+    return ((_a19 = sortedRatings[sortedRatings.length - 1]) == null ? void 0 : _a19.description) || null;
   }
 
   // src/teacher/teacherStudentGradeCustomizer.js
@@ -5263,7 +5263,7 @@ You may need to refresh the page to see the new scores.`);
   var currentStudentId = null;
   var urlChangeDetectionSetup = false;
   async function fetchStudentAvgScore(courseId, studentId, apiClient2) {
-    var _a18, _b18;
+    var _a19, _b18;
     logger.trace(`[Teacher] fetchStudentAvgScore: courseId=${courseId}, studentId=${studentId}`);
     try {
       logger.trace(`[Teacher] Searching for AVG assignment "${AVG_ASSIGNMENT_NAME}"...`);
@@ -5302,7 +5302,7 @@ You may need to refresh the page to see the new scores.`);
         return null;
       }
       logger.trace(`[Teacher] Student score found: ${score}`);
-      let letterGrade = (_b18 = (_a18 = submission == null ? void 0 : submission.grade) != null ? _a18 : submission == null ? void 0 : submission.entered_grade) != null ? _b18 : null;
+      let letterGrade = (_b18 = (_a19 = submission == null ? void 0 : submission.grade) != null ? _a19 : submission == null ? void 0 : submission.entered_grade) != null ? _b18 : null;
       if (!letterGrade || !isNaN(parseFloat(letterGrade))) {
         logger.trace(`[Teacher] No valid letter grade from submission API (got: ${letterGrade}), calculating from score...`);
         letterGrade = scoreToGradeLevel(score);
@@ -5442,7 +5442,7 @@ You may need to refresh the page to see the new scores.`);
     }, 0);
   }
   async function initTeacherStudentGradeCustomizer() {
-    var _a18, _b18;
+    var _a19, _b18;
     logger.debug("[Teacher] Initializing teacher student grade page customizer");
     const courseId = getCourseId();
     const studentId = getStudentIdFromUrl();
@@ -5457,7 +5457,7 @@ You may need to refresh the page to see the new scores.`);
     }
     currentStudentId = studentId;
     logger.debug(`[Teacher] Teacher viewing student ${studentId} grades for course ${courseId}`);
-    const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+    const courseName = ((_b18 = (_a19 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a19.textContent) == null ? void 0 : _b18.trim()) || "Course";
     const apiClient2 = new CanvasApiClient();
     let snapshot = getCourseSnapshot(courseId);
     if (!snapshot) {
@@ -5613,8 +5613,8 @@ You may need to refresh the page to see the new scores.`);
     return results;
   }
   async function processCourseFromEnrollment(enrollment, apiClient2) {
-    var _a18, _b18, _c, _d, _e, _f;
-    const courseId = (_a18 = enrollment.course_id) == null ? void 0 : _a18.toString();
+    var _a19, _b18, _c, _d, _e, _f;
+    const courseId = (_a19 = enrollment.course_id) == null ? void 0 : _a19.toString();
     if (!courseId) return null;
     const grades = enrollment.grades || {};
     const percentage = (_c = (_b18 = grades.current_score) != null ? _b18 : grades.final_score) != null ? _c : null;
@@ -5750,6 +5750,718 @@ You may need to refresh the page to see the new scores.`);
     window.CG_testAllGradesDataSources = compareDataSourceApproaches;
   }
 
+  // src/admin/pageDetection.js
+  var CG_ADMIN_FLAG = "cg_admin_dashboard";
+  function isThemeEditorPage() {
+    return /^\/accounts\/\d+\/theme_editor/.test(window.location.pathname);
+  }
+  function isAdminDashboardPage() {
+    return new URLSearchParams(window.location.search).has(CG_ADMIN_FLAG);
+  }
+  function getAccountId() {
+    var _a19;
+    return ((_a19 = window.ENV) == null ? void 0 : _a19.ACCOUNT_ID) || null;
+  }
+  function getInstalledThemeJsUrl() {
+    var _a19, _b18;
+    return normalizeUrl((_b18 = (_a19 = window.ENV) == null ? void 0 : _a19.active_brand_config) == null ? void 0 : _b18.js_overrides);
+  }
+  function getInstalledThemeCssUrl() {
+    var _a19, _b18;
+    return normalizeUrl((_b18 = (_a19 = window.ENV) == null ? void 0 : _a19.active_brand_config) == null ? void 0 : _b18.css_overrides);
+  }
+  function getBrandConfigMetadata() {
+    var _a19;
+    const brand = ((_a19 = window.ENV) == null ? void 0 : _a19.active_brand_config) || {};
+    return {
+      md5: brand.md5 || null,
+      created_at: brand.created_at || null
+    };
+  }
+  function normalizeUrl(url) {
+    if (url == null) return "";
+    return String(url).trim();
+  }
+
+  // src/admin/themeEditorInjection.js
+  var INJECTION_MARKER = "cg-theme-editor-tools";
+  function injectThemeEditorButton() {
+    if (document.querySelector(`.${INJECTION_MARKER}`)) {
+      logger.trace("[ThemeEditorInjection] Already injected, skipping");
+      return true;
+    }
+    const labels = Array.from(document.querySelectorAll("label"));
+    const jsLabel = labels.find(
+      (label) => /^javascript file/i.test(label.textContent.trim())
+    );
+    if (!jsLabel) {
+      logger.trace("[ThemeEditorInjection] JavaScript file label not found");
+      return false;
+    }
+    const container = jsLabel.closest(".ic-Form-control") || jsLabel.closest(".ic-Form-control__control") || jsLabel.parentElement;
+    if (!container) {
+      logger.warn("[ThemeEditorInjection] Could not find parent container for injection");
+      return false;
+    }
+    const block = document.createElement("div");
+    block.className = INJECTION_MARKER;
+    block.style.cssText = `
+        margin-top: 10px;
+        padding: 10px;
+        border: 2px solid #22dd88;
+        border-radius: 6px;
+        background: rgba(34, 221, 136, 0.08);
+    `;
+    const title = document.createElement("div");
+    title.textContent = "Customized Gradebook Tools";
+    title.style.fontWeight = "600";
+    title.style.marginBottom = "8px";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "Button Button--small";
+    button.textContent = "Open CG Admin Dashboard";
+    button.addEventListener("click", () => {
+      const accountId = getAccountId();
+      if (!accountId) {
+        alert("Account ID not found in ENV.");
+        return;
+      }
+      window.open(`/accounts/${accountId}?cg_admin_dashboard=1`, "_blank");
+    });
+    block.appendChild(title);
+    block.appendChild(button);
+    container.appendChild(block);
+    logger.info("[ThemeEditorInjection] CG Tools button injected successfully");
+    return true;
+  }
+
+  // src/admin/domHelpers.js
+  function createElement(tag, props = {}) {
+    const element = document.createElement(tag);
+    if (props.className) {
+      element.className = props.className;
+    }
+    if (props.text != null) {
+      element.textContent = props.text;
+    }
+    if (props.html != null) {
+      element.innerHTML = props.html;
+    }
+    if (props.style && typeof props.style === "object") {
+      Object.assign(element.style, props.style);
+    }
+    if (props.attrs && typeof props.attrs === "object") {
+      for (const [key, value] of Object.entries(props.attrs)) {
+        element.setAttribute(key, value);
+      }
+    }
+    if (props.on && typeof props.on === "object") {
+      for (const [event, handler] of Object.entries(props.on)) {
+        element.addEventListener(event, handler);
+      }
+    }
+    return element;
+  }
+  function createPanel(parent, title) {
+    const panel = createElement("div", {
+      style: {
+        marginTop: "16px",
+        padding: "16px",
+        border: "1px solid #ddd",
+        borderRadius: "10px",
+        background: "#fff"
+      }
+    });
+    const titleElement = createElement("div", {
+      text: title,
+      style: {
+        fontWeight: "700",
+        marginBottom: "10px"
+      }
+    });
+    panel.appendChild(titleElement);
+    parent.appendChild(panel);
+    return panel;
+  }
+  function escapeHtml2(str) {
+    return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: "text/javascript;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // src/admin/themeStatusPanel.js
+  var _a18;
+  var DEFAULT_EXPECTED_JS_URL = ((_a18 = window.CG_CONFIG) == null ? void 0 : _a18.EXPECTED_THEME_JS_URL) || "";
+  function renderThemeStatusPanels(root) {
+    logger.debug("[ThemeStatusPanel] Rendering theme status panels");
+    const installedJs = getInstalledThemeJsUrl();
+    const installedCss = getInstalledThemeCssUrl();
+    const metadata = getBrandConfigMetadata();
+    renderInstalledOverridesPanel(root, installedJs, installedCss, metadata);
+    renderScriptCheckPanel(root, installedJs);
+  }
+  function renderInstalledOverridesPanel(root, installedJs, installedCss, metadata) {
+    const panel = createPanel(root, "Installed Theme Overrides (ENV.active_brand_config)");
+    const pre = createElement("pre", {
+      style: {
+        margin: "0",
+        padding: "12px",
+        background: "#f8f9fa",
+        border: "1px solid #eee",
+        borderRadius: "8px",
+        fontSize: "13px",
+        overflow: "auto"
+      }
+    });
+    pre.textContent = JSON.stringify({
+      js_overrides: installedJs || null,
+      css_overrides: installedCss || null,
+      brand_md5: metadata.md5,
+      brand_created_at: metadata.created_at
+    }, null, 2);
+    panel.appendChild(pre);
+  }
+  function renderScriptCheckPanel(root, installedJs) {
+    const panel = createPanel(root, "CG Script Check");
+    const inputLabel = createElement("div", {
+      text: "Expected CG JS URL:",
+      style: {
+        fontWeight: "600",
+        marginBottom: "6px"
+      }
+    });
+    const input = createElement("input", {
+      attrs: {
+        type: "text",
+        value: DEFAULT_EXPECTED_JS_URL,
+        spellcheck: "false"
+      },
+      style: {
+        width: "100%",
+        padding: "8px 10px",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        fontSize: "13px"
+      }
+    });
+    const status = createElement("div", {
+      style: { marginTop: "10px" }
+    });
+    function renderStatus() {
+      const expected = input.value.trim();
+      const matches = expected && installedJs && expected === installedJs;
+      status.innerHTML = "";
+      if (!installedJs) {
+        status.appendChild(createElement("div", {
+          text: "\u26A0\uFE0F No JavaScript override is currently installed on this account.",
+          style: {
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #f3d19e",
+            background: "#fff7e6"
+          }
+        }));
+        return;
+      }
+      if (!expected) {
+        status.appendChild(createElement("div", {
+          text: "Enter an Expected CG JS URL to compare.",
+          style: { color: "#666" }
+        }));
+        return;
+      }
+      if (matches) {
+        status.appendChild(createElement("div", {
+          text: "\u2705 Installed JS matches Expected CG JS URL.",
+          style: {
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #b7eb8f",
+            background: "#f6ffed"
+          }
+        }));
+      } else {
+        status.appendChild(createElement("div", {
+          html: `\u{1F6A8} <strong>Script has changed</strong><br>Installed JS does not match the expected CG script URL.`,
+          style: {
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #ffa39e",
+            background: "#fff1f0"
+          }
+        }));
+        status.appendChild(createElement("div", {
+          html: `
+                    <div style="margin-top:10px; font-size:13px; color:#333;">
+                        <div><strong>Installed:</strong> ${escapeHtml2(installedJs)}</div>
+                        <div style="margin-top:6px;"><strong>Expected:</strong> ${escapeHtml2(expected)}</div>
+                    </div>
+                `
+        }));
+      }
+    }
+    input.addEventListener("input", renderStatus);
+    panel.appendChild(inputLabel);
+    panel.appendChild(input);
+    panel.appendChild(status);
+    renderStatus();
+  }
+
+  // src/admin/fetchHelpers.js
+  async function fetchTextWithTimeout(url, timeoutMs) {
+    logger.debug(`[FetchHelpers] Fetching ${url} with ${timeoutMs}ms timeout`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "omit",
+        // S3/public asset: do not send Canvas cookies
+        signal: controller.signal,
+        cache: "no-store"
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const text = await response.text();
+      logger.debug(`[FetchHelpers] Successfully fetched ${text.length} bytes`);
+      return text;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // src/admin/loaderGenerator.js
+  var CG_BEGIN = "/* BEGIN CG MANAGED CODE */";
+  var CG_END = "/* END CG MANAGED CODE */";
+  function buildCGManagedBlock({ accountId, enableDashboard, dashboardLabel }) {
+    logger.debug("[LoaderGenerator] Building CG-managed block", {
+      accountId,
+      enableDashboard,
+      dashboardLabel
+    });
+    const lines = [
+      CG_BEGIN,
+      `/* Generated: ${(/* @__PURE__ */ new Date()).toISOString()} */`,
+      `/* Account: ${accountId != null ? accountId : "unknown"} */`,
+      "/* Purpose: Configure CG features without altering district loader behavior */",
+      "",
+      "window.CG_CONFIG = window.CG_CONFIG || {};",
+      "window.CG_CONFIG.features = window.CG_CONFIG.features || {};",
+      `window.CG_CONFIG.features.adminDashboard = ${enableDashboard ? "true" : "false"};`,
+      `window.CG_CONFIG.features.adminDashboardLabel = ${JSON.stringify(dashboardLabel || "Open CG Admin Dashboard")};`,
+      "",
+      "window.__CG_ADMIN_DASHBOARD_ENABLED__ = " + (enableDashboard ? "true" : "false") + ";",
+      "",
+      CG_END
+    ];
+    return lines.join("\n");
+  }
+  function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
+    logger.debug("[LoaderGenerator] Upserting CG block into loader");
+    const beginIdx = baseLoaderText.indexOf(CG_BEGIN);
+    const endIdx = baseLoaderText.indexOf(CG_END);
+    if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
+      logger.debug("[LoaderGenerator] Replacing existing CG block");
+      const before = baseLoaderText.slice(0, beginIdx).trimEnd();
+      const after = baseLoaderText.slice(endIdx + CG_END.length).trimStart();
+      return `${before}
+
+${cgBlock}
+
+${after}
+`;
+    }
+    logger.debug("[LoaderGenerator] Appending CG block at end");
+    const trimmed = baseLoaderText.trimEnd();
+    return `${trimmed}
+
+${cgBlock}
+`;
+  }
+
+  // src/admin/loaderGeneratorPanel.js
+  function renderLoaderGeneratorPanel(root) {
+    logger.debug("[LoaderGeneratorPanel] Rendering loader generator panel");
+    const panel = createPanel(root, "Generate Combined Loader (District loader + CG block)");
+    const installedUrl = getInstalledThemeJsUrl();
+    const topNote = createElement("div", {
+      html: `
+            <div style="color:#444; margin-bottom:10px;">
+                This tool preserves the existing Theme JavaScript (district loader) and inserts/updates a CG-managed block at the <strong>end</strong> of the file.
+            </div>
+        `
+    });
+    const installedLine = createElement("div", {
+      html: `
+            <div style="font-size:13px; color:#666; margin-bottom:10px;">
+                Detected installed Theme JS URL:
+                <div style="margin-top:4px; word-break:break-all;"><code>${escapeHtml2(installedUrl || "(none)")}</code></div>
+            </div>
+        `
+    });
+    const loadStatus = createElement("div", {
+      style: { marginBottom: "10px" }
+    });
+    const { settingsRow, enableDashboard, labelInput } = createSettingsRow();
+    const { baseLabel, baseTA, lockRow, unlockBtn, relockBtn, reloadBtn } = createBaseLoaderTextarea(installedUrl);
+    const { actions, genBtn, dlBtn, copyBtn } = createActionButtons();
+    const { outLabel, outTA, hint } = createOutputTextarea();
+    async function tryAutoLoad(reason) {
+      loadStatus.innerHTML = "";
+      if (!installedUrl) {
+        loadStatus.appendChild(createElement("div", {
+          text: "\u26A0\uFE0F No installed Theme JS URL detected. Paste the loader manually.",
+          style: {
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #f3d19e",
+            background: "#fff7e6"
+          }
+        }));
+        setLoaderText(baseTA, "", false, unlockBtn, relockBtn);
+        return;
+      }
+      loadStatus.appendChild(createElement("div", {
+        html: `\u23F3 Loading current Theme JavaScript from installed URL\u2026 <span style="color:#666">(${escapeHtml2(reason || "auto")})</span>`,
+        style: {
+          padding: "10px",
+          borderRadius: "8px",
+          border: "1px solid #d9d9d9",
+          background: "#fafafa"
+        }
+      }));
+      try {
+        let text;
+        try {
+          text = await fetchTextWithTimeout(installedUrl, 1e3);
+        } catch (e) {
+          text = await fetchTextWithTimeout(installedUrl, 3e3);
+        }
+        loadStatus.innerHTML = "";
+        loadStatus.appendChild(createElement("div", {
+          html: `\u2705 Loaded current Theme JavaScript automatically.<br><span style="color:#666; font-size:13px;">Textarea is locked to prevent accidental edits. Click "Unlock to edit" if needed.</span>`,
+          style: {
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #b7eb8f",
+            background: "#f6ffed"
+          }
+        }));
+        setLoaderText(baseTA, text, true, unlockBtn, relockBtn);
+      } catch (err) {
+        logger.warn("[LoaderGeneratorPanel] Auto-load failed", err);
+        loadStatus.innerHTML = "";
+        loadStatus.appendChild(createElement("div", {
+          html: `\u26A0\uFE0F Could not auto-load the current Theme JavaScript (likely CORS).<br><span style="color:#666; font-size:13px;">Please copy/paste the loader contents manually from the Theme Editor.</span>`,
+          style: {
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #f3d19e",
+            background: "#fff7e6"
+          }
+        }));
+        setLoaderText(baseTA, "", false, unlockBtn, relockBtn);
+      }
+    }
+    unlockBtn.addEventListener("click", () => setLocked(baseTA, false, unlockBtn, relockBtn));
+    relockBtn.addEventListener("click", () => setLocked(baseTA, true, unlockBtn, relockBtn));
+    reloadBtn.addEventListener("click", () => tryAutoLoad("manual reload"));
+    genBtn.addEventListener("click", () => {
+      generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBtn, copyBtn);
+    });
+    dlBtn.addEventListener("click", () => {
+      if (!outTA.value.trim()) return;
+      downloadText("loader.js", outTA.value);
+    });
+    copyBtn.addEventListener("click", async () => {
+      if (!outTA.value.trim()) return;
+      try {
+        await navigator.clipboard.writeText(outTA.value);
+        alert("Copied combined loader to clipboard.");
+      } catch (e) {
+        logger.error("[LoaderGeneratorPanel] Copy failed", e);
+        alert("Copy failed (clipboard permissions). You can still manually select + copy.");
+      }
+    });
+    panel.appendChild(topNote);
+    panel.appendChild(installedLine);
+    panel.appendChild(loadStatus);
+    panel.appendChild(settingsRow);
+    panel.appendChild(baseLabel);
+    panel.appendChild(baseTA);
+    panel.appendChild(lockRow);
+    panel.appendChild(actions);
+    panel.appendChild(outLabel);
+    panel.appendChild(outTA);
+    panel.appendChild(hint);
+    tryAutoLoad("auto");
+  }
+  function createSettingsRow() {
+    const settingsRow = createElement("div", {
+      style: {
+        display: "flex",
+        gap: "12px",
+        flexWrap: "wrap",
+        alignItems: "center",
+        marginBottom: "10px"
+      }
+    });
+    const enableDashboard = createElement("input", {
+      attrs: { type: "checkbox", checked: "true" }
+    });
+    const enableLabel = createElement("label", {
+      style: {
+        display: "flex",
+        gap: "8px",
+        alignItems: "center",
+        fontSize: "13px"
+      }
+    });
+    enableLabel.appendChild(enableDashboard);
+    enableLabel.appendChild(createElement("span", { text: "Enable Admin Dashboard module" }));
+    const labelInput = createElement("input", {
+      attrs: {
+        type: "text",
+        value: "Open CG Admin Dashboard",
+        spellcheck: "false"
+      },
+      style: {
+        flex: "1",
+        minWidth: "320px",
+        padding: "8px 10px",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        fontSize: "13px"
+      }
+    });
+    settingsRow.appendChild(enableLabel);
+    settingsRow.appendChild(createElement("div", {
+      text: "Button label:",
+      style: { fontWeight: "600", fontSize: "13px" }
+    }));
+    settingsRow.appendChild(labelInput);
+    return { settingsRow, enableDashboard, labelInput };
+  }
+  function createBaseLoaderTextarea(installedUrl) {
+    const baseLabel = createElement("div", {
+      text: "Current Theme JavaScript (district loader):",
+      style: { fontWeight: "700", marginTop: "6px" }
+    });
+    const baseTA = createElement("textarea", {
+      attrs: { rows: "12", spellcheck: "false" },
+      style: {
+        width: "100%",
+        marginTop: "6px",
+        padding: "10px",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        fontSize: "13px",
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        background: "#fafafa"
+      }
+    });
+    const lockRow = createElement("div", {
+      style: {
+        display: "flex",
+        gap: "10px",
+        marginTop: "10px",
+        flexWrap: "wrap",
+        alignItems: "center"
+      }
+    });
+    const unlockBtn = createElement("button", {
+      text: "Unlock to edit",
+      className: "Button Button--small",
+      attrs: { disabled: "true" }
+    });
+    const relockBtn = createElement("button", {
+      text: "Re-lock",
+      className: "Button Button--small",
+      attrs: { disabled: "true" }
+    });
+    const reloadBtn = createElement("button", {
+      text: "Reload from installed Theme JS URL",
+      className: "Button Button--small",
+      attrs: installedUrl ? {} : { disabled: "true" }
+    });
+    lockRow.appendChild(unlockBtn);
+    lockRow.appendChild(relockBtn);
+    lockRow.appendChild(reloadBtn);
+    return { baseLabel, baseTA, lockRow, unlockBtn, relockBtn, reloadBtn };
+  }
+  function createActionButtons() {
+    const actions = createElement("div", {
+      style: {
+        display: "flex",
+        gap: "10px",
+        marginTop: "12px",
+        flexWrap: "wrap"
+      }
+    });
+    const genBtn = createElement("button", {
+      text: "Generate Combined Loader",
+      className: "Button Button--primary"
+    });
+    const dlBtn = createElement("button", {
+      text: "Download loader.js",
+      className: "Button",
+      attrs: { disabled: "true" }
+    });
+    const copyBtn = createElement("button", {
+      text: "Copy Output",
+      className: "Button",
+      attrs: { disabled: "true" }
+    });
+    actions.appendChild(genBtn);
+    actions.appendChild(dlBtn);
+    actions.appendChild(copyBtn);
+    return { actions, genBtn, dlBtn, copyBtn };
+  }
+  function createOutputTextarea() {
+    const outLabel = createElement("div", {
+      text: "Combined Output (copy/upload this):",
+      style: { fontWeight: "700", marginTop: "14px" }
+    });
+    const outTA = createElement("textarea", {
+      attrs: { rows: "14", spellcheck: "false", readonly: "true" },
+      style: {
+        width: "100%",
+        marginTop: "6px",
+        padding: "10px",
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        fontSize: "13px",
+        background: "#fafafa",
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+      }
+    });
+    const hint = createElement("div", {
+      html: `
+            <div style="margin-top:10px; color:#666; font-size:13px;">
+                The CG-managed block is bracketed with:<br>
+                <code>/* BEGIN CG MANAGED CODE */</code> \u2026 <code>/* END CG MANAGED CODE */</code>
+            </div>
+        `
+    });
+    return { outLabel, outTA, hint };
+  }
+  function setLoaderText(textarea, text, locked, unlockBtn, relockBtn) {
+    textarea.value = text || "";
+    setLocked(textarea, locked, unlockBtn, relockBtn);
+  }
+  function setLocked(textarea, locked, unlockBtn, relockBtn) {
+    if (locked) {
+      textarea.setAttribute("readonly", "true");
+      textarea.style.background = "#fafafa";
+      unlockBtn.removeAttribute("disabled");
+      relockBtn.setAttribute("disabled", "true");
+    } else {
+      textarea.removeAttribute("readonly");
+      textarea.style.background = "#fff";
+      unlockBtn.setAttribute("disabled", "true");
+      relockBtn.removeAttribute("disabled");
+    }
+  }
+  function generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBtn, copyBtn) {
+    const baseText = baseTA.value || "";
+    if (!baseText.trim()) {
+      alert("No loader text found. Paste the current Theme JavaScript (district loader) first, or use Reload if available.");
+      return;
+    }
+    const cgBlock = buildCGManagedBlock({
+      accountId: getAccountId(),
+      enableDashboard: !!enableDashboard.checked,
+      dashboardLabel: labelInput.value || "Open CG Admin Dashboard"
+    });
+    const combined = upsertCGBlockIntoLoader({ baseLoaderText: baseText, cgBlock });
+    outTA.value = combined;
+    dlBtn.removeAttribute("disabled");
+    copyBtn.removeAttribute("disabled");
+  }
+
+  // src/admin/dashboardRenderer.js
+  function renderAdminDashboardPage() {
+    logger.info("[DashboardRenderer] Rendering admin dashboard page");
+    document.documentElement.innerHTML = "";
+    const root = createElement("div", {
+      attrs: { id: "cg-admin-root" },
+      style: {
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        padding: "32px",
+        maxWidth: "1100px",
+        margin: "0 auto",
+        background: "#fff"
+      }
+    });
+    const header = createElement("h1", {
+      text: "Customized Gradebook \u2013 Admin Dashboard"
+    });
+    const accountInfo = createElement("p", {
+      html: `Account ID: <strong>${getAccountId() || "unknown"}</strong>`,
+      style: {
+        color: "#666",
+        marginTop: "6px"
+      }
+    });
+    const banner = createElement("div", {
+      html: `\u2705 Virtual admin page rendered via Theme JS<br>Same origin \u2022 Same session \u2022 CSRF intact`,
+      style: {
+        marginTop: "16px",
+        padding: "16px",
+        border: "2px solid #22dd88",
+        borderRadius: "10px",
+        background: "rgba(34, 221, 136, 0.08)"
+      }
+    });
+    root.appendChild(header);
+    root.appendChild(accountInfo);
+    root.appendChild(banner);
+    renderThemeStatusPanels(root);
+    renderLoaderGeneratorPanel(root);
+    document.body.appendChild(root);
+    logger.debug("[DashboardRenderer] Admin dashboard page rendered successfully");
+  }
+
+  // src/admin/adminDashboard.js
+  function initAdminDashboard() {
+    logger.debug("[AdminDashboard] Checking if admin dashboard should initialize");
+    if (isAdminDashboardPage()) {
+      logger.info("[AdminDashboard] Rendering virtual admin dashboard page");
+      renderAdminDashboardPage();
+      return;
+    }
+    if (isThemeEditorPage()) {
+      logger.info("[AdminDashboard] Injecting CG Tools button in Theme Editor");
+      let attempts = 0;
+      const maxAttempts = 20;
+      const pollInterval = 250;
+      const timer = setInterval(() => {
+        const injected = injectThemeEditorButton();
+        attempts++;
+        if (injected || attempts >= maxAttempts) {
+          clearInterval(timer);
+          if (injected) {
+            logger.debug("[AdminDashboard] CG Tools button injected successfully");
+          } else {
+            logger.warn("[AdminDashboard] Failed to inject CG Tools button after max attempts");
+          }
+        }
+      }, pollInterval);
+      return;
+    }
+    logger.trace("[AdminDashboard] Not on Theme Editor or Admin Dashboard page, skipping");
+  }
+
   // src/customGradebookInit.js
   function isDashboardPage2() {
     const path = window.location.pathname;
@@ -5759,8 +6471,8 @@ You may need to refresh the page to see the new scores.`);
     return window.location.pathname.includes("/speed_grader");
   }
   (function init() {
-    logBanner("dev", "2026-02-03 3:31:14 PM (dev, 9903bf5)");
-    exposeVersion("dev", "2026-02-03 3:31:14 PM (dev, 9903bf5)");
+    logBanner("dev", "2026-02-04 8:46:49 AM (dev, 0c9970f)");
+    exposeVersion("dev", "2026-02-04 8:46:49 AM (dev, 0c9970f)");
     if (true) {
       logger.info("Running in DEV mode");
     }
@@ -5769,10 +6481,15 @@ You may need to refresh the page to see the new scores.`);
     }
     logger.info(`Build environment: ${"dev"}`);
     validateAllSnapshots();
+    initAdminDashboard();
+    if (isAdminDashboardPage()) {
+      logger.info("[Init] On admin dashboard page, skipping normal CG initialization");
+      return;
+    }
     if (window.location.pathname.includes("/gradebook")) {
       injectButtons();
       (async () => {
-        var _a18, _b18;
+        var _a19, _b18;
         const courseId = getCourseId();
         if (!courseId) {
           logger.debug("[Init] Cannot get course ID, skipping Refresh Mastery initialization");
@@ -5781,7 +6498,7 @@ You may need to refresh the page to see the new scores.`);
         let snapshot = getCourseSnapshot(courseId);
         if (!snapshot) {
           const apiClient2 = new CanvasApiClient();
-          const courseName = ((_b18 = (_a18 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a18.textContent) == null ? void 0 : _b18.trim()) || "Course";
+          const courseName = ((_b18 = (_a19 = document.querySelector(".course-title, h1, #breadcrumbs li:last-child")) == null ? void 0 : _a19.textContent) == null ? void 0 : _b18.trim()) || "Course";
           snapshot = await populateCourseSnapshot(courseId, courseName, apiClient2);
         }
         if (!snapshot || snapshot.model !== "standards") {

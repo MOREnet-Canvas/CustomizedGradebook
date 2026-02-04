@@ -31,6 +31,8 @@ import { clearAllSnapshots, debugSnapshots, validateAllSnapshots, getCourseSnaps
 import { getUserRoleGroup, getCourseId } from "./utils/canvas.js";
 import { isTeacherViewingStudentGrades } from "./utils/pageDetection.js";
 import { CanvasApiClient } from "./utils/canvasApiClient.js";
+import { initAdminDashboard } from "./admin/adminDashboard.js";
+import { isAdminDashboardPage } from "./admin/pageDetection.js";
 
 /**
  * Check if current page is the dashboard
@@ -64,6 +66,16 @@ function isSpeedGraderPage() {
 
     // Validate all existing snapshots on initialization (security)
     validateAllSnapshots();
+
+    // Admin Dashboard (Theme Editor and virtual admin page)
+    // Must run early to prevent normal CG behavior on admin dashboard page
+    initAdminDashboard();
+
+    // Early return if on admin dashboard page (prevent normal CG behavior)
+    if (isAdminDashboardPage()) {
+        logger.info('[Init] On admin dashboard page, skipping normal CG initialization');
+        return;
+    }
 
     // Gradebook functionality (teacher-side)
     if (window.location.pathname.includes("/gradebook")) {
