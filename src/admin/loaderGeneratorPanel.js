@@ -17,8 +17,59 @@ import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, ext
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 
 /**
+ * Parse configuration settings from Section C (CG_MANAGED block)
+ *
+ * @param {string} sectionC - Section C content
+ * @returns {Object} Parsed configuration settings
+ */
+function parseConfigFromSectionC(sectionC) {
+    if (!sectionC) {
+        throw new Error('Section C is empty');
+    }
+
+    // Execute Section C in a sandboxed context to extract window.CG_MANAGED
+    const sandbox = { window: { CG_MANAGED: null, CG_CONFIG: {} } };
+
+    try {
+        // Create a function that executes the Section C code
+        const func = new Function('window', sectionC);
+        func(sandbox.window);
+    } catch (err) {
+        logger.error('[LoaderGeneratorPanel] Failed to execute Section C', err);
+        throw new Error('Failed to parse Section C: ' + err.message);
+    }
+
+    const managed = sandbox.window.CG_MANAGED;
+    const config = sandbox.window.CG_CONFIG;
+
+    if (!managed || !managed.release || !managed.config) {
+        throw new Error('Section C does not contain valid CG_MANAGED structure');
+    }
+
+    // Extract all settings
+    return {
+        version: managed.release.version || 'v1.0.3',
+        channel: managed.release.channel || 'prod',
+        source: managed.release.source || 'github_release',
+        enableDashboard: managed.config.adminDashboard !== false,
+        dashboardLabel: managed.config.adminDashboardLabel || 'Open CG Admin Dashboard',
+        enableStudentGradeCustomization: managed.config.enableStudentGradeCustomization !== false,
+        enableOutcomeUpdates: managed.config.enableOutcomeUpdates !== false,
+        enableGradeOverride: managed.config.enableGradeOverride !== false,
+        updateAvgButtonLabel: config.UPDATE_AVG_BUTTON_LABEL || 'Update Avg',
+        avgOutcomeName: config.AVG_OUTCOME_NAME || 'Average',
+        avgAssignmentName: config.AVG_ASSIGNMENT_NAME || 'Average Assignment',
+        avgRubricName: config.AVG_RUBRIC_NAME || 'Average Rubric',
+        defaultMaxPoints: config.DEFAULT_MAX_POINTS || 4,
+        defaultMasteryThreshold: config.DEFAULT_MASTERY_THRESHOLD || 3,
+        outcomeAndRubricRatings: config.OUTCOME_AND_RUBRIC_RATINGS || [],
+        excludedOutcomeKeywords: config.EXCLUDED_OUTCOME_KEYWORDS || []
+    };
+}
+
+/**
  * Render loader generator panel
- * 
+ *
  * @param {HTMLElement} root - Root container element
  */
 export function renderLoaderGeneratorPanel(root) {
@@ -27,13 +78,20 @@ export function renderLoaderGeneratorPanel(root) {
     const panel = createPanel(root, 'Generate Combined Loader (A+B+C Model)');
     const installedUrl = getInstalledThemeJsUrl();
 
+    // State management for change tracking and revert functionality
+    const state = {
+        currentCanvasSettings: null,
+        hasUnsavedChanges: false,
+        isGenerated: false
+    };
+
     // Version selector
     const { versionSelector, versionDropdown } = createVersionSelector();
 
-    // Top note - explain A/B/C model
+    // Top note - explain A/B/C model (will be moved below config panel)
     const topNote = createElement('div', {
         html: `
-            <div style="color:#444; margin-bottom:10px;">
+            <div style="color:#444; margin-bottom:10px; padding:12px; background:#f9f9f9; border-left:3px solid #0374B5; border-radius:6px;">
                 This tool generates a combined loader using the <strong>A+B+C model</strong>:
                 <ul style="margin:8px 0; padding-left:20px; font-size:13px;">
                     <li><strong>A</strong> = Other Theme Scripts (preserved exactly as-is)</li>
@@ -44,17 +102,17 @@ export function renderLoaderGeneratorPanel(root) {
         `
     });
 
-    // Installed URL display
+    // Installed URL display (will be moved below config panel)
     const installedLine = createElement('div', {
         html: `
-            <div style="font-size:13px; color:#666; margin-bottom:10px;">
-                Detected installed Theme JS URL:
-                <div style="margin-top:4px; word-break:break-all;"><code>${escapeHtml(installedUrl || '(none)')}</code></div>
+            <div style="font-size:13px; color:#666; margin-bottom:10px; padding:10px; background:#f5f5f5; border-radius:6px;">
+                <strong>Detected installed Theme JS URL:</strong>
+                <div style="margin-top:4px; word-break:break-all; font-family:monospace; font-size:12px;">${escapeHtml(installedUrl || '(none)')}</div>
             </div>
         `
     });
 
-    // Load status display
+    // Load status display (will be moved below config panel)
     const loadStatus = createElement('div', {
         style: { marginBottom: '10px' }
     });
@@ -71,8 +129,12 @@ export function renderLoaderGeneratorPanel(root) {
     // Textarea C: Managed Config Preview (read-only)
     const { configLabel, configTA } = createConfigTextarea();
 
-    // Actions (generate, download, copy)
-    const { actions, genBtn, dlBtn, copyBtn } = createActionButtons();
+    // Sticky action panel (right side)
+    const { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn, revertBtn } = createStickyActionPanel();
+
+    // Legacy inline actions (hidden, for compatibility)
+    const { actions } = createActionButtons();
+    actions.style.display = 'none';
 
     // Textarea 4: Combined Output (read-only)
     const { outLabel, outTA, hint } = createOutputTextarea();
@@ -117,6 +179,16 @@ export function renderLoaderGeneratorPanel(root) {
             // Success - extract sections
             const { A, B, C } = extractSections(text);
 
+            // Parse Section C to extract current Canvas settings
+            try {
+                const parsedSettings = parseConfigFromSectionC(C);
+                state.currentCanvasSettings = parsedSettings;
+                logger.debug('[LoaderGeneratorPanel] Stored current Canvas settings', parsedSettings);
+            } catch (err) {
+                logger.warn('[LoaderGeneratorPanel] Failed to parse current Canvas settings', err);
+                state.currentCanvasSettings = null;
+            }
+
             loadStatus.innerHTML = '';
             loadStatus.appendChild(createElement('div', {
                 html: `✅ Loaded current Theme JavaScript automatically.<br><span style="color:#666; font-size:13px;">Sections extracted. Textarea A is locked to prevent accidental edits. Click "Unlock to edit" if needed.</span>`,
@@ -157,6 +229,12 @@ export function renderLoaderGeneratorPanel(root) {
 
     genBtn.addEventListener('click', () => {
         generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn, versionDropdown);
+
+        // After successful generation:
+        state.isGenerated = true;
+        state.hasUnsavedChanges = false;
+        changeNotification.style.display = 'none';
+        revertBtn.style.display = 'block';
     });
 
     dlBtn.addEventListener('click', () => {
@@ -176,21 +254,101 @@ export function renderLoaderGeneratorPanel(root) {
         }
     });
 
-    // Append all elements
+    // Revert button handler
+    revertBtn.addEventListener('click', () => {
+        if (!state.currentCanvasSettings) {
+            alert('No Canvas settings available to revert to.');
+            return;
+        }
+
+        // Restore all controls from saved state
+        const settings = state.currentCanvasSettings;
+
+        controls.enableDashboard.checked = settings.enableDashboard;
+        controls.labelInput.value = settings.dashboardLabel;
+        controls.enableStudentGrade.checked = settings.enableStudentGradeCustomization;
+        controls.enableOutcomeUpdates.checked = settings.enableOutcomeUpdates;
+        controls.enableGradeOverride.checked = settings.enableGradeOverride;
+        controls.updateAvgButtonLabel.value = settings.updateAvgButtonLabel;
+        controls.avgOutcomeName.value = settings.avgOutcomeName;
+        controls.avgAssignmentName.value = settings.avgAssignmentName;
+        controls.avgRubricName.value = settings.avgRubricName;
+        controls.defaultMaxPoints.value = settings.defaultMaxPoints;
+        controls.defaultMasteryThreshold.value = settings.defaultMasteryThreshold;
+        controls.ratingsTextarea.value = JSON.stringify(settings.outcomeAndRubricRatings, null, 2);
+        controls.keywordsInput.value = settings.excludedOutcomeKeywords.join(', ');
+
+        // Restore version dropdown
+        versionDropdown.value = settings.version || 'v1.0.3';
+
+        // Clear output and disable buttons
+        outTA.value = '';
+        dlBtn.setAttribute('disabled', 'true');
+        copyBtn.setAttribute('disabled', 'true');
+
+        // Reset state
+        state.hasUnsavedChanges = false;
+        state.isGenerated = false;
+        changeNotification.style.display = 'none';
+        revertBtn.style.display = 'none';
+
+        alert('✅ Settings reverted to current Canvas configuration.');
+    });
+
+    // Change tracking - add listeners to all form controls
+    function markAsChanged() {
+        if (!state.hasUnsavedChanges) {
+            state.hasUnsavedChanges = true;
+            changeNotification.style.display = 'block';
+        }
+    }
+
+    // Track changes on all configuration controls
+    controls.enableDashboard.addEventListener('change', markAsChanged);
+    controls.labelInput.addEventListener('input', markAsChanged);
+    controls.enableStudentGrade.addEventListener('change', markAsChanged);
+    controls.enableOutcomeUpdates.addEventListener('change', markAsChanged);
+    controls.enableGradeOverride.addEventListener('change', markAsChanged);
+    controls.updateAvgButtonLabel.addEventListener('input', markAsChanged);
+    controls.avgOutcomeName.addEventListener('input', markAsChanged);
+    controls.avgAssignmentName.addEventListener('input', markAsChanged);
+    controls.avgRubricName.addEventListener('input', markAsChanged);
+    controls.defaultMaxPoints.addEventListener('input', markAsChanged);
+    controls.defaultMasteryThreshold.addEventListener('input', markAsChanged);
+    controls.ratingsTextarea.addEventListener('input', markAsChanged);
+    controls.keywordsInput.addEventListener('input', markAsChanged);
+    versionDropdown.addEventListener('change', markAsChanged);
+
+    // Append all elements in new order:
+    // 1. Version selector
     panel.appendChild(versionSelector);
+
+    // 2. Configuration panel (all settings)
+    panel.appendChild(configPanel);
+
+    // 3. Status messages (moved here from top)
     panel.appendChild(topNote);
     panel.appendChild(installedLine);
     panel.appendChild(loadStatus);
-    panel.appendChild(configPanel);
+
+    // 4. Textarea A (Other Theme Scripts)
     panel.appendChild(baseLabel);
     panel.appendChild(helperText);
     panel.appendChild(baseTA);
     panel.appendChild(lockRow);
+
+    // 5. Textarea B (CG Loader Template)
     panel.appendChild(templateLabel);
     panel.appendChild(templateTA);
+
+    // 6. Textarea C (Managed Config Preview)
     panel.appendChild(configLabel);
     panel.appendChild(configTA);
+
+    // 7. Action buttons (will be moved to sticky panel)
     panel.appendChild(actions);
+
+    // 8. Output textarea
     panel.appendChild(outLabel);
     panel.appendChild(outTA);
     panel.appendChild(hint);
@@ -729,7 +887,138 @@ function createConfigTextarea() {
 }
 
 /**
- * Create action buttons (generate, download, copy)
+ * Create sticky action buttons panel (right side)
+ */
+function createStickyActionPanel() {
+    // Sticky container
+    const stickyPanel = createElement('div', {
+        style: {
+            position: 'fixed',
+            right: '20px',
+            top: '100px',
+            width: '220px',
+            padding: '16px',
+            background: '#fff',
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            zIndex: '1000'
+        }
+    });
+
+    // Change notification (initially hidden)
+    const changeNotification = createElement('div', {
+        style: {
+            padding: '10px',
+            background: '#fff7e6',
+            border: '1px solid #f3d19e',
+            borderRadius: '6px',
+            marginBottom: '12px',
+            fontSize: '13px',
+            display: 'none'
+        }
+    });
+
+    const notificationContent = createElement('div', {
+        style: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'start'
+        }
+    });
+
+    const notificationText = createElement('div', {
+        text: '⚠️ Settings changed. Generate and upload new loader to Canvas to apply changes.',
+        style: { flex: '1' }
+    });
+
+    const dismissBtn = createElement('button', {
+        text: '×',
+        attrs: { title: 'Dismiss' },
+        style: {
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '16px',
+            padding: '0 0 0 8px',
+            color: '#666'
+        }
+    });
+
+    dismissBtn.addEventListener('click', () => {
+        changeNotification.style.display = 'none';
+    });
+
+    notificationContent.appendChild(notificationText);
+    notificationContent.appendChild(dismissBtn);
+    changeNotification.appendChild(notificationContent);
+
+    // Buttons container
+    const buttonsContainer = createElement('div', {
+        style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+        }
+    });
+
+    const genBtn = createElement('button', {
+        text: 'Generate Loader File',
+        className: 'Button Button--primary',
+        style: {
+            width: '100%',
+            justifyContent: 'center'
+        }
+    });
+
+    const dlBtn = createElement('button', {
+        text: 'Download Loader File',
+        className: 'Button',
+        attrs: { disabled: 'true' },
+        style: {
+            width: '100%',
+            justifyContent: 'center'
+        }
+    });
+
+    const copyBtn = createElement('button', {
+        text: 'Copy Output',
+        className: 'Button',
+        attrs: { disabled: 'true' },
+        style: {
+            width: '100%',
+            justifyContent: 'center'
+        }
+    });
+
+    // Revert button (initially hidden)
+    const revertBtn = createElement('button', {
+        text: 'Revert to Current Canvas Settings',
+        className: 'Button',
+        style: {
+            width: '100%',
+            justifyContent: 'center',
+            marginTop: '8px',
+            display: 'none'
+        }
+    });
+
+    buttonsContainer.appendChild(genBtn);
+    buttonsContainer.appendChild(dlBtn);
+    buttonsContainer.appendChild(copyBtn);
+    buttonsContainer.appendChild(revertBtn);
+
+    stickyPanel.appendChild(changeNotification);
+    stickyPanel.appendChild(buttonsContainer);
+
+    // Append to body (not to panel, so it stays fixed)
+    document.body.appendChild(stickyPanel);
+
+    return { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn, revertBtn };
+}
+
+/**
+ * Create action buttons (legacy - for inline display, now replaced by sticky panel)
  */
 function createActionButtons() {
     const actions = createElement('div', {

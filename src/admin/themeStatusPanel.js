@@ -20,7 +20,7 @@ const DEFAULT_EXPECTED_JS_URL = window.CG_CONFIG?.EXPECTED_THEME_JS_URL || '';
 
 /**
  * Render theme status panels
- * 
+ *
  * @param {HTMLElement} root - Root container element
  */
 export function renderThemeStatusPanels(root) {
@@ -33,8 +33,8 @@ export function renderThemeStatusPanels(root) {
     // Panel 1: Installed Theme Overrides
     renderInstalledOverridesPanel(root, installedJs, installedCss, metadata);
 
-    // Panel 2: CG Script Check
-    renderScriptCheckPanel(root, installedJs);
+    // Panel 2: CG Script Check - REMOVED per UX improvements
+    // renderScriptCheckPanel(root, installedJs);
 }
 
 /**
@@ -176,4 +176,3 @@ function renderScriptCheckPanel(root, installedJs) {
 
     renderStatus();
 }
-

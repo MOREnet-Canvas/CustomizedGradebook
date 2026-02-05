@@ -82,23 +82,10 @@ export function renderAdminDashboardPage() {
         }
     });
 
-    // Confirmation banner
-    const banner = createElement('div', {
-        html: `✅ Virtual admin page rendered via Theme JS<br>Same origin • Same session • CSRF intact`,
-        style: {
-            marginTop: '16px',
-            padding: '16px',
-            border: '2px solid #22dd88',
-            borderRadius: '10px',
-            background: 'rgba(34, 221, 136, 0.08)'
-        }
-    });
-
     root.appendChild(header);
     root.appendChild(accountInfo);
-    root.appendChild(banner);
 
-    // Render theme status panels
+    // Render theme status panels (Installed Theme Overrides only)
     renderThemeStatusPanels(root);
 
     // Render loader generator panel
