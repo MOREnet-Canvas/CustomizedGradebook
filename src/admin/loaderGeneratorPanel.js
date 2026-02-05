@@ -1,9 +1,9 @@
 // src/admin/loaderGeneratorPanel.js
 /**
  * Loader Generator Panel Module
- * 
+ *
  * Renders the loader generator panel with:
- * - Auto-load current Theme JS (district loader)
+ * - Auto-load current Theme JS (other theme scripts - preserved)
  * - Textarea locking/unlocking
  * - CG-managed block generation (CONFIG-ONLY)
  * - Combined loader output with copy/download
@@ -27,13 +27,16 @@ export function renderLoaderGeneratorPanel(root) {
     const panel = createPanel(root, 'Generate Combined Loader (A+B+C Model)');
     const installedUrl = getInstalledThemeJsUrl();
 
+    // Version selector
+    const { versionSelector, versionDropdown } = createVersionSelector();
+
     // Top note - explain A/B/C model
     const topNote = createElement('div', {
         html: `
             <div style="color:#444; margin-bottom:10px;">
                 This tool generates a combined loader using the <strong>A+B+C model</strong>:
                 <ul style="margin:8px 0; padding-left:20px; font-size:13px;">
-                    <li><strong>A</strong> = External loader (district's Theme JS from textarea below)</li>
+                    <li><strong>A</strong> = Other Theme Scripts (preserved exactly as-is)</li>
                     <li><strong>B</strong> = CG loader template (stable logic from codebase)</li>
                     <li><strong>C</strong> = Managed config block (generated fresh from your settings)</li>
                 </ul>
@@ -59,8 +62,8 @@ export function renderLoaderGeneratorPanel(root) {
     // Configuration panel with all settings
     const { container: configPanel, controls } = createConfigurationPanel();
 
-    // Textarea A: External Loader (editable)
-    const { baseLabel, baseTA, lockRow, unlockBtn, relockBtn, reloadBtn } = createBaseLoaderTextarea(installedUrl);
+    // Textarea A: Other Theme Scripts (editable)
+    const { baseLabel, baseTA, helperText, lockRow, unlockBtn, relockBtn, reloadBtn } = createOtherScriptsTextarea(installedUrl);
 
     // Textarea B: CG Loader Template (read-only)
     const { templateLabel, templateTA } = createTemplateTextarea();
@@ -153,12 +156,13 @@ export function renderLoaderGeneratorPanel(root) {
     reloadBtn.addEventListener('click', () => tryAutoLoad('manual reload'));
 
     genBtn.addEventListener('click', () => {
-        generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn);
+        generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn, versionDropdown);
     });
 
     dlBtn.addEventListener('click', () => {
         if (!outTA.value.trim()) return;
-        downloadText('loader.js', outTA.value);
+        const filename = generateDownloadFilename(versionDropdown.value);
+        downloadText(filename, outTA.value);
     });
 
     copyBtn.addEventListener('click', async () => {
@@ -173,11 +177,13 @@ export function renderLoaderGeneratorPanel(root) {
     });
 
     // Append all elements
+    panel.appendChild(versionSelector);
     panel.appendChild(topNote);
     panel.appendChild(installedLine);
     panel.appendChild(loadStatus);
     panel.appendChild(configPanel);
     panel.appendChild(baseLabel);
+    panel.appendChild(helperText);
     panel.appendChild(baseTA);
     panel.appendChild(lockRow);
     panel.appendChild(templateLabel);
@@ -191,6 +197,83 @@ export function renderLoaderGeneratorPanel(root) {
 
     // Auto-load on first render
     tryAutoLoad('auto');
+}
+
+/**
+ * Create version selector dropdown
+ */
+function createVersionSelector() {
+    const container = createElement('div', {
+        style: {
+            marginBottom: '16px',
+            padding: '12px',
+            border: '1px solid #0374B5',
+            borderRadius: '8px',
+            background: '#f0f7ff'
+        }
+    });
+
+    const label = createElement('label', {
+        html: '<strong>Customized Gradebook Version:</strong>',
+        style: {
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: '14px',
+            color: '#2D3B45'
+        }
+    });
+
+    const dropdown = createElement('select', {
+        style: {
+            width: '100%',
+            padding: '8px 10px',
+            border: '1px solid #0374B5',
+            borderRadius: '6px',
+            fontSize: '13px',
+            background: '#fff',
+            cursor: 'pointer'
+        }
+    });
+
+    // Version options
+    const versions = [
+        { value: 'v1.0.3', label: 'v1.0.3 (Current Production)', channel: 'prod' },
+        { value: 'v1.0.2', label: 'v1.0.2', channel: 'prod' },
+        { value: 'v1.0.1', label: 'v1.0.1', channel: 'prod' },
+        { value: 'v1.0.0', label: 'v1.0.0', channel: 'prod' },
+        { value: 'latest', label: 'Latest (Auto-Update from GitHub)', channel: 'beta' },
+        { value: 'dev', label: 'Development (Unstable)', channel: 'dev' }
+    ];
+
+    versions.forEach(v => {
+        const option = createElement('option', {
+            text: v.label,
+            attrs: { value: v.value, 'data-channel': v.channel }
+        });
+        dropdown.appendChild(option);
+    });
+
+    container.appendChild(label);
+    container.appendChild(dropdown);
+
+    return { versionSelector: container, versionDropdown: dropdown };
+}
+
+/**
+ * Generate download filename based on version and current date
+ * Format: theme_loader_<version>_<YYYY-MM-DD>.js
+ */
+function generateDownloadFilename(version) {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    // Sanitize version for filename
+    const sanitizedVersion = version.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    return `theme_loader_${sanitizedVersion}_${dateStr}.js`;
 }
 
 /**
@@ -521,12 +604,22 @@ function createNumberInput(labelText, defaultValue) {
 }
 
 /**
- * Create base loader textarea with lock controls (A = External Loader)
+ * Create other theme scripts textarea with lock controls (A = Other Theme Scripts - Preserved)
  */
-function createBaseLoaderTextarea(installedUrl) {
+function createOtherScriptsTextarea(installedUrl) {
     const baseLabel = createElement('div', {
-        html: '<strong>A</strong> = External Loader (District\'s Theme JavaScript):',
+        html: '<strong>A</strong> = Other Theme Scripts (Preserved):',
         style: { fontWeight: '700', marginTop: '6px' }
+    });
+
+    const helperText = createElement('div', {
+        html: `
+            <div style="font-size:12px; color:#666; margin-top:4px; margin-bottom:6px; padding:8px; background:#f0f7ff; border-left:3px solid #0374B5; border-radius:4px;">
+                This textarea holds all theme JavaScript <strong>not related to Customized Gradebook</strong>.
+                It will be copied <strong>exactly as-is</strong> and is never rewritten by this tool.
+                It is locked by default when auto-loaded (and can be unlocked for manual edits).
+            </div>
+        `
     });
 
     const baseTA = createElement('textarea', {
@@ -575,7 +668,7 @@ function createBaseLoaderTextarea(installedUrl) {
     lockRow.appendChild(relockBtn);
     lockRow.appendChild(reloadBtn);
 
-    return { baseLabel, baseTA, lockRow, unlockBtn, relockBtn, reloadBtn };
+    return { baseLabel, baseTA, helperText, lockRow, unlockBtn, relockBtn, reloadBtn };
 }
 
 /**
@@ -654,7 +747,7 @@ function createActionButtons() {
     });
 
     const dlBtn = createElement('button', {
-        text: 'Download loader.js',
+        text: 'Download Combined Loader',
         className: 'Button',
         attrs: { disabled: 'true' }
     });
@@ -698,7 +791,7 @@ function createOutputTextarea() {
     const hint = createElement('div', {
         html: `
             <div style="margin-top:10px; color:#666; font-size:13px;">
-                <strong>Structure:</strong> A (external loader) + B (CG template from codebase) + C (managed config)<br>
+                <strong>Structure:</strong> A (other theme scripts - preserved) + B (CG template from codebase) + C (managed config)<br>
                 Each section is wrapped with markers: <code>/* ========== BEGIN SECTION X: ... ========== */</code> … <code>/* ========== END SECTION X: ... ========== */</code>
             </div>
         `
@@ -735,15 +828,15 @@ function setLocked(textarea, locked, unlockBtn, relockBtn) {
 /**
  * Generate combined loader (A+B+C)
  *
- * A = External loader (district's Theme JS from textarea)
+ * A = Other Theme Scripts (preserved exactly as-is from textarea)
  * B = CG_LOADER_TEMPLATE (from codebase)
  * C = Managed config block (generated fresh from UI state)
  */
-function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn) {
+function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn, versionDropdown) {
     const baseText = baseTA.value || '';
 
     if (!baseText.trim()) {
-        alert('No loader text found. Paste the current Theme JavaScript (district loader) first, or use Reload if available.');
+        alert('No other theme scripts found. Paste the current Theme JavaScript first, or use Reload if available.');
         return;
     }
 
@@ -765,13 +858,18 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
+    // Get version and channel from dropdown
+    const selectedVersion = versionDropdown.value;
+    const selectedOption = versionDropdown.options[versionDropdown.selectedIndex];
+    const selectedChannel = selectedOption.getAttribute('data-channel') || 'prod';
+
     // Generate managed config block (C) with all configuration options
     const cgBlock = buildCGManagedBlock({
         accountId: getAccountId(),
         enableDashboard: !!controls.enableDashboard.checked,
         dashboardLabel: controls.labelInput.value || 'Open CG Admin Dashboard',
-        channel: 'prod',
-        version: 'v1.0.3',
+        channel: selectedChannel,
+        version: selectedVersion,
         source: 'github_release',
         enableStudentGradeCustomization: !!controls.enableStudentGrade.checked,
         enableOutcomeUpdates: !!controls.enableOutcomeUpdates.checked,
