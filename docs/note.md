@@ -53,6 +53,11 @@ TODO: remove legacy code
  - outcome name
  - assignment name
  - rubric name
+## Admin Dashboard - Improvements
+    - make sure it doesn't reproduce unnecessary code
+    - Use don't hard code colors - use theme colors
+    - make better json editor
+
 
 ## Agent Recommendations
 ### Recommendations
