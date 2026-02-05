@@ -13,7 +13,8 @@ import { logger } from '../utils/logger.js';
 import { getAccountId, getInstalledThemeJsUrl } from './pageDetection.js';
 import { createElement, createPanel, escapeHtml, downloadText } from './domHelpers.js';
 import { fetchTextWithTimeout } from './fetchHelpers.js';
-import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput } from './loaderGenerator.js';
+import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, extractSections } from './loaderGenerator.js';
+import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 
 /**
  * Render loader generator panel
@@ -58,13 +59,19 @@ export function renderLoaderGeneratorPanel(root) {
     // Settings row (checkbox + label input)
     const { settingsRow, enableDashboard, labelInput } = createSettingsRow();
 
-    // Base loader textarea
+    // Textarea A: External Loader (editable)
     const { baseLabel, baseTA, lockRow, unlockBtn, relockBtn, reloadBtn } = createBaseLoaderTextarea(installedUrl);
+
+    // Textarea B: CG Loader Template (read-only)
+    const { templateLabel, templateTA } = createTemplateTextarea();
+
+    // Textarea C: Managed Config Preview (read-only)
+    const { configLabel, configTA } = createConfigTextarea();
 
     // Actions (generate, download, copy)
     const { actions, genBtn, dlBtn, copyBtn } = createActionButtons();
 
-    // Output textarea
+    // Textarea 4: Combined Output (read-only)
     const { outLabel, outTA, hint } = createOutputTextarea();
 
     // Auto-load function
@@ -104,10 +111,12 @@ export function renderLoaderGeneratorPanel(root) {
                 text = await fetchTextWithTimeout(installedUrl, 3000);
             }
 
-            // Success
+            // Success - extract sections
+            const { A, B, C } = extractSections(text);
+
             loadStatus.innerHTML = '';
             loadStatus.appendChild(createElement('div', {
-                html: `✅ Loaded current Theme JavaScript automatically.<br><span style="color:#666; font-size:13px;">Textarea is locked to prevent accidental edits. Click "Unlock to edit" if needed.</span>`,
+                html: `✅ Loaded current Theme JavaScript automatically.<br><span style="color:#666; font-size:13px;">Sections extracted. Textarea A is locked to prevent accidental edits. Click "Unlock to edit" if needed.</span>`,
                 style: {
                     padding: '10px',
                     borderRadius: '8px',
@@ -116,7 +125,10 @@ export function renderLoaderGeneratorPanel(root) {
                 }
             }));
 
-            setLoaderText(baseTA, text, true, unlockBtn, relockBtn);
+            // Populate textareas
+            setLoaderText(baseTA, A || text, true, unlockBtn, relockBtn);
+            templateTA.value = B || CG_LOADER_TEMPLATE;
+            configTA.value = C;
         } catch (err) {
             logger.warn('[LoaderGeneratorPanel] Auto-load failed', err);
 
@@ -141,7 +153,7 @@ export function renderLoaderGeneratorPanel(root) {
     reloadBtn.addEventListener('click', () => tryAutoLoad('manual reload'));
 
     genBtn.addEventListener('click', () => {
-        generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBtn, copyBtn);
+        generateCombinedLoader(baseTA, enableDashboard, labelInput, configTA, outTA, dlBtn, copyBtn);
     });
 
     dlBtn.addEventListener('click', () => {
@@ -168,6 +180,10 @@ export function renderLoaderGeneratorPanel(root) {
     panel.appendChild(baseLabel);
     panel.appendChild(baseTA);
     panel.appendChild(lockRow);
+    panel.appendChild(templateLabel);
+    panel.appendChild(templateTA);
+    panel.appendChild(configLabel);
+    panel.appendChild(configTA);
     panel.appendChild(actions);
     panel.appendChild(outLabel);
     panel.appendChild(outTA);
@@ -291,6 +307,63 @@ function createBaseLoaderTextarea(installedUrl) {
 }
 
 /**
+ * Create CG Loader Template textarea (B = Read-only template from codebase)
+ */
+function createTemplateTextarea() {
+    const templateLabel = createElement('div', {
+        html: '<strong>B</strong> = CG Loader Template (Read-Only, from codebase):',
+        style: { fontWeight: '700', marginTop: '16px' }
+    });
+
+    const templateTA = createElement('textarea', {
+        attrs: { rows: '10', spellcheck: 'false', readonly: 'true' },
+        style: {
+            width: '100%',
+            marginTop: '6px',
+            padding: '10px',
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            background: '#f5f5f5',
+            color: '#666'
+        }
+    });
+
+    // Populate with template from codebase
+    templateTA.value = CG_LOADER_TEMPLATE;
+
+    return { templateLabel, templateTA };
+}
+
+/**
+ * Create Managed Config Block textarea (C = Read-only preview of generated config)
+ */
+function createConfigTextarea() {
+    const configLabel = createElement('div', {
+        html: '<strong>C</strong> = Managed Config Block (Read-Only Preview):',
+        style: { fontWeight: '700', marginTop: '16px' }
+    });
+
+    const configTA = createElement('textarea', {
+        attrs: { rows: '8', spellcheck: 'false', readonly: 'true' },
+        style: {
+            width: '100%',
+            marginTop: '6px',
+            padding: '10px',
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            background: '#f5f5f5',
+            color: '#666'
+        }
+    });
+
+    return { configLabel, configTA };
+}
+
+/**
  * Create action buttons (generate, download, copy)
  */
 function createActionButtons() {
@@ -354,7 +427,7 @@ function createOutputTextarea() {
         html: `
             <div style="margin-top:10px; color:#666; font-size:13px;">
                 <strong>Structure:</strong> A (external loader) + B (CG template from codebase) + C (managed config)<br>
-                <strong>C</strong> is bracketed with: <code>/* BEGIN CG MANAGED CODE */</code> … <code>/* END CG MANAGED CODE */</code>
+                Each section is wrapped with markers: <code>/* ========== BEGIN SECTION X: ... ========== */</code> … <code>/* ========== END SECTION X: ... ========== */</code>
             </div>
         `
     });
@@ -394,7 +467,7 @@ function setLocked(textarea, locked, unlockBtn, relockBtn) {
  * B = CG_LOADER_TEMPLATE (from codebase)
  * C = Managed config block (generated fresh from UI state)
  */
-function generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBtn, copyBtn) {
+function generateCombinedLoader(baseTA, enableDashboard, labelInput, configTA, outTA, dlBtn, copyBtn) {
     const baseText = baseTA.value || '';
 
     if (!baseText.trim()) {
@@ -408,9 +481,12 @@ function generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBt
         enableDashboard: !!enableDashboard.checked,
         dashboardLabel: labelInput.value || 'Open CG Admin Dashboard',
         channel: 'prod',
-        version: 'v1.0.2', // TODO: Read from package.json or ENV
+        version: 'v1.0.3',
         source: 'github_release'
     });
+
+    // Update config preview textarea (C)
+    configTA.value = cgBlock;
 
     // Assemble A+B+C
     const combined = upsertCGBlockIntoLoader({ baseLoaderText: baseText, cgBlock });

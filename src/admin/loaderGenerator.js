@@ -16,9 +16,13 @@
 import { logger } from '../utils/logger.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 
-// Sentinel markers for CG-managed block
-const CG_BEGIN = '/* BEGIN CG MANAGED CODE */';
-const CG_END = '/* END CG MANAGED CODE */';
+// Sentinel markers for all sections
+const A_BEGIN = '/* ========== BEGIN SECTION A: EXTERNAL LOADER ========== */';
+const A_END = '/* ========== END SECTION A: EXTERNAL LOADER ========== */';
+const B_BEGIN = '/* ========== BEGIN SECTION B: CG LOADER TEMPLATE ========== */';
+const B_END = '/* ========== END SECTION B: CG LOADER TEMPLATE ========== */';
+const C_BEGIN = '/* ========== BEGIN SECTION C: MANAGED CONFIG BLOCK ========== */';
+const C_END = '/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */';
 
 /**
  * Build CG-managed block (CONFIG-ONLY)
@@ -54,7 +58,7 @@ export function buildCGManagedBlock({
     });
 
     const lines = [
-        CG_BEGIN,
+        C_BEGIN,
         `/* Generated: ${new Date().toISOString()} */`,
         `/* Account: ${accountId ?? 'unknown'} */`,
         '/* Purpose: Version and configuration management for CG loader */',
@@ -74,7 +78,7 @@ export function buildCGManagedBlock({
         `    adminDashboardLabel: ${JSON.stringify(dashboardLabel || 'Open CG Admin Dashboard')}`,
         '};',
         '',
-        CG_END
+        C_END
     ];
 
     return lines.join('\n');
@@ -98,39 +102,20 @@ export function buildCGManagedBlock({
 export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
     logger.debug('[LoaderGenerator] Assembling A+B+C loader output');
 
-    // Extract A: Remove any existing CG loader (B) and managed block (C) from base text
-    let externalLoader = baseLoaderText;
+    // Extract A using the extractSections function
+    const { A: extractedA } = extractSections(baseLoaderText);
 
-    // Remove existing CG-managed block (C) if present
-    const beginIdx = externalLoader.indexOf(CG_BEGIN);
-    const endIdx = externalLoader.indexOf(CG_END);
-
-    if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
-        logger.debug('[LoaderGenerator] Removing existing CG-managed block from external loader');
-        const before = externalLoader.slice(0, beginIdx);
-        const after = externalLoader.slice(endIdx + CG_END.length);
-        externalLoader = (before + after).trim();
-    }
-
-    // Remove existing CG loader template (B) if present
-    // Look for the CG loader IIFE pattern
-    const cgLoaderPattern = /\(function\s*\(\)\s*\{[\s\S]*?\/\/\s*={5,}\s*CG LOADER[\s\S]*?\}\)\(\);?/;
-    if (cgLoaderPattern.test(externalLoader)) {
-        logger.debug('[LoaderGenerator] Removing existing CG loader template from external loader');
-        externalLoader = externalLoader.replace(cgLoaderPattern, '').trim();
-    }
-
-    // A = External loader (district code only)
-    const A = externalLoader.trimEnd();
+    // Use extracted A if available, otherwise use the entire base text
+    const A = extractedA || baseLoaderText.trimEnd();
 
     // B = CG loader template (from codebase)
     const B = CG_LOADER_TEMPLATE.trim();
 
-    // C = Managed config block (generated fresh)
+    // C = Managed config block (generated fresh, already has markers)
     const C = cgBlock.trimEnd();
 
-    // Assemble: A + B + C
-    const output = `${A}\n\n${B}\n\n${C}\n`;
+    // Assemble with section markers: A + B + C
+    const output = `${A_BEGIN}\n${A}\n${A_END}\n\n${B_BEGIN}\n${B}\n${B_END}\n\n${C}\n`;
 
     logger.debug('[LoaderGenerator] A+B+C assembly complete', {
         aLength: A.length,
@@ -143,11 +128,62 @@ export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
 }
 
 /**
+ * Extract sections A, B, and C from a combined loader
+ *
+ * Intelligently parses a combined loader to extract:
+ * - A = External loader (district code)
+ * - B = CG loader template
+ * - C = Managed config block
+ *
+ * @param {string} combinedLoader - Combined loader text
+ * @returns {Object} Extracted sections { A: string, B: string, C: string }
+ */
+export function extractSections(combinedLoader) {
+    logger.debug('[LoaderGenerator] Extracting sections from combined loader');
+
+    let A = '';
+    let B = '';
+    let C = '';
+
+    // Extract Section A
+    const aStart = combinedLoader.indexOf(A_BEGIN);
+    const aEnd = combinedLoader.indexOf(A_END);
+    if (aStart !== -1 && aEnd !== -1 && aEnd > aStart) {
+        A = combinedLoader.slice(aStart + A_BEGIN.length, aEnd).trim();
+        logger.debug('[LoaderGenerator] Extracted Section A');
+    }
+
+    // Extract Section B
+    const bStart = combinedLoader.indexOf(B_BEGIN);
+    const bEnd = combinedLoader.indexOf(B_END);
+    if (bStart !== -1 && bEnd !== -1 && bEnd > bStart) {
+        B = combinedLoader.slice(bStart + B_BEGIN.length, bEnd).trim();
+        logger.debug('[LoaderGenerator] Extracted Section B');
+    }
+
+    // Extract Section C
+    const cStart = combinedLoader.indexOf(C_BEGIN);
+    const cEnd = combinedLoader.indexOf(C_END);
+    if (cStart !== -1 && cEnd !== -1 && cEnd > cStart) {
+        C = combinedLoader.slice(cStart, cEnd + C_END.length).trim();
+        logger.debug('[LoaderGenerator] Extracted Section C');
+    }
+
+    logger.debug('[LoaderGenerator] Section extraction complete', {
+        aLength: A.length,
+        bLength: B.length,
+        cLength: C.length
+    });
+
+    return { A, B, C };
+}
+
+/**
  * Validate assembled loader output
  *
  * Performs safety checks:
- * - Output must contain exactly one BEGIN and one END sentinel
- * - BEGIN must occur after A and B sections (in the C section)
+ * - Output must contain section markers for A, B, and C
+ * - Markers must be in correct order
  *
  * @param {string} output - Assembled loader output
  * @returns {Object} Validation result { valid: boolean, errors: string[] }
@@ -155,34 +191,54 @@ export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
 export function validateLoaderOutput(output) {
     const errors = [];
 
-    // Count sentinels
-    const beginCount = (output.match(/\/\* BEGIN CG MANAGED CODE \*\//g) || []).length;
-    const endCount = (output.match(/\/\* END CG MANAGED CODE \*\//g) || []).length;
-
-    if (beginCount === 0) {
-        errors.push('Missing BEGIN CG MANAGED CODE sentinel');
-    } else if (beginCount > 1) {
-        errors.push(`Found ${beginCount} BEGIN sentinels (expected exactly 1)`);
+    // Check for Section A markers
+    if (!output.includes(A_BEGIN)) {
+        errors.push('Missing Section A BEGIN marker');
+    }
+    if (!output.includes(A_END)) {
+        errors.push('Missing Section A END marker');
     }
 
-    if (endCount === 0) {
-        errors.push('Missing END CG MANAGED CODE sentinel');
-    } else if (endCount > 1) {
-        errors.push(`Found ${endCount} END sentinels (expected exactly 1)`);
+    // Check for Section B markers
+    if (!output.includes(B_BEGIN)) {
+        errors.push('Missing Section B BEGIN marker');
+    }
+    if (!output.includes(B_END)) {
+        errors.push('Missing Section B END marker');
     }
 
-    // Check sentinel order
-    const beginIdx = output.indexOf(CG_BEGIN);
-    const endIdx = output.indexOf(CG_END);
-
-    if (beginIdx !== -1 && endIdx !== -1 && endIdx <= beginIdx) {
-        errors.push('END sentinel appears before BEGIN sentinel');
+    // Check for Section C markers
+    if (!output.includes(C_BEGIN)) {
+        errors.push('Missing Section C BEGIN marker');
+    }
+    if (!output.includes(C_END)) {
+        errors.push('Missing Section C END marker');
     }
 
-    // Check that sentinels are in the final section (after CG loader template)
-    const cgLoaderIdx = output.indexOf('// CG LOADER - CONFIGURATION MERGE');
-    if (cgLoaderIdx !== -1 && beginIdx !== -1 && beginIdx < cgLoaderIdx) {
-        errors.push('BEGIN sentinel appears before CG loader template (should be after)');
+    // Check marker order
+    const aBeginIdx = output.indexOf(A_BEGIN);
+    const aEndIdx = output.indexOf(A_END);
+    const bBeginIdx = output.indexOf(B_BEGIN);
+    const bEndIdx = output.indexOf(B_END);
+    const cBeginIdx = output.indexOf(C_BEGIN);
+    const cEndIdx = output.indexOf(C_END);
+
+    if (aBeginIdx !== -1 && aEndIdx !== -1 && aEndIdx <= aBeginIdx) {
+        errors.push('Section A END marker appears before BEGIN marker');
+    }
+    if (bBeginIdx !== -1 && bEndIdx !== -1 && bEndIdx <= bBeginIdx) {
+        errors.push('Section B END marker appears before BEGIN marker');
+    }
+    if (cBeginIdx !== -1 && cEndIdx !== -1 && cEndIdx <= cBeginIdx) {
+        errors.push('Section C END marker appears before BEGIN marker');
+    }
+
+    // Check that sections appear in order: A, then B, then C
+    if (aBeginIdx !== -1 && bBeginIdx !== -1 && bBeginIdx <= aBeginIdx) {
+        errors.push('Section B appears before Section A');
+    }
+    if (bBeginIdx !== -1 && cBeginIdx !== -1 && cBeginIdx <= bBeginIdx) {
+        errors.push('Section C appears before Section B');
     }
 
     const valid = errors.length === 0;
