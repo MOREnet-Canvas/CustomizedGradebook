@@ -29,15 +29,26 @@ const C_END = '/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */';
  *
  * Generates the managed config block (C) with:
  * - window.CG_MANAGED.release (channel, version, source)
- * - window.CG_MANAGED.config (configuration overrides from UI)
+ * - window.CG_MANAGED.config (all configuration options from UI)
  *
  * @param {Object} options - Configuration options
  * @param {string} options.accountId - Account ID
  * @param {boolean} options.enableDashboard - Enable admin dashboard module
  * @param {string} options.dashboardLabel - Button label for admin dashboard
  * @param {string} [options.channel='prod'] - Release channel (prod/dev)
- * @param {string} [options.version='v1.0.2'] - Release version
+ * @param {string} [options.version='v1.0.3'] - Release version
  * @param {string} [options.source='github_release'] - Release source (github_release/pages)
+ * @param {boolean} [options.enableStudentGradeCustomization=true] - Enable student grade customization
+ * @param {boolean} [options.enableOutcomeUpdates=true] - Enable outcome updates
+ * @param {boolean} [options.enableGradeOverride=true] - Enable grade override
+ * @param {string} [options.updateAvgButtonLabel='Update Current Score'] - Update average button label
+ * @param {string} [options.avgOutcomeName='Current Score'] - Average outcome name
+ * @param {string} [options.avgAssignmentName='Current Score Assignment'] - Average assignment name
+ * @param {string} [options.avgRubricName='Current Score Rubric'] - Average rubric name
+ * @param {number} [options.defaultMaxPoints=4] - Default max points for outcomes
+ * @param {number} [options.defaultMasteryThreshold=3] - Default mastery threshold
+ * @param {Array} [options.outcomeAndRubricRatings] - Rating scale for outcomes and rubrics
+ * @param {Array} [options.excludedOutcomeKeywords] - Keywords to exclude from outcomes
  * @returns {string} CG-managed block content
  */
 export function buildCGManagedBlock({
@@ -45,8 +56,29 @@ export function buildCGManagedBlock({
     enableDashboard,
     dashboardLabel,
     channel = 'prod',
-    version = 'v1.0.2',
-    source = 'github_release'
+    version = 'v1.0.3',
+    source = 'github_release',
+    enableStudentGradeCustomization = true,
+    enableOutcomeUpdates = true,
+    enableGradeOverride = true,
+    updateAvgButtonLabel = 'Update Current Score',
+    avgOutcomeName = 'Current Score',
+    avgAssignmentName = 'Current Score Assignment',
+    avgRubricName = 'Current Score Rubric',
+    defaultMaxPoints = 4,
+    defaultMasteryThreshold = 3,
+    outcomeAndRubricRatings = [
+        { description: "Exemplary", points: 4 },
+        { description: "Beyond Target", points: 3.5 },
+        { description: "Target", points: 3 },
+        { description: "Approaching Target", points: 2.5 },
+        { description: "Developing", points: 2 },
+        { description: "Beginning", points: 1.5 },
+        { description: "Needs Partial Support", points: 1 },
+        { description: "Needs Full Support", points: 0.5 },
+        { description: "No Evidence", points: 0 }
+    ],
+    excludedOutcomeKeywords = ["Homework Completion"]
 }) {
     logger.debug('[LoaderGenerator] Building CG-managed block', {
         accountId,
@@ -74,8 +106,30 @@ export function buildCGManagedBlock({
         '',
         '// Configuration overrides',
         'window.CG_MANAGED.config = {',
+        `    // Admin Dashboard`,
         `    adminDashboard: ${enableDashboard ? 'true' : 'false'},`,
-        `    adminDashboardLabel: ${JSON.stringify(dashboardLabel || 'Open CG Admin Dashboard')}`,
+        `    adminDashboardLabel: ${JSON.stringify(dashboardLabel || 'Open CG Admin Dashboard')},`,
+        '',
+        `    // Feature flags`,
+        `    ENABLE_STUDENT_GRADE_CUSTOMIZATION: ${enableStudentGradeCustomization ? 'true' : 'false'},`,
+        `    ENABLE_OUTCOME_UPDATES: ${enableOutcomeUpdates ? 'true' : 'false'},`,
+        `    ENABLE_GRADE_OVERRIDE: ${enableGradeOverride ? 'true' : 'false'},`,
+        '',
+        `    // UI labels`,
+        `    UPDATE_AVG_BUTTON_LABEL: ${JSON.stringify(updateAvgButtonLabel)},`,
+        `    AVG_OUTCOME_NAME: ${JSON.stringify(avgOutcomeName)},`,
+        `    AVG_ASSIGNMENT_NAME: ${JSON.stringify(avgAssignmentName)},`,
+        `    AVG_RUBRIC_NAME: ${JSON.stringify(avgRubricName)},`,
+        '',
+        `    // Outcome configuration`,
+        `    DEFAULT_MAX_POINTS: ${defaultMaxPoints},`,
+        `    DEFAULT_MASTERY_THRESHOLD: ${defaultMasteryThreshold},`,
+        '',
+        `    // Rating scale`,
+        `    OUTCOME_AND_RUBRIC_RATINGS: ${JSON.stringify(outcomeAndRubricRatings, null, 8).replace(/\n/g, '\n    ')},`,
+        '',
+        `    // Outcome filtering`,
+        `    EXCLUDED_OUTCOME_KEYWORDS: ${JSON.stringify(excludedOutcomeKeywords)}`,
         '};',
         '',
         C_END
