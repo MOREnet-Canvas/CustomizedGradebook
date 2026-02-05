@@ -112,13 +112,15 @@ onElementRendered('.reset_course_content_button', function(e) {
 /* Generated: 2026-02-05T17:00:00.000Z */
 /* Account: 1 */
 /* Purpose: Version and configuration management for CG loader */
+/* NOTE: This is the BETA loader - automatically uses the latest production release */
+/* WARNING: This loader may receive breaking changes without notice. Use for testing only. */
 
 window.CG_MANAGED = window.CG_MANAGED || {};
 
-// Release configuration
+// Release configuration - BETA channel uses GitHub's /releases/latest/ redirect
 window.CG_MANAGED.release = {
-    channel: "dev",
-    version: "dev",
+    channel: "beta",
+    version: "latest",  // Automatically uses the most recent production release
     source: "github_release"
 };
 
@@ -142,6 +144,7 @@ window.CG_MANAGED.config = {
     // Outcome configuration
     DEFAULT_MAX_POINTS: 4,
     DEFAULT_MASTERY_THRESHOLD: 3,
+
 
     // Rating scale
     OUTCOME_AND_RUBRIC_RATINGS: [
@@ -208,17 +211,17 @@ window.CG_MANAGED.config = {
     }
 
     // ========================================================================
-    // CG LOADER - SCRIPT INJECTION
+    // CG LOADER - SCRIPT INJECTION (BETA CHANNEL)
     // ========================================================================
 
     // Read release configuration from managed block
     const release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
-        channel: "prod",
-        version: "v1.0.3",
+        channel: "beta",
+        version: "latest",
         source: "github_release"
     };
 
-    // Prevent duplicate loading
+    // Prevent duplicate loading - uses unique bundle ID for beta channel
     const bundleId = "cg_" + release.channel + "_bundle";
     if (document.getElementById(bundleId)) {
         console.log(`[CG] ${release.channel.toUpperCase()} bundle already loaded; skipping`);
@@ -235,6 +238,11 @@ window.CG_MANAGED.config = {
             // Dev channel: use cache-busting query parameter
             const cacheBuster = Date.now();
             script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=${cacheBuster}`;
+        } else if (release.channel === "beta") {
+            // Beta channel: use GitHub's /releases/latest/download/ redirect
+            // This automatically fetches the most recent production release without version pinning
+            // WARNING: May receive breaking changes without notice - use for testing only
+            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/latest/download/customGradebookInit.js`;
         } else {
             // Prod channel: use version tag
             script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/${release.version}/customGradebookInit.js`;
@@ -247,7 +255,7 @@ window.CG_MANAGED.config = {
         return;
     }
 
-    script.onload = () => console.log(`[CG] Loaded customGradebookInit.js (${release.channel.toUpperCase()} ${release.version})`);
+    script.onload = () => console.log(`[CG] Loaded customGradebookInit.js (${release.channel.toUpperCase()} ${release.version}) - Auto-updated from latest production release`);
     script.onerror = () => console.error(`[CG] Failed to load customGradebookInit.js (${release.channel.toUpperCase()})`);
     document.head.appendChild(script);
 })();

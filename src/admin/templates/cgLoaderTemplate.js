@@ -59,6 +59,11 @@ export const CG_LOADER_TEMPLATE = `
             // Dev channel: use cache-busting query parameter
             const cacheBuster = Date.now();
             script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=\${cacheBuster}\`;
+        } else if (release.channel === "beta") {
+            // Beta channel: use GitHub's /releases/latest/download/ redirect
+            // This automatically fetches the most recent production release without version pinning
+            // WARNING: May receive breaking changes without notice - use for testing only
+            script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/latest/download/customGradebookInit.js\`;
         } else {
             // Prod channel: use version tag
             script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/\${release.version}/customGradebookInit.js\`;
