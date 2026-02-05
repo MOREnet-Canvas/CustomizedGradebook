@@ -802,6 +802,25 @@ function createConfigTextarea() {
  * Create sticky action buttons panel (right side)
  */
 function createStickyActionPanel() {
+    // Add CSS animation keyframes for button activation
+    if (!document.getElementById('cg-button-animations')) {
+        const style = document.createElement('style');
+        style.id = 'cg-button-animations';
+        style.textContent = `
+            @keyframes cg-pulse {
+                0%, 100% {
+                    transform: scale(1);
+                    box-shadow: 0 2px 8px rgba(3, 116, 181, 0.3);
+                }
+                50% {
+                    transform: scale(1.03);
+                    box-shadow: 0 4px 16px rgba(3, 116, 181, 0.5);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     // Sticky container
     const stickyPanel = createElement('div', {
         style: {
@@ -884,22 +903,26 @@ function createStickyActionPanel() {
     });
 
     const dlBtn = createElement('button', {
-        text: 'Download Loader File',
+        text: '⬇️ Download Loader File',
         className: 'Button',
         attrs: { disabled: 'true' },
         style: {
             width: '100%',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            transition: 'all 0.3s ease',
+            position: 'relative'
         }
     });
 
     const copyBtn = createElement('button', {
-        text: 'Copy Output',
+        text: '📋 Copy Loader Code',
         className: 'Button',
         attrs: { disabled: 'true' },
         style: {
             width: '100%',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            transition: 'all 0.3s ease',
+            position: 'relative'
         }
     });
 
@@ -1102,8 +1125,45 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
 
     outTA.value = combined;
 
+    // Enable buttons and add "activated" visual styling
     dlBtn.removeAttribute('disabled');
     copyBtn.removeAttribute('disabled');
+
+    // Add prominent "ready to use" styling
+    dlBtn.style.background = 'linear-gradient(135deg, #0374B5 0%, #0056b3 100%)';
+    dlBtn.style.color = '#fff';
+    dlBtn.style.fontWeight = '600';
+    dlBtn.style.boxShadow = '0 2px 8px rgba(3, 116, 181, 0.3)';
+    dlBtn.style.border = '1px solid #0056b3';
+
+    copyBtn.style.background = 'linear-gradient(135deg, #0374B5 0%, #0056b3 100%)';
+    copyBtn.style.color = '#fff';
+    copyBtn.style.fontWeight = '600';
+    copyBtn.style.boxShadow = '0 2px 8px rgba(3, 116, 181, 0.3)';
+    copyBtn.style.border = '1px solid #0056b3';
+
+    // Add subtle pulse animation on first activation
+    dlBtn.style.animation = 'cg-pulse 1.5s ease-in-out 2';
+    copyBtn.style.animation = 'cg-pulse 1.5s ease-in-out 2';
+
+    // Add hover effect enhancement
+    const addHoverEffect = (btn) => {
+        btn.addEventListener('mouseenter', () => {
+            if (!btn.hasAttribute('disabled')) {
+                btn.style.transform = 'translateY(-2px)';
+                btn.style.boxShadow = '0 4px 12px rgba(3, 116, 181, 0.4)';
+            }
+        });
+        btn.addEventListener('mouseleave', () => {
+            if (!btn.hasAttribute('disabled')) {
+                btn.style.transform = 'translateY(0)';
+                btn.style.boxShadow = '0 2px 8px rgba(3, 116, 181, 0.3)';
+            }
+        });
+    };
+
+    addHoverEffect(dlBtn);
+    addHoverEffect(copyBtn);
 
     logger.info('[LoaderGeneratorPanel] A+B+C loader generated successfully');
 }
