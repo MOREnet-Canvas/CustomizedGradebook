@@ -56,8 +56,8 @@ export function renderLoaderGeneratorPanel(root) {
         style: { marginBottom: '10px' }
     });
 
-    // Settings row (checkbox + label input)
-    const { settingsRow, enableDashboard, labelInput } = createSettingsRow();
+    // Configuration panel with all settings
+    const { container: configPanel, controls } = createConfigurationPanel();
 
     // Textarea A: External Loader (editable)
     const { baseLabel, baseTA, lockRow, unlockBtn, relockBtn, reloadBtn } = createBaseLoaderTextarea(installedUrl);
@@ -153,7 +153,7 @@ export function renderLoaderGeneratorPanel(root) {
     reloadBtn.addEventListener('click', () => tryAutoLoad('manual reload'));
 
     genBtn.addEventListener('click', () => {
-        generateCombinedLoader(baseTA, enableDashboard, labelInput, configTA, outTA, dlBtn, copyBtn);
+        generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn);
     });
 
     dlBtn.addEventListener('click', () => {
@@ -176,7 +176,7 @@ export function renderLoaderGeneratorPanel(root) {
     panel.appendChild(topNote);
     panel.appendChild(installedLine);
     panel.appendChild(loadStatus);
-    panel.appendChild(settingsRow);
+    panel.appendChild(configPanel);
     panel.appendChild(baseLabel);
     panel.appendChild(baseTA);
     panel.appendChild(lockRow);
@@ -194,58 +194,227 @@ export function renderLoaderGeneratorPanel(root) {
 }
 
 /**
- * Create settings row (checkbox + label input)
+ * Create configuration panel with all settings
  */
-function createSettingsRow() {
-    const settingsRow = createElement('div', {
+function createConfigurationPanel() {
+    const container = createElement('div', {
         style: {
-            display: 'flex',
-            gap: '12px',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            marginBottom: '10px'
+            marginBottom: '16px',
+            padding: '16px',
+            border: '1px solid #d9d9d9',
+            borderRadius: '8px',
+            background: '#f9f9f9'
         }
+    });
+
+    const title = createElement('div', {
+        html: '<strong>Configuration Settings</strong>',
+        style: { marginBottom: '12px', fontSize: '14px' }
+    });
+
+    // Admin Dashboard Section
+    const adminSection = createElement('div', { style: { marginBottom: '16px' } });
+    const adminTitle = createElement('div', {
+        html: '<strong>Admin Dashboard</strong>',
+        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
     });
 
     const enableDashboard = createElement('input', {
-        attrs: { type: 'checkbox', checked: 'true' }
+        attrs: { type: 'checkbox', checked: 'true', id: 'cfg_enableDashboard' }
     });
-
-    const enableLabel = createElement('label', {
-        style: {
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-            fontSize: '13px'
-        }
+    const dashboardLabel = createElement('label', {
+        attrs: { for: 'cfg_enableDashboard' },
+        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '8px' }
     });
-    enableLabel.appendChild(enableDashboard);
-    enableLabel.appendChild(createElement('span', { text: 'Enable Admin Dashboard module' }));
+    dashboardLabel.appendChild(enableDashboard);
+    dashboardLabel.appendChild(createElement('span', { text: 'Enable Admin Dashboard module' }));
 
     const labelInput = createElement('input', {
-        attrs: {
-            type: 'text',
-            value: 'Open CG Admin Dashboard',
-            spellcheck: 'false'
-        },
-        style: {
-            flex: '1',
-            minWidth: '320px',
-            padding: '8px 10px',
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            fontSize: '13px'
-        }
+        attrs: { type: 'text', value: 'Open CG Admin Dashboard', spellcheck: 'false', placeholder: 'Button label' },
+        style: { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px' }
     });
 
-    settingsRow.appendChild(enableLabel);
-    settingsRow.appendChild(createElement('div', {
-        text: 'Button label:',
-        style: { fontWeight: '600', fontSize: '13px' }
-    }));
-    settingsRow.appendChild(labelInput);
+    adminSection.appendChild(adminTitle);
+    adminSection.appendChild(dashboardLabel);
+    adminSection.appendChild(labelInput);
 
-    return { settingsRow, enableDashboard, labelInput };
+    // Feature Flags Section
+    const featureSection = createElement('div', { style: { marginBottom: '16px' } });
+    const featureTitle = createElement('div', {
+        html: '<strong>Feature Flags</strong>',
+        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+    });
+
+    const enableStudentGrade = createCheckbox('Enable Student Grade Customization', 'cfg_enableStudentGrade', true);
+    const enableOutcomeUpdates = createCheckbox('Enable Outcome Updates', 'cfg_enableOutcomeUpdates', true);
+    const enableGradeOverride = createCheckbox('Enable Grade Override', 'cfg_enableGradeOverride', true);
+
+    featureSection.appendChild(featureTitle);
+    featureSection.appendChild(enableStudentGrade.label);
+    featureSection.appendChild(enableOutcomeUpdates.label);
+    featureSection.appendChild(enableGradeOverride.label);
+
+    // UI Labels Section
+    const labelsSection = createElement('div', { style: { marginBottom: '16px' } });
+    const labelsTitle = createElement('div', {
+        html: '<strong>UI Labels</strong>',
+        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+    });
+
+    const updateAvgButtonLabel = createTextInput('Update Button Label', 'Update Current Score');
+    const avgOutcomeName = createTextInput('Outcome Name', 'Current Score');
+    const avgAssignmentName = createTextInput('Assignment Name', 'Current Score Assignment');
+    const avgRubricName = createTextInput('Rubric Name', 'Current Score Rubric');
+
+    labelsSection.appendChild(labelsTitle);
+    labelsSection.appendChild(updateAvgButtonLabel.container);
+    labelsSection.appendChild(avgOutcomeName.container);
+    labelsSection.appendChild(avgAssignmentName.container);
+    labelsSection.appendChild(avgRubricName.container);
+
+    // Outcome Configuration Section
+    const outcomeSection = createElement('div', { style: { marginBottom: '16px' } });
+    const outcomeTitle = createElement('div', {
+        html: '<strong>Outcome Configuration</strong>',
+        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+    });
+
+    const defaultMaxPoints = createNumberInput('Default Max Points', 4);
+    const defaultMasteryThreshold = createNumberInput('Default Mastery Threshold', 3);
+
+    outcomeSection.appendChild(outcomeTitle);
+    outcomeSection.appendChild(defaultMaxPoints.container);
+    outcomeSection.appendChild(defaultMasteryThreshold.container);
+
+    // Rating Scale Section
+    const ratingsSection = createElement('div', { style: { marginBottom: '16px' } });
+    const ratingsTitle = createElement('div', {
+        html: '<strong>Rating Scale (JSON)</strong>',
+        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+    });
+
+    const defaultRatings = [
+        { description: "Exemplary", points: 4 },
+        { description: "Beyond Target", points: 3.5 },
+        { description: "Target", points: 3 },
+        { description: "Approaching Target", points: 2.5 },
+        { description: "Developing", points: 2 },
+        { description: "Beginning", points: 1.5 },
+        { description: "Needs Partial Support", points: 1 },
+        { description: "Needs Full Support", points: 0.5 },
+        { description: "No Evidence", points: 0 }
+    ];
+
+    const ratingsTextarea = createElement('textarea', {
+        attrs: { rows: '8', spellcheck: 'false' },
+        style: {
+            width: '100%',
+            padding: '8px 10px',
+            border: '1px solid #ccc',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+        }
+    });
+    ratingsTextarea.value = JSON.stringify(defaultRatings, null, 2);
+
+    ratingsSection.appendChild(ratingsTitle);
+    ratingsSection.appendChild(ratingsTextarea);
+
+    // Excluded Keywords Section
+    const keywordsSection = createElement('div', { style: { marginBottom: '0' } });
+    const keywordsTitle = createElement('div', {
+        html: '<strong>Excluded Outcome Keywords (comma-separated)</strong>',
+        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+    });
+
+    const keywordsInput = createElement('input', {
+        attrs: { type: 'text', value: 'Homework Completion', spellcheck: 'false' },
+        style: { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px' }
+    });
+
+    keywordsSection.appendChild(keywordsTitle);
+    keywordsSection.appendChild(keywordsInput);
+
+    // Assemble container
+    container.appendChild(title);
+    container.appendChild(adminSection);
+    container.appendChild(featureSection);
+    container.appendChild(labelsSection);
+    container.appendChild(outcomeSection);
+    container.appendChild(ratingsSection);
+    container.appendChild(keywordsSection);
+
+    return {
+        container,
+        controls: {
+            enableDashboard,
+            labelInput,
+            enableStudentGrade: enableStudentGrade.checkbox,
+            enableOutcomeUpdates: enableOutcomeUpdates.checkbox,
+            enableGradeOverride: enableGradeOverride.checkbox,
+            updateAvgButtonLabel: updateAvgButtonLabel.input,
+            avgOutcomeName: avgOutcomeName.input,
+            avgAssignmentName: avgAssignmentName.input,
+            avgRubricName: avgRubricName.input,
+            defaultMaxPoints: defaultMaxPoints.input,
+            defaultMasteryThreshold: defaultMasteryThreshold.input,
+            ratingsTextarea,
+            keywordsInput
+        }
+    };
+}
+
+/**
+ * Helper: Create checkbox with label
+ */
+function createCheckbox(labelText, id, checked) {
+    const checkbox = createElement('input', {
+        attrs: { type: 'checkbox', checked: checked ? 'true' : undefined, id }
+    });
+    const label = createElement('label', {
+        attrs: { for: id },
+        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '6px' }
+    });
+    label.appendChild(checkbox);
+    label.appendChild(createElement('span', { text: labelText }));
+    return { checkbox, label };
+}
+
+/**
+ * Helper: Create text input with label
+ */
+function createTextInput(labelText, defaultValue) {
+    const container = createElement('div', { style: { marginBottom: '8px' } });
+    const label = createElement('div', {
+        text: labelText + ':',
+        style: { fontSize: '12px', marginBottom: '4px', color: '#555' }
+    });
+    const input = createElement('input', {
+        attrs: { type: 'text', value: defaultValue, spellcheck: 'false' },
+        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
+    });
+    container.appendChild(label);
+    container.appendChild(input);
+    return { container, input };
+}
+
+/**
+ * Helper: Create number input with label
+ */
+function createNumberInput(labelText, defaultValue) {
+    const container = createElement('div', { style: { marginBottom: '8px' } });
+    const label = createElement('div', {
+        text: labelText + ':',
+        style: { fontSize: '12px', marginBottom: '4px', color: '#555' }
+    });
+    const input = createElement('input', {
+        attrs: { type: 'number', value: defaultValue.toString(), min: '0', step: '0.5' },
+        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
+    });
+    container.appendChild(label);
+    container.appendChild(input);
+    return { container, input };
 }
 
 /**
@@ -467,7 +636,7 @@ function setLocked(textarea, locked, unlockBtn, relockBtn) {
  * B = CG_LOADER_TEMPLATE (from codebase)
  * C = Managed config block (generated fresh from UI state)
  */
-function generateCombinedLoader(baseTA, enableDashboard, labelInput, configTA, outTA, dlBtn, copyBtn) {
+function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBtn) {
     const baseText = baseTA.value || '';
 
     if (!baseText.trim()) {
@@ -475,14 +644,43 @@ function generateCombinedLoader(baseTA, enableDashboard, labelInput, configTA, o
         return;
     }
 
-    // Generate managed config block (C) with release info
+    // Parse ratings JSON
+    let outcomeAndRubricRatings;
+    try {
+        outcomeAndRubricRatings = JSON.parse(controls.ratingsTextarea.value);
+        if (!Array.isArray(outcomeAndRubricRatings)) {
+            throw new Error('Ratings must be an array');
+        }
+    } catch (e) {
+        alert('Invalid JSON in Rating Scale field. Please fix the JSON syntax.\n\nError: ' + e.message);
+        return;
+    }
+
+    // Parse excluded keywords (comma-separated)
+    const excludedOutcomeKeywords = controls.keywordsInput.value
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0);
+
+    // Generate managed config block (C) with all configuration options
     const cgBlock = buildCGManagedBlock({
         accountId: getAccountId(),
-        enableDashboard: !!enableDashboard.checked,
-        dashboardLabel: labelInput.value || 'Open CG Admin Dashboard',
+        enableDashboard: !!controls.enableDashboard.checked,
+        dashboardLabel: controls.labelInput.value || 'Open CG Admin Dashboard',
         channel: 'prod',
         version: 'v1.0.3',
-        source: 'github_release'
+        source: 'github_release',
+        enableStudentGradeCustomization: !!controls.enableStudentGrade.checked,
+        enableOutcomeUpdates: !!controls.enableOutcomeUpdates.checked,
+        enableGradeOverride: !!controls.enableGradeOverride.checked,
+        updateAvgButtonLabel: controls.updateAvgButtonLabel.value,
+        avgOutcomeName: controls.avgOutcomeName.value,
+        avgAssignmentName: controls.avgAssignmentName.value,
+        avgRubricName: controls.avgRubricName.value,
+        defaultMaxPoints: parseFloat(controls.defaultMaxPoints.value) || 4,
+        defaultMasteryThreshold: parseFloat(controls.defaultMasteryThreshold.value) || 3,
+        outcomeAndRubricRatings,
+        excludedOutcomeKeywords
     });
 
     // Update config preview textarea (C)
