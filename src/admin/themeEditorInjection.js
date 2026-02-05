@@ -8,6 +8,7 @@
 
 import { logger } from '../utils/logger.js';
 import { getAccountId } from './pageDetection.js';
+import { ADMIN_DASHBOARD_LABEL } from '../config.js';
 
 const INJECTION_MARKER = 'cg-theme-editor-tools';
 
@@ -69,7 +70,7 @@ export function injectThemeEditorButton() {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'Button Button--small';
-    button.textContent = 'Open CG Admin Dashboard';
+    button.textContent = ADMIN_DASHBOARD_LABEL;
     button.addEventListener('click', () => {
         const accountId = getAccountId();
         if (!accountId) {
@@ -86,4 +87,3 @@ export function injectThemeEditorButton() {
     logger.info('[ThemeEditorInjection] CG Tools button injected successfully');
     return true;
 }
-

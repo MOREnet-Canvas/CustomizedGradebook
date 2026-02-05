@@ -40,6 +40,10 @@ export const REMOVE_ASSIGNMENT_TAB = window.CG_CONFIG?.REMOVE_ASSIGNMENT_TAB ?? 
 export const PER_STUDENT_UPDATE_THRESHOLD = window.CG_CONFIG?.PER_STUDENT_UPDATE_THRESHOLD ?? 25;
 export const MASTERY_REFRESH_ENABLED = window.CG_CONFIG?.MASTERY_REFRESH_ENABLED ?? true;
 
+// Admin Dashboard configuration
+export const ADMIN_DASHBOARD_ENABLED = window.CG_CONFIG?.ADMIN_DASHBOARD_ENABLED ?? true;
+export const ADMIN_DASHBOARD_LABEL = window.CG_CONFIG?.ADMIN_DASHBOARD_LABEL ?? "Open CG Admin Dashboard";
+
 // Grading mode configuration
 // ENABLE_OUTCOME_UPDATES: Controls whether outcome scores (and assignments/rubrics) are updated
 // ENABLE_GRADE_OVERRIDE: Controls whether final grade overrides are updated
