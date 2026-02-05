@@ -197,7 +197,8 @@ export function renderLoaderGeneratorPanel(root) {
  * Create configuration panel with all settings
  */
 function createConfigurationPanel() {
-    const container = createElement('div', {
+    const container = createElement('details', {
+        attrs: { open: 'true' },
         style: {
             marginBottom: '16px',
             padding: '16px',
@@ -207,16 +208,33 @@ function createConfigurationPanel() {
         }
     });
 
-    const title = createElement('div', {
-        html: '<strong>Configuration Settings</strong>',
-        style: { marginBottom: '12px', fontSize: '14px' }
+    const title = createElement('summary', {
+        html: '<strong>⚙️ Configuration Settings</strong>',
+        style: {
+            marginBottom: '12px',
+            fontSize: '14px',
+            cursor: 'pointer'
+        }
     });
 
     // Admin Dashboard Section
-    const adminSection = createElement('div', { style: { marginBottom: '16px' } });
+    const adminSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
     const adminTitle = createElement('div', {
         html: '<strong>Admin Dashboard</strong>',
-        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
     });
 
     const enableDashboard = createElement('input', {
@@ -231,7 +249,7 @@ function createConfigurationPanel() {
 
     const labelInput = createElement('input', {
         attrs: { type: 'text', value: 'Open CG Admin Dashboard', spellcheck: 'false', placeholder: 'Button label' },
-        style: { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px' }
+        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
     });
 
     adminSection.appendChild(adminTitle);
@@ -239,10 +257,23 @@ function createConfigurationPanel() {
     adminSection.appendChild(labelInput);
 
     // Feature Flags Section
-    const featureSection = createElement('div', { style: { marginBottom: '16px' } });
+    const featureSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
     const featureTitle = createElement('div', {
         html: '<strong>Feature Flags</strong>',
-        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
     });
 
     const enableStudentGrade = createCheckbox('Enable Student Grade Customization', 'cfg_enableStudentGrade', true);
@@ -255,10 +286,23 @@ function createConfigurationPanel() {
     featureSection.appendChild(enableGradeOverride.label);
 
     // UI Labels Section
-    const labelsSection = createElement('div', { style: { marginBottom: '16px' } });
+    const labelsSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
     const labelsTitle = createElement('div', {
         html: '<strong>UI Labels</strong>',
-        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
     });
 
     const updateAvgButtonLabel = createTextInput('Update Button Label', 'Update Current Score');
@@ -266,31 +310,77 @@ function createConfigurationPanel() {
     const avgAssignmentName = createTextInput('Assignment Name', 'Current Score Assignment');
     const avgRubricName = createTextInput('Rubric Name', 'Current Score Rubric');
 
+    const labelsGrid = createElement('div', {
+        style: {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px'
+        }
+    });
+
+    labelsGrid.appendChild(updateAvgButtonLabel.container);
+    labelsGrid.appendChild(avgOutcomeName.container);
+    labelsGrid.appendChild(avgAssignmentName.container);
+    labelsGrid.appendChild(avgRubricName.container);
+
     labelsSection.appendChild(labelsTitle);
-    labelsSection.appendChild(updateAvgButtonLabel.container);
-    labelsSection.appendChild(avgOutcomeName.container);
-    labelsSection.appendChild(avgAssignmentName.container);
-    labelsSection.appendChild(avgRubricName.container);
+    labelsSection.appendChild(labelsGrid);
 
     // Outcome Configuration Section
-    const outcomeSection = createElement('div', { style: { marginBottom: '16px' } });
+    const outcomeSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
     const outcomeTitle = createElement('div', {
         html: '<strong>Outcome Configuration</strong>',
-        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
     });
 
     const defaultMaxPoints = createNumberInput('Default Max Points', 4);
     const defaultMasteryThreshold = createNumberInput('Default Mastery Threshold', 3);
 
+    const outcomeGrid = createElement('div', {
+        style: {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px'
+        }
+    });
+
+    outcomeGrid.appendChild(defaultMaxPoints.container);
+    outcomeGrid.appendChild(defaultMasteryThreshold.container);
+
     outcomeSection.appendChild(outcomeTitle);
-    outcomeSection.appendChild(defaultMaxPoints.container);
-    outcomeSection.appendChild(defaultMasteryThreshold.container);
+    outcomeSection.appendChild(outcomeGrid);
 
     // Rating Scale Section
-    const ratingsSection = createElement('div', { style: { marginBottom: '16px' } });
+    const ratingsSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
     const ratingsTitle = createElement('div', {
         html: '<strong>Rating Scale (JSON)</strong>',
-        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
     });
 
     const defaultRatings = [
@@ -306,12 +396,12 @@ function createConfigurationPanel() {
     ];
 
     const ratingsTextarea = createElement('textarea', {
-        attrs: { rows: '8', spellcheck: 'false' },
+        attrs: { rows: '6', spellcheck: 'false' },
         style: {
             width: '100%',
-            padding: '8px 10px',
+            padding: '6px 8px',
             border: '1px solid #ccc',
-            borderRadius: '6px',
+            borderRadius: '4px',
             fontSize: '12px',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
         }
@@ -322,15 +412,28 @@ function createConfigurationPanel() {
     ratingsSection.appendChild(ratingsTextarea);
 
     // Excluded Keywords Section
-    const keywordsSection = createElement('div', { style: { marginBottom: '0' } });
+    const keywordsSection = createElement('div', {
+        style: {
+            marginBottom: '0',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
     const keywordsTitle = createElement('div', {
         html: '<strong>Excluded Outcome Keywords (comma-separated)</strong>',
-        style: { marginBottom: '8px', fontSize: '13px', color: '#666' }
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
     });
 
     const keywordsInput = createElement('input', {
         attrs: { type: 'text', value: 'Homework Completion', spellcheck: 'false' },
-        style: { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px' }
+        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
     });
 
     keywordsSection.appendChild(keywordsTitle);
