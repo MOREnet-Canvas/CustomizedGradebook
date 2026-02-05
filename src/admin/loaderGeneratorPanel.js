@@ -13,7 +13,7 @@ import { logger } from '../utils/logger.js';
 import { getAccountId, getInstalledThemeJsUrl } from './pageDetection.js';
 import { createElement, createPanel, escapeHtml, downloadText } from './domHelpers.js';
 import { fetchTextWithTimeout } from './fetchHelpers.js';
-import { buildCGManagedBlock, upsertCGBlockIntoLoader } from './loaderGenerator.js';
+import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput } from './loaderGenerator.js';
 
 /**
  * Render loader generator panel
@@ -23,14 +23,19 @@ import { buildCGManagedBlock, upsertCGBlockIntoLoader } from './loaderGenerator.
 export function renderLoaderGeneratorPanel(root) {
     logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
 
-    const panel = createPanel(root, 'Generate Combined Loader (District loader + CG block)');
+    const panel = createPanel(root, 'Generate Combined Loader (A+B+C Model)');
     const installedUrl = getInstalledThemeJsUrl();
 
-    // Top note
+    // Top note - explain A/B/C model
     const topNote = createElement('div', {
         html: `
             <div style="color:#444; margin-bottom:10px;">
-                This tool preserves the existing Theme JavaScript (district loader) and inserts/updates a CG-managed block at the <strong>end</strong> of the file.
+                This tool generates a combined loader using the <strong>A+B+C model</strong>:
+                <ul style="margin:8px 0; padding-left:20px; font-size:13px;">
+                    <li><strong>A</strong> = External loader (district's Theme JS from textarea below)</li>
+                    <li><strong>B</strong> = CG loader template (stable logic from codebase)</li>
+                    <li><strong>C</strong> = Managed config block (generated fresh from your settings)</li>
+                </ul>
             </div>
         `
     });
@@ -228,11 +233,11 @@ function createSettingsRow() {
 }
 
 /**
- * Create base loader textarea with lock controls
+ * Create base loader textarea with lock controls (A = External Loader)
  */
 function createBaseLoaderTextarea(installedUrl) {
     const baseLabel = createElement('div', {
-        text: 'Current Theme JavaScript (district loader):',
+        html: '<strong>A</strong> = External Loader (District\'s Theme JavaScript):',
         style: { fontWeight: '700', marginTop: '6px' }
     });
 
@@ -323,11 +328,11 @@ function createActionButtons() {
 }
 
 /**
- * Create output textarea
+ * Create output textarea (A+B+C combined)
  */
 function createOutputTextarea() {
     const outLabel = createElement('div', {
-        text: 'Combined Output (copy/upload this):',
+        html: '<strong>A+B+C</strong> Combined Output (copy/upload this to Canvas Theme Editor):',
         style: { fontWeight: '700', marginTop: '14px' }
     });
 
@@ -348,8 +353,8 @@ function createOutputTextarea() {
     const hint = createElement('div', {
         html: `
             <div style="margin-top:10px; color:#666; font-size:13px;">
-                The CG-managed block is bracketed with:<br>
-                <code>/* BEGIN CG MANAGED CODE */</code> … <code>/* END CG MANAGED CODE */</code>
+                <strong>Structure:</strong> A (external loader) + B (CG template from codebase) + C (managed config)<br>
+                <strong>C</strong> is bracketed with: <code>/* BEGIN CG MANAGED CODE */</code> … <code>/* END CG MANAGED CODE */</code>
             </div>
         `
     });
@@ -383,7 +388,11 @@ function setLocked(textarea, locked, unlockBtn, relockBtn) {
 }
 
 /**
- * Generate combined loader
+ * Generate combined loader (A+B+C)
+ *
+ * A = External loader (district's Theme JS from textarea)
+ * B = CG_LOADER_TEMPLATE (from codebase)
+ * C = Managed config block (generated fresh from UI state)
  */
 function generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBtn, copyBtn) {
     const baseText = baseTA.value || '';
@@ -393,15 +402,33 @@ function generateCombinedLoader(baseTA, enableDashboard, labelInput, outTA, dlBt
         return;
     }
 
+    // Generate managed config block (C) with release info
     const cgBlock = buildCGManagedBlock({
         accountId: getAccountId(),
         enableDashboard: !!enableDashboard.checked,
-        dashboardLabel: labelInput.value || 'Open CG Admin Dashboard'
+        dashboardLabel: labelInput.value || 'Open CG Admin Dashboard',
+        channel: 'prod',
+        version: 'v1.0.2', // TODO: Read from package.json or ENV
+        source: 'github_release'
     });
 
+    // Assemble A+B+C
     const combined = upsertCGBlockIntoLoader({ baseLoaderText: baseText, cgBlock });
+
+    // Validate output
+    const validation = validateLoaderOutput(combined);
+
+    if (!validation.valid) {
+        const errorMsg = 'Generated loader failed validation:\n\n' + validation.errors.join('\n');
+        alert(errorMsg);
+        logger.error('[LoaderGeneratorPanel] Validation failed', validation.errors);
+        return;
+    }
+
     outTA.value = combined;
 
     dlBtn.removeAttribute('disabled');
     copyBtn.removeAttribute('disabled');
+
+    logger.info('[LoaderGeneratorPanel] A+B+C loader generated successfully');
 }
