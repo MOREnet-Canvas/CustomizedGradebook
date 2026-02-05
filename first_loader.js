@@ -120,49 +120,6 @@ onElementRendered('.reset_course_content_button', function(e) {
     // Initialize CG_CONFIG if not already present (allows pre-configuration)
     window.CG_CONFIG = window.CG_CONFIG || {};
 
-    // Define configuration defaults
-    const defaults = {
-        // Feature flags
-        ENABLE_STUDENT_GRADE_CUSTOMIZATION: true,
-
-        // Grading mode configuration
-        ENABLE_OUTCOME_UPDATES: true,
-        ENABLE_GRADE_OVERRIDE: true,
-
-        // UI labels and resource names
-        UPDATE_AVG_BUTTON_LABEL: "Update Current Score",
-        AVG_OUTCOME_NAME: "Current Score",
-        AVG_ASSIGNMENT_NAME: "Current Score Assignment",
-        AVG_RUBRIC_NAME: "Current Score Rubric",
-
-        // Outcome configuration
-        DEFAULT_MAX_POINTS: 4,
-        DEFAULT_MASTERY_THRESHOLD: 3,
-
-        // Rating scale for outcomes and rubrics
-        OUTCOME_AND_RUBRIC_RATINGS: [
-            { description: "Exemplary", points: 4 },
-            { description: "Beyond Target", points: 3.5 },
-            { description: "Target", points: 3 },
-            { description: "Approaching Target", points: 2.5 },
-            { description: "Developing", points: 2 },
-            { description: "Beginning", points: 1.5 },
-            { description: "Needs Partial Support", points: 1 },
-            { description: "Needs Full Support", points: 0.5 },
-            { description: "No Evidence", points: 0 }
-        ],
-
-        // Outcome filtering
-        EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
-    };
-
-    // Apply defaults only where keys are undefined
-    for (const key in defaults) {
-        if (window.CG_CONFIG[key] === undefined) {
-            window.CG_CONFIG[key] = defaults[key];
-        }
-    }
-
     // Merge managed config if present (only for undefined keys)
     if (window.CG_MANAGED && window.CG_MANAGED.config) {
         for (const key in window.CG_MANAGED.config) {
@@ -176,12 +133,6 @@ onElementRendered('.reset_course_content_button', function(e) {
     // CG LOADER - SCRIPT INJECTION
     // ========================================================================
 
-    // Prevent duplicate loading
-    if (document.getElementById("cg_prod_bundle")) {
-        console.log("[CG] PROD bundle already loaded; skipping");
-        return;
-    }
-
     // Read release configuration from managed block
     const release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
         channel: "prod",
@@ -189,29 +140,43 @@ onElementRendered('.reset_course_content_button', function(e) {
         source: "github_release"
     };
 
+    // Prevent duplicate loading
+    const bundleId = "cg_" + release.channel + "_bundle";
+    if (document.getElementById(bundleId)) {
+        console.log(`[CG] ${release.channel.toUpperCase()} bundle already loaded; skipping`);
+        return;
+    }
+
     const script = document.createElement("script");
-    script.id = "cg_prod_bundle";
+    script.id = bundleId;
     script.defer = true;
 
-    // Determine script URL based on source
+    // Determine script URL based on source and channel
     if (release.source === "github_release") {
-        script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/${release.version}/customGradebookInit.js`;
+        if (release.channel === "dev") {
+            // Dev channel: use cache-busting query parameter
+            const cacheBuster = Date.now();
+            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=${cacheBuster}`;
+        } else {
+            // Prod channel: use version tag
+            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/${release.version}/customGradebookInit.js`;
+        }
     } else if (release.source === "pages") {
         const cacheBuster = release.version || Date.now();
-        script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/prod/customGradebookInit.js?v=${cacheBuster}`;
+        script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/${release.channel}/customGradebookInit.js?v=${cacheBuster}`;
     } else {
         console.error("[CG] Unknown release source:", release.source);
         return;
     }
 
-    script.onload = () => console.log(`[CG] Loaded customGradebookInit.js (PROD ${release.version})`);
-    script.onerror = () => console.error("[CG] Failed to load customGradebookInit.js (PROD)");
+    script.onload = () => console.log(`[CG] Loaded customGradebookInit.js (${release.channel.toUpperCase()} ${release.version})`);
+    script.onerror = () => console.error(`[CG] Failed to load customGradebookInit.js (${release.channel.toUpperCase()})`);
     document.head.appendChild(script);
 })();
 /* ========== END SECTION B: CG LOADER TEMPLATE ========== */
 
 /* ========== BEGIN SECTION C: MANAGED CONFIG BLOCK ========== */
-/* Generated: 2026-02-05T16:22:55.516Z */
+/* Generated: 2026-02-05T17:00:00.000Z */
 /* Account: 1 */
 /* Purpose: Version and configuration management for CG loader */
 
@@ -226,8 +191,67 @@ window.CG_MANAGED.release = {
 
 // Configuration overrides
 window.CG_MANAGED.config = {
+    // Admin Dashboard
     adminDashboard: true,
-    adminDashboardLabel: "Open CG Admin Dashboard"
+    adminDashboardLabel: "Open CG Admin Dashboard",
+
+    // Feature flags
+    ENABLE_STUDENT_GRADE_CUSTOMIZATION: true,
+    ENABLE_OUTCOME_UPDATES: true,
+    ENABLE_GRADE_OVERRIDE: true,
+
+    // UI labels
+    UPDATE_AVG_BUTTON_LABEL: "Update Current Score",
+    AVG_OUTCOME_NAME: "Current Score",
+    AVG_ASSIGNMENT_NAME: "Current Score Assignment",
+    AVG_RUBRIC_NAME: "Current Score Rubric",
+
+    // Outcome configuration
+    DEFAULT_MAX_POINTS: 4,
+    DEFAULT_MASTERY_THRESHOLD: 3,
+
+    // Rating scale
+    OUTCOME_AND_RUBRIC_RATINGS: [
+                {
+                        "description": "Exemplary",
+                        "points": 4
+                },
+                {
+                        "description": "Beyond Target",
+                        "points": 3.5
+                },
+                {
+                        "description": "Target",
+                        "points": 3
+                },
+                {
+                        "description": "Approaching Target",
+                        "points": 2.5
+                },
+                {
+                        "description": "Developing",
+                        "points": 2
+                },
+                {
+                        "description": "Beginning",
+                        "points": 1.5
+                },
+                {
+                        "description": "Needs Partial Support",
+                        "points": 1
+                },
+                {
+                        "description": "Needs Full Support",
+                        "points": 0.5
+                },
+                {
+                        "description": "No Evidence",
+                        "points": 0
+                }
+        ],
+
+    // Outcome filtering
+    EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
 };
 
 /* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */
