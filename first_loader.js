@@ -108,84 +108,18 @@ onElementRendered('.reset_course_content_button', function(e) {
 ////////////////////////////////////////////////////////////////////////////////
 /* ========== END SECTION A: EXTERNAL LOADER ========== */
 
-
-
-
-/* ========== BEGIN SECTION B: CG LOADER TEMPLATE ========== */
-(function () {
-    // ========================================================================
-    // CG LOADER - CONFIGURATION MERGE
-    // ========================================================================
-
-    // Initialize CG_CONFIG if not already present (allows pre-configuration)
-    window.CG_CONFIG = window.CG_CONFIG || {};
-
-    // Merge managed config if present (only for undefined keys)
-    if (window.CG_MANAGED && window.CG_MANAGED.config) {
-        for (const key in window.CG_MANAGED.config) {
-            if (window.CG_CONFIG[key] === undefined) {
-                window.CG_CONFIG[key] = window.CG_MANAGED.config[key];
-            }
-        }
-    }
-
-    // ========================================================================
-    // CG LOADER - SCRIPT INJECTION
-    // ========================================================================
-
-    // Read release configuration from managed block
-    const release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
-        channel: "prod",
-        version: "v1.0.3",
-        source: "github_release"
-    };
-
-    // Prevent duplicate loading
-    const bundleId = "cg_" + release.channel + "_bundle";
-    if (document.getElementById(bundleId)) {
-        console.log(`[CG] ${release.channel.toUpperCase()} bundle already loaded; skipping`);
-        return;
-    }
-
-    const script = document.createElement("script");
-    script.id = bundleId;
-    script.defer = true;
-
-    // Determine script URL based on source and channel
-    if (release.source === "github_release") {
-        if (release.channel === "dev") {
-            // Dev channel: use cache-busting query parameter
-            const cacheBuster = Date.now();
-            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=${cacheBuster}`;
-        } else {
-            // Prod channel: use version tag
-            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/${release.version}/customGradebookInit.js`;
-        }
-    } else if (release.source === "pages") {
-        const cacheBuster = release.version || Date.now();
-        script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/${release.channel}/customGradebookInit.js?v=${cacheBuster}`;
-    } else {
-        console.error("[CG] Unknown release source:", release.source);
-        return;
-    }
-
-    script.onload = () => console.log(`[CG] Loaded customGradebookInit.js (${release.channel.toUpperCase()} ${release.version})`);
-    script.onerror = () => console.error(`[CG] Failed to load customGradebookInit.js (${release.channel.toUpperCase()})`);
-    document.head.appendChild(script);
-})();
-/* ========== END SECTION B: CG LOADER TEMPLATE ========== */
-
 /* ========== BEGIN SECTION C: MANAGED CONFIG BLOCK ========== */
 /* Generated: 2026-02-05T17:00:00.000Z */
 /* Account: 1 */
 /* Purpose: Version and configuration management for CG loader */
+/* NOTE: Keep version in sync with package.json (currently 1.0.3 -> v1.0.3) */
 
 window.CG_MANAGED = window.CG_MANAGED || {};
 
 // Release configuration
 window.CG_MANAGED.release = {
     channel: "prod",
-    version: "v1.0.3",
+    version: "v1.0.3",  // Keep in sync with package.json version
     source: "github_release"
 };
 
@@ -255,3 +189,67 @@ window.CG_MANAGED.config = {
 };
 
 /* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */
+
+/* ========== BEGIN SECTION B: CG LOADER TEMPLATE ========== */
+(function () {
+    // ========================================================================
+    // CG LOADER - CONFIGURATION MERGE
+    // ========================================================================
+
+    // Initialize CG_CONFIG if not already present (allows pre-configuration)
+    window.CG_CONFIG = window.CG_CONFIG || {};
+
+    // Merge managed config if present (only for undefined keys)
+    if (window.CG_MANAGED && window.CG_MANAGED.config) {
+        for (const key in window.CG_MANAGED.config) {
+            if (window.CG_CONFIG[key] === undefined) {
+                window.CG_CONFIG[key] = window.CG_MANAGED.config[key];
+            }
+        }
+    }
+
+    // ========================================================================
+    // CG LOADER - SCRIPT INJECTION
+    // ========================================================================
+
+    // Read release configuration from managed block
+    const release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
+        channel: "prod",
+        version: "v1.0.3",
+        source: "github_release"
+    };
+
+    // Prevent duplicate loading
+    const bundleId = "cg_" + release.channel + "_bundle";
+    if (document.getElementById(bundleId)) {
+        console.log(`[CG] ${release.channel.toUpperCase()} bundle already loaded; skipping`);
+        return;
+    }
+
+    const script = document.createElement("script");
+    script.id = bundleId;
+    script.defer = true;
+
+    // Determine script URL based on source and channel
+    if (release.source === "github_release") {
+        if (release.channel === "dev") {
+            // Dev channel: use cache-busting query parameter
+            const cacheBuster = Date.now();
+            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=${cacheBuster}`;
+        } else {
+            // Prod channel: use version tag
+            script.src = `https://github.com/morenet-canvas/CustomizedGradebook/releases/download/${release.version}/customGradebookInit.js`;
+        }
+    } else if (release.source === "pages") {
+        const cacheBuster = release.version || Date.now();
+        script.src = `https://morenet-canvas.github.io/CustomizedGradebook/dist/${release.channel}/customGradebookInit.js?v=${cacheBuster}`;
+    } else {
+        console.error("[CG] Unknown release source:", release.source);
+        return;
+    }
+
+    script.onload = () => console.log(`[CG] Loaded customGradebookInit.js (${release.channel.toUpperCase()} ${release.version})`);
+    script.onerror = () => console.error(`[CG] Failed to load customGradebookInit.js (${release.channel.toUpperCase()})`);
+    document.head.appendChild(script);
+})();
+/* ========== END SECTION B: CG LOADER TEMPLATE ========== */

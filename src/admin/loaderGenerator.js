@@ -94,13 +94,14 @@ export function buildCGManagedBlock({
         `/* Generated: ${new Date().toISOString()} */`,
         `/* Account: ${accountId ?? 'unknown'} */`,
         '/* Purpose: Version and configuration management for CG loader */',
+        channel === 'prod' ? '/* NOTE: Keep version in sync with package.json */' : '',
         '',
         'window.CG_MANAGED = window.CG_MANAGED || {};',
         '',
         '// Release configuration',
         'window.CG_MANAGED.release = {',
         `    channel: ${JSON.stringify(channel)},`,
-        `    version: ${JSON.stringify(version)},`,
+        `    version: ${JSON.stringify(version)},${channel === 'prod' ? '  // Keep in sync with package.json version' : ''}`,
         `    source: ${JSON.stringify(source)}`,
         '};',
         '',
@@ -139,22 +140,26 @@ export function buildCGManagedBlock({
 }
 
 /**
- * Assemble A+B+C loader output
+ * Assemble A+C+B loader output
  *
- * Implements deterministic A+B+C assembly:
+ * Implements deterministic A+C+B assembly:
  * - A = External loader (district's Theme JS) - copied verbatim
+ * - C = Managed config block - generated fresh from UI state (MUST come before B)
  * - B = CG_LOADER_TEMPLATE (stable CG loader) - inserted verbatim from codebase
- * - C = Managed config block - generated fresh from UI state
  *
- * Output format: A.trimEnd() + "\n\n" + B.trim() + "\n\n" + C.trimEnd() + "\n"
+ * IMPORTANT: Section C must come before Section B because Section B reads
+ * window.CG_MANAGED.release at runtime. If B executes before C is defined,
+ * it will fall back to hardcoded defaults.
+ *
+ * Output format: A.trimEnd() + "\n\n" + C.trimEnd() + "\n\n" + B.trim() + "\n"
  *
  * @param {Object} options - Options
  * @param {string} options.baseLoaderText - Base loader text (A - external/district loader)
  * @param {string} options.cgBlock - CG-managed block (C - generated config)
- * @returns {string} Combined loader text (A+B+C)
+ * @returns {string} Combined loader text (A+C+B)
  */
 export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
-    logger.debug('[LoaderGenerator] Assembling A+B+C loader output');
+    logger.debug('[LoaderGenerator] Assembling A+C+B loader output');
 
     // Extract A using the extractSections function
     const { A: extractedA } = extractSections(baseLoaderText);
@@ -168,13 +173,13 @@ export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
     // C = Managed config block (generated fresh, already has markers)
     const C = cgBlock.trimEnd();
 
-    // Assemble with section markers: A + B + C
-    const output = `${A_BEGIN}\n${A}\n${A_END}\n\n${B_BEGIN}\n${B}\n${B_END}\n\n${C}\n`;
+    // Assemble with section markers: A + C + B (C must come before B!)
+    const output = `${A_BEGIN}\n${A}\n${A_END}\n\n${C}\n\n${B_BEGIN}\n${B}\n${B_END}\n`;
 
-    logger.debug('[LoaderGenerator] A+B+C assembly complete', {
+    logger.debug('[LoaderGenerator] A+C+B assembly complete', {
         aLength: A.length,
-        bLength: B.length,
         cLength: C.length,
+        bLength: B.length,
         totalLength: output.length
     });
 
@@ -237,7 +242,7 @@ export function extractSections(combinedLoader) {
  *
  * Performs safety checks:
  * - Output must contain section markers for A, B, and C
- * - Markers must be in correct order
+ * - Markers must be in correct order: A → C → B
  *
  * @param {string} output - Assembled loader output
  * @returns {Object} Validation result { valid: boolean, errors: string[] }
@@ -287,12 +292,12 @@ export function validateLoaderOutput(output) {
         errors.push('Section C END marker appears before BEGIN marker');
     }
 
-    // Check that sections appear in order: A, then B, then C
-    if (aBeginIdx !== -1 && bBeginIdx !== -1 && bBeginIdx <= aBeginIdx) {
-        errors.push('Section B appears before Section A');
+    // Check that sections appear in order: A, then C, then B
+    if (aBeginIdx !== -1 && cBeginIdx !== -1 && cBeginIdx <= aBeginIdx) {
+        errors.push('Section C appears before Section A');
     }
-    if (bBeginIdx !== -1 && cBeginIdx !== -1 && cBeginIdx <= bBeginIdx) {
-        errors.push('Section C appears before Section B');
+    if (cBeginIdx !== -1 && bBeginIdx !== -1 && bBeginIdx <= cBeginIdx) {
+        errors.push('Section B appears before Section C (Section C must come before B!)');
     }
 
     const valid = errors.length === 0;
