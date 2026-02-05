@@ -51,8 +51,6 @@ function parseConfigFromSectionC(sectionC) {
         version: managed.release.version || 'v1.0.3',
         channel: managed.release.channel || 'prod',
         source: managed.release.source || 'github_release',
-        enableDashboard: managed.config.adminDashboard !== false,
-        dashboardLabel: managed.config.adminDashboardLabel || 'Open CG Admin Dashboard',
         enableStudentGradeCustomization: managed.config.enableStudentGradeCustomization !== false,
         enableOutcomeUpdates: managed.config.enableOutcomeUpdates !== false,
         enableGradeOverride: managed.config.enableGradeOverride !== false,
@@ -130,7 +128,7 @@ export function renderLoaderGeneratorPanel(root) {
     const { configLabel, configTA } = createConfigTextarea();
 
     // Sticky action panel (right side)
-    const { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn, revertBtn } = createStickyActionPanel();
+    const { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn } = createStickyActionPanel();
 
     // Legacy inline actions (hidden, for compatibility)
     const { actions } = createActionButtons();
@@ -234,7 +232,6 @@ export function renderLoaderGeneratorPanel(root) {
         state.isGenerated = true;
         state.hasUnsavedChanges = false;
         changeNotification.style.display = 'none';
-        revertBtn.style.display = 'block';
     });
 
     dlBtn.addEventListener('click', () => {
@@ -254,47 +251,6 @@ export function renderLoaderGeneratorPanel(root) {
         }
     });
 
-    // Revert button handler
-    revertBtn.addEventListener('click', () => {
-        if (!state.currentCanvasSettings) {
-            alert('No Canvas settings available to revert to.');
-            return;
-        }
-
-        // Restore all controls from saved state
-        const settings = state.currentCanvasSettings;
-
-        controls.enableDashboard.checked = settings.enableDashboard;
-        controls.labelInput.value = settings.dashboardLabel;
-        controls.enableStudentGrade.checked = settings.enableStudentGradeCustomization;
-        controls.enableOutcomeUpdates.checked = settings.enableOutcomeUpdates;
-        controls.enableGradeOverride.checked = settings.enableGradeOverride;
-        controls.updateAvgButtonLabel.value = settings.updateAvgButtonLabel;
-        controls.avgOutcomeName.value = settings.avgOutcomeName;
-        controls.avgAssignmentName.value = settings.avgAssignmentName;
-        controls.avgRubricName.value = settings.avgRubricName;
-        controls.defaultMaxPoints.value = settings.defaultMaxPoints;
-        controls.defaultMasteryThreshold.value = settings.defaultMasteryThreshold;
-        controls.ratingsTextarea.value = JSON.stringify(settings.outcomeAndRubricRatings, null, 2);
-        controls.keywordsInput.value = settings.excludedOutcomeKeywords.join(', ');
-
-        // Restore version dropdown
-        versionDropdown.value = settings.version || 'v1.0.3';
-
-        // Clear output and disable buttons
-        outTA.value = '';
-        dlBtn.setAttribute('disabled', 'true');
-        copyBtn.setAttribute('disabled', 'true');
-
-        // Reset state
-        state.hasUnsavedChanges = false;
-        state.isGenerated = false;
-        changeNotification.style.display = 'none';
-        revertBtn.style.display = 'none';
-
-        alert('✅ Settings reverted to current Canvas configuration.');
-    });
-
     // Change tracking - add listeners to all form controls
     function markAsChanged() {
         if (!state.hasUnsavedChanges) {
@@ -304,8 +260,6 @@ export function renderLoaderGeneratorPanel(root) {
     }
 
     // Track changes on all configuration controls
-    controls.enableDashboard.addEventListener('change', markAsChanged);
-    controls.labelInput.addEventListener('input', markAsChanged);
     controls.enableStudentGrade.addEventListener('change', markAsChanged);
     controls.enableOutcomeUpdates.addEventListener('change', markAsChanged);
     controls.enableGradeOverride.addEventListener('change', markAsChanged);
@@ -457,45 +411,6 @@ function createConfigurationPanel() {
             cursor: 'pointer'
         }
     });
-
-    // Admin Dashboard Section
-    const adminSection = createElement('div', {
-        style: {
-            marginBottom: '12px',
-            padding: '10px',
-            background: '#f5f5f5',
-            borderRadius: '6px'
-        }
-    });
-    const adminTitle = createElement('div', {
-        html: '<strong>Admin Dashboard</strong>',
-        style: {
-            marginBottom: '8px',
-            fontSize: '13px',
-            color: '#2D3B45',
-            paddingLeft: '8px',
-            borderLeft: '3px solid #0374B5'
-        }
-    });
-
-    const enableDashboard = createElement('input', {
-        attrs: { type: 'checkbox', checked: 'true', id: 'cfg_enableDashboard' }
-    });
-    const dashboardLabel = createElement('label', {
-        attrs: { for: 'cfg_enableDashboard' },
-        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '8px' }
-    });
-    dashboardLabel.appendChild(enableDashboard);
-    dashboardLabel.appendChild(createElement('span', { text: 'Enable Admin Dashboard module' }));
-
-    const labelInput = createElement('input', {
-        attrs: { type: 'text', value: 'Open CG Admin Dashboard', spellcheck: 'false', placeholder: 'Button label' },
-        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
-    });
-
-    adminSection.appendChild(adminTitle);
-    adminSection.appendChild(dashboardLabel);
-    adminSection.appendChild(labelInput);
 
     // Feature Flags Section
     const featureSection = createElement('div', {
@@ -682,7 +597,6 @@ function createConfigurationPanel() {
 
     // Assemble container
     container.appendChild(title);
-    container.appendChild(adminSection);
     container.appendChild(featureSection);
     container.appendChild(labelsSection);
     container.appendChild(outcomeSection);
@@ -692,8 +606,6 @@ function createConfigurationPanel() {
     return {
         container,
         controls: {
-            enableDashboard,
-            labelInput,
             enableStudentGrade: enableStudentGrade.checkbox,
             enableOutcomeUpdates: enableOutcomeUpdates.checkbox,
             enableGradeOverride: enableGradeOverride.checkbox,
@@ -991,22 +903,23 @@ function createStickyActionPanel() {
         }
     });
 
-    // Revert button (initially hidden)
-    const revertBtn = createElement('button', {
-        text: 'Revert to Current Canvas Settings',
-        className: 'Button',
-        style: {
-            width: '100%',
-            justifyContent: 'center',
-            marginTop: '8px',
-            display: 'none'
-        }
-    });
-
     buttonsContainer.appendChild(genBtn);
     buttonsContainer.appendChild(dlBtn);
     buttonsContainer.appendChild(copyBtn);
-    buttonsContainer.appendChild(revertBtn);
+
+    // Static informational message
+    const revertInfoMessage = createElement('div', {
+        text: 'To revert to current Canvas settings, refresh this page.',
+        style: {
+            fontSize: '12px',
+            color: '#666',
+            marginTop: '12px',
+            textAlign: 'center',
+            lineHeight: '1.4'
+        }
+    });
+
+    buttonsContainer.appendChild(revertInfoMessage);
 
     stickyPanel.appendChild(changeNotification);
     stickyPanel.appendChild(buttonsContainer);
@@ -1014,7 +927,7 @@ function createStickyActionPanel() {
     // Append to body (not to panel, so it stays fixed)
     document.body.appendChild(stickyPanel);
 
-    return { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn, revertBtn };
+    return { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn };
 }
 
 /**
@@ -1155,8 +1068,6 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
     // Generate managed config block (C) with all configuration options
     const cgBlock = buildCGManagedBlock({
         accountId: getAccountId(),
-        enableDashboard: !!controls.enableDashboard.checked,
-        dashboardLabel: controls.labelInput.value || 'Open CG Admin Dashboard',
         channel: selectedChannel,
         version: selectedVersion,
         source: 'github_release',

@@ -33,8 +33,6 @@ const C_END = '/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */';
  *
  * @param {Object} options - Configuration options
  * @param {string} options.accountId - Account ID
- * @param {boolean} options.enableDashboard - Enable admin dashboard module
- * @param {string} options.dashboardLabel - Button label for admin dashboard
  * @param {string} [options.channel='prod'] - Release channel (prod/dev)
  * @param {string} [options.version='v1.0.3'] - Release version
  * @param {string} [options.source='github_release'] - Release source (github_release/pages)
@@ -53,8 +51,6 @@ const C_END = '/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */';
  */
 export function buildCGManagedBlock({
     accountId,
-    enableDashboard,
-    dashboardLabel,
     channel = 'prod',
     version = 'v1.0.3',
     source = 'github_release',
@@ -82,8 +78,6 @@ export function buildCGManagedBlock({
 }) {
     logger.debug('[LoaderGenerator] Building CG-managed block', {
         accountId,
-        enableDashboard,
-        dashboardLabel,
         channel,
         version,
         source
@@ -107,10 +101,6 @@ export function buildCGManagedBlock({
         '',
         '// Configuration overrides',
         'window.CG_MANAGED.config = {',
-        `    // Admin Dashboard`,
-        `    adminDashboard: ${enableDashboard ? 'true' : 'false'},`,
-        `    adminDashboardLabel: ${JSON.stringify(dashboardLabel || 'Open CG Admin Dashboard')},`,
-        '',
         `    // Feature flags`,
         `    ENABLE_STUDENT_GRADE_CUSTOMIZATION: ${enableStudentGradeCustomization ? 'true' : 'false'},`,
         `    ENABLE_OUTCOME_UPDATES: ${enableOutcomeUpdates ? 'true' : 'false'},`,
