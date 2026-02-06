@@ -73,6 +73,18 @@ export function renderAdminDashboardPage() {
         text: 'Customized Gradebook – Admin Dashboard'
     });
 
+    // Tagline
+    const tagline = createElement('div', {
+        text: 'by MOREnet',
+        style: {
+            fontSize: '16px',
+            color: '#888',
+            marginTop: '-8px',
+            marginBottom: '12px',
+            fontWeight: '400'
+        }
+    });
+
     // Account info
     const accountInfo = createElement('p', {
         html: `Account ID: <strong>${getAccountId() || 'unknown'}</strong>`,
@@ -83,6 +95,7 @@ export function renderAdminDashboardPage() {
     });
 
     root.appendChild(header);
+    root.appendChild(tagline);
     root.appendChild(accountInfo);
 
     // Render theme status panels (Installed Theme Overrides only)

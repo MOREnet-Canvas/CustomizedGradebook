@@ -54,6 +54,13 @@ export const ADMIN_DASHBOARD_LABEL = window.CG_CONFIG?.ADMIN_DASHBOARD_LABEL ?? 
 export const ENABLE_OUTCOME_UPDATES = window.CG_CONFIG?.ENABLE_OUTCOME_UPDATES ?? true;
 export const ENABLE_GRADE_OVERRIDE = window.CG_CONFIG?.ENABLE_GRADE_OVERRIDE ?? true;
 
+// ENFORCE_COURSE_OVERRIDE: Controls whether the script automatically enables the Canvas course-level
+// "Allow Final Grade Override" setting via API when ENABLE_GRADE_OVERRIDE is true
+// - true: Script calls enableCourseOverride() to set allow_final_grade_override=true via Canvas API
+// - false: Teachers retain manual control over the course-level override setting in Canvas UI
+// Default: false (preserves teacher autonomy)
+export const ENFORCE_COURSE_OVERRIDE = window.CG_CONFIG?.ENFORCE_COURSE_OVERRIDE ?? false;
+
 // Grade scaling function (0-4 scale to 0-100 scale)
 // Default: multiply by 25 to convert 0-4 range to 0-100 range
 const defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));
