@@ -37,7 +37,6 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  * @param {string} [options.version='v1.0.3'] - Release version
  * @param {string} [options.source='github_release'] - Release source (github_release/pages)
  * @param {boolean} [options.enableStudentGradeCustomization=true] - Enable student grade customization
- * @param {boolean} [options.enableOutcomeUpdates=true] - Enable outcome updates
  * @param {boolean} [options.enableGradeOverride=true] - Enable grade override
  * @param {boolean} [options.enforceCourseOverride=false] - Enforce course override setting via API
  * @param {string} [options.updateAvgButtonLabel='Update Current Score'] - Update average button label
@@ -56,7 +55,6 @@ export function buildCGManagedBlock({
     version = 'v1.0.3',
     source = 'github_release',
     enableStudentGradeCustomization = true,
-    enableOutcomeUpdates = true,
     enableGradeOverride = true,
     enforceCourseOverride = false,
     updateAvgButtonLabel = 'Update Current Score',
@@ -105,7 +103,6 @@ export function buildCGManagedBlock({
         'window.CG_MANAGED.config = {',
         `    // Feature flags`,
         `    ENABLE_STUDENT_GRADE_CUSTOMIZATION: ${enableStudentGradeCustomization ? 'true' : 'false'},`,
-        `    ENABLE_OUTCOME_UPDATES: ${enableOutcomeUpdates ? 'true' : 'false'},`,
         `    ENABLE_GRADE_OVERRIDE: ${enableGradeOverride ? 'true' : 'false'},`,
         `    ENFORCE_COURSE_OVERRIDE: ${enforceCourseOverride ? 'true' : 'false'},`,
         '',

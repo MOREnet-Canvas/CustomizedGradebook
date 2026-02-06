@@ -52,7 +52,6 @@ function parseConfigFromSectionB(sectionB) {
         channel: managed.release.channel || 'prod',
         source: managed.release.source || 'github_release',
         enableStudentGradeCustomization: managed.config.enableStudentGradeCustomization !== false,
-        enableOutcomeUpdates: managed.config.enableOutcomeUpdates !== false,
         enableGradeOverride: managed.config.enableGradeOverride !== false,
         enforceCourseOverride: managed.config.enforceCourseOverride === true,
         updateAvgButtonLabel: config.UPDATE_AVG_BUTTON_LABEL || 'Update Avg',
@@ -262,7 +261,6 @@ export function renderLoaderGeneratorPanel(root) {
 
     // Track changes on all configuration controls
     controls.enableStudentGrade.addEventListener('change', markAsChanged);
-    controls.enableOutcomeUpdates.addEventListener('change', markAsChanged);
     controls.enableGradeOverride.addEventListener('change', markAsChanged);
     controls.enforceCourseOverride.addEventListener('change', markAsChanged);
     controls.updateAvgButtonLabel.addEventListener('input', markAsChanged);
@@ -433,14 +431,12 @@ function createConfigurationPanel() {
         }
     });
 
-    const enableStudentGrade = createCheckbox('Enable Student Grade Customization', 'cfg_enableStudentGrade', true);
-    const enableOutcomeUpdates = createCheckbox('Enable Outcome Updates', 'cfg_enableOutcomeUpdates', true);
+    const enableStudentGrade = createCheckbox('Enable Student Grade Page Customization', 'cfg_enableStudentGrade', true);
     const enableGradeOverride = createCheckbox('Enable Grade Override', 'cfg_enableGradeOverride', true);
     const enforceCourseOverride = createCheckbox('Enforce Course Override Setting', 'cfg_enforceCourseOverride', false);
 
     featureSection.appendChild(featureTitle);
     featureSection.appendChild(enableStudentGrade.label);
-    featureSection.appendChild(enableOutcomeUpdates.label);
     featureSection.appendChild(enableGradeOverride.label);
     featureSection.appendChild(enforceCourseOverride.label);
 
@@ -610,7 +606,6 @@ function createConfigurationPanel() {
         container,
         controls: {
             enableStudentGrade: enableStudentGrade.checkbox,
-            enableOutcomeUpdates: enableOutcomeUpdates.checkbox,
             enableGradeOverride: enableGradeOverride.checkbox,
             enforceCourseOverride: enforceCourseOverride.checkbox,
             updateAvgButtonLabel: updateAvgButtonLabel.input,
@@ -1149,7 +1144,6 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         version: selectedVersion,
         source: 'github_release',
         enableStudentGradeCustomization: !!controls.enableStudentGrade.checked,
-        enableOutcomeUpdates: !!controls.enableOutcomeUpdates.checked,
         enableGradeOverride: !!controls.enableGradeOverride.checked,
         enforceCourseOverride: !!controls.enforceCourseOverride.checked,
         updateAvgButtonLabel: controls.updateAvgButtonLabel.value,
