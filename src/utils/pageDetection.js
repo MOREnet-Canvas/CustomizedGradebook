@@ -114,6 +114,23 @@ export function isTeacherViewingStudentGrades() {
 }
 
 /**
+ * Check if current page is the gradebook page
+ *
+ * Matches:
+ * - /courses/123/gradebook
+ * - /courses/123/gradebook?cid=xxx
+ *
+ * Does NOT match:
+ * - /courses/123/gradebook/speed_grader (SpeedGrader)
+ *
+ * @returns {boolean} True if on gradebook page
+ */
+export function isGradebookPage() {
+    const path = window.location.pathname;
+    return path.includes('/courses/') && path.includes('/gradebook') && !path.includes('/speed_grader');
+}
+
+/**
  * Check if current page is SpeedGrader
  *
  * Matches:
