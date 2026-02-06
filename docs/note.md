@@ -20,9 +20,15 @@ TODO: Add Checks for assignments
 - do they have points possible set to 0?
 - what grading scheme are they using?
 - are all assignments using same grading scheme?
+TODO: add options for determining standards based courses
+    - name patterns
+    - avg assignment
+    - grading scheme
+    - outcomes used?
 
 
 ## Debugging
+TODO: The python script can make the rubric criteria ignore_for_scoring and have the assignments points set to zero, and still submit a score, not sure why ignore_for_scoring keeps this script from adding a grade to the assignment but not the outcome (rubric assessment exists, but looks blank in UI)
 
 ## Grade Customization
 TODO: When no avg_assignment course grade page doesn't remove /4 fix?
@@ -31,6 +37,7 @@ TODO: Do we want to make points classes default to standards based?
 ## Possible Enhancements
 TODO: figure out how to get grading scheme(s) → this might be easy way to determine class type
 TODO: Mastery Refresh: This does not update rubric scores, so outcome results are unchanged. Maybe this needs to stay this way.
+
 
 
 ## Refactoring
