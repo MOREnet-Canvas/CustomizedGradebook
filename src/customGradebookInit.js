@@ -148,10 +148,17 @@ function isSpeedGraderPage() {
         window.CG_clearAllSnapshots = clearAllSnapshots;
         window.CG_debugSnapshots = debugSnapshots;
 
+        // Assignment detection debugging
+        window.CG_debugAssignmentDetection = async (courseId) => {
+            const { debugAssignmentDetection } = await import('./utils/courseDetection.js');
+            return await debugAssignmentDetection(courseId);
+        };
+
         logger.debug('Debug functions exposed:');
         logger.debug('  - window.CG_testAllGradesDataSources()');
         logger.debug('  - window.CG_clearAllSnapshots() - Clear all cached snapshots');
         logger.debug('  - window.CG_debugSnapshots() - Show all cached snapshots');
+        logger.debug('  - window.CG_debugAssignmentDetection(courseId) - Debug assignment detection for a course');
     }
 
     // Always expose clearAllSnapshots for logout/user change scenarios
