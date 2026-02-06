@@ -54,6 +54,7 @@ function parseConfigFromSectionB(sectionB) {
         enableStudentGradeCustomization: managed.config.enableStudentGradeCustomization !== false,
         enableOutcomeUpdates: managed.config.enableOutcomeUpdates !== false,
         enableGradeOverride: managed.config.enableGradeOverride !== false,
+        enforceCourseOverride: managed.config.enforceCourseOverride === true,
         updateAvgButtonLabel: config.UPDATE_AVG_BUTTON_LABEL || 'Update Avg',
         avgOutcomeName: config.AVG_OUTCOME_NAME || 'Average',
         avgAssignmentName: config.AVG_ASSIGNMENT_NAME || 'Average Assignment',
@@ -263,6 +264,7 @@ export function renderLoaderGeneratorPanel(root) {
     controls.enableStudentGrade.addEventListener('change', markAsChanged);
     controls.enableOutcomeUpdates.addEventListener('change', markAsChanged);
     controls.enableGradeOverride.addEventListener('change', markAsChanged);
+    controls.enforceCourseOverride.addEventListener('change', markAsChanged);
     controls.updateAvgButtonLabel.addEventListener('input', markAsChanged);
     controls.avgOutcomeName.addEventListener('input', markAsChanged);
     controls.avgAssignmentName.addEventListener('input', markAsChanged);
@@ -434,11 +436,13 @@ function createConfigurationPanel() {
     const enableStudentGrade = createCheckbox('Enable Student Grade Customization', 'cfg_enableStudentGrade', true);
     const enableOutcomeUpdates = createCheckbox('Enable Outcome Updates', 'cfg_enableOutcomeUpdates', true);
     const enableGradeOverride = createCheckbox('Enable Grade Override', 'cfg_enableGradeOverride', true);
+    const enforceCourseOverride = createCheckbox('Enforce Course Override Setting', 'cfg_enforceCourseOverride', false);
 
     featureSection.appendChild(featureTitle);
     featureSection.appendChild(enableStudentGrade.label);
     featureSection.appendChild(enableOutcomeUpdates.label);
     featureSection.appendChild(enableGradeOverride.label);
+    featureSection.appendChild(enforceCourseOverride.label);
 
     // UI Labels Section
     const labelsSection = createElement('div', {
@@ -608,6 +612,7 @@ function createConfigurationPanel() {
             enableStudentGrade: enableStudentGrade.checkbox,
             enableOutcomeUpdates: enableOutcomeUpdates.checkbox,
             enableGradeOverride: enableGradeOverride.checkbox,
+            enforceCourseOverride: enforceCourseOverride.checkbox,
             updateAvgButtonLabel: updateAvgButtonLabel.input,
             avgOutcomeName: avgOutcomeName.input,
             avgAssignmentName: avgAssignmentName.input,
@@ -1146,6 +1151,7 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         enableStudentGradeCustomization: !!controls.enableStudentGrade.checked,
         enableOutcomeUpdates: !!controls.enableOutcomeUpdates.checked,
         enableGradeOverride: !!controls.enableGradeOverride.checked,
+        enforceCourseOverride: !!controls.enforceCourseOverride.checked,
         updateAvgButtonLabel: controls.updateAvgButtonLabel.value,
         avgOutcomeName: controls.avgOutcomeName.value,
         avgAssignmentName: controls.avgAssignmentName.value,

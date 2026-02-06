@@ -18,6 +18,7 @@ import {
     PER_STUDENT_UPDATE_THRESHOLD,
     ENABLE_OUTCOME_UPDATES,
     ENABLE_GRADE_OVERRIDE,
+    ENFORCE_COURSE_OVERRIDE,
     OVERRIDE_SCALE
 } from "../config.js";
 import { UserCancelledError } from "../utils/errorHandler.js";
@@ -126,7 +127,7 @@ export async function handleCheckingSetup(stateMachine) {
     }
 
     // Enable final grade override if configured
-    if (ENABLE_GRADE_OVERRIDE) {
+    if (ENABLE_GRADE_OVERRIDE && ENFORCE_COURSE_OVERRIDE) {
         try {
             await enableCourseOverride(courseId, apiClient);
         } catch (error) {
@@ -343,6 +344,14 @@ export async function handleVerifyingOverrides(stateMachine) {
 
     logger.info(`Grade override submission complete: ${successCount} succeeded, ${failCount} failed`);
 
+    // Track if all overrides failed (indicates course override setting may not be enabled)
+    const allOverridesFailed = failCount > 0 && successCount === 0 && averages.length > 0;
+
+    // Store override failure status in context for completion message
+    if (allOverridesFailed && !ENFORCE_COURSE_OVERRIDE) {
+        stateMachine.updateContext({ overridesNotEnabled: true });
+    }
+
     // Verify override scores with retry logic
     const maxRetries = 3;
     const retryDelayMs = 2000; // 2 seconds between retries
@@ -374,6 +383,11 @@ export async function handleVerifyingOverrides(stateMachine) {
                     expected: m.expected,
                     actual: m.actual
                 })));
+
+                // If all verifications failed and ENFORCE_COURSE_OVERRIDE is false, likely course setting not enabled
+                if (overrideMismatches.length === averages.length && !ENFORCE_COURSE_OVERRIDE) {
+                    stateMachine.updateContext({ overridesNotEnabled: true });
+                }
             }
         }
     } catch (error) {
@@ -390,7 +404,7 @@ export async function handleVerifyingOverrides(stateMachine) {
  * Shows success message and cleans up
  */
 export async function handleComplete(stateMachine) {
-    const { numberOfUpdates, banner, courseId, zeroUpdates } = stateMachine.getContext();
+    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled } = stateMachine.getContext();
 
     const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
@@ -422,7 +436,15 @@ export async function handleComplete(stateMachine) {
     localStorage.setItem(`duration_${courseId}`, elapsedTime);
     localStorage.setItem(`lastUpdateAt_${courseId}`, new Date().toISOString());
 
-    alert(`All ${updateTarget} have been updated. (elapsed time: ${elapsedTime}s)\nYou may need to refresh the page to see the new scores.`);
+    // Build completion message
+    let completionMessage = `All ${updateTarget} have been updated. (elapsed time: ${elapsedTime}s)\nYou may need to refresh the page to see the new scores.`;
+
+    // Add warning if override grades were not enabled in the course
+    if (overridesNotEnabled && ENABLE_GRADE_OVERRIDE && !ENFORCE_COURSE_OVERRIDE) {
+        completionMessage += '\n\nOverride grades not enabled for this course';
+    }
+
+    alert(completionMessage);
 
     return STATES.IDLE;
 }
