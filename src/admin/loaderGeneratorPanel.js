@@ -352,14 +352,19 @@ function createVersionSelector() {
         { value: 'v1.0.2', label: 'v1.0.2', channel: 'prod' },
         { value: 'v1.0.1', label: 'v1.0.1', channel: 'prod' },
         { value: 'v1.0.0', label: 'v1.0.0', channel: 'prod' },
-        { value: 'latest', label: 'Latest (Auto-Update from GitHub)', channel: 'beta' },
-        { value: 'dev', label: 'Development (Unstable)', channel: 'dev' }
+        { value: 'v1.0-latest', label: 'Auto-Patch v1.0.x (Recommended)', channel: 'auto-patch', track: 'v1.0-latest' },
+        { value: 'latest', label: 'Beta - Latest Release (Any Version)', channel: 'beta' },
+        { value: 'dev', label: 'Dev - Unstable Builds', channel: 'dev' }
     ];
 
     versions.forEach(v => {
         const option = createElement('option', {
             text: v.label,
-            attrs: { value: v.value, 'data-channel': v.channel }
+            attrs: {
+                value: v.value,
+                'data-channel': v.channel,
+                'data-track': v.track || ''
+            }
         });
         dropdown.appendChild(option);
     });
@@ -1136,12 +1141,21 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
     const selectedVersion = versionDropdown.value;
     const selectedOption = versionDropdown.options[versionDropdown.selectedIndex];
     const selectedChannel = selectedOption.getAttribute('data-channel') || 'prod';
+    const selectedTrack = selectedOption.getAttribute('data-track') || null;
+
+    // For auto-patch channel, extract fallback version from track (e.g., "v1.0-latest" → "v1.0.3")
+    let fallbackVersion = selectedVersion;
+    if (selectedChannel === 'auto-patch' && selectedTrack) {
+        // Use the current production version as fallback
+        fallbackVersion = 'v1.0.3';
+    }
 
     // Generate managed config block (C) with all configuration options
     const cgBlock = buildCGManagedBlock({
         accountId: getAccountId(),
         channel: selectedChannel,
-        version: selectedVersion,
+        version: fallbackVersion,
+        versionTrack: selectedTrack,
         source: 'github_release',
         enableStudentGradeCustomization: !!controls.enableStudentGrade.checked,
         enableGradeOverride: !!controls.enableGradeOverride.checked,
