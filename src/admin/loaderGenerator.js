@@ -39,6 +39,7 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  * @param {boolean} [options.enableStudentGradeCustomization=true] - Enable student grade customization
  * @param {boolean} [options.enableOutcomeUpdates=true] - Enable outcome updates
  * @param {boolean} [options.enableGradeOverride=true] - Enable grade override
+ * @param {boolean} [options.enforceCourseOverride=false] - Enforce course override setting via API
  * @param {string} [options.updateAvgButtonLabel='Update Current Score'] - Update average button label
  * @param {string} [options.avgOutcomeName='Current Score'] - Average outcome name
  * @param {string} [options.avgAssignmentName='Current Score Assignment'] - Average assignment name
@@ -57,6 +58,7 @@ export function buildCGManagedBlock({
     enableStudentGradeCustomization = true,
     enableOutcomeUpdates = true,
     enableGradeOverride = true,
+    enforceCourseOverride = false,
     updateAvgButtonLabel = 'Update Current Score',
     avgOutcomeName = 'Current Score',
     avgAssignmentName = 'Current Score Assignment',
@@ -105,6 +107,7 @@ export function buildCGManagedBlock({
         `    ENABLE_STUDENT_GRADE_CUSTOMIZATION: ${enableStudentGradeCustomization ? 'true' : 'false'},`,
         `    ENABLE_OUTCOME_UPDATES: ${enableOutcomeUpdates ? 'true' : 'false'},`,
         `    ENABLE_GRADE_OVERRIDE: ${enableGradeOverride ? 'true' : 'false'},`,
+        `    ENFORCE_COURSE_OVERRIDE: ${enforceCourseOverride ? 'true' : 'false'},`,
         '',
         `    // UI labels`,
         `    UPDATE_AVG_BUTTON_LABEL: ${JSON.stringify(updateAvgButtonLabel)},`,
