@@ -108,7 +108,7 @@ onElementRendered('.reset_course_content_button', function(e) {
 ////////////////////////////////////////////////////////////////////////////////
 /* ========== END SECTION A: EXTERNAL LOADER ========== */
 
-/* ========== BEGIN SECTION C: MANAGED CONFIG BLOCK ========== */
+/* ========== BEGIN SECTION B: MANAGED CONFIG BLOCK ========== */
 /* Generated: 2026-02-05T17:00:00.000Z */
 /* Account: 1 */
 /* Purpose: Version and configuration management for CG loader */
@@ -190,9 +190,9 @@ window.CG_MANAGED.config = {
     EXCLUDED_OUTCOME_KEYWORDS: ["Homework Completion"]
 };
 
-/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */
+/* ========== END SECTION B: MANAGED CONFIG BLOCK ========== */
 
-/* ========== BEGIN SECTION B: CG LOADER TEMPLATE ========== */
+/* ========== BEGIN SECTION C: CG LOADER TEMPLATE ========== */
 (function () {
     // ========================================================================
     // CG LOADER - CONFIGURATION MERGE
@@ -259,4 +259,4 @@ window.CG_MANAGED.config = {
     script.onerror = () => console.error(`[CG] Failed to load customGradebookInit.js (${release.channel.toUpperCase()})`);
     document.head.appendChild(script);
 })();
-/* ========== END SECTION B: CG LOADER TEMPLATE ========== */
+/* ========== END SECTION C: CG LOADER TEMPLATE ========== */

@@ -17,33 +17,33 @@ import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, ext
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 
 /**
- * Parse configuration settings from Section C (CG_MANAGED block)
+ * Parse configuration settings from Section B (CG_MANAGED block)
  *
- * @param {string} sectionC - Section C content
+ * @param {string} sectionB - Section B content
  * @returns {Object} Parsed configuration settings
  */
-function parseConfigFromSectionC(sectionC) {
-    if (!sectionC) {
-        throw new Error('Section C is empty');
+function parseConfigFromSectionB(sectionB) {
+    if (!sectionB) {
+        throw new Error('Section B is empty');
     }
 
-    // Execute Section C in a sandboxed context to extract window.CG_MANAGED
+    // Execute Section B in a sandboxed context to extract window.CG_MANAGED
     const sandbox = { window: { CG_MANAGED: null, CG_CONFIG: {} } };
 
     try {
-        // Create a function that executes the Section C code
-        const func = new Function('window', sectionC);
+        // Create a function that executes the Section B code
+        const func = new Function('window', sectionB);
         func(sandbox.window);
     } catch (err) {
-        logger.error('[LoaderGeneratorPanel] Failed to execute Section C', err);
-        throw new Error('Failed to parse Section C: ' + err.message);
+        logger.error('[LoaderGeneratorPanel] Failed to execute Section B', err);
+        throw new Error('Failed to parse Section B: ' + err.message);
     }
 
     const managed = sandbox.window.CG_MANAGED;
     const config = sandbox.window.CG_CONFIG;
 
     if (!managed || !managed.release || !managed.config) {
-        throw new Error('Section C does not contain valid CG_MANAGED structure');
+        throw new Error('Section B does not contain valid CG_MANAGED structure');
     }
 
     // Extract all settings
@@ -93,8 +93,8 @@ export function renderLoaderGeneratorPanel(root) {
                 This tool generates a combined loader using the <strong>A+B+C model</strong>:
                 <ul style="margin:8px 0; padding-left:20px; font-size:13px;">
                     <li><strong>A</strong> = Other Theme Scripts (preserved exactly as-is)</li>
-                    <li><strong>B</strong> = CG loader template (stable logic from codebase)</li>
-                    <li><strong>C</strong> = Managed config block (generated fresh from your settings)</li>
+                    <li><strong>B</strong> = Managed config block (generated fresh from your settings)</li>
+                    <li><strong>C</strong> = CG loader template (stable logic from codebase)</li>
                 </ul>
             </div>
         `
@@ -121,11 +121,11 @@ export function renderLoaderGeneratorPanel(root) {
     // Textarea A: Other Theme Scripts (editable)
     const { baseLabel, baseTA, helperText, lockRow, unlockBtn, relockBtn, reloadBtn } = createOtherScriptsTextarea(installedUrl);
 
-    // Textarea B: CG Loader Template (read-only)
-    const { templateLabel, templateTA } = createTemplateTextarea();
-
-    // Textarea C: Managed Config Preview (read-only)
+    // Textarea B: Managed Config Preview (read-only)
     const { configLabel, configTA } = createConfigTextarea();
+
+    // Textarea C: CG Loader Template (read-only, collapsible)
+    const { templateLabel, templateTA, templateCollapsible } = createTemplateTextarea();
 
     // Sticky action panel (right side)
     const { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn } = createStickyActionPanel();
@@ -177,9 +177,9 @@ export function renderLoaderGeneratorPanel(root) {
             // Success - extract sections
             const { A, B, C } = extractSections(text);
 
-            // Parse Section C to extract current Canvas settings
+            // Parse Section B to extract current Canvas settings
             try {
-                const parsedSettings = parseConfigFromSectionC(C);
+                const parsedSettings = parseConfigFromSectionB(B);
                 state.currentCanvasSettings = parsedSettings;
                 logger.debug('[LoaderGeneratorPanel] Stored current Canvas settings', parsedSettings);
             } catch (err) {
@@ -291,13 +291,12 @@ export function renderLoaderGeneratorPanel(root) {
     panel.appendChild(baseTA);
     panel.appendChild(lockRow);
 
-    // 5. Textarea B (CG Loader Template)
-    panel.appendChild(templateLabel);
-    panel.appendChild(templateTA);
-
-    // 6. Textarea C (Managed Config Preview)
+    // 5. Textarea B (Managed Config Preview)
     panel.appendChild(configLabel);
     panel.appendChild(configTA);
+
+    // 6. Textarea C (CG Loader Template - collapsible)
+    panel.appendChild(templateCollapsible);
 
     // 7. Action buttons (will be moved to sticky panel)
     panel.appendChild(actions);
@@ -742,41 +741,11 @@ function createOtherScriptsTextarea(installedUrl) {
 }
 
 /**
- * Create CG Loader Template textarea (B = Read-only template from codebase)
- */
-function createTemplateTextarea() {
-    const templateLabel = createElement('div', {
-        html: '<strong>B</strong> = CG Loader Template (Read-Only, from codebase):',
-        style: { fontWeight: '700', marginTop: '16px' }
-    });
-
-    const templateTA = createElement('textarea', {
-        attrs: { rows: '10', spellcheck: 'false', readonly: 'true' },
-        style: {
-            width: '100%',
-            marginTop: '6px',
-            padding: '10px',
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            background: '#f5f5f5',
-            color: '#666'
-        }
-    });
-
-    // Populate with template from codebase
-    templateTA.value = CG_LOADER_TEMPLATE;
-
-    return { templateLabel, templateTA };
-}
-
-/**
- * Create Managed Config Block textarea (C = Read-only preview of generated config)
+ * Create Managed Config Block textarea (B = Read-only preview of generated config)
  */
 function createConfigTextarea() {
     const configLabel = createElement('div', {
-        html: '<strong>C</strong> = Managed Config Block (Read-Only Preview):',
+        html: '<strong>B</strong> = Managed Config Block (Read-Only Preview):',
         style: { fontWeight: '700', marginTop: '16px' }
     });
 
@@ -796,6 +765,86 @@ function createConfigTextarea() {
     });
 
     return { configLabel, configTA };
+}
+
+/**
+ * Create CG Loader Template textarea (C = Read-only template from codebase, collapsible)
+ */
+function createTemplateTextarea() {
+    // Container for collapsible section
+    const templateCollapsible = createElement('div', {
+        style: { marginTop: '16px' }
+    });
+
+    // Header with toggle button
+    const templateLabel = createElement('div', {
+        style: {
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            padding: '8px',
+            background: '#f9f9f9',
+            borderRadius: '6px',
+            border: '1px solid #ddd'
+        }
+    });
+
+    const labelText = createElement('span', {
+        html: '<strong>C</strong> = CG Loader Template (Read-Only, from codebase)'
+    });
+
+    const toggleBtn = createElement('button', {
+        text: 'Expand ▼',
+        style: {
+            padding: '4px 12px',
+            fontSize: '12px',
+            background: '#0374B5',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+        }
+    });
+
+    templateLabel.appendChild(labelText);
+    templateLabel.appendChild(toggleBtn);
+
+    // Textarea (initially hidden)
+    const templateTA = createElement('textarea', {
+        attrs: { rows: '10', spellcheck: 'false', readonly: 'true' },
+        style: {
+            width: '100%',
+            marginTop: '6px',
+            padding: '10px',
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            background: '#f5f5f5',
+            color: '#666',
+            display: 'none'
+        }
+    });
+
+    // Populate with template from codebase
+    templateTA.value = CG_LOADER_TEMPLATE;
+
+    // Toggle functionality
+    let isExpanded = false;
+    const toggle = () => {
+        isExpanded = !isExpanded;
+        templateTA.style.display = isExpanded ? 'block' : 'none';
+        toggleBtn.textContent = isExpanded ? 'Collapse ▲' : 'Expand ▼';
+    };
+
+    templateLabel.addEventListener('click', toggle);
+
+    templateCollapsible.appendChild(templateLabel);
+    templateCollapsible.appendChild(templateTA);
+
+    return { templateLabel, templateTA, templateCollapsible };
 }
 
 /**
@@ -1016,7 +1065,7 @@ function createOutputTextarea() {
     const hint = createElement('div', {
         html: `
             <div style="margin-top:10px; color:#666; font-size:13px;">
-                <strong>Structure:</strong> A (other theme scripts - preserved) + B (CG template from codebase) + C (managed config)<br>
+                <strong>Structure:</strong> A (other theme scripts - preserved) + B (managed config) + C (CG template from codebase)<br>
                 Each section is wrapped with markers: <code>/* ========== BEGIN SECTION X: ... ========== */</code> … <code>/* ========== END SECTION X: ... ========== */</code>
             </div>
         `

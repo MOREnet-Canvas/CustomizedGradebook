@@ -1,11 +1,11 @@
 // src/admin/templates/cgLoaderTemplate.js
 /**
- * CG Loader Template (B)
- * 
+ * CG Loader Template (Section C)
+ *
  * This is the stable CG loader logic that gets combined with:
  * - A = External loader (district's Theme JS)
- * - C = Managed config block (generated from dashboard UI)
- * 
+ * - B = Managed config block (generated from dashboard UI)
+ *
  * This template:
  * - Is an IIFE that loads the CG bundle
  * - Merges config safely from window.CG_MANAGED.config
