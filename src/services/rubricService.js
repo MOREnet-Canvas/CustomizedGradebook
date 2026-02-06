@@ -78,6 +78,7 @@ export async function createRubric(courseId, assignmentId, outcomeId, apiClient)
                     'mastery_points': DEFAULT_MASTERY_THRESHOLD,
                     'learning_outcome_id': outcomeId,
                     'ratings': rubricRatings,
+                    'ignore_for_scoring': true, //equivalent to "Don't count this criterion toward the assignment's total points"
                 }
             }
         },
@@ -86,7 +87,7 @@ export async function createRubric(courseId, assignmentId, outcomeId, apiClient)
             association_id: assignmentId,
             use_for_grading: true,
             purpose: "grading",
-            hide_points: true
+            hide_points: false
         }
     };
 
@@ -100,4 +101,3 @@ export async function createRubric(courseId, assignmentId, outcomeId, apiClient)
     logger.debug("Rubric created and linked to outcome:", rubric);
     return rubric.id;
 }
-
