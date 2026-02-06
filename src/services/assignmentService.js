@@ -62,7 +62,8 @@ export async function createAssignment(courseId, apiClient) {
             submission_types: ["none"], // no student submissions needed
             published: true,
             notify_of_update: true,
-            points_possible: DEFAULT_MAX_POINTS,
+            // points_possible: DEFAULT_MAX_POINTS,
+            points_possible: 0,
             grading_type: "gpa_scale",
             omit_from_final_grade: true,
         }
@@ -78,4 +79,3 @@ export async function createAssignment(courseId, apiClient) {
     logger.info("Assignment created:", assignment.name);
     return assignment.id;
 }
-
