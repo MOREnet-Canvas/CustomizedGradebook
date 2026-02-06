@@ -69,7 +69,8 @@ function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywo
  */
 function computeAverage(scores) {
     const total = scores.reduce((sum, s) => sum + s.score, 0);
-    return Number((total / scores.length).toFixed(2));
+    const average = total / scores.length;
+    return Math.round(average * 100) / 100;
 }
 
 /**
@@ -240,4 +241,3 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
 
     return results;
 }
-
