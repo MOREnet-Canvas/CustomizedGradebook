@@ -53,6 +53,7 @@ export function buildCGManagedBlock({
     accountId,
     channel = 'prod',
     version = 'v1.0.3',
+    versionTrack = null,
     source = 'github_release',
     enableStudentGradeCustomization = true,
     enableGradeOverride = true,
@@ -80,6 +81,7 @@ export function buildCGManagedBlock({
         accountId,
         channel,
         version,
+        versionTrack,
         source
     });
 
@@ -89,6 +91,7 @@ export function buildCGManagedBlock({
         `/* Account: ${accountId ?? 'unknown'} */`,
         '/* Purpose: Version and configuration management for CG loader */',
         channel === 'prod' ? '/* NOTE: Keep version in sync with package.json */' : '',
+        channel === 'auto-patch' ? `/* Auto-Patch Track: ${versionTrack} (auto-updates to latest patch) */` : '',
         '',
         'window.CG_MANAGED = window.CG_MANAGED || {};',
         '',
@@ -96,6 +99,7 @@ export function buildCGManagedBlock({
         'window.CG_MANAGED.release = {',
         `    channel: ${JSON.stringify(channel)},`,
         `    version: ${JSON.stringify(version)},${channel === 'prod' ? '  // Keep in sync with package.json version' : ''}`,
+        channel === 'auto-patch' ? `    versionTrack: ${JSON.stringify(versionTrack)},  // Auto-updates to latest patch in this track` : '',
         `    source: ${JSON.stringify(source)}`,
         '};',
         '',

@@ -65,35 +65,81 @@ export const CG_LOADER_TEMPLATE = `
         return;
     }
 
-    const script = document.createElement("script");
-    script.id = bundleId;
-    script.defer = true;
+    // Auto-patch channel: fetch version from manifest
+    if (release.channel === "auto-patch" && release.versionTrack) {
+        const manifestUrl = "https://morenet-canvas.github.io/CustomizedGradebook/versions.json";
+        const fallbackVersion = release.version || "v1.0.3";
 
-    // Determine script URL based on source and channel
-    if (release.source === "github_release") {
-        if (release.channel === "dev") {
-            // Dev channel: use cache-busting query parameter
-            const cacheBuster = Date.now();
-            script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=\${cacheBuster}\`;
-        } else if (release.channel === "beta") {
-            // Beta channel: use GitHub's /releases/latest/download/ redirect
-            // This automatically fetches the most recent production release without version pinning
-            // WARNING: May receive breaking changes without notice - use for testing only
-            script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/latest/download/customGradebookInit.js\`;
-        } else {
-            // Prod channel: use version tag
-            script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/\${release.version}/customGradebookInit.js\`;
-        }
-    } else if (release.source === "pages") {
-        const cacheBuster = release.version || Date.now();
-        script.src = \`https://morenet-canvas.github.io/CustomizedGradebook/dist/\${release.channel}/customGradebookInit.js?v=\${cacheBuster}\`;
-    } else {
-        console.error("[CG] Unknown release source:", release.source);
+        fetch(manifestUrl)
+            .then(response => {
+                if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
+                return response.json();
+            })
+            .then(manifest => {
+                const resolvedVersion = manifest[release.versionTrack];
+                if (!resolvedVersion) {
+                    console.warn(\`[CG] Version track "\${release.versionTrack}" not found in manifest, using fallback: \${fallbackVersion}\`);
+                    loadScript(fallbackVersion);
+                } else {
+                    console.log(\`[CG] Resolved \${release.versionTrack} → \${resolvedVersion}\`);
+                    loadScript(resolvedVersion);
+                }
+            })
+            .catch(error => {
+                console.warn(\`[CG] Failed to fetch version manifest: \${error.message}, using fallback: \${fallbackVersion}\`);
+                loadScript(fallbackVersion);
+            });
         return;
     }
 
-    script.onload = () => console.log(\`[CG] Loaded customGradebookInit.js (\${release.channel.toUpperCase()} \${release.version})\`);
-    script.onerror = () => console.error(\`[CG] Failed to load customGradebookInit.js (\${release.channel.toUpperCase()})\`);
-    document.head.appendChild(script);
+    // Standard channels: load immediately
+    loadScriptSync();
+
+    // ========================================================================
+    // HELPER FUNCTIONS
+    // ========================================================================
+
+    function loadScriptSync() {
+        const script = document.createElement("script");
+        script.id = bundleId;
+        script.defer = true;
+
+        // Determine script URL based on source and channel
+        if (release.source === "github_release") {
+            if (release.channel === "dev") {
+                // Dev channel: use cache-busting query parameter
+                const cacheBuster = Date.now();
+                script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/dev/customGradebookInit.js?v=\${cacheBuster}\`;
+            } else if (release.channel === "beta") {
+                // Beta channel: use GitHub's /releases/latest/download/ redirect
+                // This automatically fetches the most recent production release without version pinning
+                // WARNING: May receive breaking changes without notice - use for testing only
+                script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/latest/download/customGradebookInit.js\`;
+            } else {
+                // Prod channel: use version tag
+                script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/\${release.version}/customGradebookInit.js\`;
+            }
+        } else if (release.source === "pages") {
+            const cacheBuster = release.version || Date.now();
+            script.src = \`https://morenet-canvas.github.io/CustomizedGradebook/dist/\${release.channel}/customGradebookInit.js?v=\${cacheBuster}\`;
+        } else {
+            console.error("[CG] Unknown release source:", release.source);
+            return;
+        }
+
+        script.onload = () => console.log(\`[CG] Loaded customGradebookInit.js (\${release.channel.toUpperCase()} \${release.version})\`);
+        script.onerror = () => console.error(\`[CG] Failed to load customGradebookInit.js (\${release.channel.toUpperCase()})\`);
+        document.head.appendChild(script);
+    }
+
+    function loadScript(version) {
+        const script = document.createElement("script");
+        script.id = bundleId;
+        script.defer = true;
+        script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/\${version}/customGradebookInit.js\`;
+        script.onload = () => console.log(\`[CG] Loaded customGradebookInit.js (AUTO-PATCH \${version})\`);
+        script.onerror = () => console.error(\`[CG] Failed to load customGradebookInit.js (AUTO-PATCH \${version})\`);
+        document.head.appendChild(script);
+    }
 })();
 `.trim();
