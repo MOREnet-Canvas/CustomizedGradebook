@@ -209,6 +209,22 @@ window.CG_MANAGED.config = {
     }
 
     // ========================================================================
+    // CG LOADER - GRADES GATE (PREVENT FLASH)
+    // ========================================================================
+
+    // Hide the Canvas /grades table ASAP to prevent flash (Theme CSS uses this gate)
+    const addGradesGate = () => {
+        if (document.body
+            && window.location.pathname === '/grades'
+            && document.body.classList.contains('responsive_student_grades_page')) {
+            document.body.classList.add('cg_processing_grades');
+        }
+    };
+
+    addGradesGate();
+    document.addEventListener('DOMContentLoaded', addGradesGate, { once: true });
+
+    // ========================================================================
     // CG LOADER - SCRIPT INJECTION
     // ========================================================================
 
