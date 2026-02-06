@@ -297,14 +297,21 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
     logger.debug(`[Snapshot] Populating snapshot for course ${courseId} "${courseName}" (user role: ${roleGroup})`);
 
     try {
-        // Step 1: Fetch grade data (optional - may not exist for teachers)
-        logger.trace(`[Snapshot] Step 1: Fetching grade for ${courseId}...`);
-        const gradeData = await getCourseGrade(courseId, apiClient);
+        // Step 1: Fetch grade data (only for student-like users)
+        // Teachers don't have submissions, so skip grade fetching to avoid 404 errors
+        let gradeData = null;
 
-        if (gradeData) {
-            logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
+        if (roleGroup === 'student_like') {
+            logger.trace(`[Snapshot] Step 1: Fetching grade for ${courseId} (student-like user)...`);
+            gradeData = await getCourseGrade(courseId, apiClient);
+
+            if (gradeData) {
+                logger.trace(`[Snapshot] Course ${courseId} grade: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, source=${gradeData.source}`);
+            } else {
+                logger.trace(`[Snapshot] No grade data available for course ${courseId}`);
+            }
         } else {
-            logger.trace(`[Snapshot] No grade data available for course ${courseId} (user may not be enrolled)`);
+            logger.trace(`[Snapshot] Step 1: Skipping grade fetch for ${courseId} (user is ${roleGroup}, not student-like)`);
         }
 
         // Step 2: Classify course model (SINGLE SOURCE OF TRUTH)
