@@ -4,11 +4,11 @@
  *
  * Implements the A/B/C generation model:
  * - A = External loader (district's Theme JS from textarea)
- * - B = CG_LOADER_TEMPLATE (stable CG loader logic from codebase)
- * - C = Managed config block (generated fresh from dashboard UI state)
+ * - B = Managed config block (generated fresh from dashboard UI state)
+ * - C = CG_LOADER_TEMPLATE (stable CG loader logic from codebase)
  *
- * The CG-managed block (C):
- * - Is delimited by exact sentinels (BEGIN/END CG MANAGED CODE)
+ * The managed config block (B):
+ * - Is delimited by exact sentinels (BEGIN/END SECTION B: MANAGED CONFIG BLOCK)
  * - Contains ONLY configuration objects (window.CG_MANAGED.release and .config)
  * - Is always regenerated fresh (never copied from existing loader)
  */
@@ -19,15 +19,15 @@ import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 // Sentinel markers for all sections
 const A_BEGIN = '/* ========== BEGIN SECTION A: EXTERNAL LOADER ========== */';
 const A_END = '/* ========== END SECTION A: EXTERNAL LOADER ========== */';
-const B_BEGIN = '/* ========== BEGIN SECTION B: CG LOADER TEMPLATE ========== */';
-const B_END = '/* ========== END SECTION B: CG LOADER TEMPLATE ========== */';
-const C_BEGIN = '/* ========== BEGIN SECTION C: MANAGED CONFIG BLOCK ========== */';
-const C_END = '/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */';
+const B_BEGIN = '/* ========== BEGIN SECTION B: MANAGED CONFIG BLOCK ========== */';
+const B_END = '/* ========== END SECTION B: MANAGED CONFIG BLOCK ========== */';
+const C_BEGIN = '/* ========== BEGIN SECTION C: CG LOADER TEMPLATE ========== */';
+const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
 
 /**
- * Build CG-managed block (CONFIG-ONLY)
+ * Build managed config block (Section B)
  *
- * Generates the managed config block (C) with:
+ * Generates the managed config block (B) with:
  * - window.CG_MANAGED.release (channel, version, source)
  * - window.CG_MANAGED.config (all configuration options from UI)
  *
@@ -47,7 +47,7 @@ const C_END = '/* ========== END SECTION C: MANAGED CONFIG BLOCK ========== */';
  * @param {number} [options.defaultMasteryThreshold=3] - Default mastery threshold
  * @param {Array} [options.outcomeAndRubricRatings] - Rating scale for outcomes and rubrics
  * @param {Array} [options.excludedOutcomeKeywords] - Keywords to exclude from outcomes
- * @returns {string} CG-managed block content
+ * @returns {string} Managed config block content (Section B)
  */
 export function buildCGManagedBlock({
     accountId,
@@ -76,7 +76,7 @@ export function buildCGManagedBlock({
     ],
     excludedOutcomeKeywords = ["Homework Completion"]
 }) {
-    logger.debug('[LoaderGenerator] Building CG-managed block', {
+    logger.debug('[LoaderGenerator] Building managed config block (Section B)', {
         accountId,
         channel,
         version,
@@ -84,7 +84,7 @@ export function buildCGManagedBlock({
     });
 
     const lines = [
-        C_BEGIN,
+        B_BEGIN,
         `/* Generated: ${new Date().toISOString()} */`,
         `/* Account: ${accountId ?? 'unknown'} */`,
         '/* Purpose: Version and configuration management for CG loader */',
@@ -123,33 +123,33 @@ export function buildCGManagedBlock({
         `    EXCLUDED_OUTCOME_KEYWORDS: ${JSON.stringify(excludedOutcomeKeywords)}`,
         '};',
         '',
-        C_END
+        B_END
     ];
 
     return lines.join('\n');
 }
 
 /**
- * Assemble A+C+B loader output
+ * Assemble A+B+C loader output
  *
- * Implements deterministic A+C+B assembly:
+ * Implements deterministic A+B+C assembly:
  * - A = External loader (district's Theme JS) - copied verbatim
- * - C = Managed config block - generated fresh from UI state (MUST come before B)
- * - B = CG_LOADER_TEMPLATE (stable CG loader) - inserted verbatim from codebase
+ * - B = Managed config block - generated fresh from UI state (MUST come before C)
+ * - C = CG_LOADER_TEMPLATE (stable CG loader) - inserted verbatim from codebase
  *
- * IMPORTANT: Section C must come before Section B because Section B reads
- * window.CG_MANAGED.release at runtime. If B executes before C is defined,
+ * IMPORTANT: Section B must come before Section C because Section C reads
+ * window.CG_MANAGED.release at runtime. If C executes before B is defined,
  * it will fall back to hardcoded defaults.
  *
- * Output format: A.trimEnd() + "\n\n" + C.trimEnd() + "\n\n" + B.trim() + "\n"
+ * Output format: A.trimEnd() + "\n\n" + B.trimEnd() + "\n\n" + C.trim() + "\n"
  *
  * @param {Object} options - Options
  * @param {string} options.baseLoaderText - Base loader text (A - external/district loader)
- * @param {string} options.cgBlock - CG-managed block (C - generated config)
- * @returns {string} Combined loader text (A+C+B)
+ * @param {string} options.cgBlock - Managed config block (B - generated config)
+ * @returns {string} Combined loader text (A+B+C)
  */
 export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
-    logger.debug('[LoaderGenerator] Assembling A+C+B loader output');
+    logger.debug('[LoaderGenerator] Assembling A+B+C loader output');
 
     // Extract A using the extractSections function
     const { A: extractedA } = extractSections(baseLoaderText);
@@ -157,19 +157,19 @@ export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
     // Use extracted A if available, otherwise use the entire base text
     const A = extractedA || baseLoaderText.trimEnd();
 
-    // B = CG loader template (from codebase)
-    const B = CG_LOADER_TEMPLATE.trim();
+    // B = Managed config block (generated fresh, already has markers)
+    const B = cgBlock.trimEnd();
 
-    // C = Managed config block (generated fresh, already has markers)
-    const C = cgBlock.trimEnd();
+    // C = CG loader template (from codebase)
+    const C = CG_LOADER_TEMPLATE.trim();
 
-    // Assemble with section markers: A + C + B (C must come before B!)
-    const output = `${A_BEGIN}\n${A}\n${A_END}\n\n${C}\n\n${B_BEGIN}\n${B}\n${B_END}\n`;
+    // Assemble with section markers: A + B + C (B must come before C!)
+    const output = `${A_BEGIN}\n${A}\n${A_END}\n\n${B}\n\n${C_BEGIN}\n${C}\n${C_END}\n`;
 
-    logger.debug('[LoaderGenerator] A+C+B assembly complete', {
+    logger.debug('[LoaderGenerator] A+B+C assembly complete', {
         aLength: A.length,
-        cLength: C.length,
         bLength: B.length,
+        cLength: C.length,
         totalLength: output.length
     });
 
@@ -181,8 +181,8 @@ export function upsertCGBlockIntoLoader({ baseLoaderText, cgBlock }) {
  *
  * Intelligently parses a combined loader to extract:
  * - A = External loader (district code)
- * - B = CG loader template
- * - C = Managed config block
+ * - B = Managed config block
+ * - C = CG loader template
  *
  * @param {string} combinedLoader - Combined loader text
  * @returns {Object} Extracted sections { A: string, B: string, C: string }
@@ -206,7 +206,7 @@ export function extractSections(combinedLoader) {
     const bStart = combinedLoader.indexOf(B_BEGIN);
     const bEnd = combinedLoader.indexOf(B_END);
     if (bStart !== -1 && bEnd !== -1 && bEnd > bStart) {
-        B = combinedLoader.slice(bStart + B_BEGIN.length, bEnd).trim();
+        B = combinedLoader.slice(bStart, bEnd + B_END.length).trim();
         logger.debug('[LoaderGenerator] Extracted Section B');
     }
 
@@ -214,7 +214,7 @@ export function extractSections(combinedLoader) {
     const cStart = combinedLoader.indexOf(C_BEGIN);
     const cEnd = combinedLoader.indexOf(C_END);
     if (cStart !== -1 && cEnd !== -1 && cEnd > cStart) {
-        C = combinedLoader.slice(cStart, cEnd + C_END.length).trim();
+        C = combinedLoader.slice(cStart + C_BEGIN.length, cEnd).trim();
         logger.debug('[LoaderGenerator] Extracted Section C');
     }
 
@@ -232,7 +232,7 @@ export function extractSections(combinedLoader) {
  *
  * Performs safety checks:
  * - Output must contain section markers for A, B, and C
- * - Markers must be in correct order: A → C → B
+ * - Markers must be in correct order: A → B → C
  *
  * @param {string} output - Assembled loader output
  * @returns {Object} Validation result { valid: boolean, errors: string[] }
@@ -282,12 +282,12 @@ export function validateLoaderOutput(output) {
         errors.push('Section C END marker appears before BEGIN marker');
     }
 
-    // Check that sections appear in order: A, then C, then B
-    if (aBeginIdx !== -1 && cBeginIdx !== -1 && cBeginIdx <= aBeginIdx) {
-        errors.push('Section C appears before Section A');
+    // Check that sections appear in order: A, then B, then C
+    if (aBeginIdx !== -1 && bBeginIdx !== -1 && bBeginIdx <= aBeginIdx) {
+        errors.push('Section B appears before Section A');
     }
-    if (cBeginIdx !== -1 && bBeginIdx !== -1 && bBeginIdx <= cBeginIdx) {
-        errors.push('Section B appears before Section C (Section C must come before B!)');
+    if (bBeginIdx !== -1 && cBeginIdx !== -1 && cBeginIdx <= bBeginIdx) {
+        errors.push('Section C appears before Section B (Section B must come before C!)');
     }
 
     const valid = errors.length === 0;
