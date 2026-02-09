@@ -67,12 +67,7 @@ TODO: remove legacy code
 
 
 ## Agent Recommendations
-### Recommendations
-### For v1.0.2 (Next Patch):
-    Consider adding:
-    1. Version selector UI in loader generator panel
-    2. Configuration editors for outcome/assignment/rubric names
-    3. Excluded keywords editor with add/remove functionality
+
 ### For v1.1.0 (Next Minor):
     Consider adding API-based features:
     1. Grading scheme detector (read-only API call)

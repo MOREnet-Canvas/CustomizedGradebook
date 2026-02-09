@@ -450,10 +450,95 @@ export function renderLoaderGeneratorPanel(root) {
     tryAutoLoad('auto');
 }
 
+// Cache for fetched versions (avoid repeated API calls during same session)
+let cachedVersionData = null;
+
 /**
- * Create version selector dropdown
+ * Fetch available versions from GitHub Pages manifest
+ *
+ * @returns {Promise<Object>} Version data with latest version and all v1.0.x releases
  */
-function createVersionSelector() {
+async function fetchAvailableVersions() {
+    // Return cached data if available
+    if (cachedVersionData) {
+        logger.debug('[LoaderGeneratorPanel] Using cached version data');
+        return cachedVersionData;
+    }
+
+    const manifestUrl = 'https://morenet-canvas.github.io/CustomizedGradebook/versions.json';
+    const githubApiUrl = 'https://api.github.com/repos/MOREnet-Canvas/CustomizedGradebook/releases';
+
+    try {
+        logger.debug('[LoaderGeneratorPanel] Fetching versions from manifest:', manifestUrl);
+
+        // Fetch from GitHub Pages manifest (preferred - fast and already exists)
+        const response = await fetch(manifestUrl, {
+            method: 'GET',
+            credentials: 'omit',
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const manifest = await response.json();
+        logger.debug('[LoaderGeneratorPanel] Manifest fetched:', manifest);
+
+        // Extract latest version from manifest
+        const latestVersion = manifest['v1.0-latest'] || manifest.latest || 'v1.0.6';
+
+        // Fetch all releases from GitHub API to get full list of v1.0.x versions
+        logger.debug('[LoaderGeneratorPanel] Fetching releases from GitHub API:', githubApiUrl);
+        const releasesResponse = await fetch(githubApiUrl, {
+            method: 'GET',
+            credentials: 'omit',
+            cache: 'no-store'
+        });
+
+        if (!releasesResponse.ok) {
+            throw new Error(`HTTP ${releasesResponse.status}`);
+        }
+
+        const releases = await releasesResponse.json();
+
+        // Filter to v1.0.x releases and sort by version (newest first)
+        const v10Releases = releases
+            .filter(r => r.tag_name && r.tag_name.startsWith('v1.0.'))
+            .map(r => r.tag_name)
+            .sort((a, b) => {
+                // Extract patch numbers (e.g., "v1.0.6" → 6)
+                const patchA = parseInt(a.split('.')[2] || '0', 10);
+                const patchB = parseInt(b.split('.')[2] || '0', 10);
+                return patchB - patchA; // Descending order
+            });
+
+        logger.info('[LoaderGeneratorPanel] Found v1.0.x releases:', v10Releases);
+
+        cachedVersionData = {
+            latestVersion,
+            v10Releases
+        };
+
+        return cachedVersionData;
+    } catch (err) {
+        logger.warn('[LoaderGeneratorPanel] Failed to fetch versions from manifest/API:', err);
+
+        // Fallback to hardcoded versions
+        logger.info('[LoaderGeneratorPanel] Using fallback hardcoded versions');
+        cachedVersionData = {
+            latestVersion: 'v1.0.6',
+            v10Releases: ['v1.0.6', 'v1.0.5', 'v1.0.4', 'v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0']
+        };
+
+        return cachedVersionData;
+    }
+}
+
+/**
+ * Create version selector dropdown (async - fetches versions dynamically)
+ */
+async function createVersionSelector() {
     const container = createElement('div', {
         style: {
             marginBottom: '16px',
@@ -486,31 +571,89 @@ function createVersionSelector() {
         }
     });
 
-    // Version options
-    const versions = [
-        { value: 'v1.0.3', label: 'v1.0.3 (Current Production)', channel: 'prod' },
-        { value: 'v1.0.2', label: 'v1.0.2', channel: 'prod' },
-        { value: 'v1.0.1', label: 'v1.0.1', channel: 'prod' },
-        { value: 'v1.0.0', label: 'v1.0.0', channel: 'prod' },
-        { value: 'v1.0-latest', label: 'Auto-Patch v1.0.x (Recommended)', channel: 'auto-patch', track: 'v1.0-latest' },
-        { value: 'latest', label: 'Beta - Latest Release (Any Version)', channel: 'beta' },
-        { value: 'dev', label: 'Dev - Unstable Builds', channel: 'dev' }
-    ];
-
-    versions.forEach(v => {
-        const option = createElement('option', {
-            text: v.label,
-            attrs: {
-                value: v.value,
-                'data-channel': v.channel,
-                'data-track': v.track || ''
-            }
-        });
-        dropdown.appendChild(option);
+    // Show loading indicator
+    const loadingOption = createElement('option', {
+        text: 'Loading versions...',
+        attrs: { disabled: 'true', selected: 'true' }
     });
+    dropdown.appendChild(loadingOption);
 
     container.appendChild(label);
     container.appendChild(dropdown);
+
+    // Fetch versions asynchronously
+    (async () => {
+        try {
+            const { latestVersion, v10Releases } = await fetchAvailableVersions();
+
+            // Clear loading indicator
+            dropdown.innerHTML = '';
+
+            // Build version options array
+            const versions = [];
+
+            // Add all v1.0.x releases (newest first)
+            v10Releases.forEach((version, index) => {
+                const isLatest = version === latestVersion;
+                versions.push({
+                    value: version,
+                    label: isLatest ? `${version} (Latest Production)` : version,
+                    channel: 'prod'
+                });
+            });
+
+            // Add special options
+            versions.push(
+                { value: 'v1.0-latest', label: 'Auto-Patch v1.0.x (Recommended)', channel: 'auto-patch', track: 'v1.0-latest' },
+                { value: 'latest', label: 'Beta - Latest Release (Any Version)', channel: 'beta' },
+                { value: 'dev', label: 'Dev - Unstable Builds', channel: 'dev' }
+            );
+
+            // Populate dropdown
+            versions.forEach(v => {
+                const option = createElement('option', {
+                    text: v.label,
+                    attrs: {
+                        value: v.value,
+                        'data-channel': v.channel,
+                        'data-track': v.track || ''
+                    }
+                });
+                dropdown.appendChild(option);
+            });
+
+            logger.debug('[LoaderGeneratorPanel] Version dropdown populated with', versions.length, 'options');
+        } catch (err) {
+            logger.error('[LoaderGeneratorPanel] Failed to populate version dropdown:', err);
+
+            // Fallback: populate with hardcoded versions
+            dropdown.innerHTML = '';
+            const fallbackVersions = [
+                { value: 'v1.0.6', label: 'v1.0.6 (Latest Production)', channel: 'prod' },
+                { value: 'v1.0.5', label: 'v1.0.5', channel: 'prod' },
+                { value: 'v1.0.4', label: 'v1.0.4', channel: 'prod' },
+                { value: 'v1.0.3', label: 'v1.0.3', channel: 'prod' },
+                { value: 'v1.0.2', label: 'v1.0.2', channel: 'prod' },
+                { value: 'v1.0.1', label: 'v1.0.1', channel: 'prod' },
+                { value: 'v1.0.0', label: 'v1.0.0', channel: 'prod' },
+                { value: 'v1.0-latest', label: 'Auto-Patch v1.0.x (Recommended)', channel: 'auto-patch', track: 'v1.0-latest' },
+                { value: 'latest', label: 'Beta - Latest Release (Any Version)', channel: 'beta' },
+                { value: 'dev', label: 'Dev - Unstable Builds', channel: 'dev' }
+            ];
+
+            fallbackVersions.forEach(v => {
+                const option = createElement('option', {
+                    text: v.label,
+                    attrs: {
+                        value: v.value,
+                        'data-channel': v.channel,
+                        'data-track': v.track || ''
+                    }
+                });
+                dropdown.appendChild(option);
+            });
+        }
+    })();
 
     return { versionSelector: container, versionDropdown: dropdown };
 }
@@ -1283,11 +1426,12 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
     const selectedChannel = selectedOption.getAttribute('data-channel') || 'prod';
     const selectedTrack = selectedOption.getAttribute('data-track') || null;
 
-    // For auto-patch channel, extract fallback version from track (e.g., "v1.0-latest" → "v1.0.3")
+    // For auto-patch channel, extract fallback version from track (e.g., "v1.0-latest" → "v1.0.6")
     let fallbackVersion = selectedVersion;
     if (selectedChannel === 'auto-patch' && selectedTrack) {
-        // Use the current production version as fallback
-        fallbackVersion = 'v1.0.3';
+        // Use the dynamically determined latest production version as fallback
+        // If version data is cached, use it; otherwise fall back to v1.0.6
+        fallbackVersion = cachedVersionData?.latestVersion || 'v1.0.6';
     }
 
     // Generate managed config block (C) with all configuration options
