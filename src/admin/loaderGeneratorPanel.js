@@ -311,6 +311,11 @@ export function renderLoaderGeneratorPanel(root) {
                         parsedSettings.version,
                         parsedSettings.versionTrack
                     );
+
+                    // Store for async dropdown population to use
+                    installedVersionValue = dropdownValue;
+
+                    // Also apply immediately in case dropdown is already populated
                     updateVersionDropdownWithInstalled(versionDropdown, dropdownValue);
                 }
 
@@ -452,6 +457,9 @@ export function renderLoaderGeneratorPanel(root) {
 
 // Cache for fetched versions (avoid repeated API calls during same session)
 let cachedVersionData = null;
+
+// Store installed version value for highlighting after async population
+let installedVersionValue = null;
 
 /**
  * Fetch available versions from GitHub Pages manifest
@@ -623,6 +631,12 @@ function createVersionSelector() {
             });
 
             logger.debug('[LoaderGeneratorPanel] Version dropdown populated with', versions.length, 'options');
+
+            // Apply installed version highlighting if it was set during auto-load
+            if (installedVersionValue) {
+                logger.debug('[LoaderGeneratorPanel] Applying installed version highlighting:', installedVersionValue);
+                updateVersionDropdownWithInstalled(dropdown, installedVersionValue);
+            }
         } catch (err) {
             logger.error('[LoaderGeneratorPanel] Failed to populate version dropdown:', err);
 
@@ -652,6 +666,12 @@ function createVersionSelector() {
                 });
                 dropdown.appendChild(option);
             });
+
+            // Apply installed version highlighting if it was set during auto-load
+            if (installedVersionValue) {
+                logger.debug('[LoaderGeneratorPanel] Applying installed version highlighting (fallback):', installedVersionValue);
+                updateVersionDropdownWithInstalled(dropdown, installedVersionValue);
+            }
         }
     })();
 
