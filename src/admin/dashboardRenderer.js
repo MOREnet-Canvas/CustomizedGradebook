@@ -12,6 +12,7 @@ import { logger } from '../utils/logger.js';
 import { getAccountId } from './pageDetection.js';
 import { createElement } from './domHelpers.js';
 import { renderThemeStatusPanels } from './themeStatusPanel.js';
+import { renderAccountSettingsPanel } from './accountSettingsPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
 
 /**
@@ -100,6 +101,9 @@ export function renderAdminDashboardPage() {
 
     // Render theme status panels (Installed Theme Overrides only)
     renderThemeStatusPanels(root);
+
+    // Render account settings panels (Feature Flags & Grading Schemes)
+    renderAccountSettingsPanel(root);
 
     // Render loader generator panel
     renderLoaderGeneratorPanel(root);
