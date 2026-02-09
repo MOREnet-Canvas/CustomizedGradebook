@@ -269,13 +269,16 @@ function generateGradingSchemesHTML(schemes) {
         let tableRows = '';
         if (scheme.grading_scheme && scheme.grading_scheme.length > 0) {
             scheme.grading_scheme.forEach((entry, idx) => {
-                const [name, value] = entry;
+                // Handle both array format [name, value] and object format {name, value}
+                const name = Array.isArray(entry) ? entry[0] : entry.name;
+                const value = Array.isArray(entry) ? entry[1] : entry.value;
 
                 let rangeText = '';
                 if (idx === 0) {
                     rangeText = `${value} to ${value}`;
                 } else {
-                    const upperValue = scheme.grading_scheme[idx - 1][1];
+                    const prevEntry = scheme.grading_scheme[idx - 1];
+                    const upperValue = Array.isArray(prevEntry) ? prevEntry[1] : prevEntry.value;
                     rangeText = `&lt; ${upperValue} to ${value}`;
                 }
 
@@ -522,7 +525,9 @@ function renderGradingScheme(parent, scheme, index) {
         const tbody = createElement('tbody');
 
         scheme.grading_scheme.forEach((entry, idx) => {
-            const [name, value] = entry;
+            // Handle both array format [name, value] and object format {name, value}
+            const name = Array.isArray(entry) ? entry[0] : entry.name;
+            const value = Array.isArray(entry) ? entry[1] : entry.value;
             const row = createElement('tr');
 
             // Letter grade cell
@@ -535,17 +540,14 @@ function renderGradingScheme(parent, scheme, index) {
             }));
 
             // Range cell
-            const nextValue = idx < scheme.grading_scheme.length - 1
-                ? scheme.grading_scheme[idx + 1][1]
-                : 0;
-
             let rangeText = '';
             if (idx === 0) {
                 // Highest grade: "X to X"
                 rangeText = `${value} to ${value}`;
             } else {
                 // Other grades: "< X to Y"
-                const upperValue = scheme.grading_scheme[idx - 1][1];
+                const prevEntry = scheme.grading_scheme[idx - 1];
+                const upperValue = Array.isArray(prevEntry) ? prevEntry[1] : prevEntry.value;
                 rangeText = `< ${upperValue} to ${value}`;
             }
 
