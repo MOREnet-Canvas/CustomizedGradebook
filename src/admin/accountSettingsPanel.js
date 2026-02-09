@@ -232,6 +232,144 @@ function renderFeatureFlagPanel(root, featureData) {
     panel.appendChild(details);
 }
 
+
+/**
+ * Open grading schemes in a new tab with formatted HTML
+ *
+ * @param {Array} schemes - Array of grading schemes
+ */
+function openGradingSchemesInNewTab(schemes) {
+    const html = generateGradingSchemesHTML(schemes);
+    const newTab = window.open('', '_blank');
+
+    if (newTab) {
+        newTab.document.write(html);
+        newTab.document.close();
+    } else {
+        console.error('❌ Failed to open new tab. Please check popup blocker settings.');
+        alert('Failed to open new tab. Please check your popup blocker settings.');
+    }
+}
+
+/**
+ * Generate HTML for grading schemes display
+ *
+ * @param {Array} schemes - Array of grading schemes
+ * @returns {string} HTML string
+ */
+function generateGradingSchemesHTML(schemes) {
+    const accountId = window.location.pathname.match(/accounts\/(\d+)/)?.[1] || "unknown";
+
+    let schemesHTML = '';
+
+    schemes.forEach((scheme, index) => {
+        const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
+
+        // Build grading scale table
+        let tableRows = '';
+        if (scheme.grading_scheme && scheme.grading_scheme.length > 0) {
+            scheme.grading_scheme.forEach((entry, idx) => {
+                const [name, value] = entry;
+
+                let rangeText = '';
+                if (idx === 0) {
+                    rangeText = `${value} to ${value}`;
+                } else {
+                    const upperValue = scheme.grading_scheme[idx - 1][1];
+                    rangeText = `&lt; ${upperValue} to ${value}`;
+                }
+
+                tableRows += `
+                    <tr>
+                        <td style="padding: 8px; border-bottom: 1px solid #e8e8e8;">${escapeHtml(name)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e8e8e8;">${rangeText}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        schemesHTML += `
+            <div style="margin-bottom: 32px; padding: 20px; border: 1px solid #d9d9d9; border-radius: 8px; background: #fafafa;">
+                <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #333;">
+                    ${escapeHtml(scheme.title || 'Untitled')} <span style="color: #666; font-weight: normal;">(ID: ${scheme.id})</span>
+                </h2>
+
+                <div style="margin-bottom: 16px; font-size: 14px; color: #666;">
+                    <div><strong>Grade By:</strong> ${gradeBy}</div>
+                    <div style="margin-top: 4px;"><strong>Context:</strong> ${escapeHtml(scheme.context_type || 'Unknown')}</div>
+                    <div style="margin-top: 4px;"><strong>Context ID:</strong> ${scheme.context_id || 'N/A'}</div>
+                    ${scheme.scaling_factor ? `<div style="margin-top: 4px;"><strong>Scaling Factor:</strong> ${scheme.scaling_factor}</div>` : ''}
+                </div>
+
+                ${tableRows ? `
+                    <h3 style="margin: 16px 0 8px 0; font-size: 16px; color: #333;">Grading Scale</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; background: #fff;">
+                        <thead>
+                            <tr style="background: #f0f0f0;">
+                                <th style="text-align: left; padding: 10px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Letter Grade</th>
+                                <th style="text-align: left; padding: 10px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Range</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                ` : '<p style="color: #999; font-style: italic;">No grading scale data available.</p>'}
+            </div>
+        `;
+    });
+
+    return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Grading Schemes - Account ${escapeHtml(accountId)}</title>
+            <style>
+                body {
+                    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    margin: 0;
+                    padding: 32px;
+                    background: #f5f5f5;
+                    color: #333;
+                }
+                .container {
+                    max-width: 1000px;
+                    margin: 0 auto;
+                    background: #fff;
+                    padding: 32px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                h1 {
+                    margin: 0 0 8px 0;
+                    font-size: 28px;
+                    color: #333;
+                }
+                .subtitle {
+                    color: #666;
+                    margin-bottom: 24px;
+                    font-size: 14px;
+                }
+                @media print {
+                    body { background: #fff; padding: 0; }
+                    .container { box-shadow: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Grading Schemes</h1>
+                <div class="subtitle">Account ID: ${escapeHtml(accountId)} | Total Schemes: ${schemes.length}</div>
+                ${schemesHTML}
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+
 /**
  * Render grading schemes panel
  *
@@ -252,6 +390,29 @@ function renderGradingSchemesPanel(root, schemes) {
         }));
         return;
     }
+
+    // Add "View Full Details" button
+    const viewDetailsBtn = createElement('button', {
+        text: '📋 View Full Details',
+        style: {
+            padding: '8px 16px',
+            marginBottom: '12px',
+            background: '#0374B5',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600'
+        },
+        on: {
+            click: () => openGradingSchemesInNewTab(schemes),
+            mouseenter: (e) => { e.target.style.background = '#025a8c'; },
+            mouseleave: (e) => { e.target.style.background = '#0374B5'; }
+        }
+    });
+
+    panel.appendChild(viewDetailsBtn);
 
     // Render each scheme
     schemes.forEach((scheme, index) => {
