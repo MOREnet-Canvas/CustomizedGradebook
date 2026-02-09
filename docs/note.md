@@ -11,20 +11,13 @@ For checking version in DevTools: CG.version
 
 
 ## Next Steps
-
-~~TODO: SpeedGrader - Find lowest rubric score and use that for grade override~~
 TODO: Have the button appear for CBE courses on both gradebook pages
-TODO: Admin dashboard
 TODO: Add Checks for assignments
 - have they had mastery refresh done?
 - do they have points possible set to 0?
 - what grading scheme are they using?
 - are all assignments using same grading scheme?
-TODO: add options for determining standards based courses
-    - name patterns
-    - avg assignment
-    - grading scheme
-    - outcomes used?
+
 
 
 ## Debugging
@@ -46,20 +39,26 @@ TODO: Mastery Refresh: This does not update rubric scores, so outcome results ar
 TODO: remove legacy code
 
 ## Admin Dashboard
- - determine grading scheme
- - determine rubric ratings
- - if override is enabled for account
- - if override should be enforced for course
- - script and css downloads
- - warning that script has changed
- - version number and selector
- - excluded words from outcome
- - extra script inclusion
- - cg_ indicator
- - button label
- - outcome name
- - assignment name
- - rubric name
+ - [ ] **determine grading scheme**
+ - [ ] determine rubric ratings
+ - [x] if override is enabled for account
+ - [x] if override should be enforced for course
+ - [ ] script and css downloads
+ - [x] warning that script has changed
+ - [x] version number and selector
+ - [ ] excluded words from outcome
+ - [x] extra script inclusion
+ - [ ] cg_ indicator
+ - [x] button label
+ - [x] outcome name
+ - [x] assignment name
+ - [x] rubric name
+ - TODO: add options for determining standards based courses
+   - name patterns
+   - avg assignment
+   - grading scheme
+   - outcomes used?
+
 ## Admin Dashboard - Improvements
     - make sure it doesn't reproduce unnecessary code
     - Use don't hard code colors - use theme colors
