@@ -264,6 +264,7 @@ function generateGradingSchemesHTML(schemes) {
 
     schemes.forEach((scheme, index) => {
         const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
+        const scalingFactor = scheme.scaling_factor || null;
 
         // Build grading scale table
         let tableRows = '';
@@ -271,14 +272,18 @@ function generateGradingSchemesHTML(schemes) {
             scheme.grading_scheme.forEach((entry, idx) => {
                 // Handle both array format [name, value] and object format {name, value}
                 const name = Array.isArray(entry) ? entry[0] : entry.name;
-                const value = Array.isArray(entry) ? entry[1] : entry.value;
+                const rawValue = Array.isArray(entry) ? entry[1] : entry.value;
+
+                // Apply scaling factor if present
+                const value = scalingFactor ? (rawValue * scalingFactor).toFixed(2) : rawValue;
 
                 let rangeText = '';
                 if (idx === 0) {
                     rangeText = `${value} to ${value}`;
                 } else {
                     const prevEntry = scheme.grading_scheme[idx - 1];
-                    const upperValue = Array.isArray(prevEntry) ? prevEntry[1] : prevEntry.value;
+                    const rawUpperValue = Array.isArray(prevEntry) ? prevEntry[1] : prevEntry.value;
+                    const upperValue = scalingFactor ? (rawUpperValue * scalingFactor).toFixed(2) : rawUpperValue;
                     rangeText = `&lt; ${upperValue} to ${value}`;
                 }
 
