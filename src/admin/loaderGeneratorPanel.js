@@ -536,9 +536,9 @@ async function fetchAvailableVersions() {
 }
 
 /**
- * Create version selector dropdown (async - fetches versions dynamically)
+ * Create version selector dropdown (fetches versions dynamically via async IIFE)
  */
-async function createVersionSelector() {
+function createVersionSelector() {
     const container = createElement('div', {
         style: {
             marginBottom: '16px',
