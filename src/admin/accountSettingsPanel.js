@@ -292,12 +292,12 @@ function generateGradingSchemesHTML(schemes) {
         }
 
         schemesHTML += `
-            <div style="margin-bottom: 32px; padding: 20px; border: 1px solid #d9d9d9; border-radius: 8px; background: #fafafa;">
-                <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #333;">
+            <div class="scheme-card">
+                <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">
                     ${escapeHtml(scheme.title || 'Untitled')} <span style="color: #666; font-weight: normal;">(ID: ${scheme.id})</span>
                 </h2>
 
-                <div style="margin-bottom: 16px; font-size: 14px; color: #666;">
+                <div style="margin-bottom: 16px; font-size: 13px; color: #666;">
                     <div><strong>Grade By:</strong> ${gradeBy}</div>
                     <div style="margin-top: 4px;"><strong>Context:</strong> ${escapeHtml(scheme.context_type || 'Unknown')}</div>
                     <div style="margin-top: 4px;"><strong>Context ID:</strong> ${scheme.context_id || 'N/A'}</div>
@@ -305,12 +305,12 @@ function generateGradingSchemesHTML(schemes) {
                 </div>
 
                 ${tableRows ? `
-                    <h3 style="margin: 16px 0 8px 0; font-size: 16px; color: #333;">Grading Scale</h3>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; background: #fff;">
+                    <h3 style="margin: 16px 0 8px 0; font-size: 15px; color: #333;">Grading Scale</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; background: #fff;">
                         <thead>
                             <tr style="background: #f0f0f0;">
-                                <th style="text-align: left; padding: 10px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Letter Grade</th>
-                                <th style="text-align: left; padding: 10px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Range</th>
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Letter Grade</th>
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Range</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -338,7 +338,7 @@ function generateGradingSchemesHTML(schemes) {
                     color: #333;
                 }
                 .container {
-                    max-width: 1000px;
+                    max-width: 1400px;
                     margin: 0 auto;
                     background: #fff;
                     padding: 32px;
@@ -355,9 +355,32 @@ function generateGradingSchemesHTML(schemes) {
                     margin-bottom: 24px;
                     font-size: 14px;
                 }
+                .schemes-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 20px;
+                }
+                .scheme-card {
+                    padding: 20px;
+                    border: 1px solid #d9d9d9;
+                    border-radius: 8px;
+                    background: #fafafa;
+                    break-inside: avoid;
+                }
                 @media print {
                     body { background: #fff; padding: 0; }
                     .container { box-shadow: none; }
+                    .schemes-grid { gap: 16px; }
+                }
+                @media (max-width: 1200px) {
+                    .schemes-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+                }
+                @media (max-width: 768px) {
+                    .schemes-grid {
+                        grid-template-columns: 1fr;
+                    }
                 }
             </style>
         </head>
@@ -365,7 +388,9 @@ function generateGradingSchemesHTML(schemes) {
             <div class="container">
                 <h1>Grading Schemes</h1>
                 <div class="subtitle">Account ID: ${escapeHtml(accountId)} | Total Schemes: ${schemes.length}</div>
-                ${schemesHTML}
+                <div class="schemes-grid">
+                    ${schemesHTML}
+                </div>
             </div>
         </body>
         </html>
