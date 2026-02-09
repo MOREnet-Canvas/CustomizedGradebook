@@ -1,0 +1,407 @@
+// src/admin/accountSettingsPanel.js
+/**
+ * Account Settings Panel Module
+ *
+ * Renders diagnostic panels showing:
+ * - Final Grade Override feature flag status
+ * - Account-level grading schemes with IDs and scale data
+ */
+
+import { logger } from '../utils/logger.js';
+import { createElement, createPanel, escapeHtml } from './domHelpers.js';
+
+/**
+ * Parse Link header for pagination
+ *
+ * @param {string} linkHeader - Link header value
+ * @returns {Object} Object with rel types as keys and URLs as values
+ */
+function parseLinkHeader(linkHeader) {
+    if (!linkHeader) return {};
+    const parts = linkHeader.split(",").map(s => s.trim());
+    const links = {};
+    for (const p of parts) {
+        const m = p.match(/^<([^>]+)>\s*;\s*rel="([^"]+)"$/);
+        if (m) links[m[2]] = m[1];
+    }
+    return links;
+}
+
+/**
+ * Fetch final grade override feature flag status
+ *
+ * @param {string} accountId - Account ID
+ * @returns {Promise<Object|null>} Feature flag data or null on error
+ */
+async function fetchFinalGradeOverrideStatus(accountId) {
+    console.log(`📘 Checking final_grades_override feature for account: ${accountId}`);
+
+    const url = `/api/v1/accounts/${accountId}/features/flags/final_grades_override`;
+
+    try {
+        const res = await fetch(url, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { Accept: "application/json" }
+        });
+
+        const ct = res.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+            const text = await res.text();
+            console.error("❌ Expected JSON but got:", ct);
+            console.error("Response preview:", text.slice(0, 300));
+            return null;
+        }
+
+        if (!res.ok) {
+            console.error(`❌ HTTP ${res.status}: ${res.statusText}`);
+            const errorData = await res.json();
+            console.error("Error data:", errorData);
+            return null;
+        }
+
+        const data = await res.json();
+        console.log("✅ Feature flag data:", data);
+
+        // Store for debugging
+        window.cgFinalGradeOverrideFeature = data;
+
+        return data;
+    } catch (err) {
+        console.error("❌ Error fetching feature flag:", err);
+        return null;
+    }
+}
+
+/**
+ * Fetch all grading schemes with pagination
+ *
+ * @param {string} accountId - Account ID
+ * @returns {Promise<Array>} Array of grading schemes
+ */
+async function fetchGradingSchemes(accountId) {
+    console.log(`📘 Capturing grading schemes for account: ${accountId}`);
+
+    let url = `/api/v1/accounts/${accountId}/grading_standards?per_page=100`;
+    const schemes = [];
+
+    while (url) {
+        try {
+            const res = await fetch(url, {
+                method: "GET",
+                credentials: "same-origin",
+                headers: { Accept: "application/json" }
+            });
+
+            const ct = res.headers.get("content-type") || "";
+            if (!ct.includes("application/json")) {
+                const text = await res.text();
+                console.error("❌ Expected JSON but got:", ct);
+                console.error("Response preview:", text.slice(0, 300));
+                break;
+            }
+
+            const data = await res.json();
+            schemes.push(...data);
+
+            const links = parseLinkHeader(res.headers.get("link"));
+            url = links.next || null;
+        } catch (err) {
+            console.error("❌ Error fetching grading schemes:", err);
+            break;
+        }
+    }
+
+    console.log(`✅ Captured ${schemes.length} grading scheme(s).`);
+
+    // Store for debugging
+    window.cgGradingSchemes = schemes;
+
+    return schemes;
+}
+
+/**
+ * Render account settings panel with both features
+ *
+ * @param {HTMLElement} root - Root container element
+ */
+export async function renderAccountSettingsPanel(root) {
+    logger.debug('[AccountSettingsPanel] Rendering account settings panel');
+
+    const accountId = window.location.pathname.match(/accounts\/(\d+)/)?.[1] || "1";
+
+    // Fetch data in parallel
+    const [featureData, schemes] = await Promise.all([
+        fetchFinalGradeOverrideStatus(accountId),
+        fetchGradingSchemes(accountId)
+    ]);
+
+    // Render Feature Flag Panel
+    renderFeatureFlagPanel(root, featureData);
+
+    // Render Grading Schemes Panel
+    renderGradingSchemesPanel(root, schemes);
+}
+
+
+
+/**
+ * Render final grade override feature flag panel
+ *
+ * @param {HTMLElement} root - Root container
+ * @param {Object|null} featureData - Feature flag data
+ */
+function renderFeatureFlagPanel(root, featureData) {
+    const panel = createPanel(root, 'Final Grade Override Feature Status');
+
+    if (!featureData) {
+        panel.appendChild(createElement('div', {
+            text: '❌ Unable to fetch feature flag status. Check console for errors.',
+            style: {
+                padding: '10px',
+                borderRadius: '8px',
+                border: '1px solid #ffa39e',
+                background: '#fff1f0',
+                color: '#cf1322'
+            }
+        }));
+        return;
+    }
+
+    const { state, locked, parent_state } = featureData;
+
+    // Determine visual indicator and message
+    let indicator = '';
+    let message = '';
+    let bgColor = '';
+    let borderColor = '';
+
+    if (state === 'allowed_on' || state === 'on') {
+        indicator = '✅';
+        message = state === 'on'
+            ? 'Final Grade Override: Enabled (forced on)'
+            : 'Final Grade Override: Enabled (allowed on by default)';
+        bgColor = '#f6ffed';
+        borderColor = '#b7eb8f';
+    } else if (state === 'allowed') {
+        indicator = '⚠️';
+        message = 'Final Grade Override: Available (courses can enable)';
+        bgColor = '#fff7e6';
+        borderColor = '#f3d19e';
+    } else {
+        indicator = '❌';
+        message = 'Final Grade Override: Disabled';
+        bgColor = '#fff1f0';
+        borderColor = '#ffa39e';
+    }
+
+    // Status box
+    const statusBox = createElement('div', {
+        html: `<strong>${indicator} ${escapeHtml(message)}</strong>`,
+        style: {
+            padding: '12px',
+            borderRadius: '8px',
+            border: `1px solid ${borderColor}`,
+            background: bgColor,
+            marginBottom: '10px'
+        }
+    });
+
+    panel.appendChild(statusBox);
+
+    // Additional details
+    const details = createElement('div', {
+        style: {
+            fontSize: '13px',
+            color: '#666',
+            marginTop: '8px'
+        }
+    });
+
+    details.appendChild(createElement('div', {
+        html: `<strong>Locked:</strong> ${locked ? 'Yes' : 'No'}`
+    }));
+
+    if (parent_state && parent_state !== state) {
+        details.appendChild(createElement('div', {
+            html: `<strong>Parent State:</strong> ${escapeHtml(parent_state)}`,
+            style: { marginTop: '4px' }
+        }));
+    }
+
+    panel.appendChild(details);
+}
+
+/**
+ * Render grading schemes panel
+ *
+ * @param {HTMLElement} root - Root container
+ * @param {Array} schemes - Array of grading schemes
+ */
+function renderGradingSchemesPanel(root, schemes) {
+    const panel = createPanel(root, `Grading Schemes (${schemes.length} found)`);
+
+    if (schemes.length === 0) {
+        panel.appendChild(createElement('div', {
+            text: 'No grading schemes configured at account level.',
+            style: {
+                padding: '10px',
+                color: '#666',
+                fontStyle: 'italic'
+            }
+        }));
+        return;
+    }
+
+    // Render each scheme
+    schemes.forEach((scheme, index) => {
+        renderGradingScheme(panel, scheme, index);
+    });
+}
+
+/**
+ * Render a single grading scheme
+ *
+ * @param {HTMLElement} parent - Parent container
+ * @param {Object} scheme - Grading scheme data
+ * @param {number} index - Scheme index
+ */
+function renderGradingScheme(parent, scheme, index) {
+    const schemeContainer = createElement('div', {
+        style: {
+            marginTop: index > 0 ? '16px' : '0',
+            padding: '12px',
+            border: '1px solid #e8e8e8',
+            borderRadius: '8px',
+            background: '#fafafa'
+        }
+    });
+
+    // Header with title and ID
+    const header = createElement('div', {
+        html: `<strong>${escapeHtml(scheme.title || 'Untitled')} (ID: ${scheme.id})</strong>`,
+        style: {
+            fontSize: '15px',
+            marginBottom: '8px'
+        }
+    });
+
+    schemeContainer.appendChild(header);
+
+    // Metadata
+    const metadata = createElement('div', {
+        style: {
+            fontSize: '13px',
+            color: '#666',
+            marginBottom: '10px'
+        }
+    });
+
+    const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
+    metadata.appendChild(createElement('div', {
+        html: `<strong>Grade By:</strong> ${gradeBy}`
+    }));
+
+    metadata.appendChild(createElement('div', {
+        html: `<strong>Context:</strong> ${escapeHtml(scheme.context_type || 'Unknown')}`,
+        style: { marginTop: '2px' }
+    }));
+
+    if (scheme.scaling_factor) {
+        metadata.appendChild(createElement('div', {
+            html: `<strong>Scaling Factor:</strong> ${scheme.scaling_factor}`,
+            style: { marginTop: '2px' }
+        }));
+    }
+
+    schemeContainer.appendChild(metadata);
+
+
+    // Grading scale table
+    if (scheme.grading_scheme && scheme.grading_scheme.length > 0) {
+        const table = createElement('table', {
+            style: {
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '13px',
+                marginTop: '8px'
+            }
+        });
+
+        // Table header
+        const thead = createElement('thead');
+        const headerRow = createElement('tr');
+
+        headerRow.appendChild(createElement('th', {
+            text: 'Letter Grade',
+            style: {
+                textAlign: 'left',
+                padding: '6px 8px',
+                borderBottom: '2px solid #d9d9d9',
+                background: '#f0f0f0',
+                fontWeight: '600'
+            }
+        }));
+
+        headerRow.appendChild(createElement('th', {
+            text: 'Range',
+            style: {
+                textAlign: 'left',
+                padding: '6px 8px',
+                borderBottom: '2px solid #d9d9d9',
+                background: '#f0f0f0',
+                fontWeight: '600'
+            }
+        }));
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Table body
+        const tbody = createElement('tbody');
+
+        scheme.grading_scheme.forEach((entry, idx) => {
+            const [name, value] = entry;
+            const row = createElement('tr');
+
+            // Letter grade cell
+            row.appendChild(createElement('td', {
+                text: name,
+                style: {
+                    padding: '6px 8px',
+                    borderBottom: '1px solid #e8e8e8'
+                }
+            }));
+
+            // Range cell
+            const nextValue = idx < scheme.grading_scheme.length - 1
+                ? scheme.grading_scheme[idx + 1][1]
+                : 0;
+
+            let rangeText = '';
+            if (idx === 0) {
+                // Highest grade: "X to X"
+                rangeText = `${value} to ${value}`;
+            } else {
+                // Other grades: "< X to Y"
+                const upperValue = scheme.grading_scheme[idx - 1][1];
+                rangeText = `< ${upperValue} to ${value}`;
+            }
+
+            row.appendChild(createElement('td', {
+                text: rangeText,
+                style: {
+                    padding: '6px 8px',
+                    borderBottom: '1px solid #e8e8e8'
+                }
+            }));
+
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        schemeContainer.appendChild(table);
+    }
+
+    parent.appendChild(schemeContainer);
+}
