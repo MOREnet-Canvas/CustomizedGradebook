@@ -9,6 +9,7 @@
 
 import { logger } from '../utils/logger.js';
 import { createElement, createPanel, escapeHtml } from './domHelpers.js';
+import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 
 /**
  * Parse Link header for pagination
@@ -402,6 +403,201 @@ function generateGradingSchemesHTML(schemes) {
     `;
 }
 
+/**
+ * Open grading scheme examples in a new tab
+ *
+ * TODO: Phase 2 - Add edit functionality before applying to account
+ */
+function openGradingSchemeExamplesInNewTab() {
+    const html = generateGradingSchemeExamplesHTML();
+    const newTab = window.open('', '_blank');
+
+    if (newTab) {
+        newTab.document.write(html);
+        newTab.document.close();
+    } else {
+        console.error('❌ Failed to open new tab. Please check popup blocker settings.');
+        alert('Failed to open new tab. Please check your popup blocker settings.');
+    }
+}
+
+/**
+ * Generate HTML for grading scheme examples display
+ *
+ * @returns {string} HTML string
+ */
+function generateGradingSchemeExamplesHTML() {
+    const accountId = window.location.pathname.match(/accounts\/(\d+)/)?.[1] || "unknown";
+    const examples = getGradingSchemeExamples();
+
+    let schemesHTML = '';
+
+    examples.forEach((scheme, index) => {
+        const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
+        const scalingFactor = scheme.scaling_factor || null;
+
+        // Build grading scale table
+        let tableRows = '';
+        if (scheme.data && scheme.data.length > 0) {
+            scheme.data.forEach((entry, idx) => {
+                const name = entry.name;
+                const rawValue = entry.value;
+
+                // Apply scaling factor if present
+                const value = scalingFactor ? (rawValue * scalingFactor).toFixed(2) : rawValue;
+
+                let rangeText = '';
+                if (idx === 0) {
+                    rangeText = `${value} to ${value}`;
+                } else {
+                    const prevEntry = scheme.data[idx - 1];
+                    const rawUpperValue = prevEntry.value;
+                    const upperValue = scalingFactor ? (rawUpperValue * scalingFactor).toFixed(2) : rawUpperValue;
+                    rangeText = `&lt; ${upperValue} to ${value}`;
+                }
+
+                tableRows += `
+                    <tr>
+                        <td style="padding: 8px; border-bottom: 1px solid #e8e8e8;">${escapeHtml(name)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #e8e8e8;">${rangeText}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        schemesHTML += `
+            <div class="scheme-card">
+                <div class="example-badge" style="display: inline-block; padding: 4px 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 11px; font-weight: 600; color: #856404; margin-bottom: 12px;">
+                    📋 EXAMPLE TEMPLATE
+                </div>
+                <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">
+                    ${escapeHtml(scheme.title || 'Untitled')}
+                </h2>
+
+                <div style="margin-bottom: 16px; font-size: 13px; color: #666;">
+                    <div><strong>Grade By:</strong> ${gradeBy}</div>
+                    <div style="margin-top: 4px;"><strong>Scaling Factor:</strong> ${scheme.scaling_factor}</div>
+                    <div style="margin-top: 4px;"><strong>Scale Items:</strong> ${scheme.data.length}</div>
+                </div>
+
+                ${tableRows ? `
+                    <h3 style="margin: 16px 0 8px 0; font-size: 15px; color: #333;">Grading Scale</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; background: #fff;">
+                        <thead>
+                            <tr style="background: #f0f0f0;">
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Letter Grade</th>
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #d9d9d9; font-weight: 600;">Range</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                ` : '<p style="color: #999; font-style: italic;">No grading scale data available.</p>'}
+
+                <!-- TODO: Phase 2 - Add edit functionality -->
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                    <button disabled style="padding: 8px 16px; background: #ccc; color: #666; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: 600;" title="Coming soon - Edit and apply to account">
+                        ✏️ Edit & Apply to Account (Coming Soon)
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Grading Scheme Examples - Account ${escapeHtml(accountId)}</title>
+            <style>
+                body {
+                    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    margin: 0;
+                    padding: 32px;
+                    background: #f5f5f5;
+                    color: #333;
+                }
+                .container {
+                    max-width: 1400px;
+                    margin: 0 auto;
+                    background: #fff;
+                    padding: 32px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                h1 {
+                    margin: 0 0 8px 0;
+                    font-size: 28px;
+                    color: #333;
+                }
+                .subtitle {
+                    color: #666;
+                    margin-bottom: 24px;
+                    font-size: 14px;
+                }
+                .info-banner {
+                    background: #e7f3ff;
+                    border-left: 4px solid #0374B5;
+                    padding: 16px;
+                    margin-bottom: 24px;
+                    border-radius: 4px;
+                }
+                .info-banner p {
+                    margin: 0;
+                    color: #333;
+                    font-size: 14px;
+                    line-height: 1.6;
+                }
+                .schemes-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 20px;
+                }
+                .scheme-card {
+                    padding: 20px;
+                    border: 1px solid #d9d9d9;
+                    border-radius: 8px;
+                    background: #fafafa;
+                    break-inside: avoid;
+                }
+                @media print {
+                    body { background: #fff; padding: 0; }
+                    .container { box-shadow: none; }
+                    .schemes-grid { gap: 16px; }
+                }
+                @media (max-width: 1200px) {
+                    .schemes-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+                }
+                @media (max-width: 768px) {
+                    .schemes-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>📚 Grading Scheme Examples</h1>
+                <div class="subtitle">Example Templates for Account ${escapeHtml(accountId)}</div>
+
+                <div class="info-banner">
+                    <p><strong>ℹ️ About These Examples:</strong> These are pre-configured grading scheme templates that you can use as a starting point. In a future update, you'll be able to edit these examples and apply them to your account.</p>
+                </div>
+
+                <div class="schemes-grid">
+                    ${schemesHTML}
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+}
+
 
 /**
  * Render grading schemes panel
@@ -445,7 +641,30 @@ function renderGradingSchemesPanel(root, schemes) {
         }
     });
 
+    // Add "View Examples" button
+    const viewExamplesBtn = createElement('button', {
+        text: '📚 View Examples',
+        style: {
+            padding: '8px 16px',
+            marginBottom: '12px',
+            marginLeft: '8px',
+            background: '#0374B5',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600'
+        },
+        on: {
+            click: () => openGradingSchemeExamplesInNewTab(),
+            mouseenter: (e) => { e.target.style.background = '#025a8c'; },
+            mouseleave: (e) => { e.target.style.background = '#0374B5'; }
+        }
+    });
+
     panel.appendChild(viewDetailsBtn);
+    panel.appendChild(viewExamplesBtn);
 
     // Create grid container for scheme cards
     const gridContainer = createElement('div', {
