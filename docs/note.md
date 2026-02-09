@@ -43,10 +43,10 @@ TODO: remove legacy code
  - [ ] determine rubric ratings
  - [x] if override is enabled for account
  - [x] if override should be enforced for course
- - [ ] script and css downloads
+ - [x] script download
  - [x] warning that script has changed
  - [x] version number and selector
- - [ ] excluded words from outcome
+ - [x] excluded words from outcome
  - [x] extra script inclusion
  - [ ] cg_ indicator
  - [x] button label
@@ -63,6 +63,7 @@ TODO: remove legacy code
     - make sure it doesn't reproduce unnecessary code
     - Use don't hard code colors - use theme colors
     - make better json editor
+    - CSS downloader / alert
 
 
 ## Agent Recommendations
