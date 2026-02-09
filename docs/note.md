@@ -64,6 +64,7 @@ TODO: remove legacy code
     - Use don't hard code colors - use theme colors
     - make better json editor
     - CSS downloader / alert
+    - add option to manually type in version and make sure it will work.
 
 
 ## Agent Recommendations
