@@ -417,154 +417,102 @@ function renderGradingSchemesPanel(root, schemes) {
 
     panel.appendChild(viewDetailsBtn);
 
-    // Render each scheme
-    schemes.forEach((scheme, index) => {
-        renderGradingScheme(panel, scheme, index);
-    });
-}
-
-/**
- * Render a single grading scheme
- *
- * @param {HTMLElement} parent - Parent container
- * @param {Object} scheme - Grading scheme data
- * @param {number} index - Scheme index
- */
-function renderGradingScheme(parent, scheme, index) {
-    const schemeContainer = createElement('div', {
+    // Create grid container for scheme cards
+    const gridContainer = createElement('div', {
         style: {
-            marginTop: index > 0 ? '16px' : '0',
-            padding: '12px',
-            border: '1px solid #e8e8e8',
-            borderRadius: '8px',
-            background: '#fafafa'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '12px',
+            marginTop: '12px'
         }
     });
 
-    // Header with title and ID
-    const header = createElement('div', {
-        html: `<strong>${escapeHtml(scheme.title || 'Untitled')} (ID: ${scheme.id})</strong>`,
+    // Render each scheme as a compact card
+    schemes.forEach((scheme) => {
+        renderGradingSchemeCard(gridContainer, scheme);
+    });
+
+    panel.appendChild(gridContainer);
+}
+
+/**
+ * Render a compact grading scheme card (summary only, no table)
+ *
+ * @param {HTMLElement} parent - Parent container
+ * @param {Object} scheme - Grading scheme data
+ */
+function renderGradingSchemeCard(parent, scheme) {
+    const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
+    const scaleCount = scheme.grading_scheme ? scheme.grading_scheme.length : 0;
+
+    const card = createElement('div', {
         style: {
-            fontSize: '15px',
+            padding: '14px',
+            border: '1px solid #d9d9d9',
+            borderRadius: '8px',
+            background: '#fafafa',
+            transition: 'box-shadow 0.2s ease',
+            cursor: 'default'
+        }
+    });
+
+    // Title
+    const title = createElement('div', {
+        html: `<strong>${escapeHtml(scheme.title || 'Untitled')}</strong>`,
+        style: {
+            fontSize: '14px',
+            marginBottom: '6px',
+            color: '#333',
+            fontWeight: '600'
+        }
+    });
+
+    // ID badge
+    const idBadge = createElement('div', {
+        text: `ID: ${scheme.id}`,
+        style: {
+            display: 'inline-block',
+            padding: '2px 8px',
+            background: '#e6f7ff',
+            border: '1px solid #91d5ff',
+            borderRadius: '4px',
+            fontSize: '11px',
+            color: '#0050b3',
+            fontWeight: '600',
             marginBottom: '8px'
         }
     });
 
-    schemeContainer.appendChild(header);
-
     // Metadata
     const metadata = createElement('div', {
         style: {
-            fontSize: '13px',
+            fontSize: '12px',
             color: '#666',
-            marginBottom: '10px'
+            lineHeight: '1.6'
         }
     });
 
-    const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
     metadata.appendChild(createElement('div', {
         html: `<strong>Grade By:</strong> ${gradeBy}`
     }));
 
     metadata.appendChild(createElement('div', {
-        html: `<strong>Context:</strong> ${escapeHtml(scheme.context_type || 'Unknown')}`,
-        style: { marginTop: '2px' }
+        html: `<strong>Context:</strong> ${escapeHtml(scheme.context_type || 'Unknown')}`
+    }));
+
+    metadata.appendChild(createElement('div', {
+        html: `<strong>Scale Items:</strong> ${scaleCount}`
     }));
 
     if (scheme.scaling_factor) {
         metadata.appendChild(createElement('div', {
-            html: `<strong>Scaling Factor:</strong> ${scheme.scaling_factor}`,
-            style: { marginTop: '2px' }
+            html: `<strong>Scaling:</strong> ${scheme.scaling_factor}`
         }));
     }
 
-    schemeContainer.appendChild(metadata);
+    card.appendChild(title);
+    card.appendChild(idBadge);
+    card.appendChild(metadata);
 
-
-    // Grading scale table
-    if (scheme.grading_scheme && scheme.grading_scheme.length > 0) {
-        const table = createElement('table', {
-            style: {
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '13px',
-                marginTop: '8px'
-            }
-        });
-
-        // Table header
-        const thead = createElement('thead');
-        const headerRow = createElement('tr');
-
-        headerRow.appendChild(createElement('th', {
-            text: 'Letter Grade',
-            style: {
-                textAlign: 'left',
-                padding: '6px 8px',
-                borderBottom: '2px solid #d9d9d9',
-                background: '#f0f0f0',
-                fontWeight: '600'
-            }
-        }));
-
-        headerRow.appendChild(createElement('th', {
-            text: 'Range',
-            style: {
-                textAlign: 'left',
-                padding: '6px 8px',
-                borderBottom: '2px solid #d9d9d9',
-                background: '#f0f0f0',
-                fontWeight: '600'
-            }
-        }));
-
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        // Table body
-        const tbody = createElement('tbody');
-
-        scheme.grading_scheme.forEach((entry, idx) => {
-            // Handle both array format [name, value] and object format {name, value}
-            const name = Array.isArray(entry) ? entry[0] : entry.name;
-            const value = Array.isArray(entry) ? entry[1] : entry.value;
-            const row = createElement('tr');
-
-            // Letter grade cell
-            row.appendChild(createElement('td', {
-                text: name,
-                style: {
-                    padding: '6px 8px',
-                    borderBottom: '1px solid #e8e8e8'
-                }
-            }));
-
-            // Range cell
-            let rangeText = '';
-            if (idx === 0) {
-                // Highest grade: "X to X"
-                rangeText = `${value} to ${value}`;
-            } else {
-                // Other grades: "< X to Y"
-                const prevEntry = scheme.grading_scheme[idx - 1];
-                const upperValue = Array.isArray(prevEntry) ? prevEntry[1] : prevEntry.value;
-                rangeText = `< ${upperValue} to ${value}`;
-            }
-
-            row.appendChild(createElement('td', {
-                text: rangeText,
-                style: {
-                    padding: '6px 8px',
-                    borderBottom: '1px solid #e8e8e8'
-                }
-            }));
-
-            tbody.appendChild(row);
-        });
-
-        table.appendChild(tbody);
-        schemeContainer.appendChild(table);
-    }
-
-    parent.appendChild(schemeContainer);
+    parent.appendChild(card);
 }
