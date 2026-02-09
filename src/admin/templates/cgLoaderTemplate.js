@@ -65,38 +65,8 @@ export const CG_LOADER_TEMPLATE = `
         return;
     }
 
-    // Auto-patch channel: fetch version from manifest
-    if (release.channel === "auto-patch" && release.versionTrack) {
-        const manifestUrl = "https://morenet-canvas.github.io/CustomizedGradebook/versions.json";
-        const fallbackVersion = release.version || "v1.0.3";
-
-        fetch(manifestUrl)
-            .then(response => {
-                if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
-                return response.json();
-            })
-            .then(manifest => {
-                const resolvedVersion = manifest[release.versionTrack];
-                if (!resolvedVersion) {
-                    console.warn(\`[CG] Version track "\${release.versionTrack}" not found in manifest, using fallback: \${fallbackVersion}\`);
-                    loadScript(fallbackVersion);
-                } else {
-                    console.log(\`[CG] Resolved \${release.versionTrack} → \${resolvedVersion}\`);
-                    loadScript(resolvedVersion);
-                }
-            })
-            .catch(error => {
-                console.warn(\`[CG] Failed to fetch version manifest: \${error.message}, using fallback: \${fallbackVersion}\`);
-                loadScript(fallbackVersion);
-            });
-        return;
-    }
-
-    // Standard channels: load immediately
-    loadScriptSync();
-
     // ========================================================================
-    // HELPER FUNCTIONS
+    // HELPER FUNCTIONS (defined before use)
     // ========================================================================
 
     function loadScriptSync() {
@@ -133,6 +103,7 @@ export const CG_LOADER_TEMPLATE = `
     }
 
     function loadScript(version) {
+        console.log(\`[CG] Loading auto-patch version: \${version}\`);
         const script = document.createElement("script");
         script.id = bundleId;
         script.defer = true;
@@ -141,5 +112,42 @@ export const CG_LOADER_TEMPLATE = `
         script.onerror = () => console.error(\`[CG] Failed to load customGradebookInit.js (AUTO-PATCH \${version})\`);
         document.head.appendChild(script);
     }
+
+    // ========================================================================
+    // CHANNEL-SPECIFIC LOADING LOGIC
+    // ========================================================================
+
+    // Auto-patch channel: fetch version from manifest
+    if (release.channel === "auto-patch" && release.versionTrack) {
+        console.log(\`[CG] Auto-patch mode: fetching version manifest for track "\${release.versionTrack}"\`);
+        const manifestUrl = "https://morenet-canvas.github.io/CustomizedGradebook/versions.json";
+        const fallbackVersion = release.version || "v1.0.3";
+
+        fetch(manifestUrl)
+            .then(response => {
+                console.log(\`[CG] Manifest fetch response: \${response.status} \${response.statusText}\`);
+                if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
+                return response.json();
+            })
+            .then(manifest => {
+                console.log(\`[CG] Manifest loaded:\`, manifest);
+                const resolvedVersion = manifest[release.versionTrack];
+                if (!resolvedVersion) {
+                    console.warn(\`[CG] Version track "\${release.versionTrack}" not found in manifest, using fallback: \${fallbackVersion}\`);
+                    loadScript(fallbackVersion);
+                } else {
+                    console.log(\`[CG] Resolved \${release.versionTrack} → \${resolvedVersion}\`);
+                    loadScript(resolvedVersion);
+                }
+            })
+            .catch(error => {
+                console.warn(\`[CG] Failed to fetch version manifest: \${error.message}, using fallback: \${fallbackVersion}\`);
+                loadScript(fallbackVersion);
+            });
+        return;
+    }
+
+    // Standard channels: load immediately
+    loadScriptSync();
 })();
 `.trim();
