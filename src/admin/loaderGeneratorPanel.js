@@ -125,6 +125,67 @@ function updateVersionDropdownWithInstalled(dropdown, installedValue) {
 }
 
 /**
+ * Populate configuration controls with parsed settings from installed loader
+ *
+ * @param {Object} controls - Configuration panel controls object
+ * @param {Object} parsedSettings - Parsed settings from Section B
+ */
+function populateConfigurationControls(controls, parsedSettings) {
+    if (!controls || !parsedSettings) return;
+
+    logger.debug('[LoaderGeneratorPanel] Populating configuration controls with parsed settings', parsedSettings);
+
+    // Feature flags
+    if (parsedSettings.enableStudentGradeCustomization !== undefined) {
+        controls.enableStudentGrade.checked = parsedSettings.enableStudentGradeCustomization;
+    }
+    if (parsedSettings.enableGradeOverride !== undefined) {
+        controls.enableGradeOverride.checked = parsedSettings.enableGradeOverride;
+    }
+    if (parsedSettings.enforceCourseOverride !== undefined) {
+        controls.enforceCourseOverride.checked = parsedSettings.enforceCourseOverride;
+    }
+
+    // UI labels
+    if (parsedSettings.updateAvgButtonLabel) {
+        controls.updateAvgButtonLabel.value = parsedSettings.updateAvgButtonLabel;
+    }
+    if (parsedSettings.avgOutcomeName) {
+        controls.avgOutcomeName.value = parsedSettings.avgOutcomeName;
+    }
+    if (parsedSettings.avgAssignmentName) {
+        controls.avgAssignmentName.value = parsedSettings.avgAssignmentName;
+    }
+    if (parsedSettings.avgRubricName) {
+        controls.avgRubricName.value = parsedSettings.avgRubricName;
+    }
+
+    // Outcome configuration
+    if (parsedSettings.defaultMaxPoints !== undefined) {
+        controls.defaultMaxPoints.value = parsedSettings.defaultMaxPoints.toString();
+    }
+    if (parsedSettings.defaultMasteryThreshold !== undefined) {
+        controls.defaultMasteryThreshold.value = parsedSettings.defaultMasteryThreshold.toString();
+    }
+
+    // Rating scale (JSON array)
+    if (parsedSettings.outcomeAndRubricRatings && Array.isArray(parsedSettings.outcomeAndRubricRatings)) {
+        try {
+            controls.ratingsTextarea.value = JSON.stringify(parsedSettings.outcomeAndRubricRatings, null, 2);
+        } catch (err) {
+            logger.warn('[LoaderGeneratorPanel] Failed to stringify outcomeAndRubricRatings', err);
+        }
+    }
+
+    // Excluded keywords (array to comma-separated string)
+    if (parsedSettings.excludedOutcomeKeywords && Array.isArray(parsedSettings.excludedOutcomeKeywords)) {
+        controls.keywordsInput.value = parsedSettings.excludedOutcomeKeywords.join(', ');
+    }
+
+    logger.debug('[LoaderGeneratorPanel] Configuration controls populated successfully');
+}
+
+/**
  * Render loader generator panel
  *
  * @param {HTMLElement} root - Root container element
@@ -251,6 +312,12 @@ export function renderLoaderGeneratorPanel(root) {
                     );
                     updateVersionDropdownWithInstalled(versionDropdown, dropdownValue);
                 }
+
+                // Populate configuration controls with current settings
+                populateConfigurationControls(controls, parsedSettings);
+
+                // Reset change tracking state (no unsaved changes after auto-load)
+                state.hasUnsavedChanges = false;
             } catch (err) {
                 logger.warn('[LoaderGeneratorPanel] Failed to parse current Canvas settings', err);
                 state.currentCanvasSettings = null;
