@@ -40,7 +40,6 @@ function parseConfigFromSectionB(sectionB) {
     }
 
     const managed = sandbox.window.CG_MANAGED;
-    const config = sandbox.window.CG_CONFIG;
 
     if (!managed || !managed.release || !managed.config) {
         throw new Error('Section B does not contain valid CG_MANAGED structure');
@@ -52,17 +51,17 @@ function parseConfigFromSectionB(sectionB) {
         channel: managed.release.channel || 'prod',
         source: managed.release.source || 'github_release',
         versionTrack: managed.release.versionTrack || null,
-        enableStudentGradeCustomization: managed.config.enableStudentGradeCustomization !== false,
-        enableGradeOverride: managed.config.enableGradeOverride !== false,
-        enforceCourseOverride: managed.config.enforceCourseOverride === true,
-        updateAvgButtonLabel: config.UPDATE_AVG_BUTTON_LABEL || 'Update Avg',
-        avgOutcomeName: config.AVG_OUTCOME_NAME || 'Average',
-        avgAssignmentName: config.AVG_ASSIGNMENT_NAME || 'Average Assignment',
-        avgRubricName: config.AVG_RUBRIC_NAME || 'Average Rubric',
-        defaultMaxPoints: config.DEFAULT_MAX_POINTS || 4,
-        defaultMasteryThreshold: config.DEFAULT_MASTERY_THRESHOLD || 3,
-        outcomeAndRubricRatings: config.OUTCOME_AND_RUBRIC_RATINGS || [],
-        excludedOutcomeKeywords: config.EXCLUDED_OUTCOME_KEYWORDS || []
+        enableStudentGradeCustomization: managed.config.ENABLE_STUDENT_GRADE_CUSTOMIZATION !== false,
+        enableGradeOverride: managed.config.ENABLE_GRADE_OVERRIDE !== false,
+        enforceCourseOverride: managed.config.ENFORCE_COURSE_OVERRIDE === true,
+        updateAvgButtonLabel: managed.config.UPDATE_AVG_BUTTON_LABEL || 'Update Avg',
+        avgOutcomeName: managed.config.AVG_OUTCOME_NAME || 'Average',
+        avgAssignmentName: managed.config.AVG_ASSIGNMENT_NAME || 'Average Assignment',
+        avgRubricName: managed.config.AVG_RUBRIC_NAME || 'Average Rubric',
+        defaultMaxPoints: managed.config.DEFAULT_MAX_POINTS || 4,
+        defaultMasteryThreshold: managed.config.DEFAULT_MASTERY_THRESHOLD || 3,
+        outcomeAndRubricRatings: managed.config.OUTCOME_AND_RUBRIC_RATINGS || [],
+        excludedOutcomeKeywords: managed.config.EXCLUDED_OUTCOME_KEYWORDS || []
     };
 }
 
@@ -245,10 +244,10 @@ export function renderLoaderGeneratorPanel(root) {
     const { configLabel, configTA } = createConfigTextarea();
 
     // Textarea C: CG Loader Template (read-only, collapsible)
-    const { templateLabel, templateTA, templateCollapsible } = createTemplateTextarea();
+    const { templateTA, templateCollapsible } = createTemplateTextarea();
 
     // Sticky action panel (right side)
-    const { stickyPanel, changeNotification, genBtn, dlBtn, copyBtn } = createStickyActionPanel();
+    const { changeNotification, genBtn, dlBtn, copyBtn } = createStickyActionPanel();
 
     // Legacy inline actions (hidden, for compatibility)
     const { actions } = createActionButtons();
@@ -296,12 +295,14 @@ export function renderLoaderGeneratorPanel(root) {
 
             // Success - extract sections
             const { A, B, C } = extractSections(text);
+            logger.debug('[LoaderGeneratorPanel] Extracted sections - A length:', A?.length, 'B length:', B?.length, 'C length:', C?.length);
 
             // Parse Section B to extract current Canvas settings
             try {
                 const parsedSettings = parseConfigFromSectionB(B);
                 state.currentCanvasSettings = parsedSettings;
                 logger.debug('[LoaderGeneratorPanel] Stored current Canvas settings', parsedSettings);
+                logger.debug('[LoaderGeneratorPanel] Rating scale data:', parsedSettings.outcomeAndRubricRatings);
 
                 // Auto-select and highlight the currently installed version
                 if (parsedSettings.channel && parsedSettings.version) {
@@ -334,10 +335,13 @@ export function renderLoaderGeneratorPanel(root) {
                 }
             }));
 
-            // Populate textareas
+            // Populate textareas with correct section assignments
+            // A = Other Theme Scripts (external loader)
             setLoaderText(baseTA, A || text, true, unlockBtn, relockBtn);
-            templateTA.value = B || CG_LOADER_TEMPLATE;
-            configTA.value = C;
+            // B = Managed Config Block (generated config)
+            configTA.value = B || '';
+            // C = CG Loader Template (stable loader logic)
+            templateTA.value = C || CG_LOADER_TEMPLATE;
         } catch (err) {
             logger.warn('[LoaderGeneratorPanel] Auto-load failed', err);
 
@@ -581,6 +585,34 @@ function createConfigurationPanel() {
     featureSection.appendChild(enableGradeOverride.label);
     featureSection.appendChild(enforceCourseOverride.label);
 
+    // Excluded Keywords Section
+    const keywordsSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
+    const keywordsTitle = createElement('div', {
+        html: '<strong>Excluded Outcomes from average calcuation (Keywords, comma separated)</strong>',
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
+    });
+
+    const keywordsInput = createElement('input', {
+        attrs: { type: 'text', value: 'Homework Completion', spellcheck: 'false' },
+        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
+    });
+
+    keywordsSection.appendChild(keywordsTitle);
+    keywordsSection.appendChild(keywordsInput);
+
     // UI Labels Section
     const labelsSection = createElement('div', {
         style: {
@@ -707,41 +739,13 @@ function createConfigurationPanel() {
     ratingsSection.appendChild(ratingsTitle);
     ratingsSection.appendChild(ratingsTextarea);
 
-    // Excluded Keywords Section
-    const keywordsSection = createElement('div', {
-        style: {
-            marginBottom: '0',
-            padding: '10px',
-            background: '#f5f5f5',
-            borderRadius: '6px'
-        }
-    });
-    const keywordsTitle = createElement('div', {
-        html: '<strong>Excluded Outcome Keywords (comma-separated)</strong>',
-        style: {
-            marginBottom: '8px',
-            fontSize: '13px',
-            color: '#2D3B45',
-            paddingLeft: '8px',
-            borderLeft: '3px solid #0374B5'
-        }
-    });
-
-    const keywordsInput = createElement('input', {
-        attrs: { type: 'text', value: 'Homework Completion', spellcheck: 'false' },
-        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
-    });
-
-    keywordsSection.appendChild(keywordsTitle);
-    keywordsSection.appendChild(keywordsInput);
-
     // Assemble container
     container.appendChild(title);
     container.appendChild(featureSection);
+    container.appendChild(keywordsSection);
     container.appendChild(labelsSection);
     container.appendChild(outcomeSection);
     container.appendChild(ratingsSection);
-    container.appendChild(keywordsSection);
 
     return {
         container,
@@ -1262,8 +1266,8 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         if (!Array.isArray(outcomeAndRubricRatings)) {
             throw new Error('Ratings must be an array');
         }
-    } catch (e) {
-        alert('Invalid JSON in Rating Scale field. Please fix the JSON syntax.\n\nError: ' + e.message);
+    } catch (err) {
+        alert('Invalid JSON in Rating Scale field. Please fix the JSON syntax.\n\nError: ' + err.message);
         return;
     }
 
