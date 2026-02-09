@@ -51,6 +51,7 @@ function parseConfigFromSectionB(sectionB) {
         version: managed.release.version || 'v1.0.3',
         channel: managed.release.channel || 'prod',
         source: managed.release.source || 'github_release',
+        versionTrack: managed.release.versionTrack || null,
         enableStudentGradeCustomization: managed.config.enableStudentGradeCustomization !== false,
         enableGradeOverride: managed.config.enableGradeOverride !== false,
         enforceCourseOverride: managed.config.enforceCourseOverride === true,
@@ -63,6 +64,64 @@ function parseConfigFromSectionB(sectionB) {
         outcomeAndRubricRatings: config.OUTCOME_AND_RUBRIC_RATINGS || [],
         excludedOutcomeKeywords: config.EXCLUDED_OUTCOME_KEYWORDS || []
     };
+}
+
+/**
+ * Map channel and version to dropdown value
+ *
+ * @param {string} channel - Release channel (prod, auto-patch, beta, dev)
+ * @param {string} version - Version string (e.g., "v1.0.3")
+ * @param {string|null} versionTrack - Version track for auto-patch (e.g., "v1.0-latest")
+ * @returns {string} Dropdown value
+ */
+function mapChannelToDropdownValue(channel, version, versionTrack = null) {
+    if (channel === 'auto-patch') {
+        return versionTrack || 'v1.0-latest';
+    } else if (channel === 'beta') {
+        return 'latest';
+    } else if (channel === 'dev') {
+        return 'dev';
+    } else {
+        // prod or any other channel - use specific version
+        return version;
+    }
+}
+
+/**
+ * Update version dropdown to highlight and select the currently installed version
+ *
+ * @param {HTMLSelectElement} dropdown - Version dropdown element
+ * @param {string} installedValue - The dropdown value that matches the installed version
+ */
+function updateVersionDropdownWithInstalled(dropdown, installedValue) {
+    if (!dropdown || !installedValue) return;
+
+    // Update all options to add/remove the "Currently Installed" indicator
+    Array.from(dropdown.options).forEach(option => {
+        const baseLabel = option.getAttribute('data-base-label') || option.text.replace(' ✓ Currently Installed', '');
+
+        // Store the base label if not already stored
+        if (!option.getAttribute('data-base-label')) {
+            option.setAttribute('data-base-label', baseLabel);
+        }
+
+        if (option.value === installedValue) {
+            // Mark as currently installed
+            option.text = baseLabel + ' ✓ Currently Installed';
+            option.style.fontWeight = 'bold';
+            option.style.color = '#0374B5';
+        } else {
+            // Remove installed indicator
+            option.text = baseLabel;
+            option.style.fontWeight = 'normal';
+            option.style.color = '';
+        }
+    });
+
+    // Set the dropdown to the installed version
+    dropdown.value = installedValue;
+
+    logger.debug('[LoaderGeneratorPanel] Version dropdown updated to show installed version:', installedValue);
 }
 
 /**
@@ -182,6 +241,16 @@ export function renderLoaderGeneratorPanel(root) {
                 const parsedSettings = parseConfigFromSectionB(B);
                 state.currentCanvasSettings = parsedSettings;
                 logger.debug('[LoaderGeneratorPanel] Stored current Canvas settings', parsedSettings);
+
+                // Auto-select and highlight the currently installed version
+                if (parsedSettings.channel && parsedSettings.version) {
+                    const dropdownValue = mapChannelToDropdownValue(
+                        parsedSettings.channel,
+                        parsedSettings.version,
+                        parsedSettings.versionTrack
+                    );
+                    updateVersionDropdownWithInstalled(versionDropdown, dropdownValue);
+                }
             } catch (err) {
                 logger.warn('[LoaderGeneratorPanel] Failed to parse current Canvas settings', err);
                 state.currentCanvasSettings = null;
