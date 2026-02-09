@@ -600,12 +600,37 @@ function createVersionSelector() {
             // Build version options array
             const versions = [];
 
-            // Add all v1.0.x releases (newest first)
-            v10Releases.forEach((version, index) => {
+            // Limit production versions to 5 most recent + currently installed (if older)
+            const MAX_VERSIONS_TO_SHOW = 5;
+            const versionsToShow = new Set(v10Releases.slice(0, MAX_VERSIONS_TO_SHOW));
+
+            // If installed version exists and is a production version not in the recent 5, add it
+            if (installedVersionValue && installedVersionValue.startsWith('v1.0.')) {
+                versionsToShow.add(installedVersionValue);
+            }
+
+            // Convert to array and sort (newest first)
+            const sortedVersions = Array.from(versionsToShow).sort((a, b) => {
+                const patchA = parseInt(a.split('.')[2] || '0', 10);
+                const patchB = parseInt(b.split('.')[2] || '0', 10);
+                return patchB - patchA; // Descending order
+            });
+
+            // Add production versions with appropriate labels
+            sortedVersions.forEach((version) => {
                 const isLatest = version === latestVersion;
+                const isInstalled = version === installedVersionValue;
+
+                let label = version;
+                if (isLatest) {
+                    label += ' (Latest Production)';
+                } else if (isInstalled) {
+                    label += ' (Currently Installed)';
+                }
+
                 versions.push({
                     value: version,
-                    label: isLatest ? `${version} (Latest Production)` : version,
+                    label: label,
                     channel: 'prod'
                 });
             });
@@ -642,18 +667,52 @@ function createVersionSelector() {
 
             // Fallback: populate with hardcoded versions
             dropdown.innerHTML = '';
-            const fallbackVersions = [
-                { value: 'v1.0.6', label: 'v1.0.6 (Latest Production)', channel: 'prod' },
-                { value: 'v1.0.5', label: 'v1.0.5', channel: 'prod' },
-                { value: 'v1.0.4', label: 'v1.0.4', channel: 'prod' },
-                { value: 'v1.0.3', label: 'v1.0.3', channel: 'prod' },
-                { value: 'v1.0.2', label: 'v1.0.2', channel: 'prod' },
-                { value: 'v1.0.1', label: 'v1.0.1', channel: 'prod' },
-                { value: 'v1.0.0', label: 'v1.0.0', channel: 'prod' },
+
+            // Apply same logic: limit to 5 most recent + currently installed
+            const fallbackLatestVersion = 'v1.0.6';
+            const fallbackAllVersions = ['v1.0.6', 'v1.0.5', 'v1.0.4', 'v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0'];
+            const MAX_VERSIONS_TO_SHOW = 5;
+            const fallbackVersionsToShow = new Set(fallbackAllVersions.slice(0, MAX_VERSIONS_TO_SHOW));
+
+            // If installed version exists and is a production version not in the recent 5, add it
+            if (installedVersionValue && installedVersionValue.startsWith('v1.0.')) {
+                fallbackVersionsToShow.add(installedVersionValue);
+            }
+
+            // Convert to array and sort (newest first)
+            const sortedFallbackVersions = Array.from(fallbackVersionsToShow).sort((a, b) => {
+                const patchA = parseInt(a.split('.')[2] || '0', 10);
+                const patchB = parseInt(b.split('.')[2] || '0', 10);
+                return patchB - patchA;
+            });
+
+            // Build fallback version options
+            const fallbackVersions = [];
+
+            sortedFallbackVersions.forEach((version) => {
+                const isLatest = version === fallbackLatestVersion;
+                const isInstalled = version === installedVersionValue;
+
+                let label = version;
+                if (isLatest) {
+                    label += ' (Latest Production)';
+                } else if (isInstalled) {
+                    label += ' (Currently Installed)';
+                }
+
+                fallbackVersions.push({
+                    value: version,
+                    label: label,
+                    channel: 'prod'
+                });
+            });
+
+            // Add special options
+            fallbackVersions.push(
                 { value: 'v1.0-latest', label: 'Auto-Patch v1.0.x (Recommended)', channel: 'auto-patch', track: 'v1.0-latest' },
                 { value: 'latest', label: 'Beta - Latest Release (Any Version)', channel: 'beta' },
                 { value: 'dev', label: 'Dev - Unstable Builds', channel: 'dev' }
-            ];
+            );
 
             fallbackVersions.forEach(v => {
                 const option = createElement('option', {
