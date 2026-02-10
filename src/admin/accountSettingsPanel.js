@@ -1543,49 +1543,39 @@ function generateGradingSchemeExamplesHTML() {
                         const isPointsMode = pointsRadio.checked;
 
                         rows.forEach((row, index) => {
-                            const valueInput = row.querySelector('input[type="number"]');
                             const rangeDisplay = row.querySelector('.range-display');
-
                             if (!rangeDisplay) return;
 
-                            const currentValue = parseFloat(valueInput.value) || 0;
-                            let rangeText = '';
-
-                            if (isPointsMode) {
-                                // Points mode
-                                if (index === 0) {
-                                    // First row - highest grade
-                                    const maxPoints = currentValue;
-                                    rangeText = \`\${currentValue} to \${maxPoints} pts\`;
-                                } else {
-                                    // Other rows
-                                    const prevValueInput = rows[index - 1].querySelector('input[type="number"]');
-                                    const upperBound = parseFloat(prevValueInput.value) || 0;
-                                    rangeText = \`< \${upperBound} to \${currentValue} pts\`;
-                                }
+                            if (index === 0) {
+                                // First row - no range display needed (has two inputs)
+                                rangeDisplay.textContent = '';
                             } else {
-                                // Percentage mode (0-1 decimal, display as percentage)
-                                if (index === 0) {
-                                    // First row - highest grade
-                                    const percentage = Math.round(currentValue * 100);
-                                    rangeText = \`\${percentage}% to 100%\`;
-                                } else {
-                                    // Other rows
-                                    const prevValueInput = rows[index - 1].querySelector('input[type="number"]');
-                                    const upperBound = parseFloat(prevValueInput.value) || 0;
-                                    const upperPercentage = Math.round(upperBound * 100);
-                                    const currentPercentage = Math.round(currentValue * 100);
-                                    rangeText = \`\${currentPercentage}% to < \${upperPercentage}%\`;
-                                }
-                            }
+                                // Other rows - show calculated range
+                                const valueInput = row.querySelector('.threshold-input');
+                                const currentValue = parseFloat(valueInput.value) || 0;
 
-                            rangeDisplay.textContent = rangeText;
+                                // Get upper bound from previous row's threshold
+                                const prevRow = rows[index - 1];
+                                const prevThresholdInput = prevRow.querySelector('.threshold-input');
+                                const upperBound = parseFloat(prevThresholdInput.value) || 0;
+
+                                let rangeText = '';
+                                if (isPointsMode) {
+                                    rangeText = \`< \${upperBound}\`;
+                                } else {
+                                    const upperPercentage = Math.round(upperBound * 100);
+                                    rangeText = \`< \${upperPercentage}%\`;
+                                }
+
+                                rangeDisplay.textContent = rangeText;
+                            }
                         });
                     };
 
                     // Function to add entry row
-                    const addEntryRow = (name = '', value = 0, isPointsMode = false) => {
+                    const addEntryRow = (name = '', value = 0, isPointsMode = false, maxPoints = null) => {
                         const row = createElement('tr');
+                        const isFirstRow = tbody.children.length === 0;
 
                         // Letter Grade column
                         const nameCell = createElement('td', {
@@ -1612,7 +1602,7 @@ function generateGradingSchemeExamplesHTML() {
                         nameCell.appendChild(nameInput);
                         row.appendChild(nameCell);
 
-                        // Range column - contains both display and input
+                        // Range column - different structure for first row vs others
                         const rangeCell = createElement('td', {
                             style: {
                                 padding: '6px',
@@ -1620,7 +1610,6 @@ function generateGradingSchemeExamplesHTML() {
                             }
                         });
 
-                        // Container for range display and input
                         const rangeContainer = createElement('div', {
                             style: {
                                 display: 'flex',
@@ -1629,60 +1618,132 @@ function generateGradingSchemeExamplesHTML() {
                             }
                         });
 
-                        // Range display (read-only text)
-                        const rangeDisplay = createElement('span', {
-                            text: '',
-                            attrs: {
-                                class: 'range-display'
-                            },
-                            style: {
-                                fontSize: '13px',
-                                color: '#666',
-                                whiteSpace: 'nowrap',
-                                minWidth: '120px'
-                            }
-                        });
+                        if (isFirstRow) {
+                            // First row: Two editable inputs (upper bound and lower bound)
+                            // Upper bound input (maximum points)
+                            const upperBoundInput = createElement('input', {
+                                attrs: {
+                                    type: 'number',
+                                    value: maxPoints !== null ? maxPoints.toString() : value.toString(),
+                                    min: '0',
+                                    step: '0.01',
+                                    required: 'true',
+                                    class: 'max-points-input'
+                                },
+                                style: {
+                                    width: '80px',
+                                    padding: '6px',
+                                    border: '1px solid #d9d9d9',
+                                    borderRadius: '4px',
+                                    fontSize: '13px',
+                                    boxSizing: 'border-box'
+                                }
+                            });
 
-                        // "to" label
-                        const toLabel = createElement('span', {
-                            text: 'to',
-                            style: {
-                                fontSize: '13px',
-                                color: '#666',
-                                margin: '0 4px'
-                            }
-                        });
+                            upperBoundInput.addEventListener('input', () => {
+                                updateRangeDisplays();
+                            });
 
-                        // Value input - editable threshold
-                        const valueInput = createElement('input', {
-                            attrs: {
-                                type: 'number',
-                                value: value.toString(),
-                                min: '0',
-                                step: '0.01',
-                                required: 'true'
-                            },
-                            style: {
-                                width: '80px',
-                                padding: '6px',
-                                border: '1px solid #d9d9d9',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                                boxSizing: 'border-box'
-                            }
-                        });
+                            const toLabel = createElement('span', {
+                                text: 'to',
+                                style: {
+                                    fontSize: '13px',
+                                    color: '#666',
+                                    margin: '0 4px'
+                                }
+                            });
 
-                        // Store the mode on the input for later reference
-                        valueInput.dataset.isPointsMode = isPointsMode ? 'true' : 'false';
+                            // Lower bound input (threshold)
+                            const thresholdInput = createElement('input', {
+                                attrs: {
+                                    type: 'number',
+                                    value: value.toString(),
+                                    min: '0',
+                                    step: '0.01',
+                                    required: 'true',
+                                    class: 'threshold-input'
+                                },
+                                style: {
+                                    width: '80px',
+                                    padding: '6px',
+                                    border: '1px solid #d9d9d9',
+                                    borderRadius: '4px',
+                                    fontSize: '13px',
+                                    boxSizing: 'border-box'
+                                }
+                            });
 
-                        // Update range displays when value changes
-                        valueInput.addEventListener('input', () => {
-                            updateRangeDisplays();
-                        });
+                            thresholdInput.addEventListener('input', () => {
+                                updateRangeDisplays();
+                            });
 
-                        rangeContainer.appendChild(rangeDisplay);
-                        rangeContainer.appendChild(toLabel);
-                        rangeContainer.appendChild(valueInput);
+                            // Hidden range display for consistency
+                            const rangeDisplay = createElement('span', {
+                                text: '',
+                                attrs: {
+                                    class: 'range-display'
+                                },
+                                style: {
+                                    display: 'none'
+                                }
+                            });
+
+                            rangeContainer.appendChild(upperBoundInput);
+                            rangeContainer.appendChild(toLabel);
+                            rangeContainer.appendChild(thresholdInput);
+                            rangeContainer.appendChild(rangeDisplay);
+                        } else {
+                            // Other rows: Range display + threshold input
+                            const rangeDisplay = createElement('span', {
+                                text: '',
+                                attrs: {
+                                    class: 'range-display'
+                                },
+                                style: {
+                                    fontSize: '13px',
+                                    color: '#666',
+                                    whiteSpace: 'nowrap',
+                                    minWidth: '60px'
+                                }
+                            });
+
+                            const toLabel = createElement('span', {
+                                text: 'to',
+                                style: {
+                                    fontSize: '13px',
+                                    color: '#666',
+                                    margin: '0 4px'
+                                }
+                            });
+
+                            const thresholdInput = createElement('input', {
+                                attrs: {
+                                    type: 'number',
+                                    value: value.toString(),
+                                    min: '0',
+                                    step: '0.01',
+                                    required: 'true',
+                                    class: 'threshold-input'
+                                },
+                                style: {
+                                    width: '80px',
+                                    padding: '6px',
+                                    border: '1px solid #d9d9d9',
+                                    borderRadius: '4px',
+                                    fontSize: '13px',
+                                    boxSizing: 'border-box'
+                                }
+                            });
+
+                            thresholdInput.addEventListener('input', () => {
+                                updateRangeDisplays();
+                            });
+
+                            rangeContainer.appendChild(rangeDisplay);
+                            rangeContainer.appendChild(toLabel);
+                            rangeContainer.appendChild(thresholdInput);
+                        }
+
                         rangeCell.appendChild(rangeContainer);
                         row.appendChild(rangeCell);
 
@@ -1731,11 +1792,19 @@ function generateGradingSchemeExamplesHTML() {
 
                     // Add existing entries from example
                     // Convert values based on mode: if points-based, convert from 0-1 to actual points
-                    exampleScheme.data.forEach(entry => {
+                    const maxPoints = exampleScheme.points_based ? exampleScheme.scaling_factor : 1;
+
+                    exampleScheme.data.forEach((entry, index) => {
                         const displayValue = exampleScheme.points_based
                             ? entry.value * exampleScheme.scaling_factor
                             : entry.value;
-                        addEntryRow(entry.name, displayValue, exampleScheme.points_based);
+
+                        // Pass maxPoints only for the first row
+                        if (index === 0) {
+                            addEntryRow(entry.name, displayValue, exampleScheme.points_based, maxPoints);
+                        } else {
+                            addEntryRow(entry.name, displayValue, exampleScheme.points_based, null);
+                        }
                     });
 
                     entriesGroup.appendChild(entriesTable);
@@ -1759,7 +1828,7 @@ function generateGradingSchemeExamplesHTML() {
                         on: {
                             click: () => {
                                 const isPointsMode = pointsRadio.checked;
-                                addEntryRow('', 0, isPointsMode);
+                                addEntryRow('', 0, isPointsMode, null);
                             }
                         }
                     });
@@ -1769,32 +1838,40 @@ function generateGradingSchemeExamplesHTML() {
 
                     // Function to convert all existing row values when switching modes
                     const convertRowValues = (toPointsMode) => {
-                        const rows = tbody.querySelectorAll('tr');
-                        rows.forEach(row => {
-                            const valueInput = row.querySelector('input[type="number"]');
-                            const currentValue = parseFloat(valueInput.value) || 0;
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
 
-                            if (toPointsMode) {
-                                // Converting from 0-1 decimal to points
-                                // Use scaling factor from example or default to 4
-                                const scalingFactor = exampleScheme.scaling_factor || 4;
+                        if (toPointsMode) {
+                            // Converting from 0-1 decimal to points
+                            const scalingFactor = exampleScheme.scaling_factor || 4;
+
+                            rows.forEach((row, index) => {
+                                const thresholdInput = row.querySelector('.threshold-input');
+                                const currentValue = parseFloat(thresholdInput.value) || 0;
                                 const pointValue = currentValue * scalingFactor;
-                                valueInput.value = pointValue;
-                                valueInput.step = '0.01';
-                                valueInput.removeAttribute('max');
-                                valueInput.dataset.isPointsMode = 'true';
-                            } else {
-                                // Converting from points to 0-1 decimal
-                                // Find max value from all rows to calculate scaling
-                                const allValues = Array.from(tbody.querySelectorAll('input[type="number"]'))
-                                    .map(input => parseFloat(input.value) || 0);
-                                const maxValue = Math.max(...allValues, 1);
+                                thresholdInput.value = pointValue;
+
+                                // For first row, also update max points input
+                                if (index === 0) {
+                                    const maxPointsInput = row.querySelector('.max-points-input');
+                                    if (maxPointsInput) {
+                                        maxPointsInput.value = scalingFactor;
+                                    }
+                                }
+                            });
+                        } else {
+                            // Converting from points to 0-1 decimal
+                            // Get max points from first row
+                            const firstRow = rows[0];
+                            const maxPointsInput = firstRow ? firstRow.querySelector('.max-points-input') : null;
+                            const maxValue = maxPointsInput ? parseFloat(maxPointsInput.value) : 1;
+
+                            rows.forEach((row, index) => {
+                                const thresholdInput = row.querySelector('.threshold-input');
+                                const currentValue = parseFloat(thresholdInput.value) || 0;
                                 const decimalValue = (currentValue / maxValue).toFixed(3);
-                                valueInput.value = decimalValue;
-                                valueInput.step = '0.01';
-                                valueInput.dataset.isPointsMode = 'false';
-                            }
-                        });
+                                thresholdInput.value = decimalValue;
+                            });
+                        }
 
                         // Update range displays after conversion
                         updateRangeDisplays();
@@ -1904,13 +1981,23 @@ function generateGradingSchemeExamplesHTML() {
                             // Collect entries from table
                             const rows = tbody.querySelectorAll('tr');
                             const rawEntries = [];
+                            let maxPointsValue = null;
 
-                            rows.forEach(row => {
+                            rows.forEach((row, index) => {
                                 const nameInput = row.querySelector('input[type="text"]');
-                                const valueInput = row.querySelector('input[type="number"]');
+                                const thresholdInput = row.querySelector('.threshold-input');
+
+                                // For first row, also get the max points input
+                                if (index === 0) {
+                                    const maxPointsInput = row.querySelector('.max-points-input');
+                                    if (maxPointsInput) {
+                                        maxPointsValue = parseFloat(maxPointsInput.value);
+                                    }
+                                }
+
                                 rawEntries.push({
                                     name: nameInput.value.trim(),
-                                    rawValue: parseFloat(valueInput.value)
+                                    rawValue: parseFloat(thresholdInput.value)
                                 });
                             });
 
@@ -1927,14 +2014,19 @@ function generateGradingSchemeExamplesHTML() {
                             const data = [];
 
                             if (points_based) {
-                                // Find maximum point value from entries
-                                const maxPoints = Math.max(...rawEntries.map(e => e.rawValue));
-
-                                if (maxPoints <= 0) {
-                                    throw new Error('Point values must be greater than 0');
+                                // Use the max points from the first row's upper bound input
+                                if (maxPointsValue === null || maxPointsValue <= 0) {
+                                    throw new Error('Maximum points must be greater than 0');
                                 }
 
-                                scaling_factor = maxPoints;
+                                scaling_factor = maxPointsValue;
+
+                                // Validate that all thresholds are <= max points
+                                rawEntries.forEach(entry => {
+                                    if (entry.rawValue > maxPointsValue) {
+                                        throw new Error(\`Threshold value \${entry.rawValue} cannot exceed maximum points \${maxPointsValue}\`);
+                                    }
+                                });
 
                                 // Convert point values to 0-1 decimal range
                                 rawEntries.forEach(entry => {
