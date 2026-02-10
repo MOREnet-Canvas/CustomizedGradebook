@@ -1661,6 +1661,26 @@ function generateGradingSchemeExamplesHTML() {
                             });
 
                             upperBoundInput.addEventListener('input', () => {
+                                // When max points changes, recalculate all threshold values proportionally
+                                const newMaxPoints = parseFloat(upperBoundInput.value) || 0;
+                                const oldMaxPoints = exampleScheme.points_based ? exampleScheme.scaling_factor : 1;
+
+                                if (newMaxPoints > 0 && oldMaxPoints > 0 && pointsRadio.checked) {
+                                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                                    rows.forEach((row, index) => {
+                                        const thresholdInput = row.querySelector('.threshold-input');
+                                        if (thresholdInput) {
+                                            // Get the original value from the template
+                                            const originalEntry = exampleScheme.data[index];
+                                            if (originalEntry) {
+                                                // Recalculate based on original 0-1 value and new max points
+                                                const newValue = originalEntry.value * newMaxPoints;
+                                                thresholdInput.value = newValue.toFixed(2);
+                                            }
+                                        }
+                                    });
+                                }
+
                                 updateRangeDisplays();
                             });
 
@@ -2072,6 +2092,18 @@ function generateGradingSchemeExamplesHTML() {
 
                             // Sort entries by value (descending) - Canvas requirement
                             data.sort((a, b) => b.value - a.value);
+
+                            // Validate for duplicate values
+                            const values = data.map(entry => entry.value);
+                            const uniqueValues = new Set(values);
+                            if (values.length !== uniqueValues.size) {
+                                // Find duplicates for error message
+                                const duplicates = values.filter((value, index) => values.indexOf(value) !== index);
+                                const duplicateDisplay = points_based
+                                    ? duplicates.map(v => (v * scaling_factor).toFixed(2)).join(', ')
+                                    : duplicates.map(v => (v * 100).toFixed(0) + '%').join(', ');
+                                throw new Error(\`Grading scheme cannot contain duplicate values. Duplicates found: \${duplicateDisplay}\`);
+                            }
 
                             // Create grading standard
                             const gradingSchemeData = {
