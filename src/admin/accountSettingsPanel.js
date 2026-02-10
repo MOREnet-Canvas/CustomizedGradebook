@@ -1661,26 +1661,6 @@ function generateGradingSchemeExamplesHTML() {
                             });
 
                             upperBoundInput.addEventListener('input', () => {
-                                // When max points changes, recalculate all threshold values proportionally
-                                const newMaxPoints = parseFloat(upperBoundInput.value) || 0;
-                                const oldMaxPoints = exampleScheme.points_based ? exampleScheme.scaling_factor : 1;
-
-                                if (newMaxPoints > 0 && oldMaxPoints > 0 && pointsRadio.checked) {
-                                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                                    rows.forEach((row, index) => {
-                                        const thresholdInput = row.querySelector('.threshold-input');
-                                        if (thresholdInput) {
-                                            // Get the original value from the template
-                                            const originalEntry = exampleScheme.data[index];
-                                            if (originalEntry) {
-                                                // Recalculate based on original 0-1 value and new max points
-                                                const newValue = originalEntry.value * newMaxPoints;
-                                                thresholdInput.value = newValue.toFixed(2);
-                                            }
-                                        }
-                                    });
-                                }
-
                                 updateRangeDisplays();
                             });
 
@@ -2047,6 +2027,19 @@ function generateGradingSchemeExamplesHTML() {
                             }
                             if (rawEntries.length === 0) {
                                 throw new Error('At least one entry is required');
+                            }
+
+                            // Recalculate threshold values based on original template proportions
+                            // This ensures submitted data maintains correct ratios even if user edited max points
+                            if (points_based && maxPointsValue > 0) {
+                                const originalScalingFactor = exampleScheme.scaling_factor;
+                                rawEntries.forEach((entry, index) => {
+                                    const originalEntry = exampleScheme.data[index];
+                                    if (originalEntry) {
+                                        // Recalculate based on original 0-1 value and current max points
+                                        entry.rawValue = originalEntry.value * maxPointsValue;
+                                    }
+                                });
                             }
 
                             // Calculate scaling_factor and convert values to 0-1 range
