@@ -1361,63 +1361,55 @@ function generateGradingSchemeExamplesHTML() {
                     titleGroup.appendChild(titleInput);
                     form.appendChild(titleGroup);
 
-                    // Scaling factor input
-                    const scalingGroup = createElement('div');
-                    scalingGroup.appendChild(createElement('label', {
-                        html: '<strong>Scaling Factor:</strong>',
+                    // Grade by radio button group (Percentage/Points)
+                    const gradeByGroup = createElement('div');
+                    gradeByGroup.appendChild(createElement('label', {
+                        html: '<strong>Grade by</strong>',
                         style: {
                             display: 'block',
-                            marginBottom: '6px',
+                            marginBottom: '8px',
                             fontSize: '14px',
                             color: '#333'
                         }
                     }));
 
-                    const scalingInput = createElement('input', {
-                        attrs: {
-                            type: 'number',
-                            value: exampleScheme.scaling_factor.toString(),
-                            min: '0.01',
-                            step: '0.01',
-                            required: 'true'
-                        },
-                        style: {
-                            width: '200px',
-                            padding: '8px 12px',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '4px',
-                            fontSize: '14px'
-                        }
-                    });
-                    scalingGroup.appendChild(scalingInput);
-                    form.appendChild(scalingGroup);
-
-                    // Points-based checkbox
-                    const pointsGroup = createElement('div', {
+                    const radioContainer = createElement('div', {
                         style: {
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px'
+                            gap: '20px',
+                            marginBottom: '8px'
                         }
                     });
 
-                    const pointsCheckbox = createElement('input', {
+                    // Percentage radio button
+                    const percentageRadioWrapper = createElement('div', {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }
+                    });
+
+                    const percentageRadio = createElement('input', {
                         attrs: {
-                            type: 'checkbox',
-                            id: 'points-based-checkbox',
-                            checked: exampleScheme.points_based ? 'true' : null
+                            type: 'radio',
+                            name: 'grade-by',
+                            id: 'grade-by-percentage',
+                            value: 'percentage',
+                            checked: !exampleScheme.points_based ? 'true' : null
                         },
                         style: {
-                            width: '18px',
-                            height: '18px',
+                            width: '16px',
+                            height: '16px',
                             cursor: 'pointer'
                         }
                     });
 
-                    const pointsLabel = createElement('label', {
-                        html: '<strong>Points-Based</strong>',
+                    const percentageLabel = createElement('label', {
+                        text: 'Percentage',
                         attrs: {
-                            for: 'points-based-checkbox'
+                            for: 'grade-by-percentage'
                         },
                         style: {
                             fontSize: '14px',
@@ -1426,9 +1418,105 @@ function generateGradingSchemeExamplesHTML() {
                         }
                     });
 
-                    pointsGroup.appendChild(pointsCheckbox);
-                    pointsGroup.appendChild(pointsLabel);
-                    form.appendChild(pointsGroup);
+                    percentageRadioWrapper.appendChild(percentageRadio);
+                    percentageRadioWrapper.appendChild(percentageLabel);
+                    radioContainer.appendChild(percentageRadioWrapper);
+
+                    // Points radio button
+                    const pointsRadioWrapper = createElement('div', {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }
+                    });
+
+                    const pointsRadio = createElement('input', {
+                        attrs: {
+                            type: 'radio',
+                            name: 'grade-by',
+                            id: 'grade-by-points',
+                            value: 'points',
+                            checked: exampleScheme.points_based ? 'true' : null
+                        },
+                        style: {
+                            width: '16px',
+                            height: '16px',
+                            cursor: 'pointer'
+                        }
+                    });
+
+                    const pointsLabel = createElement('label', {
+                        text: 'Points',
+                        attrs: {
+                            for: 'grade-by-points'
+                        },
+                        style: {
+                            fontSize: '14px',
+                            color: '#333',
+                            cursor: 'pointer'
+                        }
+                    });
+
+                    pointsRadioWrapper.appendChild(pointsRadio);
+                    pointsRadioWrapper.appendChild(pointsLabel);
+                    radioContainer.appendChild(pointsRadioWrapper);
+
+                    gradeByGroup.appendChild(radioContainer);
+
+                    // Max points input (only visible when Points is selected)
+                    const maxPointsWrapper = createElement('div', {
+                        style: {
+                            display: exampleScheme.points_based ? 'flex' : 'none',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginTop: '8px',
+                            marginLeft: '22px'
+                        }
+                    });
+
+                    maxPointsWrapper.appendChild(createElement('label', {
+                        text: 'Max points:',
+                        style: {
+                            fontSize: '14px',
+                            color: '#666'
+                        }
+                    }));
+
+                    const maxPointsInput = createElement('input', {
+                        attrs: {
+                            type: 'number',
+                            value: exampleScheme.points_based ? exampleScheme.scaling_factor.toString() : '4',
+                            min: '1',
+                            step: '1'
+                        },
+                        style: {
+                            width: '100px',
+                            padding: '6px 10px',
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '4px',
+                            fontSize: '14px'
+                        }
+                    });
+
+                    maxPointsWrapper.appendChild(maxPointsInput);
+                    gradeByGroup.appendChild(maxPointsWrapper);
+
+                    // Toggle max points input visibility based on radio selection
+                    percentageRadio.addEventListener('change', () => {
+                        if (percentageRadio.checked) {
+                            maxPointsWrapper.style.display = 'none';
+                        }
+                    });
+
+                    pointsRadio.addEventListener('change', () => {
+                        if (pointsRadio.checked) {
+                            maxPointsWrapper.style.display = 'flex';
+                            maxPointsInput.focus();
+                        }
+                    });
+
+                    form.appendChild(gradeByGroup);
 
                     // Grading scale entries
                     const entriesGroup = createElement('div');
@@ -1706,8 +1794,20 @@ function generateGradingSchemeExamplesHTML() {
                         try {
                             // Collect form data
                             const title = titleInput.value.trim();
-                            const scaling_factor = parseFloat(scalingInput.value);
-                            const points_based = pointsCheckbox.checked;
+
+                            // Determine scaling_factor and points_based from radio selection
+                            let scaling_factor;
+                            let points_based;
+
+                            if (percentageRadio.checked) {
+                                scaling_factor = 1;
+                                points_based = false;
+                            } else if (pointsRadio.checked) {
+                                scaling_factor = parseFloat(maxPointsInput.value);
+                                points_based = true;
+                            } else {
+                                throw new Error('Please select either Percentage or Points');
+                            }
 
                             // Collect entries
                             const data = [];
@@ -1725,8 +1825,8 @@ function generateGradingSchemeExamplesHTML() {
                             if (!title) {
                                 throw new Error('Title is required');
                             }
-                            if (scaling_factor <= 0) {
-                                throw new Error('Scaling factor must be positive');
+                            if (points_based && (isNaN(scaling_factor) || scaling_factor < 1)) {
+                                throw new Error('Max points must be at least 1');
                             }
                             if (data.length === 0) {
                                 throw new Error('At least one entry is required');
