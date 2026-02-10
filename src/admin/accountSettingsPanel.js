@@ -333,7 +333,11 @@ function generateGradingSchemesHTML(schemes) {
 
                 let rangeText = '';
                 if (idx === 0) {
-                    rangeText = `${value} to ${value}`;
+                    // First entry: upper bound is scaling_factor (points) or 100 (percentage)
+                    const upperBound = scheme.points_based
+                        ? scalingFactor.toFixed(2)
+                        : '100';
+                    rangeText = `${upperBound} to ${value}`;
                 } else {
                     const prevEntry = scheme.grading_scheme[idx - 1];
                     const rawUpperValue = Array.isArray(prevEntry) ? prevEntry[1] : prevEntry.value;
@@ -1037,7 +1041,11 @@ function generateGradingSchemeExamplesHTML() {
 
                 let rangeText = '';
                 if (idx === 0) {
-                    rangeText = `${value} to ${value}`;
+                    // First entry: upper bound is scaling_factor (points) or 100 (percentage)
+                    const upperBound = scheme.points_based
+                        ? scalingFactor.toFixed(2)
+                        : '100';
+                    rangeText = `${upperBound} to ${value}`;
                 } else {
                     const prevEntry = scheme.data[idx - 1];
                     const rawUpperValue = prevEntry.value;
