@@ -1659,7 +1659,7 @@ function generateGradingSchemeExamplesHTML() {
                                 type: 'number',
                                 value: value.toString(),
                                 min: '0',
-                                step: isPointsMode ? '1' : '0.01',
+                                step: '0.01',
                                 required: 'true'
                             },
                             style: {
@@ -1733,7 +1733,7 @@ function generateGradingSchemeExamplesHTML() {
                     // Convert values based on mode: if points-based, convert from 0-1 to actual points
                     exampleScheme.data.forEach(entry => {
                         const displayValue = exampleScheme.points_based
-                            ? Math.round(entry.value * exampleScheme.scaling_factor)
+                            ? entry.value * exampleScheme.scaling_factor
                             : entry.value;
                         addEntryRow(entry.name, displayValue, exampleScheme.points_based);
                     });
@@ -1778,9 +1778,9 @@ function generateGradingSchemeExamplesHTML() {
                                 // Converting from 0-1 decimal to points
                                 // Use scaling factor from example or default to 4
                                 const scalingFactor = exampleScheme.scaling_factor || 4;
-                                const pointValue = Math.round(currentValue * scalingFactor);
+                                const pointValue = currentValue * scalingFactor;
                                 valueInput.value = pointValue;
-                                valueInput.step = '1';
+                                valueInput.step = '0.01';
                                 valueInput.removeAttribute('max');
                                 valueInput.dataset.isPointsMode = 'true';
                             } else {
