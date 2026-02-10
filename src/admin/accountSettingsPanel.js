@@ -2030,27 +2030,6 @@ function generateGradingSchemeExamplesHTML() {
                                 throw new Error('At least one entry is required');
                             }
 
-                            // Recalculate threshold values based on original template proportions
-                            // This ensures submitted data maintains correct ratios even if user edited max points
-                            if (points_based && maxPointsValue > 0) {
-                                rawEntries.forEach((entry, index) => {
-                                    const originalEntry = exampleScheme.data[index];
-                                    if (originalEntry) {
-                                        // Recalculate based on original 0-1 value and current max points
-                                        entry.rawValue = originalEntry.value * maxPointsValue;
-                                    }
-                                });
-                            } else if (!points_based) {
-                                // For percentage-based, recalculate from 0-1 to percentage (0-100)
-                                rawEntries.forEach((entry, index) => {
-                                    const originalEntry = exampleScheme.data[index];
-                                    if (originalEntry) {
-                                        // Convert from 0-1 to percentage
-                                        entry.rawValue = originalEntry.value * 100;
-                                    }
-                                });
-                            }
-
                             // Determine scaling_factor and validate values
                             let scaling_factor;
 
