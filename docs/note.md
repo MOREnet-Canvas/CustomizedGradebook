@@ -17,6 +17,7 @@ TODO: Add Checks for assignments
 - do they have points possible set to 0?
 - what grading scheme are they using?
 - are all assignments using same grading scheme?
+TODO: Need to add choices for current assignment configuration, and suggestions.
 
 
 
