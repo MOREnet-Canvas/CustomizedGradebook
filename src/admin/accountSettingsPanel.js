@@ -1812,12 +1812,13 @@ function generateGradingSchemeExamplesHTML() {
 
                     // Add existing entries from example
                     // Convert values based on mode: if points-based, convert from 0-1 to actual points
+                    // For percentage-based, convert from 0-1 to percentage (0-100)
                     const maxPoints = exampleScheme.points_based ? exampleScheme.scaling_factor : 1;
 
                     exampleScheme.data.forEach((entry, index) => {
                         const displayValue = exampleScheme.points_based
                             ? entry.value * exampleScheme.scaling_factor
-                            : entry.value;
+                            : entry.value * 100;  // Convert 0-1 to percentage (0-100)
 
                         // Pass maxPoints only for the first row
                         if (index === 0) {
@@ -2032,7 +2033,6 @@ function generateGradingSchemeExamplesHTML() {
                             // Recalculate threshold values based on original template proportions
                             // This ensures submitted data maintains correct ratios even if user edited max points
                             if (points_based && maxPointsValue > 0) {
-                                const originalScalingFactor = exampleScheme.scaling_factor;
                                 rawEntries.forEach((entry, index) => {
                                     const originalEntry = exampleScheme.data[index];
                                     if (originalEntry) {
@@ -2040,11 +2040,19 @@ function generateGradingSchemeExamplesHTML() {
                                         entry.rawValue = originalEntry.value * maxPointsValue;
                                     }
                                 });
+                            } else if (!points_based) {
+                                // For percentage-based, recalculate from 0-1 to percentage (0-100)
+                                rawEntries.forEach((entry, index) => {
+                                    const originalEntry = exampleScheme.data[index];
+                                    if (originalEntry) {
+                                        // Convert from 0-1 to percentage
+                                        entry.rawValue = originalEntry.value * 100;
+                                    }
+                                });
                             }
 
-                            // Calculate scaling_factor and convert values to 0-1 range
+                            // Determine scaling_factor and validate values
                             let scaling_factor;
-                            const data = [];
 
                             if (points_based) {
                                 // Use the max points from the first row's upper bound input
@@ -2054,34 +2062,29 @@ function generateGradingSchemeExamplesHTML() {
 
                                 scaling_factor = maxPointsValue;
 
-                                // Validate that all thresholds are <= max points
+                                // Validate that all thresholds are between 0 and max points
                                 rawEntries.forEach(entry => {
-                                    if (entry.rawValue > maxPointsValue) {
-                                        throw new Error(\`Threshold value \${entry.rawValue} cannot exceed maximum points \${maxPointsValue}\`);
+                                    if (entry.rawValue < 0 || entry.rawValue > maxPointsValue) {
+                                        throw new Error(\`Threshold value \${entry.rawValue} must be between 0 and \${maxPointsValue}\`);
                                     }
-                                });
-
-                                // Convert point values to 0-1 decimal range
-                                rawEntries.forEach(entry => {
-                                    data.push({
-                                        name: entry.name,
-                                        value: entry.rawValue / scaling_factor
-                                    });
                                 });
                             } else {
-                                // Percentage mode - values are already in 0-1 range
+                                // Percentage mode
                                 scaling_factor = 1;
 
+                                // Validate that all values are between 0 and 100
                                 rawEntries.forEach(entry => {
-                                    if (entry.rawValue < 0 || entry.rawValue > 1) {
-                                        throw new Error('Percentage values must be between 0 and 1');
+                                    if (entry.rawValue < 0 || entry.rawValue > 100) {
+                                        throw new Error(\`Percentage value \${entry.rawValue} must be between 0 and 100\`);
                                     }
-                                    data.push({
-                                        name: entry.name,
-                                        value: entry.rawValue
-                                    });
                                 });
                             }
+
+                            // Prepare data array with raw values (no normalization)
+                            const data = rawEntries.map(entry => ({
+                                name: entry.name,
+                                value: entry.rawValue
+                            }));
 
                             // Sort entries by value (descending) - Canvas requirement
                             data.sort((a, b) => b.value - a.value);
@@ -2093,8 +2096,8 @@ function generateGradingSchemeExamplesHTML() {
                                 // Find duplicates for error message
                                 const duplicates = values.filter((value, index) => values.indexOf(value) !== index);
                                 const duplicateDisplay = points_based
-                                    ? duplicates.map(v => (v * scaling_factor).toFixed(2)).join(', ')
-                                    : duplicates.map(v => (v * 100).toFixed(0) + '%').join(', ');
+                                    ? duplicates.map(v => v.toFixed(2)).join(', ')
+                                    : duplicates.map(v => v.toFixed(0)).join(', ');
                                 throw new Error(\`Grading scheme cannot contain duplicate values. Duplicates found: \${duplicateDisplay}\`);
                             }
 

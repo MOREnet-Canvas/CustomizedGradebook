@@ -18,6 +18,7 @@ TODO: Add Checks for assignments
 - what grading scheme are they using?
 - are all assignments using same grading scheme?
 TODO: Need to add choices for current assignment configuration, and suggestions.
+TODO: refactor accountSettingsPanel.js it is a hot mess at this point
 
 
 
