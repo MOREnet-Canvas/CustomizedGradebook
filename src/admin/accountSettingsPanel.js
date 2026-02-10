@@ -1242,28 +1242,36 @@ function generateGradingSchemeExamplesHTML() {
 
                     const url = \`/api/v1/accounts/\${accountId}/grading_standards\`;
 
-                    const payload = {
-                        title: gradingSchemeData.title,
-                        scaling_factor: gradingSchemeData.scaling_factor,
-                        points_based: gradingSchemeData.points_based,
-                        grading_scheme_entry: gradingSchemeData.data.map(entry => ({
-                            name: entry.name,
-                            value: entry.value
-                        }))
-                    };
+                    // Canvas API expects form-encoded data, not JSON
+                    // Build URLSearchParams for form-encoded request
+                    const formData = new URLSearchParams();
+                    formData.append('title', gradingSchemeData.title);
+                    formData.append('scaling_factor', gradingSchemeData.scaling_factor);
+                    formData.append('points_based', gradingSchemeData.points_based);
+
+                    // Add grading scheme entries as array parameters
+                    gradingSchemeData.data.forEach(entry => {
+                        formData.append('grading_scheme_entry[][name]', entry.name);
+                        formData.append('grading_scheme_entry[][value]', entry.value);
+                    });
+
+                    console.log('[GradingSchemeEditor] Form data being sent:', formData.toString());
+                    console.log('[GradingSchemeEditor] Grading scheme data:', JSON.stringify(gradingSchemeData, null, 2));
 
                     const response = await fetch(url, {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: {
                             'Accept': 'application/json',
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/x-www-form-urlencoded',
                             'X-CSRF-Token': csrfToken
                         },
-                        body: JSON.stringify(payload)
+                        body: formData.toString()
                     });
 
                     if (!response.ok) {
+                        const responseText = await response.text();
+                        console.error('[GradingSchemeEditor] Error response:', responseText);
                         const errorData = await response.json().catch(() => ({}));
                         throw new Error(errorData.message || \`HTTP \${response.status}: \${response.statusText}\`);
                     }
