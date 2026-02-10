@@ -29,25 +29,37 @@ async function createGradingStandard(accountId, gradingSchemeData) {
     const apiClient = new CanvasApiClient();
     const url = `/api/v1/accounts/${accountId}/grading_standards`;
 
-    // Map from example format (data) to Canvas API format (grading_scheme_entry)
-    const payload = {
-        title: gradingSchemeData.title,
-        scaling_factor: gradingSchemeData.scaling_factor,
-        points_based: gradingSchemeData.points_based,
-        grading_scheme_entry: gradingSchemeData.data.map(entry => ({
-            name: entry.name,
-            value: entry.value
-        }))
-    };
+    // Canvas API expects form-encoded data, not JSON
+    // Build URLSearchParams for form-encoded request
+    const formData = new URLSearchParams();
+    formData.append('title', gradingSchemeData.title);
+    formData.append('scaling_factor', gradingSchemeData.scaling_factor);
+    formData.append('points_based', gradingSchemeData.points_based);
 
-    logger.debug('[AccountSettingsPanel] API payload:', payload);
+    // Add grading scheme entries as array parameters
+    gradingSchemeData.data.forEach(entry => {
+        formData.append('grading_scheme_entry[][name]', entry.name);
+        formData.append('grading_scheme_entry[][value]', entry.value);
+    });
+
+    logger.debug('[AccountSettingsPanel] API form data:', Object.fromEntries(formData));
+    console.log('[DEBUG] Form data being sent to Canvas API:', formData.toString());
+    console.log('[DEBUG] Grading scheme data:', JSON.stringify(gradingSchemeData, null, 2));
 
     try {
-        const result = await apiClient.post(url, payload, {}, 'createGradingStandard');
+        // Send as form-encoded data instead of JSON
+        const result = await apiClient.post(url, formData.toString(), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        }, 'createGradingStandard');
         logger.info('[AccountSettingsPanel] Grading standard created successfully:', result);
         return result;
     } catch (error) {
         logger.error('[AccountSettingsPanel] Failed to create grading standard:', error);
+        console.error('[DEBUG] Error details:', error);
+        console.error('[DEBUG] Error message:', error.message);
+        console.error('[DEBUG] Error response:', error.responseText);
         throw error;
     }
 }
@@ -2060,6 +2072,13 @@ function generateGradingSchemeExamplesHTML() {
                                 points_based,
                                 data
                             };
+
+                            console.log('[DEBUG] Form submission - Raw entries:', rawEntries);
+                            console.log('[DEBUG] Form submission - Max points value:', maxPointsValue);
+                            console.log('[DEBUG] Form submission - Points based:', points_based);
+                            console.log('[DEBUG] Form submission - Scaling factor:', scaling_factor);
+                            console.log('[DEBUG] Form submission - Final data array:', data);
+                            console.log('[DEBUG] Form submission - Complete grading scheme data:', gradingSchemeData);
 
                             const result = await createGradingStandard(accountId, gradingSchemeData);
 
