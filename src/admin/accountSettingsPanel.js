@@ -1463,59 +1463,6 @@ function generateGradingSchemeExamplesHTML() {
                     radioContainer.appendChild(pointsRadioWrapper);
 
                     gradeByGroup.appendChild(radioContainer);
-
-                    // Max points input (only visible when Points is selected)
-                    const maxPointsWrapper = createElement('div', {
-                        style: {
-                            display: exampleScheme.points_based ? 'flex' : 'none',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginTop: '8px',
-                            marginLeft: '22px'
-                        }
-                    });
-
-                    maxPointsWrapper.appendChild(createElement('label', {
-                        text: 'Max points:',
-                        style: {
-                            fontSize: '14px',
-                            color: '#666'
-                        }
-                    }));
-
-                    const maxPointsInput = createElement('input', {
-                        attrs: {
-                            type: 'number',
-                            value: exampleScheme.points_based ? exampleScheme.scaling_factor.toString() : '4',
-                            min: '1',
-                            step: '1'
-                        },
-                        style: {
-                            width: '100px',
-                            padding: '6px 10px',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '4px',
-                            fontSize: '14px'
-                        }
-                    });
-
-                    maxPointsWrapper.appendChild(maxPointsInput);
-                    gradeByGroup.appendChild(maxPointsWrapper);
-
-                    // Toggle max points input visibility based on radio selection
-                    percentageRadio.addEventListener('change', () => {
-                        if (percentageRadio.checked) {
-                            maxPointsWrapper.style.display = 'none';
-                        }
-                    });
-
-                    pointsRadio.addEventListener('change', () => {
-                        if (pointsRadio.checked) {
-                            maxPointsWrapper.style.display = 'flex';
-                            maxPointsInput.focus();
-                        }
-                    });
-
                     form.appendChild(gradeByGroup);
 
                     // Grading scale entries
@@ -1548,7 +1495,7 @@ function generateGradingSchemeExamplesHTML() {
                         }
                     });
                     headerRow.appendChild(createElement('th', {
-                        text: 'Name',
+                        text: 'Letter Grade',
                         style: {
                             textAlign: 'left',
                             padding: '8px',
@@ -1557,8 +1504,10 @@ function generateGradingSchemeExamplesHTML() {
                             fontSize: '13px'
                         }
                     }));
-                    headerRow.appendChild(createElement('th', {
-                        text: 'Value (0-1)',
+
+                    // Range header - will be updated dynamically
+                    const rangeHeader = createElement('th', {
+                        text: exampleScheme.points_based ? 'Range' : 'Range',
                         style: {
                             textAlign: 'left',
                             padding: '8px',
@@ -1567,7 +1516,9 @@ function generateGradingSchemeExamplesHTML() {
                             fontSize: '13px',
                             width: '150px'
                         }
-                    }));
+                    });
+                    headerRow.appendChild(rangeHeader);
+
                     headerRow.appendChild(createElement('th', {
                         text: 'Actions',
                         style: {
@@ -1587,7 +1538,7 @@ function generateGradingSchemeExamplesHTML() {
                     entriesTable.appendChild(tbody);
 
                     // Function to add entry row
-                    const addEntryRow = (name = '', value = 0) => {
+                    const addEntryRow = (name = '', value = 0, isPointsMode = false) => {
                         const row = createElement('tr');
 
                         const nameCell = createElement('td', {
@@ -1620,13 +1571,14 @@ function generateGradingSchemeExamplesHTML() {
                                 borderBottom: '1px solid #e8e8e8'
                             }
                         });
+
+                        // Value input - changes based on mode
                         const valueInput = createElement('input', {
                             attrs: {
                                 type: 'number',
                                 value: value.toString(),
                                 min: '0',
-                                max: '1',
-                                step: '0.001',
+                                step: isPointsMode ? '1' : '0.01',
                                 required: 'true'
                             },
                             style: {
@@ -1638,6 +1590,10 @@ function generateGradingSchemeExamplesHTML() {
                                 boxSizing: 'border-box'
                             }
                         });
+
+                        // Store the mode on the input for later reference
+                        valueInput.dataset.isPointsMode = isPointsMode ? 'true' : 'false';
+
                         valueCell.appendChild(valueInput);
                         row.appendChild(valueCell);
 
@@ -1680,8 +1636,12 @@ function generateGradingSchemeExamplesHTML() {
                     };
 
                     // Add existing entries from example
+                    // Convert values based on mode: if points-based, convert from 0-1 to actual points
                     exampleScheme.data.forEach(entry => {
-                        addEntryRow(entry.name, entry.value);
+                        const displayValue = exampleScheme.points_based
+                            ? Math.round(entry.value * exampleScheme.scaling_factor)
+                            : entry.value;
+                        addEntryRow(entry.name, displayValue, exampleScheme.points_based);
                     });
 
                     entriesGroup.appendChild(entriesTable);
@@ -1703,12 +1663,58 @@ function generateGradingSchemeExamplesHTML() {
                             fontWeight: '600'
                         },
                         on: {
-                            click: () => addEntryRow('', 0)
+                            click: () => {
+                                const isPointsMode = pointsRadio.checked;
+                                addEntryRow('', 0, isPointsMode);
+                            }
                         }
                     });
                     entriesGroup.appendChild(addEntryBtn);
 
                     form.appendChild(entriesGroup);
+
+                    // Function to convert all existing row values when switching modes
+                    const convertRowValues = (toPointsMode) => {
+                        const rows = tbody.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            const valueInput = row.querySelector('input[type="number"]');
+                            const currentValue = parseFloat(valueInput.value) || 0;
+
+                            if (toPointsMode) {
+                                // Converting from 0-1 decimal to points
+                                // Use scaling factor from example or default to 4
+                                const scalingFactor = exampleScheme.scaling_factor || 4;
+                                const pointValue = Math.round(currentValue * scalingFactor);
+                                valueInput.value = pointValue;
+                                valueInput.step = '1';
+                                valueInput.removeAttribute('max');
+                                valueInput.dataset.isPointsMode = 'true';
+                            } else {
+                                // Converting from points to 0-1 decimal
+                                // Find max value from all rows to calculate scaling
+                                const allValues = Array.from(tbody.querySelectorAll('input[type="number"]'))
+                                    .map(input => parseFloat(input.value) || 0);
+                                const maxValue = Math.max(...allValues, 1);
+                                const decimalValue = (currentValue / maxValue).toFixed(3);
+                                valueInput.value = decimalValue;
+                                valueInput.step = '0.01';
+                                valueInput.dataset.isPointsMode = 'false';
+                            }
+                        });
+                    };
+
+                    // Add radio button change handlers
+                    percentageRadio.addEventListener('change', () => {
+                        if (percentageRadio.checked) {
+                            convertRowValues(false);
+                        }
+                    });
+
+                    pointsRadio.addEventListener('change', () => {
+                        if (pointsRadio.checked) {
+                            convertRowValues(true);
+                        }
+                    });
 
                     // Status message area
                     const statusArea = createElement('div', {
@@ -1795,29 +1801,19 @@ function generateGradingSchemeExamplesHTML() {
                             // Collect form data
                             const title = titleInput.value.trim();
 
-                            // Determine scaling_factor and points_based from radio selection
-                            let scaling_factor;
-                            let points_based;
+                            // Determine points_based from radio selection
+                            const points_based = pointsRadio.checked;
 
-                            if (percentageRadio.checked) {
-                                scaling_factor = 1;
-                                points_based = false;
-                            } else if (pointsRadio.checked) {
-                                scaling_factor = parseFloat(maxPointsInput.value);
-                                points_based = true;
-                            } else {
-                                throw new Error('Please select either Percentage or Points');
-                            }
-
-                            // Collect entries
-                            const data = [];
+                            // Collect entries from table
                             const rows = tbody.querySelectorAll('tr');
+                            const rawEntries = [];
+
                             rows.forEach(row => {
                                 const nameInput = row.querySelector('input[type="text"]');
                                 const valueInput = row.querySelector('input[type="number"]');
-                                data.push({
+                                rawEntries.push({
                                     name: nameInput.value.trim(),
-                                    value: parseFloat(valueInput.value)
+                                    rawValue: parseFloat(valueInput.value)
                                 });
                             });
 
@@ -1825,11 +1821,44 @@ function generateGradingSchemeExamplesHTML() {
                             if (!title) {
                                 throw new Error('Title is required');
                             }
-                            if (points_based && (isNaN(scaling_factor) || scaling_factor < 1)) {
-                                throw new Error('Max points must be at least 1');
-                            }
-                            if (data.length === 0) {
+                            if (rawEntries.length === 0) {
                                 throw new Error('At least one entry is required');
+                            }
+
+                            // Calculate scaling_factor and convert values to 0-1 range
+                            let scaling_factor;
+                            const data = [];
+
+                            if (points_based) {
+                                // Find maximum point value from entries
+                                const maxPoints = Math.max(...rawEntries.map(e => e.rawValue));
+
+                                if (maxPoints <= 0) {
+                                    throw new Error('Point values must be greater than 0');
+                                }
+
+                                scaling_factor = maxPoints;
+
+                                // Convert point values to 0-1 decimal range
+                                rawEntries.forEach(entry => {
+                                    data.push({
+                                        name: entry.name,
+                                        value: entry.rawValue / scaling_factor
+                                    });
+                                });
+                            } else {
+                                // Percentage mode - values are already in 0-1 range
+                                scaling_factor = 1;
+
+                                rawEntries.forEach(entry => {
+                                    if (entry.rawValue < 0 || entry.rawValue > 1) {
+                                        throw new Error('Percentage values must be between 0 and 1');
+                                    }
+                                    data.push({
+                                        name: entry.name,
+                                        value: entry.rawValue
+                                    });
+                                });
                             }
 
                             // Sort entries by value (descending) - Canvas requirement
