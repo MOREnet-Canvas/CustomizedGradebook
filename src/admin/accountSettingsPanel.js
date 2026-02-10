@@ -1537,10 +1537,57 @@ function generateGradingSchemeExamplesHTML() {
                     const tbody = createElement('tbody');
                     entriesTable.appendChild(tbody);
 
+                    // Function to calculate and update range displays for all rows
+                    const updateRangeDisplays = () => {
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        const isPointsMode = pointsRadio.checked;
+
+                        rows.forEach((row, index) => {
+                            const valueInput = row.querySelector('input[type="number"]');
+                            const rangeDisplay = row.querySelector('.range-display');
+
+                            if (!rangeDisplay) return;
+
+                            const currentValue = parseFloat(valueInput.value) || 0;
+                            let rangeText = '';
+
+                            if (isPointsMode) {
+                                // Points mode
+                                if (index === 0) {
+                                    // First row - highest grade
+                                    const maxPoints = currentValue;
+                                    rangeText = \`\${currentValue} to \${maxPoints} pts\`;
+                                } else {
+                                    // Other rows
+                                    const prevValueInput = rows[index - 1].querySelector('input[type="number"]');
+                                    const upperBound = parseFloat(prevValueInput.value) || 0;
+                                    rangeText = \`< \${upperBound} to \${currentValue} pts\`;
+                                }
+                            } else {
+                                // Percentage mode (0-1 decimal, display as percentage)
+                                if (index === 0) {
+                                    // First row - highest grade
+                                    const percentage = Math.round(currentValue * 100);
+                                    rangeText = \`\${percentage}% to 100%\`;
+                                } else {
+                                    // Other rows
+                                    const prevValueInput = rows[index - 1].querySelector('input[type="number"]');
+                                    const upperBound = parseFloat(prevValueInput.value) || 0;
+                                    const upperPercentage = Math.round(upperBound * 100);
+                                    const currentPercentage = Math.round(currentValue * 100);
+                                    rangeText = \`\${currentPercentage}% to < \${upperPercentage}%\`;
+                                }
+                            }
+
+                            rangeDisplay.textContent = rangeText;
+                        });
+                    };
+
                     // Function to add entry row
                     const addEntryRow = (name = '', value = 0, isPointsMode = false) => {
                         const row = createElement('tr');
 
+                        // Letter Grade column
                         const nameCell = createElement('td', {
                             style: {
                                 padding: '6px',
@@ -1565,14 +1612,48 @@ function generateGradingSchemeExamplesHTML() {
                         nameCell.appendChild(nameInput);
                         row.appendChild(nameCell);
 
-                        const valueCell = createElement('td', {
+                        // Range column - contains both display and input
+                        const rangeCell = createElement('td', {
                             style: {
                                 padding: '6px',
                                 borderBottom: '1px solid #e8e8e8'
                             }
                         });
 
-                        // Value input - changes based on mode
+                        // Container for range display and input
+                        const rangeContainer = createElement('div', {
+                            style: {
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }
+                        });
+
+                        // Range display (read-only text)
+                        const rangeDisplay = createElement('span', {
+                            text: '',
+                            attrs: {
+                                class: 'range-display'
+                            },
+                            style: {
+                                fontSize: '13px',
+                                color: '#666',
+                                whiteSpace: 'nowrap',
+                                minWidth: '120px'
+                            }
+                        });
+
+                        // "to" label
+                        const toLabel = createElement('span', {
+                            text: 'to',
+                            style: {
+                                fontSize: '13px',
+                                color: '#666',
+                                margin: '0 4px'
+                            }
+                        });
+
+                        // Value input - editable threshold
                         const valueInput = createElement('input', {
                             attrs: {
                                 type: 'number',
@@ -1582,7 +1663,7 @@ function generateGradingSchemeExamplesHTML() {
                                 required: 'true'
                             },
                             style: {
-                                width: '100%',
+                                width: '80px',
                                 padding: '6px',
                                 border: '1px solid #d9d9d9',
                                 borderRadius: '4px',
@@ -1594,9 +1675,18 @@ function generateGradingSchemeExamplesHTML() {
                         // Store the mode on the input for later reference
                         valueInput.dataset.isPointsMode = isPointsMode ? 'true' : 'false';
 
-                        valueCell.appendChild(valueInput);
-                        row.appendChild(valueCell);
+                        // Update range displays when value changes
+                        valueInput.addEventListener('input', () => {
+                            updateRangeDisplays();
+                        });
 
+                        rangeContainer.appendChild(rangeDisplay);
+                        rangeContainer.appendChild(toLabel);
+                        rangeContainer.appendChild(valueInput);
+                        rangeCell.appendChild(rangeContainer);
+                        row.appendChild(rangeCell);
+
+                        // Actions column
                         const actionsCell = createElement('td', {
                             style: {
                                 padding: '6px',
@@ -1623,6 +1713,7 @@ function generateGradingSchemeExamplesHTML() {
                                 click: () => {
                                     if (tbody.children.length > 1) {
                                         row.remove();
+                                        updateRangeDisplays();
                                     } else {
                                         alert('At least one entry is required.');
                                     }
@@ -1633,6 +1724,9 @@ function generateGradingSchemeExamplesHTML() {
                         row.appendChild(actionsCell);
 
                         tbody.appendChild(row);
+
+                        // Update all range displays after adding new row
+                        setTimeout(() => updateRangeDisplays(), 0);
                     };
 
                     // Add existing entries from example
@@ -1701,6 +1795,9 @@ function generateGradingSchemeExamplesHTML() {
                                 valueInput.dataset.isPointsMode = 'false';
                             }
                         });
+
+                        // Update range displays after conversion
+                        updateRangeDisplays();
                     };
 
                     // Add radio button change handlers
