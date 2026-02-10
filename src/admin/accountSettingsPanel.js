@@ -10,6 +10,47 @@
 import { logger } from '../utils/logger.js';
 import { createElement, createPanel, escapeHtml } from './domHelpers.js';
 import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
+
+/**
+ * Create a grading standard in Canvas via API
+ *
+ * @param {string} accountId - Account ID
+ * @param {Object} gradingSchemeData - Grading scheme data
+ * @param {string} gradingSchemeData.title - Title of the grading scheme
+ * @param {number} gradingSchemeData.scaling_factor - Scaling factor
+ * @param {boolean} gradingSchemeData.points_based - Whether points-based
+ * @param {Array} gradingSchemeData.data - Array of {name, value} entries
+ * @returns {Promise<Object>} Created grading standard data
+ */
+async function createGradingStandard(accountId, gradingSchemeData) {
+    logger.info('[AccountSettingsPanel] Creating grading standard:', gradingSchemeData.title);
+
+    const apiClient = new CanvasApiClient();
+    const url = `/api/v1/accounts/${accountId}/grading_standards`;
+
+    // Map from example format (data) to Canvas API format (grading_scheme_entry)
+    const payload = {
+        title: gradingSchemeData.title,
+        scaling_factor: gradingSchemeData.scaling_factor,
+        points_based: gradingSchemeData.points_based,
+        grading_scheme_entry: gradingSchemeData.data.map(entry => ({
+            name: entry.name,
+            value: entry.value
+        }))
+    };
+
+    logger.debug('[AccountSettingsPanel] API payload:', payload);
+
+    try {
+        const result = await apiClient.post(url, payload, {}, 'createGradingStandard');
+        logger.info('[AccountSettingsPanel] Grading standard created successfully:', result);
+        return result;
+    } catch (error) {
+        logger.error('[AccountSettingsPanel] Failed to create grading standard:', error);
+        throw error;
+    }
+}
 
 /**
  * Parse Link header for pagination
@@ -404,9 +445,545 @@ function generateGradingSchemesHTML(schemes) {
 }
 
 /**
- * Open grading scheme examples in a new tab
+ * Open grading scheme editor modal
  *
- * TODO: Phase 2 - Add edit functionality before applying to account
+ * @param {Object} exampleScheme - Example grading scheme to use as template
+ * @param {Function} onSuccess - Callback function to call after successful creation
+ */
+function openGradingSchemeEditor(exampleScheme, onSuccess) {
+    const accountId = window.location.pathname.match(/accounts\/(\d+)/)?.[1] || "1";
+
+    // Create modal overlay
+    const overlay = createElement('div', {
+        style: {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            right: '0',
+            bottom: '0',
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: '10000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+        }
+    });
+
+    // Create modal container
+    const modal = createElement('div', {
+        style: {
+            background: '#fff',
+            borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            padding: '24px'
+        }
+    });
+
+    // Modal header
+    const header = createElement('div', {
+        style: {
+            marginBottom: '20px',
+            paddingBottom: '16px',
+            borderBottom: '2px solid #e8e8e8'
+        }
+    });
+
+    header.appendChild(createElement('h2', {
+        text: 'Create Grading Standard',
+        style: {
+            margin: '0 0 8px 0',
+            fontSize: '24px',
+            color: '#333'
+        }
+    }));
+
+    header.appendChild(createElement('div', {
+        html: `Based on template: <strong>${escapeHtml(exampleScheme.title)}</strong>`,
+        style: {
+            fontSize: '14px',
+            color: '#666'
+        }
+    }));
+
+    modal.appendChild(header);
+
+    // Create form
+    const form = createElement('form', {
+        style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+        }
+    });
+
+    // Title input
+    const titleGroup = createElement('div');
+    titleGroup.appendChild(createElement('label', {
+        html: '<strong>Title:</strong>',
+        style: {
+            display: 'block',
+            marginBottom: '6px',
+            fontSize: '14px',
+            color: '#333'
+        }
+    }));
+
+    const titleInput = createElement('input', {
+        attrs: {
+            type: 'text',
+            value: exampleScheme.title,
+            required: 'true'
+        },
+        style: {
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d9d9d9',
+            borderRadius: '4px',
+            fontSize: '14px',
+            boxSizing: 'border-box'
+        }
+    });
+    titleGroup.appendChild(titleInput);
+    form.appendChild(titleGroup);
+
+    // Scaling factor input
+    const scalingGroup = createElement('div');
+    scalingGroup.appendChild(createElement('label', {
+        html: '<strong>Scaling Factor:</strong>',
+        style: {
+            display: 'block',
+            marginBottom: '6px',
+            fontSize: '14px',
+            color: '#333'
+        }
+    }));
+
+    const scalingInput = createElement('input', {
+        attrs: {
+            type: 'number',
+            value: exampleScheme.scaling_factor.toString(),
+            min: '0.01',
+            step: '0.01',
+            required: 'true'
+        },
+        style: {
+            width: '200px',
+            padding: '8px 12px',
+            border: '1px solid #d9d9d9',
+            borderRadius: '4px',
+            fontSize: '14px'
+        }
+    });
+    scalingGroup.appendChild(scalingInput);
+    form.appendChild(scalingGroup);
+
+    // Points-based checkbox
+    const pointsGroup = createElement('div', {
+        style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+        }
+    });
+
+    const pointsCheckbox = createElement('input', {
+        attrs: {
+            type: 'checkbox',
+            id: 'points-based-checkbox',
+            checked: exampleScheme.points_based ? 'true' : null
+        },
+        style: {
+            width: '18px',
+            height: '18px',
+            cursor: 'pointer'
+        }
+    });
+
+    const pointsLabel = createElement('label', {
+        html: '<strong>Points-Based</strong>',
+        attrs: {
+            for: 'points-based-checkbox'
+        },
+        style: {
+            fontSize: '14px',
+            color: '#333',
+            cursor: 'pointer'
+        }
+    });
+
+    pointsGroup.appendChild(pointsCheckbox);
+    pointsGroup.appendChild(pointsLabel);
+    form.appendChild(pointsGroup);
+
+    // Grading scale entries
+    const entriesGroup = createElement('div');
+    entriesGroup.appendChild(createElement('label', {
+        html: '<strong>Grading Scale Entries:</strong>',
+        style: {
+            display: 'block',
+            marginBottom: '8px',
+            fontSize: '14px',
+            color: '#333'
+        }
+    }));
+
+    // Create table for entries
+    const entriesTable = createElement('table', {
+        style: {
+            width: '100%',
+            borderCollapse: 'collapse',
+            border: '1px solid #d9d9d9',
+            marginBottom: '8px'
+        }
+    });
+
+    // Table header
+    const thead = createElement('thead');
+    const headerRow = createElement('tr', {
+        style: {
+            background: '#f0f0f0'
+        }
+    });
+    headerRow.appendChild(createElement('th', {
+        text: 'Name',
+        style: {
+            textAlign: 'left',
+            padding: '8px',
+            borderBottom: '2px solid #d9d9d9',
+            fontWeight: '600',
+            fontSize: '13px'
+        }
+    }));
+    headerRow.appendChild(createElement('th', {
+        text: 'Value (0-1)',
+        style: {
+            textAlign: 'left',
+            padding: '8px',
+            borderBottom: '2px solid #d9d9d9',
+            fontWeight: '600',
+            fontSize: '13px',
+            width: '150px'
+        }
+    }));
+    headerRow.appendChild(createElement('th', {
+        text: 'Actions',
+        style: {
+            textAlign: 'center',
+            padding: '8px',
+            borderBottom: '2px solid #d9d9d9',
+            fontWeight: '600',
+            fontSize: '13px',
+            width: '80px'
+        }
+    }));
+    thead.appendChild(headerRow);
+    entriesTable.appendChild(thead);
+
+    // Table body
+    const tbody = createElement('tbody');
+    entriesTable.appendChild(tbody);
+
+    // Function to add entry row
+    const addEntryRow = (name = '', value = 0) => {
+        const row = createElement('tr');
+
+        const nameCell = createElement('td', {
+            style: {
+                padding: '6px',
+                borderBottom: '1px solid #e8e8e8'
+            }
+        });
+        const nameInput = createElement('input', {
+            attrs: {
+                type: 'text',
+                value: name,
+                required: 'true'
+            },
+            style: {
+                width: '100%',
+                padding: '6px',
+                border: '1px solid #d9d9d9',
+                borderRadius: '4px',
+                fontSize: '13px',
+                boxSizing: 'border-box'
+            }
+        });
+        nameCell.appendChild(nameInput);
+        row.appendChild(nameCell);
+
+        const valueCell = createElement('td', {
+            style: {
+                padding: '6px',
+                borderBottom: '1px solid #e8e8e8'
+            }
+        });
+        const valueInput = createElement('input', {
+            attrs: {
+                type: 'number',
+                value: value.toString(),
+                min: '0',
+                max: '1',
+                step: '0.001',
+                required: 'true'
+            },
+            style: {
+                width: '100%',
+                padding: '6px',
+                border: '1px solid #d9d9d9',
+                borderRadius: '4px',
+                fontSize: '13px',
+                boxSizing: 'border-box'
+            }
+        });
+        valueCell.appendChild(valueInput);
+        row.appendChild(valueCell);
+
+        const actionsCell = createElement('td', {
+            style: {
+                padding: '6px',
+                borderBottom: '1px solid #e8e8e8',
+                textAlign: 'center'
+            }
+        });
+        const deleteBtn = createElement('button', {
+            text: '🗑️',
+            attrs: {
+                type: 'button',
+                title: 'Delete entry'
+            },
+            style: {
+                padding: '4px 8px',
+                background: '#ff4d4f',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+            },
+            on: {
+                click: () => {
+                    if (tbody.children.length > 1) {
+                        row.remove();
+                    } else {
+                        alert('At least one entry is required.');
+                    }
+                }
+            }
+        });
+        actionsCell.appendChild(deleteBtn);
+        row.appendChild(actionsCell);
+
+        tbody.appendChild(row);
+    };
+
+    // Add existing entries from example
+    exampleScheme.data.forEach(entry => {
+        addEntryRow(entry.name, entry.value);
+    });
+
+    entriesGroup.appendChild(entriesTable);
+
+    // Add entry button
+    const addEntryBtn = createElement('button', {
+        text: '+ Add Entry',
+        attrs: {
+            type: 'button'
+        },
+        style: {
+            padding: '6px 12px',
+            background: '#52c41a',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '600'
+        },
+        on: {
+            click: () => addEntryRow('', 0)
+        }
+    });
+    entriesGroup.appendChild(addEntryBtn);
+
+    form.appendChild(entriesGroup);
+
+    // Status message area
+    const statusArea = createElement('div', {
+        style: {
+            minHeight: '40px',
+            padding: '12px',
+            borderRadius: '6px',
+            display: 'none'
+        }
+    });
+    form.appendChild(statusArea);
+
+    // Action buttons
+    const buttonGroup = createElement('div', {
+        style: {
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+            paddingTop: '16px',
+            borderTop: '1px solid #e8e8e8'
+        }
+    });
+
+    const cancelBtn = createElement('button', {
+        text: 'Cancel',
+        attrs: {
+            type: 'button'
+        },
+        style: {
+            padding: '10px 20px',
+            background: '#fff',
+            color: '#333',
+            border: '1px solid #d9d9d9',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600'
+        },
+        on: {
+            click: () => overlay.remove()
+        }
+    });
+
+    const createBtn = createElement('button', {
+        text: 'Create Grading Standard',
+        attrs: {
+            type: 'submit'
+        },
+        style: {
+            padding: '10px 20px',
+            background: '#0374B5',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600'
+        }
+    });
+
+    buttonGroup.appendChild(cancelBtn);
+    buttonGroup.appendChild(createBtn);
+    form.appendChild(buttonGroup);
+
+    // Form submit handler
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Disable buttons during submission
+        createBtn.disabled = true;
+        cancelBtn.disabled = true;
+        createBtn.style.opacity = '0.6';
+        createBtn.style.cursor = 'not-allowed';
+        createBtn.textContent = 'Creating...';
+
+        // Show loading status
+        statusArea.style.display = 'block';
+        statusArea.style.background = '#e6f7ff';
+        statusArea.style.border = '1px solid #91d5ff';
+        statusArea.style.color = '#0050b3';
+        statusArea.textContent = '⏳ Creating grading standard...';
+
+        try {
+            // Collect form data
+            const title = titleInput.value.trim();
+            const scaling_factor = parseFloat(scalingInput.value);
+            const points_based = pointsCheckbox.checked;
+
+            // Collect entries
+            const data = [];
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const nameInput = row.querySelector('input[type="text"]');
+                const valueInput = row.querySelector('input[type="number"]');
+                data.push({
+                    name: nameInput.value.trim(),
+                    value: parseFloat(valueInput.value)
+                });
+            });
+
+            // Validate
+            if (!title) {
+                throw new Error('Title is required');
+            }
+            if (scaling_factor <= 0) {
+                throw new Error('Scaling factor must be positive');
+            }
+            if (data.length === 0) {
+                throw new Error('At least one entry is required');
+            }
+
+            // Sort entries by value (descending) - Canvas requirement
+            data.sort((a, b) => b.value - a.value);
+
+            // Create grading standard
+            const gradingSchemeData = {
+                title,
+                scaling_factor,
+                points_based,
+                data
+            };
+
+            const result = await createGradingStandard(accountId, gradingSchemeData);
+
+            // Show success
+            statusArea.style.background = '#f6ffed';
+            statusArea.style.border = '1px solid #b7eb8f';
+            statusArea.style.color = '#389e0d';
+            statusArea.innerHTML = `✅ Grading standard created successfully! <a href="/accounts/${accountId}/grading_standards" target="_blank" style="color: #0374B5; text-decoration: underline;">View in Canvas</a>`;
+
+            // Call success callback
+            if (onSuccess) {
+                onSuccess(result);
+            }
+
+            // Close modal after 2 seconds
+            setTimeout(() => {
+                overlay.remove();
+            }, 2000);
+
+        } catch (error) {
+            logger.error('[AccountSettingsPanel] Error creating grading standard:', error);
+
+            // Show error
+            statusArea.style.background = '#fff1f0';
+            statusArea.style.border = '1px solid #ffa39e';
+            statusArea.style.color = '#cf1322';
+            statusArea.textContent = `❌ Error: ${error.message || 'Failed to create grading standard'}`;
+
+            // Re-enable buttons
+            createBtn.disabled = false;
+            cancelBtn.disabled = false;
+            createBtn.style.opacity = '1';
+            createBtn.style.cursor = 'pointer';
+            createBtn.textContent = 'Create Grading Standard';
+        }
+    });
+
+    modal.appendChild(form);
+    overlay.appendChild(modal);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.remove();
+        }
+    });
+
+    document.body.appendChild(overlay);
+}
+
+/**
+ * Open grading scheme examples in a new tab
  */
 function openGradingSchemeExamplesInNewTab() {
     const html = generateGradingSchemeExamplesHTML();
@@ -495,10 +1072,15 @@ function generateGradingSchemeExamplesHTML() {
                     </table>
                 ` : '<p style="color: #999; font-style: italic;">No grading scale data available.</p>'}
 
-                <!-- TODO: Phase 2 - Add edit functionality -->
                 <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
-                    <button disabled style="padding: 8px 16px; background: #ccc; color: #666; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: 600;" title="Coming soon - Edit and apply to account">
-                        ✏️ Edit & Apply to Account (Coming Soon)
+                    <button
+                        class="create-in-canvas-btn"
+                        data-example-id="${scheme.id}"
+                        style="padding: 8px 16px; background: #0374B5; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;"
+                        onmouseover="this.style.background='#025a8c'"
+                        onmouseout="this.style.background='#0374B5'"
+                    >
+                        ✨ Create in Canvas
                     </button>
                 </div>
             </div>
@@ -586,13 +1168,121 @@ function generateGradingSchemeExamplesHTML() {
                 <div class="subtitle">Example Templates for Account ${escapeHtml(accountId)}</div>
 
                 <div class="info-banner">
-                    <p><strong>ℹ️ About These Examples:</strong> These are pre-configured grading scheme templates that you can use as a starting point. In a future update, you'll be able to edit these examples and apply them to your account.</p>
+                    <p><strong>ℹ️ About These Examples:</strong> These are pre-configured grading scheme templates that you can use as a starting point. Click "Create in Canvas" to customize and apply a template to your account.</p>
                 </div>
 
                 <div class="schemes-grid">
                     ${schemesHTML}
                 </div>
             </div>
+
+            <script>
+                // Grading scheme examples data
+                const GRADING_SCHEME_EXAMPLES = ${JSON.stringify(examples)};
+
+                // Helper function to create DOM elements
+                function createElement(tag, options = {}) {
+                    const el = document.createElement(tag);
+
+                    if (options.text) el.textContent = options.text;
+                    if (options.html) el.innerHTML = options.html;
+                    if (options.attrs) {
+                        Object.entries(options.attrs).forEach(([key, value]) => {
+                            if (value !== null && value !== undefined) {
+                                el.setAttribute(key, value);
+                            }
+                        });
+                    }
+                    if (options.style) {
+                        Object.entries(options.style).forEach(([key, value]) => {
+                            el.style[key] = value;
+                        });
+                    }
+                    if (options.on) {
+                        Object.entries(options.on).forEach(([event, handler]) => {
+                            el.addEventListener(event, handler);
+                        });
+                    }
+
+                    return el;
+                }
+
+                // Escape HTML for safe display
+                function escapeHtml(str) {
+                    if (str == null) return '';
+                    const div = document.createElement('div');
+                    div.textContent = str;
+                    return div.innerHTML;
+                }
+
+                // Get CSRF token from cookies
+                function getCsrfToken() {
+                    const match = document.cookie.match(/(?:^|;\\s*)_csrf_token=([^;]+)/);
+                    return match ? decodeURIComponent(match[1]) : null;
+                }
+
+                // Create grading standard via Canvas API
+                async function createGradingStandard(accountId, gradingSchemeData) {
+                    const csrfToken = getCsrfToken();
+                    if (!csrfToken) {
+                        throw new Error('CSRF token not found - user may not be authenticated');
+                    }
+
+                    const url = \`/api/v1/accounts/\${accountId}/grading_standards\`;
+
+                    const payload = {
+                        title: gradingSchemeData.title,
+                        scaling_factor: gradingSchemeData.scaling_factor,
+                        points_based: gradingSchemeData.points_based,
+                        grading_scheme_entry: gradingSchemeData.data.map(entry => ({
+                            name: entry.name,
+                            value: entry.value
+                        }))
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.message || \`HTTP \${response.status}: \${response.statusText}\`);
+                    }
+
+                    return await response.json();
+                }
+
+                // Open grading scheme editor modal (injected from parent)
+                ${openGradingSchemeEditor.toString()}
+
+                // Add click handlers to all "Create in Canvas" buttons
+                document.addEventListener('DOMContentLoaded', () => {
+                    const buttons = document.querySelectorAll('.create-in-canvas-btn');
+                    buttons.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const exampleId = btn.getAttribute('data-example-id');
+                            const example = GRADING_SCHEME_EXAMPLES.find(ex => ex.id === exampleId);
+
+                            if (example) {
+                                openGradingSchemeEditor(example, (result) => {
+                                    console.log('Grading standard created:', result);
+                                    // Optionally refresh the parent window's grading schemes panel
+                                    if (window.opener && !window.opener.closed) {
+                                        window.opener.postMessage({ type: 'grading-standard-created', data: result }, '*');
+                                    }
+                                });
+                            }
+                        });
+                    });
+                });
+            </script>
         </body>
         </html>
     `;

@@ -24,7 +24,6 @@ Do NOT create, modify, or update documentation unless the user explicitly reques
 This includes:
 - README files
 - Markdown files
-- JSDoc / docstrings
 - Header comments or block comments
 - Architecture or design explanations
 
