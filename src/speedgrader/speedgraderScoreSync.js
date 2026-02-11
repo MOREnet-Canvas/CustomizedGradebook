@@ -5,7 +5,7 @@
  * SpeedGrader Score Sync Module
  *
  * Automatically syncs assignment scores from rubric assessments
- * in standards-based courses. Runs only for teacher-like users.
+ * in standards-based courses. Runs on SpeedGrader pages (teacher-only by Canvas).
  *
  * Features:
  * - Detects rubric submission via GraphQL fetch hook
@@ -17,7 +17,6 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { getUserRoleGroup } from '../utils/canvas.js';
 import { getCourseSnapshot, populateCourseSnapshot } from '../services/courseSnapshotService.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
@@ -895,13 +894,7 @@ export async function initSpeedGraderAutoGrade() {
     initialized = true;
 
     logger.trace('[ScoreSync] Initializing SpeedGrader score sync module');
-
-    const roleGroup = getUserRoleGroup();
-    logger.trace(`[ScoreSync] User role group: ${roleGroup}`);
-    if (roleGroup !== 'teacher_like') {
-        logger.info(`[ScoreSync] SKIPPED - user is ${roleGroup}, not teacher_like`);
-        return;
-    }
+    // Note: No role check needed - SpeedGrader is already restricted to teachers by Canvas
 
     // Use URL parsing with retry helper (Suggestion #20)
     const { courseId, assignmentId, studentId } = await parseSpeedGraderUrlWithRetry();
