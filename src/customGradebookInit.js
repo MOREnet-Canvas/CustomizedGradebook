@@ -29,27 +29,10 @@ import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGrade
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
 import { clearAllSnapshots, debugSnapshots, validateAllSnapshots, getCourseSnapshot, populateCourseSnapshot } from "./services/courseSnapshotService.js";
 import { getUserRoleGroup, getCourseId } from "./utils/canvas.js";
-import { isTeacherViewingStudentGrades } from "./utils/pageDetection.js";
+import { isDashboardPage, isGradebookPage, isSpeedGraderPage, isTeacherViewingStudentGrades } from "./utils/pageDetection.js";
 import { CanvasApiClient } from "./utils/canvasApiClient.js";
 import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
-
-/**
- * Check if current page is the dashboard
- * @returns {boolean} True if on dashboard page
- */
-function isDashboardPage() {
-    const path = window.location.pathname;
-    return path === "/" || path === "/dashboard" || path.startsWith("/dashboard/");
-}
-
-/**
- * Check if current page is SpeedGrader
- * @returns {boolean} True if on SpeedGrader page
- */
-function isSpeedGraderPage() {
-    return window.location.pathname.includes('/speed_grader');
-}
 
 /**
  * Main initialization function
@@ -78,7 +61,9 @@ function isSpeedGraderPage() {
     }
 
     // Gradebook functionality (teacher-side)
-    if (window.location.pathname.includes("/gradebook")) {
+    // Only run on gradebook pages, NOT SpeedGrader
+    if (isGradebookPage()) {
+        logger.debug('[Init] On gradebook page, initializing gradebook modules');
         injectButtons(); // Always run for all courses
 
         // Async block for Refresh Mastery initialization (standards-based courses only)
@@ -119,12 +104,16 @@ function isSpeedGraderPage() {
         initDashboardGradeDisplay();
     }
 
-    // SpeedGrader grading dropdown auto-activator (teacher-side)
+    // SpeedGrader functionality (teacher-side)
     if (isSpeedGraderPage()) {
+        logger.debug('[Init] On SpeedGrader page, initializing SpeedGrader modules');
+
+        // Grading dropdown auto-activator (all users)
         initSpeedGraderDropdown();
 
         // SpeedGrader auto-grade module (teacher-like only)
         if (getUserRoleGroup() === 'teacher_like') {
+            logger.debug('[Init] User is teacher-like, initializing SpeedGrader Score Sync');
             initSpeedGraderAutoGrade();
         }
     }
