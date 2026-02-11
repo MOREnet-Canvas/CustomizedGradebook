@@ -105,21 +105,17 @@ import { isAdminDashboardPage } from "./admin/pageDetection.js";
     }
 
     // SpeedGrader functionality (teacher-side)
+    // Note: SpeedGrader is already a teacher-only page in Canvas, so no role check needed
     if (isSpeedGraderPage()) {
         logger.debug('[Init] On SpeedGrader page, initializing SpeedGrader modules');
 
-        // Grading dropdown auto-activator (all users)
+        // Grading dropdown auto-activator
         initSpeedGraderDropdown();
 
-        // SpeedGrader auto-grade module (teacher-like only)
-        const userRole = getUserRoleGroup();
-        logger.debug(`[Init] User role group: ${userRole}`);
-        if (userRole === 'teacher_like') {
-            logger.debug('[Init] User is teacher-like, initializing SpeedGrader Score Sync');
-            initSpeedGraderAutoGrade();
-        } else {
-            logger.debug(`[Init] User is ${userRole}, NOT initializing SpeedGrader Score Sync (requires teacher_like)`);
-        }
+        // SpeedGrader Score Sync module
+        // No role check needed - SpeedGrader is already restricted to teachers by Canvas
+        logger.debug('[Init] Initializing SpeedGrader Score Sync');
+        initSpeedGraderAutoGrade();
     }
 
     // Student grade customization (student-side)
