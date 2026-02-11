@@ -1,6 +1,6 @@
 {
   "name": "customized-gradebook",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "scripts": {
     "build:dev": "node esbuild.config.js dev",
