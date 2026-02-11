@@ -70,7 +70,7 @@ function onElementRendered(selector, cb, _attempts) {
     var el = $(selector);
     _attempts = ++_attempts || 1;
     if (el.length) return cb(el);
-    if (_attempts === 60) return;
+    if (_attempts == 60) return;
     setTimeout(function() {
         onElementRendered(selector, cb, _attempts);
     }, 250);
@@ -109,19 +109,19 @@ onElementRendered('.reset_course_content_button', function(e) {
 /* ========== END SECTION A: EXTERNAL LOADER ========== */
 
 /* ========== BEGIN SECTION B: MANAGED CONFIG BLOCK ========== */
-/* Generated: 2026-02-09T15:24:07.254Z */
+/* Generated: 2026-02-11T16:32:41.349Z */
 /* Account: 1 */
 /* Purpose: Version and configuration management for CG loader */
 
-
+/* Auto-Patch Track: v1.0-latest (auto-updates to latest patch) */
 
 window.CG_MANAGED = window.CG_MANAGED || {};
 
 // Release configuration
 window.CG_MANAGED.release = {
-    channel: "dev",
-    version: "dev",
-
+    channel: "auto-patch",
+    version: "v1.0.9",
+    versionTrack: "v1.0-latest",  // Auto-updates to latest patch in this track
     source: "github_release"
 };
 
