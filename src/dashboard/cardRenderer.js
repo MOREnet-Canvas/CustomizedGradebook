@@ -17,6 +17,30 @@ import { HERO_SELECTORS, findCourseCard } from './cardSelectors.js';
 const GRADE_CLASS_PREFIX = 'cg-dashboard-grade';
 
 /**
+ * Validate grade data before rendering
+ * @param {Object} gradeData - Grade data object
+ * @returns {boolean} True if valid, false otherwise
+ */
+function isValidGradeData(gradeData) {
+    if (!gradeData) {
+        logger.trace('[Grade Display] Grade data is null/undefined');
+        return false;
+    }
+
+    if (typeof gradeData.score !== 'number' || gradeData.score === null || isNaN(gradeData.score)) {
+        logger.trace(`[Grade Display] Invalid score: ${gradeData.score}`);
+        return false;
+    }
+
+    if (!gradeData.displayType || (gradeData.displayType !== 'points' && gradeData.displayType !== 'percentage')) {
+        logger.trace(`[Grade Display] Invalid displayType: ${gradeData.displayType}`);
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Format grade data for display
  * Pure function - no side effects, easy to test
  * Now uses pre-calculated display values from snapshot service
@@ -198,11 +222,6 @@ function findGradeContainer(cardElement) {
                 container.style.position = 'relative';
             }
 
-            // Fix for cards without hero images: ensure container has dimensions
-            // When no image is present, hero container may have 0 height and overflow:hidden
-            // which clips the absolutely positioned badge
-            ensureContainerCanDisplayBadge(container);
-
             logger.trace(`Using container for grade badge placement: ${selector}`);
             return container;
         }
@@ -214,8 +233,6 @@ function findGradeContainer(cardElement) {
     if (cardStyles.position === 'static') {
         cardElement.style.position = 'relative';
     }
-
-    ensureContainerCanDisplayBadge(cardElement);
 
     return cardElement;
 }
@@ -274,6 +291,12 @@ function ensureContainerCanDisplayBadge(container) {
  * @param {string} gradeData.source - Grade source ('assignment' or 'enrollment')
  */
 export function renderGradeOnCard(cardElement, gradeData) {
+    // Validate grade data before rendering
+    if (!isValidGradeData(gradeData)) {
+        logger.trace('Invalid grade data, skipping badge render');
+        return;
+    }
+
     // Remove any existing grade badge first
     removeGradeFromCard(cardElement);
 
@@ -288,6 +311,10 @@ export function renderGradeOnCard(cardElement, gradeData) {
 
     // Create new badge with hero color integration
     const badge = createGradeBadge(gradeData, heroContainer);
+
+    // NOW fix container visibility issues - only when we're actually adding a badge
+    // This ensures we don't modify cards that don't have grades
+    ensureContainerCanDisplayBadge(heroContainer);
 
     // Append badge to hero container
     heroContainer.appendChild(badge);
