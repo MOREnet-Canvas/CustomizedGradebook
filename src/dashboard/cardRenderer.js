@@ -93,10 +93,10 @@ function formatGradeDisplay(gradeData) {
  * @param {string|null} gradeData.letterGrade - Display letter grade
  * @param {string} gradeData.displayType - Display type ('points' or 'percentage')
  * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
- * @param {HTMLElement} heroElement - Hero element for color extraction (optional)
+ * @param {HTMLElement} containerElement - Container element for color extraction (header_image or similar)
  * @returns {HTMLElement} Grade badge element
  */
-function createGradeBadge(gradeData, heroElement = null) {
+function createGradeBadge(gradeData, containerElement = null) {
     const { source, displayType } = gradeData;
 
     // Format the grade display (pure function)
@@ -110,22 +110,23 @@ function createGradeBadge(gradeData, heroElement = null) {
     badge.setAttribute('aria-label', ariaLabel);
     badge.textContent = displayValue;
 
-    // Extract hero background color for badge styling
+    // Extract background color from container for badge styling
+    // For cards with images, this extracts the dominant color from the header
     let badgeBackground = 'rgba(64, 64, 64, 0.85)'; // Default fallback
 
-    if (heroElement) {
-        const heroStyles = window.getComputedStyle(heroElement);
-        const heroColor = heroStyles.backgroundColor;
+    if (containerElement) {
+        const containerStyles = window.getComputedStyle(containerElement);
+        const bgColor = containerStyles.backgroundColor;
 
-        if (heroColor && heroColor !== 'transparent' && heroColor !== 'rgba(0, 0, 0, 0)') {
-            // Derive a translucent version of the hero color
-            badgeBackground = deriveTranslucentColor(heroColor);
-            logger.trace(`Derived badge background from hero color: ${heroColor} -> ${badgeBackground}`);
+        if (bgColor && bgColor !== 'transparent' && bgColor !== 'rgba(0, 0, 0, 0)') {
+            // Derive a translucent version of the background color
+            badgeBackground = deriveTranslucentColor(bgColor);
+            logger.trace(`Derived badge background from container color: ${bgColor} -> ${badgeBackground}`);
         }
     }
 
     // Apply inline styles with frosted-glass effect
-    // Positioned to overlay on hero section (lower-right corner)
+    // Positioned to overlay on hero/header section (lower-right corner)
     badge.style.cssText = `
         position: absolute;
         bottom: 8px;
@@ -240,19 +241,10 @@ function findGradeContainer(cardElement) {
 /**
  * Ensure container has sufficient dimensions and overflow settings to display badge
  * Fixes issue where cards without hero images have 0-height containers with overflow:hidden
- * Also fixes opacity:0 on hero containers that makes badges invisible
  * @param {HTMLElement} container - Container element
  */
 function ensureContainerCanDisplayBadge(container) {
     const styles = window.getComputedStyle(container);
-
-    // CRITICAL FIX: Canvas sets opacity:0 on .ic-DashboardCard__header_hero
-    // This makes the entire container and all children (including our badge) invisible
-    // We need to override this to make the badge visible
-    if (styles.opacity === '0') {
-        container.style.opacity = '1';
-        logger.trace('Changed opacity from 0 to 1 to make badge visible');
-    }
 
     // Check if container has minimal/zero height
     const height = container.offsetHeight;
