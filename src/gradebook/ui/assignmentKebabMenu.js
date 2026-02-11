@@ -126,16 +126,121 @@ function resetMenuFocus(menuElement) {
  * @returns {HTMLElement|null} Menu item element or null if template not found
  */
 function createMenuItemLike(menuElement) {
-    // Find a template menu item to clone (try multiple selectors)
-    const template =
-        menuElement.querySelector('a[role="menuitem"].css-1kq4kmj-menuItem') ||
-        menuElement.querySelector('button[role="menuitem"].css-1kq4kmj-menuItem') ||
-        menuElement.querySelector('span[role="menuitem"].css-1kq4kmj-menuItem');
+    // Find all menu items for debugging
+    const allMenuItems = [...menuElement.querySelectorAll('[role="menuitem"]')];
 
+    logger.debug('[RefreshMastery] Searching for menu item template...');
+    logger.debug(`[RefreshMastery] Found ${allMenuItems.length} total menu items`);
+
+    // Log details about each menu item for debugging
+    allMenuItems.forEach((item, index) => {
+        const tag = item.tagName.toLowerCase();
+        const classes = item.className || '(no classes)';
+        const text = (item.innerText || item.textContent || '').trim().substring(0, 30);
+        const disabled = item.getAttribute('aria-disabled') === 'true';
+        logger.debug(`[RefreshMastery]   [${index}] <${tag}> classes="${classes}" text="${text}" disabled=${disabled}`);
+    });
+
+    // Strategy: Try multiple selector patterns in order of preference
+    // 1. Try known Canvas class patterns (specific to enabled items)
+    // 2. Fall back to generic role-based selectors
+    // 3. Filter out disabled items, separators, and nested submenus
+    // 4. Prefer <a> or <button> elements over <span> elements
+
+    let template = null;
+    let selectorUsed = null;
+
+    // Selector set 1: Known Canvas class patterns (original)
+    const knownClassSelectors = [
+        'a[role="menuitem"].css-1kq4kmj-menuItem',
+        'button[role="menuitem"].css-1kq4kmj-menuItem',
+        'span[role="menuitem"].css-1kq4kmj-menuItem'
+    ];
+
+    for (const selector of knownClassSelectors) {
+        template = menuElement.querySelector(selector);
+        if (template) {
+            selectorUsed = selector;
+            logger.debug(`[RefreshMastery] Found template using selector: ${selector}`);
+            break;
+        }
+    }
+
+    // Selector set 2: Sedalia Canvas class patterns (css-10s2u1f-menuItem for enabled items)
+    if (!template) {
+        const sedaliaClassSelectors = [
+            'a[role="menuitem"].css-10s2u1f-menuItem',
+            'button[role="menuitem"].css-10s2u1f-menuItem',
+            'span[role="menuitem"].css-10s2u1f-menuItem'
+        ];
+
+        for (const selector of sedaliaClassSelectors) {
+            template = menuElement.querySelector(selector);
+            if (template) {
+                selectorUsed = selector;
+                logger.debug(`[RefreshMastery] Found template using Sedalia selector: ${selector}`);
+                break;
+            }
+        }
+    }
+
+    // Selector set 3: Generic fallback - find any enabled menu item
+    if (!template) {
+        logger.debug('[RefreshMastery] Trying generic fallback selectors...');
+
+        // Filter menu items: exclude disabled, separators, and nested submenus
+        const validMenuItems = allMenuItems.filter(item => {
+            // Exclude disabled items
+            if (item.getAttribute('aria-disabled') === 'true') {
+                return false;
+            }
+
+            // Exclude separators (usually have role="separator" or specific classes)
+            if (item.getAttribute('role') === 'separator') {
+                return false;
+            }
+
+            // Exclude items with no text content (likely separators or structural elements)
+            const text = (item.innerText || item.textContent || '').trim();
+            if (!text || text.length === 0) {
+                return false;
+            }
+
+            // Exclude nested submenu triggers (usually have aria-haspopup)
+            if (item.getAttribute('aria-haspopup')) {
+                return false;
+            }
+
+            return true;
+        });
+
+        logger.debug(`[RefreshMastery] Found ${validMenuItems.length} valid (enabled, non-separator) menu items`);
+
+        // Prefer <a> or <button> elements over <span> elements
+        template = validMenuItems.find(item => {
+            const tag = item.tagName.toLowerCase();
+            return tag === 'a' || tag === 'button';
+        });
+
+        if (template) {
+            selectorUsed = `generic (${template.tagName.toLowerCase()})`;
+            logger.debug(`[RefreshMastery] Found template using generic fallback: <${template.tagName.toLowerCase()}>`);
+        } else if (validMenuItems.length > 0) {
+            // Fall back to first valid item (even if it's a <span>)
+            template = validMenuItems[0];
+            selectorUsed = `generic (${template.tagName.toLowerCase()})`;
+            logger.debug(`[RefreshMastery] Found template using generic fallback (span): <${template.tagName.toLowerCase()}>`);
+        }
+    }
+
+    // If still no template found, log full menu structure and fail
     if (!template) {
         logger.warn('[RefreshMastery] Could not find menu item template to clone');
+        logger.warn('[RefreshMastery] Menu element HTML structure:', menuElement.innerHTML.substring(0, 500));
         return null;
     }
+
+    logger.info(`[RefreshMastery] Successfully found template using: ${selectorUsed}`);
 
     // Clone the template
     const menuItem = template.cloneNode(true);
