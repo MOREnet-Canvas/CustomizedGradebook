@@ -20,6 +20,7 @@ TODO: Add Checks for assignments
 TODO: Need to add choices for current assignment configuration, and suggestions.
 TODO: refactor accountSettingsPanel.js it is a hot mess at this point
 TODO: write out "production", clean up logging
+TODO: session key for debug
 
 
 
