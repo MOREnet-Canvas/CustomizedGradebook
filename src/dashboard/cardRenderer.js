@@ -93,11 +93,10 @@ function formatGradeDisplay(gradeData) {
  * @param {string|null} gradeData.letterGrade - Display letter grade
  * @param {string} gradeData.displayType - Display type ('points' or 'percentage')
  * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
- * @param {HTMLElement} containerElement - Container element for color extraction (header_image or similar)
- * @param {boolean} useTopPosition - If true, position at top instead of bottom (for cards without images)
+ * @param {HTMLElement} containerElement - Container element for color extraction (header_image or header_hero)
  * @returns {HTMLElement} Grade badge element
  */
-function createGradeBadge(gradeData, containerElement = null, useTopPosition = false) {
+function createGradeBadge(gradeData, containerElement = null) {
     const { source, displayType } = gradeData;
 
     // Format the grade display (pure function)
@@ -126,16 +125,11 @@ function createGradeBadge(gradeData, containerElement = null, useTopPosition = f
         }
     }
 
-    // Position badge based on whether card has an image
-    // For cards without images, position below the kebab menu (top: 44px)
-    // For cards with images, position at bottom-right corner
-    const verticalPosition = useTopPosition ? 'top: 44px;' : 'bottom: 8px;';
-
     // Apply inline styles with frosted-glass effect
-    // Positioned to overlay on hero/header section (below kebab menu or bottom-right corner)
+    // Always position at bottom-right corner of the header/hero area
     badge.style.cssText = `
         position: absolute;
-        ${verticalPosition}
+        bottom: 8px;
         right: 8px;
         font-size: 0.875rem;
         line-height: 1.4;
@@ -218,12 +212,40 @@ function parseColor(colorString) {
  * @returns {HTMLElement|null} Hero container element or null
  */
 function findGradeContainer(cardElement) {
-    // Try each hero/header selector in order of preference
+    // First, check if card has a background image on .ic-DashboardCard__header_image
+    const imageContainer = cardElement.querySelector('.ic-DashboardCard__header_image');
+
+    if (imageContainer) {
+        const styles = window.getComputedStyle(imageContainer);
+        const bgImage = styles.backgroundImage;
+        const hasBackgroundImage = bgImage && bgImage !== 'none' && !bgImage.includes('data:image/svg');
+
+        if (hasBackgroundImage) {
+            // Card has image - use the image container
+            if (styles.position === 'static') {
+                imageContainer.style.position = 'relative';
+            }
+            logger.trace('Using .ic-DashboardCard__header_image (has background image)');
+            return imageContainer;
+        }
+    }
+
+    // Card has no image - use the hero bar (.ic-DashboardCard__header_hero)
+    const heroBar = cardElement.querySelector('.ic-DashboardCard__header_hero');
+    if (heroBar) {
+        const heroStyles = window.getComputedStyle(heroBar);
+        if (heroStyles.position === 'static') {
+            heroBar.style.position = 'relative';
+        }
+        logger.trace('Using .ic-DashboardCard__header_hero (no background image)');
+        return heroBar;
+    }
+
+    // Fallback: try other selectors
     for (const selector of HERO_SELECTORS) {
         const container = cardElement.querySelector(selector);
 
         if (container) {
-            // Ensure container has position: relative for absolute positioning of badge
             const styles = window.getComputedStyle(container);
             if (styles.position === 'static') {
                 container.style.position = 'relative';
@@ -245,19 +267,12 @@ function findGradeContainer(cardElement) {
 }
 
 /**
- * Ensure container has sufficient dimensions and overflow settings to display badge
- * Fixes issue where cards without hero images have 0-height containers with overflow:hidden
+ * Ensure container has proper overflow settings to display badge
+ * Fixes issue where overflow:hidden would clip absolutely positioned badges
  * @param {HTMLElement} container - Container element
- * @returns {boolean} True if container has no background image, false otherwise
  */
 function ensureContainerCanDisplayBadge(container) {
     const styles = window.getComputedStyle(container);
-
-    // Check if container has a background image
-    const bgImage = styles.backgroundImage;
-    const hasBackgroundImage = bgImage && bgImage !== 'none' && !bgImage.includes('data:image/svg');
-
-    logger.trace(`Container background-image: ${bgImage}, hasBackgroundImage: ${hasBackgroundImage}`);
 
     // Ensure overflow doesn't clip the badge
     // Only override if it's 'hidden' - preserve other values like 'auto' or 'scroll'
@@ -273,9 +288,6 @@ function ensureContainerCanDisplayBadge(container) {
     if (styles.overflowY === 'hidden') {
         container.style.overflowY = 'visible';
     }
-
-    // Return true if NO background image (should use top positioning)
-    return !hasBackgroundImage;
 }
 
 /**
@@ -307,13 +319,11 @@ export function renderGradeOnCard(cardElement, gradeData) {
         return;
     }
 
-    // Fix container visibility issues and check if it has a background image
-    // This ensures we don't modify cards that don't have grades
-    const hasNoBackgroundImage = ensureContainerCanDisplayBadge(heroContainer);
+    // Fix container overflow issues to ensure badge is visible
+    ensureContainerCanDisplayBadge(heroContainer);
 
     // Create new badge with hero color integration
-    // Use top positioning for cards without images to avoid overlapping course title
-    const badge = createGradeBadge(gradeData, heroContainer, hasNoBackgroundImage);
+    const badge = createGradeBadge(gradeData, heroContainer);
 
     // Append badge to hero container
     heroContainer.appendChild(badge);
@@ -323,8 +333,7 @@ export function renderGradeOnCard(cardElement, gradeData) {
         const displayInfo = gradeData.letterGrade
             ? `${gradeData.score}${suffix} (${gradeData.letterGrade})`
             : `${gradeData.score}${suffix}`;
-        const position = hasNoBackgroundImage ? 'top-right (no image)' : 'bottom-right (with image)';
-        logger.trace(`Grade badge rendered (${displayInfo}, type: ${gradeData.displayType}, source: ${gradeData.source}, position: ${position})`);
+        logger.trace(`Grade badge rendered (${displayInfo}, type: ${gradeData.displayType}, source: ${gradeData.source})`);
         logger.trace(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
     } else {
         logger.debug(`Grade badge rendered on card (type: ${gradeData.displayType}, source: ${gradeData.source})`);
