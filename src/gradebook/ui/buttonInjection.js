@@ -13,6 +13,7 @@ import { handleError } from "../../utils/errorHandler.js";
 import { logger } from "../../utils/logger.js";
 import { startUpdateFlow } from "../updateFlowOrchestrator.js";
 import { renderLastUpdateNotice } from "../../utils/uiHelpers.js";
+import { isGradebookPage } from "../../utils/pageDetection.js";
 
 /**
  * Inject the "Update Average" button into Canvas gradebook toolbar
@@ -80,7 +81,7 @@ export function resetButtonToNormal(button) {
 function waitForGradebookAndToolbar(callback) {
     let attempts = 0;
     const intervalId = setInterval(() => {
-        const onGradebookPage = window.location.pathname.includes('/gradebook');
+        const onGradebookPage = isGradebookPage();
         const documentReady = document.readyState === 'complete';
         const toolbar = document.querySelector(
             '.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]'
@@ -96,4 +97,3 @@ function waitForGradebookAndToolbar(callback) {
         }
     }, 300);
 }
-
