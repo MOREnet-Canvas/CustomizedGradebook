@@ -246,22 +246,16 @@ function findGradeContainer(cardElement) {
  * Ensure container has sufficient dimensions and overflow settings to display badge
  * Fixes issue where cards without hero images have 0-height containers with overflow:hidden
  * @param {HTMLElement} container - Container element
- * @returns {boolean} True if container has minimal height (no image), false otherwise
+ * @returns {boolean} True if container has no background image, false otherwise
  */
 function ensureContainerCanDisplayBadge(container) {
     const styles = window.getComputedStyle(container);
 
-    // Check if container has minimal/zero height
-    const height = container.offsetHeight;
-    const hasMinHeight = styles.minHeight && styles.minHeight !== '0px' && styles.minHeight !== 'auto';
-    let hasMinimalHeight = false;
+    // Check if container has a background image
+    const bgImage = styles.backgroundImage;
+    const hasBackgroundImage = bgImage && bgImage !== 'none' && !bgImage.includes('data:image/svg');
 
-    if (height < 40 && !hasMinHeight) {
-        // Container is too small (likely no image), ensure minimum height for badge visibility
-        container.style.minHeight = '48px';
-        hasMinimalHeight = true;
-        logger.trace(`Set min-height on container (was ${height}px)`);
-    }
+    logger.trace(`Container background-image: ${bgImage}, hasBackgroundImage: ${hasBackgroundImage}`);
 
     // Ensure overflow doesn't clip the badge
     // Only override if it's 'hidden' - preserve other values like 'auto' or 'scroll'
@@ -278,7 +272,8 @@ function ensureContainerCanDisplayBadge(container) {
         container.style.overflowY = 'visible';
     }
 
-    return hasMinimalHeight;
+    // Return true if NO background image (should use top positioning)
+    return !hasBackgroundImage;
 }
 
 /**
@@ -310,13 +305,13 @@ export function renderGradeOnCard(cardElement, gradeData) {
         return;
     }
 
-    // Fix container visibility issues and check if it has minimal height (no image)
+    // Fix container visibility issues and check if it has a background image
     // This ensures we don't modify cards that don't have grades
-    const hasMinimalHeight = ensureContainerCanDisplayBadge(heroContainer);
+    const hasNoBackgroundImage = ensureContainerCanDisplayBadge(heroContainer);
 
     // Create new badge with hero color integration
     // Use top positioning for cards without images to avoid overlapping course title
-    const badge = createGradeBadge(gradeData, heroContainer, hasMinimalHeight);
+    const badge = createGradeBadge(gradeData, heroContainer, hasNoBackgroundImage);
 
     // Append badge to hero container
     heroContainer.appendChild(badge);
@@ -326,7 +321,7 @@ export function renderGradeOnCard(cardElement, gradeData) {
         const displayInfo = gradeData.letterGrade
             ? `${gradeData.score}${suffix} (${gradeData.letterGrade})`
             : `${gradeData.score}${suffix}`;
-        const position = hasMinimalHeight ? 'top-right (no image)' : 'bottom-right (with image)';
+        const position = hasNoBackgroundImage ? 'top-right (no image)' : 'bottom-right (with image)';
         logger.trace(`Grade badge rendered (${displayInfo}, type: ${gradeData.displayType}, source: ${gradeData.source}, position: ${position})`);
         logger.trace(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
     } else {
