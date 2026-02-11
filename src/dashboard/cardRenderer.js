@@ -94,9 +94,10 @@ function formatGradeDisplay(gradeData) {
  * @param {string} gradeData.displayType - Display type ('points' or 'percentage')
  * @param {string} gradeData.source - Grade source (GRADE_SOURCE.ASSIGNMENT or GRADE_SOURCE.ENROLLMENT)
  * @param {HTMLElement} containerElement - Container element for color extraction (header_image or similar)
+ * @param {boolean} useTopPosition - If true, position at top instead of bottom (for cards without images)
  * @returns {HTMLElement} Grade badge element
  */
-function createGradeBadge(gradeData, containerElement = null) {
+function createGradeBadge(gradeData, containerElement = null, useTopPosition = false) {
     const { source, displayType } = gradeData;
 
     // Format the grade display (pure function)
@@ -125,11 +126,14 @@ function createGradeBadge(gradeData, containerElement = null) {
         }
     }
 
+    // Position badge based on whether card has an image
+    const verticalPosition = useTopPosition ? 'top: 8px;' : 'bottom: 8px;';
+
     // Apply inline styles with frosted-glass effect
-    // Positioned to overlay on hero/header section (lower-right corner)
+    // Positioned to overlay on hero/header section (top-right or bottom-right corner)
     badge.style.cssText = `
         position: absolute;
-        bottom: 8px;
+        ${verticalPosition}
         right: 8px;
         font-size: 0.875rem;
         line-height: 1.4;
@@ -242,6 +246,7 @@ function findGradeContainer(cardElement) {
  * Ensure container has sufficient dimensions and overflow settings to display badge
  * Fixes issue where cards without hero images have 0-height containers with overflow:hidden
  * @param {HTMLElement} container - Container element
+ * @returns {boolean} True if container has minimal height (no image), false otherwise
  */
 function ensureContainerCanDisplayBadge(container) {
     const styles = window.getComputedStyle(container);
@@ -249,10 +254,12 @@ function ensureContainerCanDisplayBadge(container) {
     // Check if container has minimal/zero height
     const height = container.offsetHeight;
     const hasMinHeight = styles.minHeight && styles.minHeight !== '0px' && styles.minHeight !== 'auto';
+    let hasMinimalHeight = false;
 
     if (height < 40 && !hasMinHeight) {
         // Container is too small (likely no image), ensure minimum height for badge visibility
         container.style.minHeight = '48px';
+        hasMinimalHeight = true;
         logger.trace(`Set min-height on container (was ${height}px)`);
     }
 
@@ -270,6 +277,8 @@ function ensureContainerCanDisplayBadge(container) {
     if (styles.overflowY === 'hidden') {
         container.style.overflowY = 'visible';
     }
+
+    return hasMinimalHeight;
 }
 
 /**
@@ -301,12 +310,13 @@ export function renderGradeOnCard(cardElement, gradeData) {
         return;
     }
 
-    // Create new badge with hero color integration
-    const badge = createGradeBadge(gradeData, heroContainer);
-
-    // NOW fix container visibility issues - only when we're actually adding a badge
+    // Fix container visibility issues and check if it has minimal height (no image)
     // This ensures we don't modify cards that don't have grades
-    ensureContainerCanDisplayBadge(heroContainer);
+    const hasMinimalHeight = ensureContainerCanDisplayBadge(heroContainer);
+
+    // Create new badge with hero color integration
+    // Use top positioning for cards without images to avoid overlapping course title
+    const badge = createGradeBadge(gradeData, heroContainer, hasMinimalHeight);
 
     // Append badge to hero container
     heroContainer.appendChild(badge);
@@ -316,7 +326,8 @@ export function renderGradeOnCard(cardElement, gradeData) {
         const displayInfo = gradeData.letterGrade
             ? `${gradeData.score}${suffix} (${gradeData.letterGrade})`
             : `${gradeData.score}${suffix}`;
-        logger.trace(`Grade badge rendered (${displayInfo}, type: ${gradeData.displayType}, source: ${gradeData.source})`);
+        const position = hasMinimalHeight ? 'top-right (no image)' : 'bottom-right (with image)';
+        logger.trace(`Grade badge rendered (${displayInfo}, type: ${gradeData.displayType}, source: ${gradeData.source}, position: ${position})`);
         logger.trace(`Badge placed in: ${heroContainer.className || heroContainer.tagName}`);
     } else {
         logger.debug(`Grade badge rendered on card (type: ${gradeData.displayType}, source: ${gradeData.source})`);
