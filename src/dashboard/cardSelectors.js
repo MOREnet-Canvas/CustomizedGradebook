@@ -35,16 +35,20 @@ export const CARD_SELECTORS = [
 /**
  * Selectors for finding hero/header containers within cards
  * Ordered by preference for badge placement
- * 
+ *
  * Used by cardRenderer to find the best location to place grade badges
+ *
+ * NOTE: We target .ic-DashboardCard__header_image instead of __header_hero
+ * because Canvas sets opacity:0 on the hero overlay, which would make our badge invisible.
+ * The header_image container has the background image and is always visible.
  */
 export const HERO_SELECTORS = [
-    '.ic-DashboardCard__header_hero',
-    '[class*="hero"]',
-    '[class*="Hero"]',
-    '.ic-DashboardCard__header',
-    '[class*="header"]',
-    '[class*="Header"]'
+    '.ic-DashboardCard__header_image',  // Primary: image container (visible, has background)
+    '.ic-DashboardCard__header',        // Fallback: header container
+    '[class*="header"]',                // Generic header
+    '[class*="Header"]',                // Generic Header (capitalized)
+    '[class*="hero"]',                  // Generic hero (avoid __header_hero due to opacity:0)
+    '[class*="Hero"]'                   // Generic Hero (capitalized)
 ];
 
 /**
@@ -197,4 +201,3 @@ export function findCourseCard(courseId) {
     logger.trace(`Dashboard card not found for course ${courseId}`);
     return null;
 }
-

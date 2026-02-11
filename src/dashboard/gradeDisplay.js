@@ -135,21 +135,35 @@ async function updateCourseCard(courseId, courseName, apiClient) {
         // Find the card element
         const cardElement = findCourseCard(courseId);
         if (!cardElement) {
-            logger.trace(`Card element not found for course ${courseId}, skipping`);
+            logger.trace(`[Dashboard] Course ${courseId}: Card element not found, skipping`);
             return;
         }
 
         // Check if snapshot exists, populate if not
         let snapshot = getCourseSnapshot(courseId);
         if (!snapshot) {
-            logger.trace(`No snapshot for course ${courseId}, populating...`);
+            logger.trace(`[Dashboard] Course ${courseId}: No snapshot, populating...`);
             snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
         }
 
         if (!snapshot) {
-            logger.trace(`No grade available for course ${courseId}, skipping`);
+            logger.trace(`[Dashboard] Course ${courseId}: No snapshot available after population, skipping`);
             return;
         }
+
+        // CRITICAL: Only render badges on standards-based courses
+        if (snapshot.model !== 'standards') {
+            logger.trace(`[Dashboard] Course ${courseId} "${courseName}": Skipping badge (model=${snapshot.model}, reason=${snapshot.modelReason})`);
+            return;
+        }
+
+        // Check if we have valid grade data
+        if (snapshot.displayScore === null || snapshot.displayScore === undefined) {
+            logger.trace(`[Dashboard] Course ${courseId} "${courseName}": No grade data (model=${snapshot.model}, displayScore=${snapshot.displayScore})`);
+            return;
+        }
+
+        logger.trace(`[Dashboard] Course ${courseId} "${courseName}": Rendering badge (model=${snapshot.model}, score=${snapshot.displayScore}, type=${snapshot.displayType})`);
 
         // Render grade on card using display values from snapshot
         // Display values are pre-calculated by snapshot service for consistency
@@ -164,7 +178,7 @@ async function updateCourseCard(courseId, courseName, apiClient) {
         const displayInfo = snapshot.displayLetterGrade
             ? `${snapshot.displayScore} (${snapshot.displayLetterGrade})`
             : `${snapshot.displayScore}`;
-        logger.trace(`Grade displayed for course ${courseId}: ${displayInfo} ${snapshot.displayType} (source: ${snapshot.gradeSource})`);
+        logger.trace(`[Dashboard] Course ${courseId}: Badge rendered - ${displayInfo} ${snapshot.displayType} (source: ${snapshot.gradeSource})`);
 
     } catch (error) {
         // Fail silently for individual courses - don't break the entire dashboard
