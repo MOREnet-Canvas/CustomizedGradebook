@@ -122,8 +122,9 @@ export const CG_LOADER_TEMPLATE = `
         console.log(\`[CG] Auto-patch mode: fetching version manifest for track "\${release.versionTrack}"\`);
         const manifestUrl = "https://morenet-canvas.github.io/CustomizedGradebook/versions.json";
         const fallbackVersion = release.version || "v1.0.3";
+        const cacheBuster = Date.now();
 
-        fetch(manifestUrl)
+        fetch(\`\${manifestUrl}?t=\${cacheBuster}\`)
             .then(response => {
                 console.log(\`[CG] Manifest fetch response: \${response.status} \${response.statusText}\`);
                 if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
