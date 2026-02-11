@@ -127,10 +127,12 @@ function createGradeBadge(gradeData, containerElement = null, useTopPosition = f
     }
 
     // Position badge based on whether card has an image
-    const verticalPosition = useTopPosition ? 'top: 8px;' : 'bottom: 8px;';
+    // For cards without images, position below the kebab menu (top: 44px)
+    // For cards with images, position at bottom-right corner
+    const verticalPosition = useTopPosition ? 'top: 44px;' : 'bottom: 8px;';
 
     // Apply inline styles with frosted-glass effect
-    // Positioned to overlay on hero/header section (top-right or bottom-right corner)
+    // Positioned to overlay on hero/header section (below kebab menu or bottom-right corner)
     badge.style.cssText = `
         position: absolute;
         ${verticalPosition}
