@@ -112,9 +112,13 @@ import { isAdminDashboardPage } from "./admin/pageDetection.js";
         initSpeedGraderDropdown();
 
         // SpeedGrader auto-grade module (teacher-like only)
-        if (getUserRoleGroup() === 'teacher_like') {
+        const userRole = getUserRoleGroup();
+        logger.debug(`[Init] User role group: ${userRole}`);
+        if (userRole === 'teacher_like') {
             logger.debug('[Init] User is teacher-like, initializing SpeedGrader Score Sync');
             initSpeedGraderAutoGrade();
+        } else {
+            logger.debug(`[Init] User is ${userRole}, NOT initializing SpeedGrader Score Sync (requires teacher_like)`);
         }
     }
 
