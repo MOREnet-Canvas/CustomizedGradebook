@@ -198,6 +198,11 @@ function findGradeContainer(cardElement) {
                 container.style.position = 'relative';
             }
 
+            // Fix for cards without hero images: ensure container has dimensions
+            // When no image is present, hero container may have 0 height and overflow:hidden
+            // which clips the absolutely positioned badge
+            ensureContainerCanDisplayBadge(container);
+
             logger.trace(`Using container for grade badge placement: ${selector}`);
             return container;
         }
@@ -210,7 +215,52 @@ function findGradeContainer(cardElement) {
         cardElement.style.position = 'relative';
     }
 
+    ensureContainerCanDisplayBadge(cardElement);
+
     return cardElement;
+}
+
+/**
+ * Ensure container has sufficient dimensions and overflow settings to display badge
+ * Fixes issue where cards without hero images have 0-height containers with overflow:hidden
+ * Also fixes opacity:0 on hero containers that makes badges invisible
+ * @param {HTMLElement} container - Container element
+ */
+function ensureContainerCanDisplayBadge(container) {
+    const styles = window.getComputedStyle(container);
+
+    // CRITICAL FIX: Canvas sets opacity:0 on .ic-DashboardCard__header_hero
+    // This makes the entire container and all children (including our badge) invisible
+    // We need to override this to make the badge visible
+    if (styles.opacity === '0') {
+        container.style.opacity = '1';
+        logger.trace('Changed opacity from 0 to 1 to make badge visible');
+    }
+
+    // Check if container has minimal/zero height
+    const height = container.offsetHeight;
+    const hasMinHeight = styles.minHeight && styles.minHeight !== '0px' && styles.minHeight !== 'auto';
+
+    if (height < 40 && !hasMinHeight) {
+        // Container is too small (likely no image), ensure minimum height for badge visibility
+        container.style.minHeight = '48px';
+        logger.trace(`Set min-height on container (was ${height}px)`);
+    }
+
+    // Ensure overflow doesn't clip the badge
+    // Only override if it's 'hidden' - preserve other values like 'auto' or 'scroll'
+    if (styles.overflow === 'hidden') {
+        container.style.overflow = 'visible';
+        logger.trace('Changed overflow from hidden to visible');
+    }
+
+    // Also check overflow-x and overflow-y specifically
+    if (styles.overflowX === 'hidden') {
+        container.style.overflowX = 'visible';
+    }
+    if (styles.overflowY === 'hidden') {
+        container.style.overflowY = 'visible';
+    }
 }
 
 /**
