@@ -19,6 +19,7 @@ TODO: Add Checks for assignments
 - are all assignments using same grading scheme?
 TODO: Need to add choices for current assignment configuration, and suggestions.
 TODO: refactor accountSettingsPanel.js it is a hot mess at this point
+TODO: write out "production", clean up logging
 
 
 
@@ -77,3 +78,16 @@ TODO: remove legacy code
     2. Rubric ratings inspector (read-only API call)
     3. Override settings checker (read-only API call)
 These would require careful API integration but would provide valuable diagnostic information.
+
+## issue 1
+There needs to be a check for role and page before course id: 
+```------ Account JS is duplicated in Canvas ------
+customGradebookInit.js:1 Customized Gradebook Loaded
+customGradebookInit.js:1 Environment: prod
+customGradebookInit.js:1 Build Version: 2026-02-09 10:03:31 AM (prod, 7127d9d)
+customGradebookInit.js:1 Debug logging: disabled
+customGradebookInit.js:1 [INFO] Running in PROD mode
+customGradebookInit.js:1 [INFO] Build environment: prod
+customGradebookInit.js:1 [INFO] Initializing student grade customizations
+customGradebookInit.js:1 [ERROR] Course ID not found on page.
+```
