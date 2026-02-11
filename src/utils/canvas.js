@@ -89,11 +89,13 @@ export function getUserRoleGroup() {
     const teacherLike = ["teacher", "admin", "root_admin", "designer", "ta", "accountadmin"];
     const studentLike = ["student", "observer"];
 
+    // Check teacher_like FIRST to handle users with multiple roles (e.g., admin who is also a student)
+    // This ensures admins/teachers are correctly identified even if they have student role
     let group = "other";
-    if (normRoles.some(r => studentLike.includes(r))) {
-        group = "student_like";
-    } else if (normRoles.some(r => teacherLike.includes(r))) {
+    if (normRoles.some(r => teacherLike.includes(r))) {
         group = "teacher_like";
+    } else if (normRoles.some(r => studentLike.includes(r))) {
+        group = "student_like";
     }
 
     sessionStorage.setItem(cacheKeyGroup, group);
