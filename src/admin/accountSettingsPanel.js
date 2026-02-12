@@ -11,82 +11,7 @@ import { logger } from '../utils/logger.js';
 import { createElement, createPanel, escapeHtml } from './domHelpers.js';
 import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-
-/**
- * Show persistent notification banner for grading scheme changes
- */
-function showGradingSchemeChangeNotification() {
-    // Remove any existing grading scheme notification
-    const existingNotification = document.querySelector('#cg-grading-scheme-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-
-    // Create notification banner
-    const notification = createElement('div', {
-        attrs: { id: 'cg-grading-scheme-notification' },
-        style: {
-            position: 'fixed',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            maxWidth: '600px',
-            padding: '16px 20px',
-            background: '#fff7e6',
-            border: '2px solid #faad14',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: '10001',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#333'
-        }
-    });
-
-    const content = createElement('div', {
-        style: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-        }
-    });
-
-    const icon = createElement('div', {
-        text: '⚠️',
-        style: { fontSize: '20px' }
-    });
-
-    const message = createElement('div', {
-        html: '<strong>Grading Scheme Selection Changed</strong><br>Go to the <strong>Loader Generator</strong> panel below, click <strong>Generate</strong>, then <strong>Download</strong> the new loader file and upload it to Canvas Theme Editor to apply this change.',
-        style: { flex: '1', lineHeight: '1.5' }
-    });
-
-    const closeBtn = createElement('button', {
-        text: '×',
-        attrs: { title: 'Dismiss' },
-        style: {
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '24px',
-            padding: '0',
-            color: '#666',
-            lineHeight: '1'
-        },
-        on: {
-            click: () => notification.remove()
-        }
-    });
-
-    content.appendChild(icon);
-    content.appendChild(message);
-    content.appendChild(closeBtn);
-    notification.appendChild(content);
-
-    document.body.appendChild(notification);
-
-    logger.debug('[AccountSettingsPanel] Grading scheme change notification displayed');
-}
+import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
 
 /**
  * Select a grading scheme as default
@@ -107,11 +32,8 @@ function selectGradingScheme(scheme, gridContainer, allSchemes) {
 
     logger.info('[AccountSettingsPanel] Selected grading scheme:', scheme.title, 'ID:', scheme.id);
 
-    // Show success message
-    alert(`✓ Selected grading scheme: ${scheme.title} (ID: ${scheme.id})`);
-
-    // Show persistent notification
-    showGradingSchemeChangeNotification();
+    // Trigger the shared configuration change notification
+    triggerConfigChangeNotification();
 
     // Refresh the grid to show visual feedback
     if (gridContainer && allSchemes) {
@@ -132,11 +54,8 @@ function deselectGradingScheme(gridContainer, allSchemes) {
 
     logger.info('[AccountSettingsPanel] Deselected grading scheme');
 
-    // Show success message
-    alert('✓ Grading scheme deselected.');
-
-    // Show persistent notification
-    showGradingSchemeChangeNotification();
+    // Trigger the shared configuration change notification
+    triggerConfigChangeNotification();
 
     // Refresh the grid to show visual feedback
     if (gridContainer && allSchemes) {
