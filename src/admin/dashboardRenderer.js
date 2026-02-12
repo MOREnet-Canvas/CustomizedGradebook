@@ -22,6 +22,9 @@ import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
  * Clears the page and renders a full-page admin dashboard UI.
  */
 export function renderAdminDashboardPage() {
+    logger.debug('[DashboardRenderer] ========================================');
+    logger.debug('[DashboardRenderer] renderAdminDashboardPage() CALLED');
+    logger.debug('[DashboardRenderer] ========================================');
     logger.info('[DashboardRenderer] Rendering admin dashboard page');
 
     // Clear body content
@@ -101,17 +104,27 @@ export function renderAdminDashboardPage() {
     root.appendChild(accountInfo);
 
     // Render theme status panels (Installed Theme Overrides only)
+    logger.debug('[DashboardRenderer] Rendering theme status panels...');
     renderThemeStatusPanels(root);
 
     // Render account settings panels (Feature Flags & Grading Schemes)
+    logger.debug('[DashboardRenderer] Rendering account settings panel...');
     renderAccountSettingsPanel(root);
 
     // Render account filter panel (after Configuration, before Grading Schemes)
+    logger.debug('[DashboardRenderer] ========================================');
+    logger.debug('[DashboardRenderer] About to call renderAccountFilterPanel()');
+    logger.debug('[DashboardRenderer] ========================================');
     // Get current config from window.CG_MANAGED if available
     const currentConfig = window.CG_MANAGED?.config || {};
+    logger.debug('[DashboardRenderer] Current config:', currentConfig);
+    logger.debug('[DashboardRenderer] Root element:', root);
+    logger.debug('[DashboardRenderer] Calling renderAccountFilterPanel()...');
     renderAccountFilterPanel(root, currentConfig);
+    logger.debug('[DashboardRenderer] renderAccountFilterPanel() call completed (async, may still be running)');
 
     // Render loader generator panel
+    logger.debug('[DashboardRenderer] Rendering loader generator panel...');
     renderLoaderGeneratorPanel(root);
 
     // Append to body

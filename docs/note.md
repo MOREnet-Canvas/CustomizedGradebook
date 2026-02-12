@@ -18,9 +18,14 @@ TODO: Add Checks for assignments
 - what grading scheme are they using?
 - are all assignments using same grading scheme?
 TODO: Need to add choices for current assignment configuration, and suggestions.
+
 TODO: refactor accountSettingsPanel.js it is a hot mess at this point
+
 TODO: write out "production", clean up logging
+
 TODO: session key for debug
+
+TODO: clean up debugging
 
 
 
@@ -33,13 +38,16 @@ TODO: Do we want to make points classes default to standards based?
 
 ## Possible Enhancements
 TODO: figure out how to get grading scheme(s) → this might be easy way to determine class type
+
 TODO: Mastery Refresh: This does not update rubric scores, so outcome results are unchanged. Maybe this needs to stay this way.
 
 
 
 ## Refactoring
 ~~TODO: remove canvasHelpers.js?~~
+
 ~~TODO: get rid of all references to current score~~
+
 TODO: remove legacy code
 
 ## Admin Dashboard
