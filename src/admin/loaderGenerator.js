@@ -48,6 +48,7 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  * @param {Array} [options.outcomeAndRubricRatings] - Rating scale for outcomes and rubrics
  * @param {Array} [options.excludedOutcomeKeywords] - Keywords to exclude from outcomes
  * @param {number|null} [options.defaultGradingSchemeId=null] - Default grading scheme ID
+ * @param {Object|null} [options.defaultGradingScheme=null] - Default grading scheme object
  * @returns {string} Managed config block content (Section B)
  */
 export function buildCGManagedBlock({
@@ -77,7 +78,8 @@ export function buildCGManagedBlock({
         { description: "No Evidence", points: 0 }
     ],
     excludedOutcomeKeywords = ["Homework Completion"],
-    defaultGradingSchemeId = null
+    defaultGradingSchemeId = null,
+    defaultGradingScheme = null
 }) {
     logger.debug('[LoaderGenerator] Building managed config block (Section B)', {
         accountId,
@@ -129,7 +131,8 @@ export function buildCGManagedBlock({
         `    EXCLUDED_OUTCOME_KEYWORDS: ${JSON.stringify(excludedOutcomeKeywords)},`,
         '',
         `    // Grading scheme`,
-        `    DEFAULT_GRADING_SCHEME_ID: ${defaultGradingSchemeId !== null ? defaultGradingSchemeId : 'null'}`,
+        `    DEFAULT_GRADING_SCHEME_ID: ${defaultGradingSchemeId !== null ? defaultGradingSchemeId : 'null'},`,
+        `    DEFAULT_GRADING_SCHEME: ${defaultGradingScheme !== null ? JSON.stringify(defaultGradingScheme, null, 8).replace(/\n/g, '\n    ') : 'null'}`,
         '};',
         '',
         B_END
