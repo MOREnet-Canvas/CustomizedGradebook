@@ -32,6 +32,31 @@ export const CG_LOADER_TEMPLATE = `
     }
 
     // ========================================================================
+    // CG LOADER - ACCOUNT FILTER (EARLY EXIT)
+    // ========================================================================
+
+    // Check if account filtering is enabled
+    if (window.CG_CONFIG.ENABLE_ACCOUNT_FILTER) {
+        const allowedAccounts = window.CG_CONFIG.ALLOWED_ACCOUNT_IDS || [];
+
+        // Get current account ID from Canvas ENV
+        const currentAccountId = window.ENV?.ACCOUNT_ID ? String(window.ENV.ACCOUNT_ID) : null;
+
+        // If we can determine the account and it's not in the allowed list, stop execution
+        if (currentAccountId && !allowedAccounts.includes(currentAccountId)) {
+            console.log(\`[CG] Script disabled for account \${currentAccountId} (not in allowed list: \${allowedAccounts.join(', ')})\`);
+            return; // Exit IIFE - prevent rest of loader from running
+        }
+
+        // If filtering is enabled but we can't determine account, log warning but continue
+        if (!currentAccountId) {
+            console.warn('[CG] Account filtering enabled but cannot determine current account ID - allowing script to run');
+        } else {
+            console.log(\`[CG] Account \${currentAccountId} is allowed, continuing...\`);
+        }
+    }
+
+    // ========================================================================
     // CG LOADER - GRADES GATE (PREVENT FLASH)
     // ========================================================================
 

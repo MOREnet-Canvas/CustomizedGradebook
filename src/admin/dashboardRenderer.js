@@ -13,6 +13,7 @@ import { getAccountId } from './pageDetection.js';
 import { createElement } from './domHelpers.js';
 import { renderThemeStatusPanels } from './themeStatusPanel.js';
 import { renderAccountSettingsPanel } from './accountSettingsPanel.js';
+import { renderAccountFilterPanel } from './accountFilterPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
 
 /**
@@ -104,6 +105,11 @@ export function renderAdminDashboardPage() {
 
     // Render account settings panels (Feature Flags & Grading Schemes)
     renderAccountSettingsPanel(root);
+
+    // Render account filter panel (after Configuration, before Grading Schemes)
+    // Get current config from window.CG_MANAGED if available
+    const currentConfig = window.CG_MANAGED?.config || {};
+    renderAccountFilterPanel(root, currentConfig);
 
     // Render loader generator panel
     renderLoaderGeneratorPanel(root);
