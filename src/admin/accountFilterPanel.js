@@ -220,15 +220,20 @@ function renderAccountNode(node, selectedIds, onChange, level = 0) {
 
     // Create container for this node and its children
     const nodeContainer = createElement('div', {
-        style: 'margin-bottom: 0px;'
+        style: {
+            marginBottom: '0px'
+        }
     });
 
-    // Create indentation wrapper
+    // Create indentation wrapper with proper margin-left as object
+    const indentMargin = level * 24;
+    logger.trace(`[AccountFilter] Creating indent wrapper for level ${level} with margin-left: ${indentMargin}px`);
     const indentWrapper = createElement('div', {
-        style: `
-            margin-left: ${level * 24}px;
-        `
+        style: {
+            marginLeft: `${indentMargin}px`
+        }
     });
+    logger.trace(`[AccountFilter] Indent wrapper created, marginLeft style: ${indentWrapper.style.marginLeft}`);
 
     // Build label text with account info
     const subCount = countSubAccounts(node);
