@@ -268,8 +268,17 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     }
 
     logger.trace('[AccountFilter] Creating panel...');
-    const panel = createPanel('Account Filter', 'Configure which accounts the script should run on');
+    const panel = createPanel(root, 'Account Filter');
     logger.trace('[AccountFilter] Panel created:', panel);
+
+    // Add description
+    logger.trace('[AccountFilter] Adding description...');
+    const description = createElement('div', {
+        style: 'margin-bottom: 12px; color: #666; font-size: 14px;'
+    });
+    description.textContent = 'Configure which accounts the script should run on';
+    panel.appendChild(description);
+    logger.trace('[AccountFilter] Description added');
 
     // Enable toggle
     logger.trace('[AccountFilter] Creating enable toggle...');
@@ -332,9 +341,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     });
     panel.appendChild(statusDiv);
 
-    logger.debug('[AccountFilter] Appending panel to root...');
-    root.appendChild(panel);
-    logger.debug('[AccountFilter] Panel appended to DOM');
+    logger.debug('[AccountFilter] Panel already appended to DOM by createPanel()');
 
     // Fetch and render accounts
     logger.debug('[AccountFilter] Starting account fetch and render...');
