@@ -13,11 +13,89 @@ import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 /**
+ * Show persistent notification banner for grading scheme changes
+ */
+function showGradingSchemeChangeNotification() {
+    // Remove any existing grading scheme notification
+    const existingNotification = document.querySelector('#cg-grading-scheme-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    // Create notification banner
+    const notification = createElement('div', {
+        attrs: { id: 'cg-grading-scheme-notification' },
+        style: {
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            maxWidth: '600px',
+            padding: '16px 20px',
+            background: '#fff7e6',
+            border: '2px solid #faad14',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            zIndex: '10001',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#333'
+        }
+    });
+
+    const content = createElement('div', {
+        style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+        }
+    });
+
+    const icon = createElement('div', {
+        text: '⚠️',
+        style: { fontSize: '20px' }
+    });
+
+    const message = createElement('div', {
+        html: '<strong>Grading Scheme Selection Changed</strong><br>Go to the <strong>Loader Generator</strong> panel below, click <strong>Generate</strong>, then <strong>Download</strong> the new loader file and upload it to Canvas Theme Editor to apply this change.',
+        style: { flex: '1', lineHeight: '1.5' }
+    });
+
+    const closeBtn = createElement('button', {
+        text: '×',
+        attrs: { title: 'Dismiss' },
+        style: {
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '24px',
+            padding: '0',
+            color: '#666',
+            lineHeight: '1'
+        },
+        on: {
+            click: () => notification.remove()
+        }
+    });
+
+    content.appendChild(icon);
+    content.appendChild(message);
+    content.appendChild(closeBtn);
+    notification.appendChild(content);
+
+    document.body.appendChild(notification);
+
+    logger.debug('[AccountSettingsPanel] Grading scheme change notification displayed');
+}
+
+/**
  * Select a grading scheme as default
  *
  * @param {Object} scheme - Grading scheme to select
+ * @param {HTMLElement} gridContainer - Grid container element to refresh
+ * @param {Array} allSchemes - All available schemes
  */
-function selectGradingScheme(scheme) {
+function selectGradingScheme(scheme, gridContainer, allSchemes) {
     if (!window.CG_MANAGED) {
         window.CG_MANAGED = { config: {} };
     }
@@ -30,22 +108,24 @@ function selectGradingScheme(scheme) {
     logger.info('[AccountSettingsPanel] Selected grading scheme:', scheme.title, 'ID:', scheme.id);
 
     // Show success message
-    alert(`✓ Selected grading scheme: ${scheme.title} (ID: ${scheme.id})\n\nThis selection will be saved when you regenerate the loader in the Loader Generator panel.`);
+    alert(`✓ Selected grading scheme: ${scheme.title} (ID: ${scheme.id})`);
 
-    // Reload the panel to show updated selection
-    const root = document.querySelector('#cg-admin-dashboard-content');
-    if (root) {
-        // Re-render the account settings panel
-        import('./dashboardRenderer.js').then(module => {
-            module.renderAdminDashboardPage();
-        });
+    // Show persistent notification
+    showGradingSchemeChangeNotification();
+
+    // Refresh the grid to show visual feedback
+    if (gridContainer && allSchemes) {
+        refreshGradingSchemesGrid(gridContainer, allSchemes);
     }
 }
 
 /**
  * Deselect the current grading scheme
+ *
+ * @param {HTMLElement} gridContainer - Grid container element to refresh
+ * @param {Array} allSchemes - All available schemes
  */
-function deselectGradingScheme() {
+function deselectGradingScheme(gridContainer, allSchemes) {
     if (window.CG_MANAGED?.config) {
         window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = null;
     }
@@ -53,16 +133,51 @@ function deselectGradingScheme() {
     logger.info('[AccountSettingsPanel] Deselected grading scheme');
 
     // Show success message
-    alert('✓ Grading scheme deselected.\n\nThis change will be saved when you regenerate the loader in the Loader Generator panel.');
+    alert('✓ Grading scheme deselected.');
 
-    // Reload the panel to show updated selection
-    const root = document.querySelector('#cg-admin-dashboard-content');
-    if (root) {
-        // Re-render the account settings panel
-        import('./dashboardRenderer.js').then(module => {
-            module.renderAdminDashboardPage();
-        });
+    // Show persistent notification
+    showGradingSchemeChangeNotification();
+
+    // Refresh the grid to show visual feedback
+    if (gridContainer && allSchemes) {
+        refreshGradingSchemesGrid(gridContainer, allSchemes);
     }
+}
+
+/**
+ * Refresh the grading schemes grid to show updated selection
+ *
+ * @param {HTMLElement} gridContainer - Grid container element
+ * @param {Array} schemes - Array of grading schemes
+ */
+function refreshGradingSchemesGrid(gridContainer, schemes) {
+    const currentSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
+
+    // Clear existing cards
+    gridContainer.innerHTML = '';
+
+    // Re-render all cards with updated selection state
+    schemes.forEach((scheme) => {
+        renderGradingSchemeCard(gridContainer, scheme, currentSchemeId, schemes);
+    });
+
+    // Update the "Currently Selected" display
+    const selectedDisplay = document.querySelector('#cg-selected-scheme-display');
+    if (selectedDisplay) {
+        if (currentSchemeId) {
+            const selectedScheme = schemes.find(s => s.id === currentSchemeId);
+            if (selectedScheme) {
+                selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ${escapeHtml(selectedScheme.title)} (ID: ${currentSchemeId})`;
+            } else {
+                selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ID ${currentSchemeId} <em>(not found in current schemes)</em>`;
+            }
+            selectedDisplay.style.display = 'block';
+        } else {
+            selectedDisplay.style.display = 'none';
+        }
+    }
+
+    logger.debug('[AccountSettingsPanel] Grading schemes grid refreshed');
 }
 
 /**
@@ -2310,27 +2425,27 @@ function renderGradingSchemesPanel(root, schemes) {
     const currentSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
 
     // Display currently selected scheme
-    if (currentSchemeId) {
-        const selectedScheme = schemes.find(s => s.id === currentSchemeId);
-        const selectedDisplay = createElement('div', {
-            style: {
-                padding: '10px',
-                marginBottom: '12px',
-                background: '#e6f7ff',
-                border: '1px solid #91d5ff',
-                borderRadius: '6px',
-                fontSize: '13px'
-            }
-        });
-
-        if (selectedScheme) {
-            selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ${escapeHtml(selectedScheme.title)} (ID: ${currentSchemeId})`;
-        } else {
-            selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ID ${currentSchemeId} <em>(not found in current schemes)</em>`;
+    const selectedScheme = currentSchemeId ? schemes.find(s => s.id === currentSchemeId) : null;
+    const selectedDisplay = createElement('div', {
+        attrs: { id: 'cg-selected-scheme-display' },
+        style: {
+            padding: '10px',
+            marginBottom: '12px',
+            background: '#e6f7ff',
+            border: '1px solid #91d5ff',
+            borderRadius: '6px',
+            fontSize: '13px',
+            display: currentSchemeId ? 'block' : 'none'
         }
+    });
 
-        panel.appendChild(selectedDisplay);
+    if (selectedScheme) {
+        selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ${escapeHtml(selectedScheme.title)} (ID: ${currentSchemeId})`;
+    } else if (currentSchemeId) {
+        selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ID ${currentSchemeId} <em>(not found in current schemes)</em>`;
     }
+
+    panel.appendChild(selectedDisplay);
 
     // Add "View Full Details" button
     const viewDetailsBtn = createElement('button', {
@@ -2390,7 +2505,7 @@ function renderGradingSchemesPanel(root, schemes) {
 
     // Render each scheme as a compact card
     schemes.forEach((scheme) => {
-        renderGradingSchemeCard(gridContainer, scheme, currentSchemeId);
+        renderGradingSchemeCard(gridContainer, scheme, currentSchemeId, schemes);
     });
 
     panel.appendChild(gridContainer);
@@ -2402,8 +2517,9 @@ function renderGradingSchemesPanel(root, schemes) {
  * @param {HTMLElement} parent - Parent container
  * @param {Object} scheme - Grading scheme data
  * @param {number|null} currentSchemeId - Currently selected scheme ID
+ * @param {Array} allSchemes - All available schemes (for refresh)
  */
-function renderGradingSchemeCard(parent, scheme, currentSchemeId = null) {
+function renderGradingSchemeCard(parent, scheme, currentSchemeId = null, allSchemes = []) {
     const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
     const scaleCount = scheme.grading_scheme ? scheme.grading_scheme.length : 0;
     const isSelected = currentSchemeId === scheme.id;
@@ -2513,9 +2629,9 @@ function renderGradingSchemeCard(parent, scheme, currentSchemeId = null) {
         on: {
             click: () => {
                 if (isSelected) {
-                    deselectGradingScheme();
+                    deselectGradingScheme(parent, allSchemes);
                 } else {
-                    selectGradingScheme(scheme);
+                    selectGradingScheme(scheme, parent, allSchemes);
                 }
             },
             mouseenter: (e) => {
