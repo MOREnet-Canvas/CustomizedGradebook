@@ -1601,7 +1601,9 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         outcomeAndRubricRatings,
         excludedOutcomeKeywords,
         defaultGradingSchemeId,
-        defaultGradingScheme
+        defaultGradingScheme,
+        enableAccountFilter: window.CG_MANAGED?.config?.ENABLE_ACCOUNT_FILTER || false,
+        allowedAccountIds: window.CG_MANAGED?.config?.ALLOWED_ACCOUNT_IDS || []
     });
 
     // Update config preview textarea (C)
