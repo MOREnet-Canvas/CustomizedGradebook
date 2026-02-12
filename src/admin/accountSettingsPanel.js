@@ -32,7 +32,16 @@ function selectGradingScheme(scheme, gridContainer, allSchemes) {
         window.CG_MANAGED.config = {};
     }
 
+    // Store both the ID and the complete scheme object
     window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = scheme.id;
+    window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME = {
+        id: scheme.id,
+        title: scheme.title,
+        scaling_factor: scheme.scaling_factor,
+        points_based: scheme.points_based,
+        grading_scheme: scheme.grading_scheme,
+        context_type: scheme.context_type
+    };
 
     logger.info('[AccountSettingsPanel] Selected grading scheme:', scheme.title, 'ID:', scheme.id);
 
@@ -54,6 +63,7 @@ function selectGradingScheme(scheme, gridContainer, allSchemes) {
 function deselectGradingScheme(gridContainer, allSchemes) {
     if (window.CG_MANAGED?.config) {
         window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = null;
+        window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME = null;
     }
 
     logger.info('[AccountSettingsPanel] Deselected grading scheme');
