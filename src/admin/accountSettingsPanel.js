@@ -234,7 +234,7 @@ async function fetchFinalGradeOverrideStatus(accountId) {
  * @param {string} accountId - Account ID
  * @returns {Promise<Array>} Array of grading schemes
  */
-async function fetchGradingSchemes(accountId) {
+export async function fetchGradingSchemes(accountId) {
     console.log(`📘 Capturing grading schemes for account: ${accountId}`);
 
     let url = `/api/v1/accounts/${accountId}/grading_standards?per_page=100`;
@@ -707,7 +707,8 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
         attrs: {
             type: 'text',
             value: exampleScheme.title,
-            required: 'true'
+            required: 'true',
+            readonly: 'true'
         },
         style: {
             width: '100%',
@@ -715,7 +716,9 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
             border: '1px solid #d9d9d9',
             borderRadius: '4px',
             fontSize: '14px',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            background: '#f5f5f5',
+            cursor: 'not-allowed'
         }
     });
     titleGroup.appendChild(titleInput);
@@ -739,14 +742,17 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
             value: exampleScheme.scaling_factor.toString(),
             min: '0.01',
             step: '0.01',
-            required: 'true'
+            required: 'true',
+            readonly: 'true'
         },
         style: {
             width: '200px',
             padding: '8px 12px',
             border: '1px solid #d9d9d9',
             borderRadius: '4px',
-            fontSize: '14px'
+            fontSize: '14px',
+            background: '#f5f5f5',
+            cursor: 'not-allowed'
         }
     });
     scalingGroup.appendChild(scalingInput);
@@ -765,12 +771,13 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
         attrs: {
             type: 'checkbox',
             id: 'points-based-checkbox',
-            checked: exampleScheme.points_based ? 'true' : null
+            checked: exampleScheme.points_based ? 'true' : null,
+            disabled: 'true'
         },
         style: {
             width: '18px',
             height: '18px',
-            cursor: 'pointer'
+            cursor: 'not-allowed'
         }
     });
 
@@ -840,17 +847,7 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
             width: '150px'
         }
     }));
-    headerRow.appendChild(createElement('th', {
-        text: 'Actions',
-        style: {
-            textAlign: 'center',
-            padding: '8px',
-            borderBottom: '2px solid #d9d9d9',
-            fontWeight: '600',
-            fontSize: '13px',
-            width: '80px'
-        }
-    }));
+    // Actions column header removed (editing disabled)
     thead.appendChild(headerRow);
     entriesTable.appendChild(thead);
 
@@ -872,7 +869,8 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
             attrs: {
                 type: 'text',
                 value: name,
-                required: 'true'
+                required: 'true',
+                readonly: 'true'
             },
             style: {
                 width: '100%',
@@ -880,7 +878,9 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
                 border: '1px solid #d9d9d9',
                 borderRadius: '4px',
                 fontSize: '13px',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                background: '#f5f5f5',
+                cursor: 'not-allowed'
             }
         });
         nameCell.appendChild(nameInput);
@@ -899,7 +899,8 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
                 min: '0',
                 max: '1',
                 step: '0.001',
-                required: 'true'
+                required: 'true',
+                readonly: 'true'
             },
             style: {
                 width: '100%',
@@ -907,46 +908,15 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
                 border: '1px solid #d9d9d9',
                 borderRadius: '4px',
                 fontSize: '13px',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                background: '#f5f5f5',
+                cursor: 'not-allowed'
             }
         });
         valueCell.appendChild(valueInput);
         row.appendChild(valueCell);
 
-        const actionsCell = createElement('td', {
-            style: {
-                padding: '6px',
-                borderBottom: '1px solid #e8e8e8',
-                textAlign: 'center'
-            }
-        });
-        const deleteBtn = createElement('button', {
-            text: '🗑️',
-            attrs: {
-                type: 'button',
-                title: 'Delete entry'
-            },
-            style: {
-                padding: '4px 8px',
-                background: '#ff4d4f',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px'
-            },
-            on: {
-                click: () => {
-                    if (tbody.children.length > 1) {
-                        row.remove();
-                    } else {
-                        alert('At least one entry is required.');
-                    }
-                }
-            }
-        });
-        actionsCell.appendChild(deleteBtn);
-        row.appendChild(actionsCell);
+        // Actions cell removed (editing disabled)
 
         tbody.appendChild(row);
     };
@@ -958,27 +928,7 @@ function openGradingSchemeEditor(exampleScheme, onSuccess) {
 
     entriesGroup.appendChild(entriesTable);
 
-    // Add entry button
-    const addEntryBtn = createElement('button', {
-        text: '+ Add Entry',
-        attrs: {
-            type: 'button'
-        },
-        style: {
-            padding: '6px 12px',
-            background: '#52c41a',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '600'
-        },
-        on: {
-            click: () => addEntryRow('', 0)
-        }
-    });
-    entriesGroup.appendChild(addEntryBtn);
+    // Add entry button removed (editing disabled)
 
     form.appendChild(entriesGroup);
 
@@ -2339,7 +2289,7 @@ function generateGradingSchemeExamplesHTML() {
  * @param {HTMLElement} root - Root container
  * @param {Array} schemes - Array of grading schemes
  */
-function renderGradingSchemesPanel(root, schemes) {
+export function renderGradingSchemesPanel(root, schemes) {
     const panel = createPanel(root, `Grading Schemes (${schemes.length} found)`);
 
     if (schemes.length === 0) {
