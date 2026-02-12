@@ -13,6 +13,10 @@ import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
 
+// Global references for grading schemes grid refresh
+let globalGradingSchemesGridContainer = null;
+let globalGradingSchemes = [];
+
 /**
  * Select a grading scheme as default
  *
@@ -2422,6 +2426,10 @@ function renderGradingSchemesPanel(root, schemes) {
         }
     });
 
+    // Store references globally for refresh capability
+    globalGradingSchemesGridContainer = gridContainer;
+    globalGradingSchemes = schemes;
+
     // Render each scheme as a compact card
     schemes.forEach((scheme) => {
         renderGradingSchemeCard(gridContainer, scheme, currentSchemeId, schemes);
@@ -2532,11 +2540,11 @@ function renderGradingSchemeCard(parent, scheme, currentSchemeId = null, allSche
 
     // Select button
     const selectBtn = createElement('button', {
-        text: isSelected ? 'Deselect' : 'Select as Default',
+        text: isSelected ? 'Current Default' : 'Select as Default',
         style: {
             width: '100%',
             padding: '6px 12px',
-            background: isSelected ? '#ff4d4f' : '#52c41a',
+            background: isSelected ? '#52c41a' : '#6c757d',
             color: '#fff',
             border: 'none',
             borderRadius: '4px',
@@ -2554,10 +2562,10 @@ function renderGradingSchemeCard(parent, scheme, currentSchemeId = null, allSche
                 }
             },
             mouseenter: (e) => {
-                e.target.style.background = isSelected ? '#cf1322' : '#389e0d';
+                e.target.style.background = isSelected ? '#389e0d' : '#5a6268';
             },
             mouseleave: (e) => {
-                e.target.style.background = isSelected ? '#ff4d4f' : '#52c41a';
+                e.target.style.background = isSelected ? '#52c41a' : '#6c757d';
             }
         }
     });
@@ -2568,4 +2576,17 @@ function renderGradingSchemeCard(parent, scheme, currentSchemeId = null, allSche
     card.appendChild(selectBtn);
 
     parent.appendChild(card);
+}
+
+/**
+ * Refresh grading schemes grid from external trigger (e.g., after loader parse)
+ * This function can be called from other panels to update the visual state
+ */
+export function refreshGradingSchemesGridExternal() {
+    if (globalGradingSchemesGridContainer && globalGradingSchemes.length > 0) {
+        refreshGradingSchemesGrid(globalGradingSchemesGridContainer, globalGradingSchemes);
+        logger.debug('[AccountSettingsPanel] Grading schemes grid refreshed from external trigger');
+    } else {
+        logger.warn('[AccountSettingsPanel] Cannot refresh grading schemes grid - not yet initialized');
+    }
 }

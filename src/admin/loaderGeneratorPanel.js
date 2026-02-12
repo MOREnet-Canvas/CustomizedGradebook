@@ -15,6 +15,7 @@ import { createElement, createPanel, escapeHtml, downloadText } from './domHelpe
 import { fetchTextWithTimeout } from './fetchHelpers.js';
 import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, extractSections } from './loaderGenerator.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
+import { refreshGradingSchemesGridExternal } from './accountSettingsPanel.js';
 
 // Global reference to the change notification trigger function
 let globalMarkAsChanged = null;
@@ -330,6 +331,18 @@ export function renderLoaderGeneratorPanel(root) {
 
                 // Populate configuration controls with current settings
                 populateConfigurationControls(controls, parsedSettings);
+
+                // Populate window.CG_MANAGED.config with parsed settings (for grading scheme selection)
+                if (!window.CG_MANAGED) {
+                    window.CG_MANAGED = { config: {} };
+                }
+                if (!window.CG_MANAGED.config) {
+                    window.CG_MANAGED.config = {};
+                }
+                window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = parsedSettings.defaultGradingSchemeId;
+
+                // Refresh grading schemes grid to show selected scheme
+                refreshGradingSchemesGridExternal();
 
                 // Reset change tracking state (no unsaved changes after auto-load)
                 state.hasUnsavedChanges = false;
@@ -1553,9 +1566,14 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
-    // Parse grading scheme ID
-    const gradingSchemeIdValue = controls.gradingSchemeId.value.trim();
-    const defaultGradingSchemeId = gradingSchemeIdValue ? parseInt(gradingSchemeIdValue, 10) : null;
+    // Parse grading scheme ID - prioritize window.CG_MANAGED.config over text input
+    let defaultGradingSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID;
+
+    // If not set in window.CG_MANAGED, fall back to text input
+    if (defaultGradingSchemeId === undefined || defaultGradingSchemeId === null) {
+        const gradingSchemeIdValue = controls.gradingSchemeId.value.trim();
+        defaultGradingSchemeId = gradingSchemeIdValue ? parseInt(gradingSchemeIdValue, 10) : null;
+    }
 
     // Get version and channel from dropdown
     const selectedVersion = versionDropdown.value;
