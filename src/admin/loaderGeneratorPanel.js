@@ -1664,6 +1664,3 @@ export function triggerConfigChangeNotification() {
         logger.warn('[LoaderGeneratorPanel] Cannot trigger notification - loader generator panel not yet initialized');
     }
 }
-
-    logger.info('[LoaderGeneratorPanel] A+B+C loader generated successfully');
-}
