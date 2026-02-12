@@ -199,55 +199,80 @@ function countSubAccounts(node) {
 function renderAccountNode(node, selectedIds, onChange, level = 0) {
     logger.trace(`[AccountFilter] Rendering node: ${node.name} (ID: ${node.id}, level: ${level})`);
 
-    const container = createElement('div', {
-        style: `margin-left: ${level * 20}px; margin-bottom: 4px;`
-    });
-
     const isChecked = selectedIds.has(String(node.id));
     logger.trace(`[AccountFilter] Node ${node.id} checked state: ${isChecked}`);
 
-    const checkbox = createElement('input', {
-        type: 'checkbox',
-        id: `account-${node.id}`,
-        checked: isChecked,
-        style: 'margin-right: 8px;'
+    // Create container for this node
+    const nodeContainer = createElement('div', {
+        style: 'margin-bottom: 2px;'
     });
 
-    checkbox.addEventListener('change', () => {
-        logger.debug(`[AccountFilter] Checkbox changed for account ${node.id} (${node.name}): ${checkbox.checked}`);
-        onChange(String(node.id), checkbox.checked);
+    // Create clickable row with indentation
+    const row = createElement('div', {
+        style: `
+            padding-left: ${level * 24}px;
+            cursor: pointer;
+            user-select: none;
+            padding-top: 2px;
+            padding-bottom: 2px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        `
     });
 
+    // Add hover effect
+    row.addEventListener('mouseenter', () => {
+        row.style.background = '#f0f0f0';
+    });
+    row.addEventListener('mouseleave', () => {
+        row.style.background = 'transparent';
+    });
+
+    // Build the text content with checkbox symbol
+    const checkboxSymbol = isChecked ? '☑' : '☐';
     const subCount = countSubAccounts(node);
-    const label = createElement('label', {
-        for: `account-${node.id}`,
-        style: 'cursor: pointer; user-select: none;'
+    const labelText = subCount > 0
+        ? `${checkboxSymbol} ${node.name} (ID: ${node.id}) [${subCount} sub-account${subCount !== 1 ? 's' : ''}]`
+        : `${checkboxSymbol} ${node.name} (ID: ${node.id})`;
+
+    row.textContent = labelText;
+
+    // Click handler to toggle checkbox
+    row.addEventListener('click', () => {
+        const newCheckedState = !isChecked;
+        logger.debug(`[AccountFilter] Row clicked for account ${node.id} (${node.name}): ${isChecked} -> ${newCheckedState}`);
+
+        // Update the visual checkbox symbol
+        const newCheckboxSymbol = newCheckedState ? '☑' : '☐';
+        const newLabelText = subCount > 0
+            ? `${newCheckboxSymbol} ${node.name} (ID: ${node.id}) [${subCount} sub-account${subCount !== 1 ? 's' : ''}]`
+            : `${newCheckboxSymbol} ${node.name} (ID: ${node.id})`;
+        row.textContent = newLabelText;
+
+        // Update the selected state
+        if (newCheckedState) {
+            selectedIds.add(String(node.id));
+        } else {
+            selectedIds.delete(String(node.id));
+        }
+
+        // Trigger the onChange callback
+        onChange(String(node.id), newCheckedState);
     });
 
-    const labelText = subCount > 0
-        ? `${node.name} (ID: ${node.id}) [${subCount} sub-account${subCount !== 1 ? 's' : ''}]`
-        : `${node.name} (ID: ${node.id})`;
-
-    label.textContent = labelText;
-
-    container.appendChild(checkbox);
-    container.appendChild(label);
+    nodeContainer.appendChild(row);
 
     // Render children
     if (node.children && node.children.length > 0) {
         logger.trace(`[AccountFilter] Node ${node.id} has ${node.children.length} children, rendering...`);
-        const childrenContainer = createElement('div', {
-            style: 'margin-top: 4px;'
-        });
 
         node.children.forEach(child => {
-            childrenContainer.appendChild(renderAccountNode(child, selectedIds, onChange, level + 1));
+            nodeContainer.appendChild(renderAccountNode(child, selectedIds, onChange, level + 1));
         });
-
-        container.appendChild(childrenContainer);
     }
 
-    return container;
+    return nodeContainer;
 }
 
 /**
@@ -319,8 +344,24 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     logger.trace('[AccountFilter] Creating tree container...');
     const treeContainer = createElement('div', {
         id: 'account-tree-container',
-        style: 'margin-top: 16px; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 12px; border-radius: 4px; background: #fafafa;'
+        style: `
+            margin-top: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 4px;
+            background: #fafafa;
+            display: ${enabledState ? 'block' : 'none'};
+            font-family: 'Courier New', monospace;
+        `
     });
+
+    // Function to update tree container visibility
+    const updateTreeVisibility = (enabled) => {
+        treeContainer.style.display = enabled ? 'block' : 'none';
+        treeContainer.style.opacity = enabled ? '1' : '0.5';
+    };
 
     // Loading state
     logger.trace('[AccountFilter] Creating loading indicator...');
@@ -390,6 +431,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         logger.trace('[AccountFilter] Attaching enable toggle event listener...');
         enableCheckbox.addEventListener('change', () => {
             logger.debug(`[AccountFilter] Enable toggle changed: ${enableCheckbox.checked}`);
+            updateTreeVisibility(enableCheckbox.checked);
             updateAccountFilterConfig(enableCheckbox.checked, Array.from(selectedIds));
         });
         logger.trace('[AccountFilter] Enable toggle event listener attached');
