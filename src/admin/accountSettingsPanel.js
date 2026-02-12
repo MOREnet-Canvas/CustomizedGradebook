@@ -1321,6 +1321,24 @@ function generateGradingSchemeExamplesHTML() {
                 async function createGradingSchemeDirectly(exampleScheme, buttonElement) {
                     const accountId = window.location.pathname.match(/accounts\\/(\\d+)/)?.[1] || "1";
 
+                    // Prompt user for a new name
+                    const newTitle = prompt(
+                        \`Enter a name for this grading scheme:\`,
+                        exampleScheme.title
+                    );
+
+                    // User cancelled
+                    if (newTitle === null) {
+                        return;
+                    }
+
+                    // Validate title
+                    const title = newTitle.trim();
+                    if (!title) {
+                        alert('❌ Error: Title cannot be empty');
+                        return;
+                    }
+
                     // Disable button and show loading state
                     const originalText = buttonElement.textContent;
                     buttonElement.disabled = true;
@@ -1336,16 +1354,27 @@ function generateGradingSchemeExamplesHTML() {
 
                         const url = \`/api/v1/accounts/\${accountId}/grading_standards\`;
 
+                        // Process the data the same way the modal editor does
+                        // Sort entries by value (descending) - Canvas requirement
+                        const sortedData = [...exampleScheme.data].sort((a, b) => b.value - a.value);
+
                         // Build form data
                         const formData = new URLSearchParams();
-                        formData.append('title', exampleScheme.title);
+                        formData.append('title', title);
                         formData.append('scaling_factor', exampleScheme.scaling_factor);
                         formData.append('points_based', exampleScheme.points_based);
 
-                        // Add grading scheme entries
-                        exampleScheme.data.forEach(entry => {
+                        // CRITICAL FIX: Convert normalized values (0-1) to API format
+                        // Canvas API expects INTEGER percentages (0-100) or points, NOT decimals (0-1)
+                        // For percentage-based: multiply by 100 (0.94 → 94)
+                        // For points-based: multiply by scaling_factor (0.94 * 4 → 3.76)
+                        const multiplier = exampleScheme.points_based ? exampleScheme.scaling_factor : 100;
+
+                        sortedData.forEach(entry => {
                             formData.append('grading_scheme_entry[][name]', entry.name);
-                            formData.append('grading_scheme_entry[][value]', entry.value);
+                            // Convert: 0.94 * 100 = 94 (for percentage) or 0.94 * 4 = 3.76 (for points)
+                            const apiValue = entry.value * multiplier;
+                            formData.append('grading_scheme_entry[][value]', apiValue);
                         });
 
                         console.log('[GradingSchemeExamples] Creating grading standard:', exampleScheme.title);
