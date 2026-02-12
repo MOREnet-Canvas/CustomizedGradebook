@@ -61,7 +61,8 @@ function parseConfigFromSectionB(sectionB) {
         defaultMaxPoints: managed.config.DEFAULT_MAX_POINTS || 4,
         defaultMasteryThreshold: managed.config.DEFAULT_MASTERY_THRESHOLD || 3,
         outcomeAndRubricRatings: managed.config.OUTCOME_AND_RUBRIC_RATINGS || [],
-        excludedOutcomeKeywords: managed.config.EXCLUDED_OUTCOME_KEYWORDS || []
+        excludedOutcomeKeywords: managed.config.EXCLUDED_OUTCOME_KEYWORDS || [],
+        defaultGradingSchemeId: managed.config.DEFAULT_GRADING_SCHEME_ID || null
     };
 }
 
@@ -179,6 +180,11 @@ function populateConfigurationControls(controls, parsedSettings) {
     // Excluded keywords (array to comma-separated string)
     if (parsedSettings.excludedOutcomeKeywords && Array.isArray(parsedSettings.excludedOutcomeKeywords)) {
         controls.keywordsInput.value = parsedSettings.excludedOutcomeKeywords.join(', ');
+    }
+
+    // Grading scheme ID
+    if (parsedSettings.defaultGradingSchemeId !== undefined && parsedSettings.defaultGradingSchemeId !== null) {
+        controls.gradingSchemeId.value = parsedSettings.defaultGradingSchemeId.toString();
     }
 
     logger.debug('[LoaderGeneratorPanel] Configuration controls populated successfully');
@@ -416,6 +422,7 @@ export function renderLoaderGeneratorPanel(root) {
     controls.defaultMasteryThreshold.addEventListener('input', markAsChanged);
     controls.ratingsTextarea.addEventListener('input', markAsChanged);
     controls.keywordsInput.addEventListener('input', markAsChanged);
+    controls.gradingSchemeId.addEventListener('input', markAsChanged);
     versionDropdown.addEventListener('change', markAsChanged);
 
     // Append all elements in new order:
@@ -961,6 +968,45 @@ function createConfigurationPanel() {
     ratingsSection.appendChild(ratingsTitle);
     ratingsSection.appendChild(ratingsTextarea);
 
+    // Grading Scheme Section
+    const gradingSchemeSection = createElement('div', {
+        style: {
+            marginBottom: '12px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
+    });
+    const gradingSchemeTitle = createElement('div', {
+        html: '<strong>Default Grading Scheme</strong>',
+        style: {
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: '#2D3B45',
+            paddingLeft: '8px',
+            borderLeft: '3px solid #0374B5'
+        }
+    });
+
+    const gradingSchemeInput = createElement('input', {
+        attrs: { type: 'number', value: '', placeholder: 'Enter grading scheme ID (optional)', spellcheck: 'false' },
+        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
+    });
+
+    const gradingSchemeHelp = createElement('div', {
+        text: 'Optional: Enter the Canvas grading scheme ID to use as default. Leave empty for no default scheme.',
+        style: {
+            fontSize: '11px',
+            color: '#666',
+            marginTop: '4px',
+            fontStyle: 'italic'
+        }
+    });
+
+    gradingSchemeSection.appendChild(gradingSchemeTitle);
+    gradingSchemeSection.appendChild(gradingSchemeInput);
+    gradingSchemeSection.appendChild(gradingSchemeHelp);
+
     // Assemble container
     container.appendChild(title);
     container.appendChild(featureSection);
@@ -968,6 +1014,7 @@ function createConfigurationPanel() {
     container.appendChild(labelsSection);
     container.appendChild(outcomeSection);
     container.appendChild(ratingsSection);
+    container.appendChild(gradingSchemeSection);
 
     return {
         container,
@@ -982,7 +1029,8 @@ function createConfigurationPanel() {
             defaultMaxPoints: defaultMaxPoints.input,
             defaultMasteryThreshold: defaultMasteryThreshold.input,
             ratingsTextarea,
-            keywordsInput
+            keywordsInput,
+            gradingSchemeId: gradingSchemeInput
         }
     };
 }
@@ -1499,6 +1547,10 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
+    // Parse grading scheme ID
+    const gradingSchemeIdValue = controls.gradingSchemeId.value.trim();
+    const defaultGradingSchemeId = gradingSchemeIdValue ? parseInt(gradingSchemeIdValue, 10) : null;
+
     // Get version and channel from dropdown
     const selectedVersion = versionDropdown.value;
     const selectedOption = versionDropdown.options[versionDropdown.selectedIndex];
@@ -1530,7 +1582,8 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         defaultMaxPoints: parseFloat(controls.defaultMaxPoints.value) || 4,
         defaultMasteryThreshold: parseFloat(controls.defaultMasteryThreshold.value) || 3,
         outcomeAndRubricRatings,
-        excludedOutcomeKeywords
+        excludedOutcomeKeywords,
+        defaultGradingSchemeId
     });
 
     // Update config preview textarea (C)

@@ -13,6 +13,59 @@ import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 /**
+ * Select a grading scheme as default
+ *
+ * @param {Object} scheme - Grading scheme to select
+ */
+function selectGradingScheme(scheme) {
+    if (!window.CG_MANAGED) {
+        window.CG_MANAGED = { config: {} };
+    }
+    if (!window.CG_MANAGED.config) {
+        window.CG_MANAGED.config = {};
+    }
+
+    window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = scheme.id;
+
+    logger.info('[AccountSettingsPanel] Selected grading scheme:', scheme.title, 'ID:', scheme.id);
+
+    // Show success message
+    alert(`✓ Selected grading scheme: ${scheme.title} (ID: ${scheme.id})\n\nThis selection will be saved when you regenerate the loader in the Loader Generator panel.`);
+
+    // Reload the panel to show updated selection
+    const root = document.querySelector('#cg-admin-dashboard-content');
+    if (root) {
+        // Re-render the account settings panel
+        import('./dashboardRenderer.js').then(module => {
+            module.renderAdminDashboardPage();
+        });
+    }
+}
+
+/**
+ * Deselect the current grading scheme
+ */
+function deselectGradingScheme() {
+    if (window.CG_MANAGED?.config) {
+        window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = null;
+    }
+
+    logger.info('[AccountSettingsPanel] Deselected grading scheme');
+
+    // Show success message
+    alert('✓ Grading scheme deselected.\n\nThis change will be saved when you regenerate the loader in the Loader Generator panel.');
+
+    // Reload the panel to show updated selection
+    const root = document.querySelector('#cg-admin-dashboard-content');
+    if (root) {
+        // Re-render the account settings panel
+        import('./dashboardRenderer.js').then(module => {
+            module.renderAdminDashboardPage();
+        });
+    }
+}
+
+/**
  * Create a grading standard in Canvas via API
  *
  * @param {string} accountId - Account ID
@@ -313,10 +366,12 @@ function openGradingSchemesInNewTab(schemes) {
  */
 function generateGradingSchemesHTML(schemes) {
     const accountId = window.location.pathname.match(/accounts\/(\d+)/)?.[1] || "unknown";
+    const currentSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
 
     let schemesHTML = '';
 
     schemes.forEach((scheme, index) => {
+        const isSelected = currentSchemeId === scheme.id;
         const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
         const scalingFactor = scheme.scaling_factor || null;
 
@@ -355,8 +410,10 @@ function generateGradingSchemesHTML(schemes) {
         }
 
         schemesHTML += `
-            <div class="scheme-card">
-                <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #333;">
+            <div class="scheme-card" data-scheme-id="${scheme.id}" style="border: ${isSelected ? '2px solid #52c41a' : '1px solid #d9d9d9'}; background: ${isSelected ? '#f6ffed' : '#fafafa'}; position: relative;">
+                ${isSelected ? '<div style="position: absolute; top: 12px; right: 12px; padding: 4px 10px; background: #52c41a; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 600;">✓ Selected</div>' : ''}
+
+                <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #333; ${isSelected ? 'padding-right: 90px;' : ''}">
                     ${escapeHtml(scheme.title || 'Untitled')} <span style="color: #666; font-weight: normal;">(ID: ${scheme.id})</span>
                 </h2>
 
@@ -381,6 +438,17 @@ function generateGradingSchemesHTML(schemes) {
                         </tbody>
                     </table>
                 ` : '<p style="color: #999; font-style: italic;">No grading scale data available.</p>'}
+
+                <button
+                    class="select-scheme-btn"
+                    data-scheme-id="${scheme.id}"
+                    data-scheme-title="${escapeHtml(scheme.title || 'Untitled')}"
+                    style="width: 100%; margin-top: 16px; padding: 8px 16px; background: ${isSelected ? '#ff4d4f' : '#52c41a'}; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.2s ease;"
+                    onmouseover="this.style.background='${isSelected ? '#cf1322' : '#389e0d'}'"
+                    onmouseout="this.style.background='${isSelected ? '#ff4d4f' : '#52c41a'}'"
+                >
+                    ${isSelected ? 'Deselect' : 'Select as Default'}
+                </button>
             </div>
         `;
     });
@@ -451,10 +519,48 @@ function generateGradingSchemesHTML(schemes) {
             <div class="container">
                 <h1>Grading Schemes</h1>
                 <div class="subtitle">Account ID: ${escapeHtml(accountId)} | Total Schemes: ${schemes.length}</div>
+                ${currentSchemeId ? `
+                    <div style="padding: 12px; margin-bottom: 20px; background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 6px; font-size: 14px;">
+                        <strong>Currently Selected:</strong> ${schemes.find(s => s.id === currentSchemeId)?.title || 'Unknown'} (ID: ${currentSchemeId})
+                    </div>
+                ` : ''}
                 <div class="schemes-grid">
                     ${schemesHTML}
                 </div>
             </div>
+
+            <script>
+                // Handle scheme selection
+                document.addEventListener('DOMContentLoaded', function() {
+                    const buttons = document.querySelectorAll('.select-scheme-btn');
+
+                    buttons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            const schemeId = parseInt(this.getAttribute('data-scheme-id'), 10);
+                            const schemeTitle = this.getAttribute('data-scheme-title');
+                            const isCurrentlySelected = this.textContent.trim() === 'Deselect';
+
+                            // Access parent window's CG_MANAGED config
+                            if (window.opener && window.opener.CG_MANAGED) {
+                                if (isCurrentlySelected) {
+                                    // Deselect
+                                    window.opener.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = null;
+                                    alert('✓ Grading scheme deselected.\\n\\nThis change will be saved when you regenerate the loader in the Loader Generator panel.');
+                                } else {
+                                    // Select
+                                    window.opener.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = schemeId;
+                                    alert('✓ Selected grading scheme: ' + schemeTitle + ' (ID: ' + schemeId + ')\\n\\nThis selection will be saved when you regenerate the loader in the Loader Generator panel.');
+                                }
+
+                                // Reload this window to show updated selection
+                                window.location.reload();
+                            } else {
+                                alert('Unable to access parent window configuration. Please use the selection buttons in the main admin dashboard instead.');
+                            }
+                        });
+                    });
+                });
+            </script>
         </body>
         </html>
     `;
@@ -2200,6 +2306,32 @@ function renderGradingSchemesPanel(root, schemes) {
         return;
     }
 
+    // Get currently selected scheme ID
+    const currentSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
+
+    // Display currently selected scheme
+    if (currentSchemeId) {
+        const selectedScheme = schemes.find(s => s.id === currentSchemeId);
+        const selectedDisplay = createElement('div', {
+            style: {
+                padding: '10px',
+                marginBottom: '12px',
+                background: '#e6f7ff',
+                border: '1px solid #91d5ff',
+                borderRadius: '6px',
+                fontSize: '13px'
+            }
+        });
+
+        if (selectedScheme) {
+            selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ${escapeHtml(selectedScheme.title)} (ID: ${currentSchemeId})`;
+        } else {
+            selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ID ${currentSchemeId} <em>(not found in current schemes)</em>`;
+        }
+
+        panel.appendChild(selectedDisplay);
+    }
+
     // Add "View Full Details" button
     const viewDetailsBtn = createElement('button', {
         text: '📋 View Full Details',
@@ -2258,7 +2390,7 @@ function renderGradingSchemesPanel(root, schemes) {
 
     // Render each scheme as a compact card
     schemes.forEach((scheme) => {
-        renderGradingSchemeCard(gridContainer, scheme);
+        renderGradingSchemeCard(gridContainer, scheme, currentSchemeId);
     });
 
     panel.appendChild(gridContainer);
@@ -2269,21 +2401,43 @@ function renderGradingSchemesPanel(root, schemes) {
  *
  * @param {HTMLElement} parent - Parent container
  * @param {Object} scheme - Grading scheme data
+ * @param {number|null} currentSchemeId - Currently selected scheme ID
  */
-function renderGradingSchemeCard(parent, scheme) {
+function renderGradingSchemeCard(parent, scheme, currentSchemeId = null) {
     const gradeBy = scheme.points_based ? 'Points' : 'Percentage';
     const scaleCount = scheme.grading_scheme ? scheme.grading_scheme.length : 0;
+    const isSelected = currentSchemeId === scheme.id;
 
     const card = createElement('div', {
         style: {
             padding: '14px',
-            border: '1px solid #d9d9d9',
+            border: isSelected ? '2px solid #52c41a' : '1px solid #d9d9d9',
             borderRadius: '8px',
-            background: '#fafafa',
-            transition: 'box-shadow 0.2s ease',
-            cursor: 'default'
+            background: isSelected ? '#f6ffed' : '#fafafa',
+            transition: 'all 0.2s ease',
+            cursor: 'default',
+            position: 'relative'
         }
     });
+
+    // Selected badge
+    if (isSelected) {
+        const selectedBadge = createElement('div', {
+            text: '✓ Selected',
+            style: {
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                padding: '2px 8px',
+                background: '#52c41a',
+                color: '#fff',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: '600'
+            }
+        });
+        card.appendChild(selectedBadge);
+    }
 
     // Title
     const title = createElement('div', {
@@ -2292,7 +2446,8 @@ function renderGradingSchemeCard(parent, scheme) {
             fontSize: '14px',
             marginBottom: '6px',
             color: '#333',
-            fontWeight: '600'
+            fontWeight: '600',
+            paddingRight: isSelected ? '70px' : '0'
         }
     });
 
@@ -2317,7 +2472,8 @@ function renderGradingSchemeCard(parent, scheme) {
         style: {
             fontSize: '12px',
             color: '#666',
-            lineHeight: '1.6'
+            lineHeight: '1.6',
+            marginBottom: '10px'
         }
     });
 
@@ -2339,9 +2495,42 @@ function renderGradingSchemeCard(parent, scheme) {
         }));
     }
 
+    // Select button
+    const selectBtn = createElement('button', {
+        text: isSelected ? 'Deselect' : 'Select as Default',
+        style: {
+            width: '100%',
+            padding: '6px 12px',
+            background: isSelected ? '#ff4d4f' : '#52c41a',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '600',
+            transition: 'background 0.2s ease'
+        },
+        on: {
+            click: () => {
+                if (isSelected) {
+                    deselectGradingScheme();
+                } else {
+                    selectGradingScheme(scheme);
+                }
+            },
+            mouseenter: (e) => {
+                e.target.style.background = isSelected ? '#cf1322' : '#389e0d';
+            },
+            mouseleave: (e) => {
+                e.target.style.background = isSelected ? '#ff4d4f' : '#52c41a';
+            }
+        }
+    });
+
     card.appendChild(title);
     card.appendChild(idBadge);
     card.appendChild(metadata);
+    card.appendChild(selectBtn);
 
     parent.appendChild(card);
 }
