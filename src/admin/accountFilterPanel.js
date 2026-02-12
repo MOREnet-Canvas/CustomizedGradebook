@@ -18,6 +18,22 @@ const CACHE_KEY = 'cg_admin_accounts_cache';
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 
 /**
+ * Helper: Create checkbox with label (matches Feature Flags styling)
+ */
+function createCheckbox(labelText, id, checked) {
+    const checkbox = createElement('input', {
+        attrs: { type: 'checkbox', checked: checked ? 'true' : undefined, id }
+    });
+    const label = createElement('label', {
+        attrs: { for: id },
+        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '6px' }
+    });
+    label.appendChild(checkbox);
+    label.appendChild(createElement('span', { text: labelText }));
+    return { checkbox, label };
+}
+
+/**
  * Fetch all accounts with pagination
  * @param {string} url - API URL
  * @returns {Promise<Array>} Array of items
@@ -202,19 +218,18 @@ function renderAccountNode(node, selectedIds, onChange, level = 0) {
     const isChecked = selectedIds.has(String(node.id));
     logger.trace(`[AccountFilter] Node ${node.id} checked state: ${isChecked}`);
 
-    // Create container for this node
+    // Create container for this node and its children
     const nodeContainer = createElement('div', {
-        style: 'margin-bottom: 2px;'
+        style: 'margin-bottom: 0px;'
     });
 
-    // Create clickable row with indentation
+    // Create row with indentation using margin-left
     const row = createElement('div', {
         style: `
-            padding-left: ${level * 24}px;
+            margin-left: ${level * 24}px;
             cursor: pointer;
             user-select: none;
-            padding-top: 2px;
-            padding-bottom: 2px;
+            padding: 2px 4px;
             font-family: 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.6;
@@ -238,27 +253,30 @@ function renderAccountNode(node, selectedIds, onChange, level = 0) {
 
     row.textContent = labelText;
 
+    // Store reference to update on click
+    let currentCheckedState = isChecked;
+
     // Click handler to toggle checkbox
     row.addEventListener('click', () => {
-        const newCheckedState = !isChecked;
-        logger.debug(`[AccountFilter] Row clicked for account ${node.id} (${node.name}): ${isChecked} -> ${newCheckedState}`);
+        currentCheckedState = !currentCheckedState;
+        logger.debug(`[AccountFilter] Row clicked for account ${node.id} (${node.name}): ${!currentCheckedState} -> ${currentCheckedState}`);
 
         // Update the visual checkbox symbol
-        const newCheckboxSymbol = newCheckedState ? '☑' : '☐';
+        const newCheckboxSymbol = currentCheckedState ? '☑' : '☐';
         const newLabelText = subCount > 0
             ? `${newCheckboxSymbol} ${node.name} (ID: ${node.id}) [${subCount} sub-account${subCount !== 1 ? 's' : ''}]`
             : `${newCheckboxSymbol} ${node.name} (ID: ${node.id})`;
         row.textContent = newLabelText;
 
         // Update the selected state
-        if (newCheckedState) {
+        if (currentCheckedState) {
             selectedIds.add(String(node.id));
         } else {
             selectedIds.delete(String(node.id));
         }
 
         // Trigger the onChange callback
-        onChange(String(node.id), newCheckedState);
+        onChange(String(node.id), currentCheckedState);
     });
 
     nodeContainer.appendChild(row);
@@ -314,20 +332,13 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     const enabledState = currentConfig.ENABLE_ACCOUNT_FILTER || false;
     logger.debug(`[AccountFilter] Enable toggle initial state: ${enabledState}`);
 
-    const enableCheckbox = createElement('input', {
-        type: 'checkbox',
-        id: 'enable-account-filter',
-        checked: enabledState,
-        style: 'margin-right: 8px;'
-    });
+    // Use the same checkbox styling as Feature Flags
+    const { checkbox: enableCheckbox, label: enableLabel } = createCheckbox(
+        'Enable Account Filtering',
+        'enable-account-filter',
+        enabledState
+    );
 
-    const enableLabel = createElement('label', {
-        for: 'enable-account-filter',
-        style: 'cursor: pointer; font-weight: 600;'
-    });
-    enableLabel.textContent = 'Enable Account Filtering';
-
-    toggleContainer.appendChild(enableCheckbox);
     toggleContainer.appendChild(enableLabel);
 
     const helpText = createElement('div', {
@@ -359,8 +370,9 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
 
     // Function to update tree container visibility
     const updateTreeVisibility = (enabled) => {
+        logger.debug(`[AccountFilter] updateTreeVisibility called with enabled=${enabled}`);
         treeContainer.style.display = enabled ? 'block' : 'none';
-        treeContainer.style.opacity = enabled ? '1' : '0.5';
+        logger.debug(`[AccountFilter] Tree container display set to: ${treeContainer.style.display}`);
     };
 
     // Loading state
