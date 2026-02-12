@@ -15,7 +15,8 @@ import { createElement, createPanel, escapeHtml, downloadText } from './domHelpe
 import { fetchTextWithTimeout } from './fetchHelpers.js';
 import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, extractSections } from './loaderGenerator.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
-import { refreshGradingSchemesGridExternal } from './accountSettingsPanel.js';
+import { refreshGradingSchemesGridExternal, fetchGradingSchemes, renderGradingSchemesPanel } from './accountSettingsPanel.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 // Global reference to the change notification trigger function
 let globalMarkAsChanged = null;
@@ -248,6 +249,11 @@ export function renderLoaderGeneratorPanel(root) {
     // Configuration panel with all settings
     const { container: configPanel, controls } = createConfigurationPanel();
 
+    // Grading Schemes Panel (will be populated async)
+    const gradingSchemesContainer = createElement('div', {
+        style: { marginBottom: '16px' }
+    });
+
     // Textarea A: Other Theme Scripts (editable)
     const { baseLabel, baseTA, helperText, lockRow, unlockBtn, relockBtn, reloadBtn } = createOtherScriptsTextarea(installedUrl);
 
@@ -443,7 +449,6 @@ export function renderLoaderGeneratorPanel(root) {
     controls.defaultMasteryThreshold.addEventListener('input', markAsChanged);
     controls.ratingsTextarea.addEventListener('input', markAsChanged);
     controls.keywordsInput.addEventListener('input', markAsChanged);
-    controls.gradingSchemeId.addEventListener('input', markAsChanged);
     versionDropdown.addEventListener('change', markAsChanged);
 
     // Append all elements in new order:
@@ -453,7 +458,10 @@ export function renderLoaderGeneratorPanel(root) {
     // 2. Configuration panel (all settings)
     panel.appendChild(configPanel);
 
-    // 3. Status messages (moved here from top)
+    // 3. Grading Schemes Panel (after config, before topNote)
+    panel.appendChild(gradingSchemesContainer);
+
+    // 4. Status messages (moved here from top)
     panel.appendChild(topNote);
     panel.appendChild(installedLine);
     panel.appendChild(loadStatus);
@@ -478,6 +486,28 @@ export function renderLoaderGeneratorPanel(root) {
     panel.appendChild(outLabel);
     panel.appendChild(outTA);
     panel.appendChild(hint);
+
+    // Fetch and render grading schemes panel (async)
+    (async () => {
+        try {
+            const accountId = getAccountId();
+            const schemes = await fetchGradingSchemes(accountId);
+            renderGradingSchemesPanel(gradingSchemesContainer, schemes);
+            logger.debug('[LoaderGeneratorPanel] Grading schemes panel rendered successfully');
+        } catch (err) {
+            logger.error('[LoaderGeneratorPanel] Failed to fetch grading schemes', err);
+            gradingSchemesContainer.appendChild(createElement('div', {
+                text: 'Failed to load grading schemes. Please refresh the page.',
+                style: {
+                    padding: '10px',
+                    color: '#cf1322',
+                    background: '#fff2f0',
+                    border: '1px solid #ffccc7',
+                    borderRadius: '6px'
+                }
+            }));
+        }
+    })();
 
     // Auto-load on first render
     tryAutoLoad('auto');
@@ -989,45 +1019,6 @@ function createConfigurationPanel() {
     ratingsSection.appendChild(ratingsTitle);
     ratingsSection.appendChild(ratingsTextarea);
 
-    // Grading Scheme Section
-    const gradingSchemeSection = createElement('div', {
-        style: {
-            marginBottom: '12px',
-            padding: '10px',
-            background: '#f5f5f5',
-            borderRadius: '6px'
-        }
-    });
-    const gradingSchemeTitle = createElement('div', {
-        html: '<strong>Default Grading Scheme</strong>',
-        style: {
-            marginBottom: '8px',
-            fontSize: '13px',
-            color: '#2D3B45',
-            paddingLeft: '8px',
-            borderLeft: '3px solid #0374B5'
-        }
-    });
-
-    const gradingSchemeInput = createElement('input', {
-        attrs: { type: 'number', value: '', placeholder: 'Enter grading scheme ID (optional)', spellcheck: 'false' },
-        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
-    });
-
-    const gradingSchemeHelp = createElement('div', {
-        text: 'Optional: Enter the Canvas grading scheme ID to use as default. Leave empty for no default scheme.',
-        style: {
-            fontSize: '11px',
-            color: '#666',
-            marginTop: '4px',
-            fontStyle: 'italic'
-        }
-    });
-
-    gradingSchemeSection.appendChild(gradingSchemeTitle);
-    gradingSchemeSection.appendChild(gradingSchemeInput);
-    gradingSchemeSection.appendChild(gradingSchemeHelp);
-
     // Assemble container
     container.appendChild(title);
     container.appendChild(featureSection);
@@ -1035,7 +1026,6 @@ function createConfigurationPanel() {
     container.appendChild(labelsSection);
     container.appendChild(outcomeSection);
     container.appendChild(ratingsSection);
-    container.appendChild(gradingSchemeSection);
 
     return {
         container,
@@ -1050,8 +1040,7 @@ function createConfigurationPanel() {
             defaultMaxPoints: defaultMaxPoints.input,
             defaultMasteryThreshold: defaultMasteryThreshold.input,
             ratingsTextarea,
-            keywordsInput,
-            gradingSchemeId: gradingSchemeInput
+            keywordsInput
         }
     };
 }
