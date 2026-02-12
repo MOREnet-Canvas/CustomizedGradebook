@@ -66,7 +66,8 @@ function parseConfigFromSectionB(sectionB) {
         defaultMasteryThreshold: managed.config.DEFAULT_MASTERY_THRESHOLD || 3,
         outcomeAndRubricRatings: managed.config.OUTCOME_AND_RUBRIC_RATINGS || [],
         excludedOutcomeKeywords: managed.config.EXCLUDED_OUTCOME_KEYWORDS || [],
-        defaultGradingSchemeId: managed.config.DEFAULT_GRADING_SCHEME_ID || null
+        defaultGradingSchemeId: managed.config.DEFAULT_GRADING_SCHEME_ID || null,
+        defaultGradingScheme: managed.config.DEFAULT_GRADING_SCHEME || null
     };
 }
 
@@ -340,6 +341,7 @@ export function renderLoaderGeneratorPanel(root) {
                     window.CG_MANAGED.config = {};
                 }
                 window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = parsedSettings.defaultGradingSchemeId;
+                window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME = parsedSettings.defaultGradingScheme;
 
                 // Refresh grading schemes grid to show selected scheme
                 refreshGradingSchemesGridExternal();
@@ -1566,13 +1568,15 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
-    // Parse grading scheme ID - prioritize window.CG_MANAGED.config over text input
+    // Parse grading scheme ID and object - prioritize window.CG_MANAGED.config over text input
     let defaultGradingSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID;
+    let defaultGradingScheme = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME;
 
     // If not set in window.CG_MANAGED, fall back to text input
     if (defaultGradingSchemeId === undefined || defaultGradingSchemeId === null) {
         const gradingSchemeIdValue = controls.gradingSchemeId.value.trim();
         defaultGradingSchemeId = gradingSchemeIdValue ? parseInt(gradingSchemeIdValue, 10) : null;
+        defaultGradingScheme = null; // No scheme object available from text input
     }
 
     // Get version and channel from dropdown
@@ -1607,7 +1611,8 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         defaultMasteryThreshold: parseFloat(controls.defaultMasteryThreshold.value) || 3,
         outcomeAndRubricRatings,
         excludedOutcomeKeywords,
-        defaultGradingSchemeId
+        defaultGradingSchemeId,
+        defaultGradingScheme
     });
 
     // Update config preview textarea (C)
