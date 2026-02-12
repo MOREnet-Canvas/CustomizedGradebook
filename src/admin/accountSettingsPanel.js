@@ -285,17 +285,12 @@ export async function renderAccountSettingsPanel(root) {
 
     const accountId = window.location.pathname.match(/accounts\/(\d+)/)?.[1] || "1";
 
-    // Fetch data in parallel
-    const [featureData, schemes] = await Promise.all([
-        fetchFinalGradeOverrideStatus(accountId),
-        fetchGradingSchemes(accountId)
-    ]);
+    // Fetch feature flag data
+    const featureData = await fetchFinalGradeOverrideStatus(accountId);
 
-    // Render Feature Flag Panel
+    // Render Feature Flag Panel only
+    // Note: Grading Schemes Panel is now rendered from loaderGeneratorPanel.js
     renderFeatureFlagPanel(root, featureData);
-
-    // Render Grading Schemes Panel
-    renderGradingSchemesPanel(root, schemes);
 }
 
 
@@ -1196,15 +1191,24 @@ function generateGradingSchemeExamplesHTML() {
                     </table>
                 ` : '<p style="color: #999; font-style: italic;">No grading scale data available.</p>'}
 
-                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0; display: flex; gap: 8px;">
                     <button
-                        class="create-in-canvas-btn"
+                        class="create-direct-btn"
                         data-example-id="${scheme.id}"
-                        style="padding: 8px 16px; background: #0374B5; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;"
-                        onmouseover="this.style.background='#025a8c'"
-                        onmouseout="this.style.background='#0374B5'"
+                        style="padding: 8px 16px; background: #52c41a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;"
+                        onmouseover="this.style.background='#389e0d'"
+                        onmouseout="this.style.background='#52c41a'"
                     >
-                        ✨ Create in Canvas
+                        ✨ Create in Canvas as is
+                    </button>
+                    <button
+                        class="create-custom-btn"
+                        data-example-id="${scheme.id}"
+                        disabled
+                        style="padding: 8px 16px; background: #d9d9d9; color: #8c8c8c; border: none; border-radius: 4px; cursor: not-allowed; font-size: 13px; font-weight: 600; opacity: 0.6;"
+                        title="Customization feature coming soon"
+                    >
+                        🎨 Customize (Coming Soon)
                     </button>
                 </div>
             </div>
@@ -1304,40 +1308,8 @@ function generateGradingSchemeExamplesHTML() {
                 // Grading scheme examples data
                 const GRADING_SCHEME_EXAMPLES = ${JSON.stringify(examples)};
 
-                // Helper function to create DOM elements
-                function createElement(tag, options = {}) {
-                    const el = document.createElement(tag);
-
-                    if (options.text) el.textContent = options.text;
-                    if (options.html) el.innerHTML = options.html;
-                    if (options.attrs) {
-                        Object.entries(options.attrs).forEach(([key, value]) => {
-                            if (value !== null && value !== undefined) {
-                                el.setAttribute(key, value);
-                            }
-                        });
-                    }
-                    if (options.style) {
-                        Object.entries(options.style).forEach(([key, value]) => {
-                            el.style[key] = value;
-                        });
-                    }
-                    if (options.on) {
-                        Object.entries(options.on).forEach(([event, handler]) => {
-                            el.addEventListener(event, handler);
-                        });
-                    }
-
-                    return el;
-                }
-
-                // Escape HTML for safe display
-                function escapeHtml(str) {
-                    if (str == null) return '';
-                    const div = document.createElement('div');
-                    div.textContent = str;
-                    return div.innerHTML;
-                }
+                // Reference to parent window's editor function (for future use when customization is enabled)
+                const parentEditor = window.opener?.CG_ADMIN?.openGradingSchemeEditor;
 
                 // Get CSRF token from cookies
                 function getCsrfToken() {
@@ -1345,934 +1317,122 @@ function generateGradingSchemeExamplesHTML() {
                     return match ? decodeURIComponent(match[1]) : null;
                 }
 
-                // Create grading standard via Canvas API
-                async function createGradingStandard(accountId, gradingSchemeData) {
-                    const csrfToken = getCsrfToken();
-                    if (!csrfToken) {
-                        throw new Error('CSRF token not found - user may not be authenticated');
-                    }
-
-                    const url = \`/api/v1/accounts/\${accountId}/grading_standards\`;
-
-                    // Canvas API expects form-encoded data, not JSON
-                    // Build URLSearchParams for form-encoded request
-                    const formData = new URLSearchParams();
-                    formData.append('title', gradingSchemeData.title);
-                    formData.append('scaling_factor', gradingSchemeData.scaling_factor);
-                    formData.append('points_based', gradingSchemeData.points_based);
-
-                    // Add grading scheme entries as array parameters
-                    gradingSchemeData.data.forEach(entry => {
-                        formData.append('grading_scheme_entry[][name]', entry.name);
-                        formData.append('grading_scheme_entry[][value]', entry.value);
-                    });
-
-                    console.log('[GradingSchemeEditor] Form data being sent:', formData.toString());
-                    console.log('[GradingSchemeEditor] Grading scheme data:', JSON.stringify(gradingSchemeData, null, 2));
-
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRF-Token': csrfToken
-                        },
-                        body: formData.toString()
-                    });
-
-                    if (!response.ok) {
-                        const responseText = await response.text();
-                        console.error('[GradingSchemeEditor] Error response:', responseText);
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.message || \`HTTP \${response.status}: \${response.statusText}\`);
-                    }
-
-                    return await response.json();
-                }
-
-                // Open grading scheme editor modal
-                function openGradingSchemeEditor(exampleScheme, onSuccess) {
+                // Create grading scheme directly without modal/editing
+                async function createGradingSchemeDirectly(exampleScheme, buttonElement) {
                     const accountId = window.location.pathname.match(/accounts\\/(\\d+)/)?.[1] || "1";
 
-                    // Create modal overlay
-                    const overlay = createElement('div', {
-                        style: {
-                            position: 'fixed',
-                            top: '0',
-                            left: '0',
-                            right: '0',
-                            bottom: '0',
-                            background: 'rgba(0, 0, 0, 0.5)',
-                            zIndex: '10000',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '20px'
+                    // Disable button and show loading state
+                    const originalText = buttonElement.textContent;
+                    buttonElement.disabled = true;
+                    buttonElement.style.opacity = '0.6';
+                    buttonElement.style.cursor = 'not-allowed';
+                    buttonElement.textContent = '⏳ Creating...';
+
+                    try {
+                        const csrfToken = getCsrfToken();
+                        if (!csrfToken) {
+                            throw new Error('CSRF token not found - user may not be authenticated');
                         }
-                    });
 
-                    // Create modal container
-                    const modal = createElement('div', {
-                        style: {
-                            background: '#fff',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-                            maxWidth: '800px',
-                            width: '100%',
-                            maxHeight: '90vh',
-                            overflow: 'auto',
-                            padding: '24px'
-                        }
-                    });
+                        const url = \`/api/v1/accounts/\${accountId}/grading_standards\`;
 
-                    // Modal header
-                    const header = createElement('div', {
-                        style: {
-                            marginBottom: '20px',
-                            paddingBottom: '16px',
-                            borderBottom: '2px solid #e8e8e8'
-                        }
-                    });
+                        // Build form data
+                        const formData = new URLSearchParams();
+                        formData.append('title', exampleScheme.title);
+                        formData.append('scaling_factor', exampleScheme.scaling_factor);
+                        formData.append('points_based', exampleScheme.points_based);
 
-                    header.appendChild(createElement('h2', {
-                        text: 'Create Grading Standard',
-                        style: {
-                            margin: '0 0 8px 0',
-                            fontSize: '24px',
-                            color: '#333'
-                        }
-                    }));
-
-                    header.appendChild(createElement('div', {
-                        html: \`Based on template: <strong>\${escapeHtml(exampleScheme.title)}</strong>\`,
-                        style: {
-                            fontSize: '14px',
-                            color: '#666'
-                        }
-                    }));
-
-                    modal.appendChild(header);
-
-                    // Create form
-                    const form = createElement('form', {
-                        style: {
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '16px'
-                        }
-                    });
-
-                    // Title input
-                    const titleGroup = createElement('div');
-                    titleGroup.appendChild(createElement('label', {
-                        html: '<strong>Title:</strong>',
-                        style: {
-                            display: 'block',
-                            marginBottom: '6px',
-                            fontSize: '14px',
-                            color: '#333'
-                        }
-                    }));
-
-                    const titleInput = createElement('input', {
-                        attrs: {
-                            type: 'text',
-                            value: exampleScheme.title,
-                            required: 'true'
-                        },
-                        style: {
-                            width: '100%',
-                            padding: '8px 12px',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            boxSizing: 'border-box'
-                        }
-                    });
-                    titleGroup.appendChild(titleInput);
-                    form.appendChild(titleGroup);
-
-                    // Grade by radio button group (Percentage/Points)
-                    const gradeByGroup = createElement('div');
-                    gradeByGroup.appendChild(createElement('label', {
-                        html: '<strong>Grade by</strong>',
-                        style: {
-                            display: 'block',
-                            marginBottom: '8px',
-                            fontSize: '14px',
-                            color: '#333'
-                        }
-                    }));
-
-                    const radioContainer = createElement('div', {
-                        style: {
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '20px',
-                            marginBottom: '8px'
-                        }
-                    });
-
-                    // Percentage radio button
-                    const percentageRadioWrapper = createElement('div', {
-                        style: {
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }
-                    });
-
-                    const percentageRadio = createElement('input', {
-                        attrs: {
-                            type: 'radio',
-                            name: 'grade-by',
-                            id: 'grade-by-percentage',
-                            value: 'percentage',
-                            checked: !exampleScheme.points_based ? 'true' : null
-                        },
-                        style: {
-                            width: '16px',
-                            height: '16px',
-                            cursor: 'pointer'
-                        }
-                    });
-
-                    const percentageLabel = createElement('label', {
-                        text: 'Percentage',
-                        attrs: {
-                            for: 'grade-by-percentage'
-                        },
-                        style: {
-                            fontSize: '14px',
-                            color: '#333',
-                            cursor: 'pointer'
-                        }
-                    });
-
-                    percentageRadioWrapper.appendChild(percentageRadio);
-                    percentageRadioWrapper.appendChild(percentageLabel);
-                    radioContainer.appendChild(percentageRadioWrapper);
-
-                    // Points radio button
-                    const pointsRadioWrapper = createElement('div', {
-                        style: {
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                        }
-                    });
-
-                    const pointsRadio = createElement('input', {
-                        attrs: {
-                            type: 'radio',
-                            name: 'grade-by',
-                            id: 'grade-by-points',
-                            value: 'points',
-                            checked: exampleScheme.points_based ? 'true' : null
-                        },
-                        style: {
-                            width: '16px',
-                            height: '16px',
-                            cursor: 'pointer'
-                        }
-                    });
-
-                    const pointsLabel = createElement('label', {
-                        text: 'Points',
-                        attrs: {
-                            for: 'grade-by-points'
-                        },
-                        style: {
-                            fontSize: '14px',
-                            color: '#333',
-                            cursor: 'pointer'
-                        }
-                    });
-
-                    pointsRadioWrapper.appendChild(pointsRadio);
-                    pointsRadioWrapper.appendChild(pointsLabel);
-                    radioContainer.appendChild(pointsRadioWrapper);
-
-                    gradeByGroup.appendChild(radioContainer);
-                    form.appendChild(gradeByGroup);
-
-                    // Grading scale entries
-                    const entriesGroup = createElement('div');
-                    entriesGroup.appendChild(createElement('label', {
-                        html: '<strong>Grading Scale Entries:</strong>',
-                        style: {
-                            display: 'block',
-                            marginBottom: '8px',
-                            fontSize: '14px',
-                            color: '#333'
-                        }
-                    }));
-
-                    // Create table for entries
-                    const entriesTable = createElement('table', {
-                        style: {
-                            width: '100%',
-                            borderCollapse: 'collapse',
-                            border: '1px solid #d9d9d9',
-                            marginBottom: '8px'
-                        }
-                    });
-
-                    // Table header
-                    const thead = createElement('thead');
-                    const headerRow = createElement('tr', {
-                        style: {
-                            background: '#f0f0f0'
-                        }
-                    });
-                    headerRow.appendChild(createElement('th', {
-                        text: 'Letter Grade',
-                        style: {
-                            textAlign: 'left',
-                            padding: '8px',
-                            borderBottom: '2px solid #d9d9d9',
-                            fontWeight: '600',
-                            fontSize: '13px'
-                        }
-                    }));
-
-                    // Range header - will be updated dynamically
-                    const rangeHeader = createElement('th', {
-                        text: exampleScheme.points_based ? 'Range' : 'Range',
-                        style: {
-                            textAlign: 'left',
-                            padding: '8px',
-                            borderBottom: '2px solid #d9d9d9',
-                            fontWeight: '600',
-                            fontSize: '13px',
-                            width: '150px'
-                        }
-                    });
-                    headerRow.appendChild(rangeHeader);
-
-                    headerRow.appendChild(createElement('th', {
-                        text: 'Actions',
-                        style: {
-                            textAlign: 'center',
-                            padding: '8px',
-                            borderBottom: '2px solid #d9d9d9',
-                            fontWeight: '600',
-                            fontSize: '13px',
-                            width: '80px'
-                        }
-                    }));
-                    thead.appendChild(headerRow);
-                    entriesTable.appendChild(thead);
-
-                    // Table body
-                    const tbody = createElement('tbody');
-                    entriesTable.appendChild(tbody);
-
-                    // Function to calculate and update range displays for all rows
-                    const updateRangeDisplays = () => {
-                        const rows = Array.from(tbody.querySelectorAll('tr'));
-                        const isPointsMode = pointsRadio.checked;
-
-                        rows.forEach((row, index) => {
-                            const rangeDisplay = row.querySelector('.range-display');
-                            if (!rangeDisplay) return;
-
-                            if (index === 0) {
-                                // First row - no range display needed (has two inputs)
-                                rangeDisplay.textContent = '';
-                            } else {
-                                // Other rows - show calculated range
-                                const valueInput = row.querySelector('.threshold-input');
-                                const currentValue = parseFloat(valueInput.value) || 0;
-
-                                // Get upper bound from previous row's threshold
-                                const prevRow = rows[index - 1];
-                                const prevThresholdInput = prevRow.querySelector('.threshold-input');
-                                const upperBound = parseFloat(prevThresholdInput.value) || 0;
-
-                                let rangeText = '';
-                                if (isPointsMode) {
-                                    rangeText = \`< \${upperBound}\`;
-                                } else {
-                                    const upperPercentage = Math.round(upperBound * 100);
-                                    rangeText = \`< \${upperPercentage}%\`;
-                                }
-
-                                rangeDisplay.textContent = rangeText;
-                            }
+                        // Add grading scheme entries
+                        exampleScheme.data.forEach(entry => {
+                            formData.append('grading_scheme_entry[][name]', entry.name);
+                            formData.append('grading_scheme_entry[][value]', entry.value);
                         });
-                    };
 
-                    // Function to add entry row
-                    const addEntryRow = (name = '', value = 0, isPointsMode = false, maxPoints = null) => {
-                        const row = createElement('tr');
-                        const isFirstRow = tbody.children.length === 0;
+                        console.log('[GradingSchemeExamples] Creating grading standard:', exampleScheme.title);
 
-                        // Letter Grade column
-                        const nameCell = createElement('td', {
-                            style: {
-                                padding: '6px',
-                                borderBottom: '1px solid #e8e8e8'
-                            }
-                        });
-                        const nameInput = createElement('input', {
-                            attrs: {
-                                type: 'text',
-                                value: name,
-                                required: 'true'
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRF-Token': csrfToken
                             },
-                            style: {
-                                width: '100%',
-                                padding: '6px',
-                                border: '1px solid #d9d9d9',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                                boxSizing: 'border-box'
-                            }
-                        });
-                        nameCell.appendChild(nameInput);
-                        row.appendChild(nameCell);
-
-                        // Range column - different structure for first row vs others
-                        const rangeCell = createElement('td', {
-                            style: {
-                                padding: '6px',
-                                borderBottom: '1px solid #e8e8e8'
-                            }
+                            body: formData.toString()
                         });
 
-                        const rangeContainer = createElement('div', {
-                            style: {
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }
-                        });
-
-                        if (isFirstRow) {
-                            // First row: Two editable inputs (upper bound and lower bound)
-                            // Upper bound input (maximum points)
-                            const upperBoundInput = createElement('input', {
-                                attrs: {
-                                    type: 'number',
-                                    value: maxPoints !== null ? maxPoints.toString() : value.toString(),
-                                    min: '0',
-                                    step: '0.01',
-                                    required: 'true',
-                                    class: 'max-points-input'
-                                },
-                                style: {
-                                    width: '80px',
-                                    padding: '6px',
-                                    border: '1px solid #d9d9d9',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    boxSizing: 'border-box'
-                                }
-                            });
-
-                            upperBoundInput.addEventListener('input', () => {
-                                updateRangeDisplays();
-                            });
-
-                            const toLabel = createElement('span', {
-                                text: 'to',
-                                style: {
-                                    fontSize: '13px',
-                                    color: '#666',
-                                    margin: '0 4px'
-                                }
-                            });
-
-                            // Lower bound input (threshold)
-                            const thresholdInput = createElement('input', {
-                                attrs: {
-                                    type: 'number',
-                                    value: value.toString(),
-                                    min: '0',
-                                    step: '0.01',
-                                    required: 'true',
-                                    class: 'threshold-input'
-                                },
-                                style: {
-                                    width: '80px',
-                                    padding: '6px',
-                                    border: '1px solid #d9d9d9',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    boxSizing: 'border-box'
-                                }
-                            });
-
-                            thresholdInput.addEventListener('input', () => {
-                                updateRangeDisplays();
-                            });
-
-                            // Hidden range display for consistency
-                            const rangeDisplay = createElement('span', {
-                                text: '',
-                                attrs: {
-                                    class: 'range-display'
-                                },
-                                style: {
-                                    display: 'none'
-                                }
-                            });
-
-                            rangeContainer.appendChild(upperBoundInput);
-                            rangeContainer.appendChild(toLabel);
-                            rangeContainer.appendChild(thresholdInput);
-                            rangeContainer.appendChild(rangeDisplay);
-                        } else {
-                            // Other rows: Range display + threshold input
-                            const rangeDisplay = createElement('span', {
-                                text: '',
-                                attrs: {
-                                    class: 'range-display'
-                                },
-                                style: {
-                                    fontSize: '13px',
-                                    color: '#666',
-                                    whiteSpace: 'nowrap',
-                                    minWidth: '60px'
-                                }
-                            });
-
-                            const toLabel = createElement('span', {
-                                text: 'to',
-                                style: {
-                                    fontSize: '13px',
-                                    color: '#666',
-                                    margin: '0 4px'
-                                }
-                            });
-
-                            const thresholdInput = createElement('input', {
-                                attrs: {
-                                    type: 'number',
-                                    value: value.toString(),
-                                    min: '0',
-                                    step: '0.01',
-                                    required: 'true',
-                                    class: 'threshold-input'
-                                },
-                                style: {
-                                    width: '80px',
-                                    padding: '6px',
-                                    border: '1px solid #d9d9d9',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    boxSizing: 'border-box'
-                                }
-                            });
-
-                            thresholdInput.addEventListener('input', () => {
-                                updateRangeDisplays();
-                            });
-
-                            rangeContainer.appendChild(rangeDisplay);
-                            rangeContainer.appendChild(toLabel);
-                            rangeContainer.appendChild(thresholdInput);
+                        if (!response.ok) {
+                            const responseText = await response.text();
+                            console.error('[GradingSchemeExamples] Error response:', responseText);
+                            const errorData = await response.json().catch(() => ({}));
+                            throw new Error(errorData.message || \`HTTP \${response.status}: \${response.statusText}\`);
                         }
 
-                        rangeCell.appendChild(rangeContainer);
-                        row.appendChild(rangeCell);
+                        const result = await response.json();
+                        console.log('[GradingSchemeExamples] Grading standard created successfully:', result);
 
-                        // Actions column
-                        const actionsCell = createElement('td', {
-                            style: {
-                                padding: '6px',
-                                borderBottom: '1px solid #e8e8e8',
-                                textAlign: 'center'
-                            }
-                        });
-                        const deleteBtn = createElement('button', {
-                            text: '🗑️',
-                            attrs: {
-                                type: 'button',
-                                title: 'Delete entry'
-                            },
-                            style: {
-                                padding: '4px 8px',
-                                background: '#ff4d4f',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            },
-                            on: {
-                                click: () => {
-                                    if (tbody.children.length > 1) {
-                                        row.remove();
-                                        updateRangeDisplays();
-                                    } else {
-                                        alert('At least one entry is required.');
-                                    }
-                                }
-                            }
-                        });
-                        actionsCell.appendChild(deleteBtn);
-                        row.appendChild(actionsCell);
+                        // Show success state
+                        buttonElement.style.background = '#52c41a';
+                        buttonElement.textContent = '✅ Created!';
 
-                        tbody.appendChild(row);
-
-                        // Update all range displays after adding new row
-                        setTimeout(() => updateRangeDisplays(), 0);
-                    };
-
-                    // Add existing entries from example
-                    // Convert values based on mode: if points-based, convert from 0-1 to actual points
-                    // For percentage-based, convert from 0-1 to percentage (0-100)
-                    const maxPoints = exampleScheme.points_based ? exampleScheme.scaling_factor : 1;
-
-                    exampleScheme.data.forEach((entry, index) => {
-                        const displayValue = exampleScheme.points_based
-                            ? entry.value * exampleScheme.scaling_factor
-                            : entry.value * 100;  // Convert 0-1 to percentage (0-100)
-
-                        // Pass maxPoints only for the first row
-                        if (index === 0) {
-                            addEntryRow(entry.name, displayValue, exampleScheme.points_based, maxPoints);
-                        } else {
-                            addEntryRow(entry.name, displayValue, exampleScheme.points_based, null);
-                        }
-                    });
-
-                    entriesGroup.appendChild(entriesTable);
-
-                    // Add entry button
-                    const addEntryBtn = createElement('button', {
-                        text: '+ Add Entry',
-                        attrs: {
-                            type: 'button'
-                        },
-                        style: {
-                            padding: '6px 12px',
-                            background: '#52c41a',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            fontWeight: '600'
-                        },
-                        on: {
-                            click: () => {
-                                const isPointsMode = pointsRadio.checked;
-                                addEntryRow('', 0, isPointsMode, null);
-                            }
-                        }
-                    });
-                    entriesGroup.appendChild(addEntryBtn);
-
-                    form.appendChild(entriesGroup);
-
-                    // Function to convert all existing row values when switching modes
-                    const convertRowValues = (toPointsMode) => {
-                        const rows = Array.from(tbody.querySelectorAll('tr'));
-
-                        if (toPointsMode) {
-                            // Converting from 0-1 decimal to points
-                            const scalingFactor = exampleScheme.scaling_factor || 4;
-
-                            rows.forEach((row, index) => {
-                                const thresholdInput = row.querySelector('.threshold-input');
-                                const currentValue = parseFloat(thresholdInput.value) || 0;
-                                const pointValue = currentValue * scalingFactor;
-                                thresholdInput.value = pointValue;
-
-                                // For first row, also update max points input
-                                if (index === 0) {
-                                    const maxPointsInput = row.querySelector('.max-points-input');
-                                    if (maxPointsInput) {
-                                        maxPointsInput.value = scalingFactor;
-                                    }
-                                }
-                            });
-                        } else {
-                            // Converting from points to 0-1 decimal
-                            // Get max points from first row
-                            const firstRow = rows[0];
-                            const maxPointsInput = firstRow ? firstRow.querySelector('.max-points-input') : null;
-                            const maxValue = maxPointsInput ? parseFloat(maxPointsInput.value) : 1;
-
-                            rows.forEach((row, index) => {
-                                const thresholdInput = row.querySelector('.threshold-input');
-                                const currentValue = parseFloat(thresholdInput.value) || 0;
-                                const decimalValue = (currentValue / maxValue).toFixed(3);
-                                thresholdInput.value = decimalValue;
-                            });
+                        // Notify parent window
+                        if (window.opener && !window.opener.closed) {
+                            window.opener.postMessage({ type: 'grading-standard-created', data: result }, '*');
                         }
 
-                        // Update range displays after conversion
-                        updateRangeDisplays();
-                    };
+                        // Show success message
+                        alert(\`✅ Grading standard "\${exampleScheme.title}" created successfully!\\n\\nYou can view it in Canvas at:\\n/accounts/\${accountId}/grading_standards\`);
 
-                    // Add radio button change handlers
-                    percentageRadio.addEventListener('change', () => {
-                        if (percentageRadio.checked) {
-                            convertRowValues(false);
-                        }
-                    });
+                        // Reset button after delay
+                        setTimeout(() => {
+                            buttonElement.disabled = false;
+                            buttonElement.style.opacity = '1';
+                            buttonElement.style.cursor = 'pointer';
+                            buttonElement.style.background = '#52c41a';
+                            buttonElement.textContent = originalText;
+                        }, 3000);
 
-                    pointsRadio.addEventListener('change', () => {
-                        if (pointsRadio.checked) {
-                            convertRowValues(true);
-                        }
-                    });
+                    } catch (error) {
+                        console.error('[GradingSchemeExamples] Error creating grading standard:', error);
 
-                    // Status message area
-                    const statusArea = createElement('div', {
-                        style: {
-                            minHeight: '40px',
-                            padding: '12px',
-                            borderRadius: '6px',
-                            display: 'none'
-                        }
-                    });
-                    form.appendChild(statusArea);
+                        // Show error state
+                        buttonElement.style.background = '#ff4d4f';
+                        buttonElement.textContent = '❌ Failed';
 
-                    // Action buttons
-                    const buttonGroup = createElement('div', {
-                        style: {
-                            display: 'flex',
-                            gap: '12px',
-                            justifyContent: 'flex-end',
-                            paddingTop: '16px',
-                            borderTop: '1px solid #e8e8e8'
-                        }
-                    });
+                        alert(\`❌ Error creating grading standard:\\n\\n\${error.message || 'Unknown error'}\`);
 
-                    const cancelBtn = createElement('button', {
-                        text: 'Cancel',
-                        attrs: {
-                            type: 'button'
-                        },
-                        style: {
-                            padding: '10px 20px',
-                            background: '#fff',
-                            color: '#333',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '600'
-                        },
-                        on: {
-                            click: () => overlay.remove()
-                        }
-                    });
-
-                    const createBtn = createElement('button', {
-                        text: 'Create Grading Standard',
-                        attrs: {
-                            type: 'submit'
-                        },
-                        style: {
-                            padding: '10px 20px',
-                            background: '#0374B5',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '600'
-                        }
-                    });
-
-                    buttonGroup.appendChild(cancelBtn);
-                    buttonGroup.appendChild(createBtn);
-                    form.appendChild(buttonGroup);
-
-                    // Form submit handler
-                    form.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-
-                        // Disable buttons during submission
-                        createBtn.disabled = true;
-                        cancelBtn.disabled = true;
-                        createBtn.style.opacity = '0.6';
-                        createBtn.style.cursor = 'not-allowed';
-                        createBtn.textContent = 'Creating...';
-
-                        // Show loading status
-                        statusArea.style.display = 'block';
-                        statusArea.style.background = '#e6f7ff';
-                        statusArea.style.border = '1px solid #91d5ff';
-                        statusArea.style.color = '#0050b3';
-                        statusArea.textContent = '⏳ Creating grading standard...';
-
-                        try {
-                            // Collect form data
-                            const title = titleInput.value.trim();
-
-                            // Determine points_based from radio selection
-                            const points_based = pointsRadio.checked;
-
-                            // Collect entries from table
-                            const rows = tbody.querySelectorAll('tr');
-                            const rawEntries = [];
-                            let maxPointsValue = null;
-
-                            rows.forEach((row, index) => {
-                                const nameInput = row.querySelector('input[type="text"]');
-                                const thresholdInput = row.querySelector('.threshold-input');
-
-                                // For first row, also get the max points input
-                                if (index === 0) {
-                                    const maxPointsInput = row.querySelector('.max-points-input');
-                                    if (maxPointsInput) {
-                                        maxPointsValue = parseFloat(maxPointsInput.value);
-                                    }
-                                }
-
-                                rawEntries.push({
-                                    name: nameInput.value.trim(),
-                                    rawValue: parseFloat(thresholdInput.value)
-                                });
-                            });
-
-                            // Validate
-                            if (!title) {
-                                throw new Error('Title is required');
-                            }
-                            if (rawEntries.length === 0) {
-                                throw new Error('At least one entry is required');
-                            }
-
-                            // Determine scaling_factor and validate values
-                            let scaling_factor;
-
-                            if (points_based) {
-                                // Use the max points from the first row's upper bound input
-                                if (maxPointsValue === null || maxPointsValue <= 0) {
-                                    throw new Error('Maximum points must be greater than 0');
-                                }
-
-                                scaling_factor = maxPointsValue;
-
-                                // Validate that all thresholds are between 0 and max points
-                                rawEntries.forEach(entry => {
-                                    if (entry.rawValue < 0 || entry.rawValue > maxPointsValue) {
-                                        throw new Error(\`Threshold value \${entry.rawValue} must be between 0 and \${maxPointsValue}\`);
-                                    }
-                                });
-                            } else {
-                                // Percentage mode
-                                scaling_factor = 1;
-
-                                // Validate that all values are between 0 and 100
-                                rawEntries.forEach(entry => {
-                                    if (entry.rawValue < 0 || entry.rawValue > 100) {
-                                        throw new Error(\`Percentage value \${entry.rawValue} must be between 0 and 100\`);
-                                    }
-                                });
-                            }
-
-                            // Prepare data array with raw values (no normalization)
-                            const data = rawEntries.map(entry => ({
-                                name: entry.name,
-                                value: entry.rawValue
-                            }));
-
-                            // Sort entries by value (descending) - Canvas requirement
-                            data.sort((a, b) => b.value - a.value);
-
-                            // Validate for duplicate values
-                            const values = data.map(entry => entry.value);
-                            const uniqueValues = new Set(values);
-                            if (values.length !== uniqueValues.size) {
-                                // Find duplicates for error message
-                                const duplicates = values.filter((value, index) => values.indexOf(value) !== index);
-                                const duplicateDisplay = points_based
-                                    ? duplicates.map(v => v.toFixed(2)).join(', ')
-                                    : duplicates.map(v => v.toFixed(0)).join(', ');
-                                throw new Error(\`Grading scheme cannot contain duplicate values. Duplicates found: \${duplicateDisplay}\`);
-                            }
-
-                            // Create grading standard
-                            const gradingSchemeData = {
-                                title,
-                                scaling_factor,
-                                points_based,
-                                data
-                            };
-
-                            console.log('[DEBUG] Form submission - Raw entries:', rawEntries);
-                            console.log('[DEBUG] Form submission - Max points value:', maxPointsValue);
-                            console.log('[DEBUG] Form submission - Points based:', points_based);
-                            console.log('[DEBUG] Form submission - Scaling factor:', scaling_factor);
-                            console.log('[DEBUG] Form submission - Final data array:', data);
-                            console.log('[DEBUG] Form submission - Complete grading scheme data:', gradingSchemeData);
-
-                            const result = await createGradingStandard(accountId, gradingSchemeData);
-
-                            // Show success
-                            statusArea.style.background = '#f6ffed';
-                            statusArea.style.border = '1px solid #b7eb8f';
-                            statusArea.style.color = '#389e0d';
-                            statusArea.innerHTML = \`✅ Grading standard created successfully! <a href="/accounts/\${accountId}/grading_standards" target="_blank" style="color: #0374B5; text-decoration: underline;">View in Canvas</a>\`;
-
-                            // Call success callback
-                            if (onSuccess) {
-                                onSuccess(result);
-                            }
-
-                            // Close modal after 2 seconds
-                            setTimeout(() => {
-                                overlay.remove();
-                            }, 2000);
-
-                        } catch (error) {
-                            console.error('[GradingSchemeEditor] Error creating grading standard:', error);
-
-                            // Show error
-                            statusArea.style.background = '#fff1f0';
-                            statusArea.style.border = '1px solid #ffa39e';
-                            statusArea.style.color = '#cf1322';
-                            statusArea.textContent = \`❌ Error: \${error.message || 'Failed to create grading standard'}\`;
-
-                            // Re-enable buttons
-                            createBtn.disabled = false;
-                            cancelBtn.disabled = false;
-                            createBtn.style.opacity = '1';
-                            createBtn.style.cursor = 'pointer';
-                            createBtn.textContent = 'Create Grading Standard';
-                        }
-                    });
-
-                    modal.appendChild(form);
-                    overlay.appendChild(modal);
-
-                    // Close on overlay click
-                    overlay.addEventListener('click', (e) => {
-                        if (e.target === overlay) {
-                            overlay.remove();
-                        }
-                    });
-
-                    document.body.appendChild(overlay);
+                        // Reset button after delay
+                        setTimeout(() => {
+                            buttonElement.disabled = false;
+                            buttonElement.style.opacity = '1';
+                            buttonElement.style.cursor = 'pointer';
+                            buttonElement.style.background = '#52c41a';
+                            buttonElement.textContent = originalText;
+                        }, 3000);
+                    }
                 }
 
-                // Add click handlers to all "Create in Canvas" buttons
+                // Wire up button click handlers
                 document.addEventListener('DOMContentLoaded', () => {
-                    const buttons = document.querySelectorAll('.create-in-canvas-btn');
-                    buttons.forEach(btn => {
+                    // "Create in Canvas as is" buttons
+                    const createDirectButtons = document.querySelectorAll('.create-direct-btn');
+                    createDirectButtons.forEach(btn => {
                         btn.addEventListener('click', () => {
                             const exampleId = btn.getAttribute('data-example-id');
                             const example = GRADING_SCHEME_EXAMPLES.find(ex => ex.id === exampleId);
-
                             if (example) {
-                                openGradingSchemeEditor(example, (result) => {
-                                    console.log('Grading standard created:', result);
-                                    // Optionally refresh the parent window's grading schemes panel
-                                    if (window.opener && !window.opener.closed) {
-                                        window.opener.postMessage({ type: 'grading-standard-created', data: result }, '*');
-                                    }
-                                });
+                                createGradingSchemeDirectly(example, btn);
                             }
+                        });
+                    });
+
+                    // "Customize" buttons (currently disabled, for future use)
+                    // When enabled, these will call: window.opener.CG_ADMIN.openGradingSchemeEditor(example, callback)
+                    const customizeButtons = document.querySelectorAll('.create-custom-btn');
+                    customizeButtons.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            // Currently disabled - will be enabled in future
+                            console.log('Customization feature coming soon');
                         });
                     });
                 });
@@ -2550,3 +1710,8 @@ export function refreshGradingSchemesGridExternal() {
         logger.warn('[AccountSettingsPanel] Cannot refresh grading schemes grid - not yet initialized');
     }
 }
+
+// Expose functions for child windows (grading scheme examples tab)
+// This allows the examples tab to reference parent window functions for future customization feature
+if (!window.CG_ADMIN) window.CG_ADMIN = {};
+window.CG_ADMIN.openGradingSchemeEditor = openGradingSchemeEditor;
