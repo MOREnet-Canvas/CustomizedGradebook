@@ -16,6 +16,9 @@ import { fetchTextWithTimeout } from './fetchHelpers.js';
 import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, extractSections } from './loaderGenerator.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 
+// Global reference to the change notification trigger function
+let globalMarkAsChanged = null;
+
 /**
  * Parse configuration settings from Section B (CG_MANAGED block)
  *
@@ -409,6 +412,9 @@ export function renderLoaderGeneratorPanel(root) {
             changeNotification.style.display = 'block';
         }
     }
+
+    // Store reference globally so other panels can trigger the notification
+    globalMarkAsChanged = markAsChanged;
 
     // Track changes on all configuration controls
     controls.enableStudentGrade.addEventListener('change', markAsChanged);
@@ -1643,6 +1649,21 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
 
     addHoverEffect(dlBtn);
     addHoverEffect(copyBtn);
+}
+
+/**
+ * Trigger the configuration change notification
+ * This function can be called from other panels (e.g., account settings panel)
+ * to show the sticky notification when configuration changes are made
+ */
+export function triggerConfigChangeNotification() {
+    if (globalMarkAsChanged) {
+        globalMarkAsChanged();
+        logger.debug('[LoaderGeneratorPanel] Configuration change notification triggered from external panel');
+    } else {
+        logger.warn('[LoaderGeneratorPanel] Cannot trigger notification - loader generator panel not yet initialized');
+    }
+}
 
     logger.info('[LoaderGeneratorPanel] A+B+C loader generated successfully');
 }
