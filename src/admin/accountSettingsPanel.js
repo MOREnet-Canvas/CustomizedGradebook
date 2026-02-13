@@ -17,6 +17,10 @@ import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
 let globalGradingSchemesGridContainer = null;
 let globalGradingSchemes = [];
 
+// Global reference for grading type dropdown
+let globalGradingTypeDropdown = null;
+let globalSelectedDisplay = null;
+
 /**
  * Select a grading scheme as default
  *
@@ -45,6 +49,9 @@ function selectGradingScheme(scheme, gridContainer, allSchemes) {
 
     logger.info('[AccountSettingsPanel] Selected grading scheme:', scheme.title, 'ID:', scheme.id);
 
+    // Auto-select grading type to 'gpa_scale' when a grading scheme is selected
+    setGradingType('gpa_scale', true);
+
     // Trigger the shared configuration change notification
     triggerConfigChangeNotification();
 
@@ -68,12 +75,77 @@ function deselectGradingScheme(gridContainer, allSchemes) {
 
     logger.info('[AccountSettingsPanel] Deselected grading scheme');
 
+    // Auto-select grading type to 'points' when no grading scheme is selected
+    setGradingType('points', true);
+
     // Trigger the shared configuration change notification
     triggerConfigChangeNotification();
 
     // Refresh the grid to show visual feedback
     if (gridContainer && allSchemes) {
         refreshGradingSchemesGrid(gridContainer, allSchemes);
+    }
+}
+
+/**
+ * Set the grading type
+ *
+ * @param {string} gradingType - Grading type to set
+ * @param {boolean} isAutoSelected - Whether this was auto-selected based on grading scheme
+ */
+function setGradingType(gradingType, isAutoSelected = false) {
+    if (!window.CG_MANAGED) {
+        window.CG_MANAGED = { config: {} };
+    }
+    if (!window.CG_MANAGED.config) {
+        window.CG_MANAGED.config = {};
+    }
+
+    window.CG_MANAGED.config.DEFAULT_GRADING_TYPE = gradingType;
+
+    logger.info('[AccountSettingsPanel] Set grading type to:', gradingType, isAutoSelected ? '(auto-selected)' : '(manual)');
+
+    // Update dropdown if it exists
+    if (globalGradingTypeDropdown) {
+        globalGradingTypeDropdown.value = gradingType;
+
+        // Update visual indication
+        const autoIndicator = globalGradingTypeDropdown.parentElement?.querySelector('.auto-indicator');
+        if (autoIndicator) {
+            autoIndicator.style.display = isAutoSelected ? 'inline' : 'none';
+        }
+    }
+
+    // Update selected display if it exists
+    if (globalSelectedDisplay) {
+        updateSelectedDisplay();
+    }
+}
+
+/**
+ * Update the "Currently Selected" display
+ */
+function updateSelectedDisplay() {
+    if (!globalSelectedDisplay) return;
+
+    const currentSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
+    const currentScheme = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME || null;
+    const currentGradingType = window.CG_MANAGED?.config?.DEFAULT_GRADING_TYPE || 'points';
+
+    if (currentSchemeId && currentScheme) {
+        globalSelectedDisplay.innerHTML = `
+            <strong>Currently Selected:</strong> ${escapeHtml(currentScheme.title || 'Unknown')} (ID: ${currentSchemeId})<br>
+            <strong>Grading Type:</strong> ${currentGradingType}
+        `;
+        globalSelectedDisplay.style.background = '#e6f7ff';
+        globalSelectedDisplay.style.border = '1px solid #91d5ff';
+    } else {
+        globalSelectedDisplay.innerHTML = `
+            <strong>No grading scheme selected</strong><br>
+            <strong>Grading Type:</strong> ${currentGradingType}
+        `;
+        globalSelectedDisplay.style.background = '#f5f5f5';
+        globalSelectedDisplay.style.border = '1px solid #d9d9d9';
     }
 }
 
@@ -95,20 +167,7 @@ function refreshGradingSchemesGrid(gridContainer, schemes) {
     });
 
     // Update the "Currently Selected" display
-    const selectedDisplay = document.querySelector('#cg-selected-scheme-display');
-    if (selectedDisplay) {
-        if (currentSchemeId) {
-            const selectedScheme = schemes.find(s => s.id === currentSchemeId);
-            if (selectedScheme) {
-                selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ${escapeHtml(selectedScheme.title)} (ID: ${currentSchemeId})`;
-            } else {
-                selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ID ${currentSchemeId} <em>(not found in current schemes)</em>`;
-            }
-            selectedDisplay.style.display = 'block';
-        } else {
-            selectedDisplay.style.display = 'none';
-        }
-    }
+    updateSelectedDisplay();
 
     logger.debug('[AccountSettingsPanel] Grading schemes grid refreshed');
 }
@@ -1493,31 +1552,142 @@ export function renderGradingSchemesPanel(root, schemes) {
         return;
     }
 
-    // Get currently selected scheme ID
+    // Get currently selected scheme ID and grading type
     const currentSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
+    const currentScheme = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME || null;
+    const currentGradingType = window.CG_MANAGED?.config?.DEFAULT_GRADING_TYPE || 'points';
 
-    // Display currently selected scheme
-    const selectedScheme = currentSchemeId ? schemes.find(s => s.id === currentSchemeId) : null;
+    // Display currently selected scheme and grading type
     const selectedDisplay = createElement('div', {
         attrs: { id: 'cg-selected-scheme-display' },
         style: {
             padding: '10px',
             marginBottom: '12px',
-            background: '#e6f7ff',
-            border: '1px solid #91d5ff',
+            background: currentSchemeId ? '#e6f7ff' : '#f5f5f5',
+            border: currentSchemeId ? '1px solid #91d5ff' : '1px solid #d9d9d9',
             borderRadius: '6px',
-            fontSize: '13px',
-            display: currentSchemeId ? 'block' : 'none'
+            fontSize: '13px'
         }
     });
 
-    if (selectedScheme) {
-        selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ${escapeHtml(selectedScheme.title)} (ID: ${currentSchemeId})`;
-    } else if (currentSchemeId) {
-        selectedDisplay.innerHTML = `<strong>Currently Selected:</strong> ID ${currentSchemeId} <em>(not found in current schemes)</em>`;
+    if (currentSchemeId && currentScheme) {
+        selectedDisplay.innerHTML = `
+            <strong>Currently Selected:</strong> ${escapeHtml(currentScheme.title || 'Unknown')} (ID: ${currentSchemeId})<br>
+            <strong>Grading Type:</strong> ${currentGradingType}
+        `;
+    } else {
+        selectedDisplay.innerHTML = `
+            <strong>No grading scheme selected</strong><br>
+            <strong>Grading Type:</strong> ${currentGradingType}
+        `;
     }
 
+    // Store reference globally for updates
+    globalSelectedDisplay = selectedDisplay;
+
     panel.appendChild(selectedDisplay);
+
+    // Add grading type dropdown
+    const gradingTypeContainer = createElement('div', {
+        style: {
+            marginBottom: '12px'
+        }
+    });
+
+    const gradingTypeLabel = createElement('label', {
+        html: '<strong>Default Grading Type:</strong>',
+        style: {
+            display: 'block',
+            marginBottom: '6px',
+            fontSize: '13px',
+            color: '#333'
+        }
+    });
+
+    const gradingTypeDropdown = createElement('select', {
+        style: {
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #d9d9d9',
+            borderRadius: '4px',
+            fontSize: '13px',
+            background: '#fff'
+        },
+        on: {
+            change: (e) => {
+                setGradingType(e.target.value, false);
+                triggerConfigChangeNotification();
+            }
+        }
+    });
+
+    // Add grading type options
+    const gradingTypes = [
+        { value: 'pass_fail', label: 'Pass/Fail' },
+        { value: 'percent', label: 'Percentage' },
+        { value: 'letter_grade', label: 'Letter Grade' },
+        { value: 'gpa_scale', label: 'GPA Scale' },
+        { value: 'points', label: 'Points' },
+        { value: 'not_graded', label: 'Not Graded' }
+    ];
+
+    gradingTypes.forEach(type => {
+        const option = createElement('option', {
+            text: type.label,
+            attrs: { value: type.value }
+        });
+        if (type.value === currentGradingType) {
+            option.selected = true;
+        }
+        gradingTypeDropdown.appendChild(option);
+    });
+
+    // Store reference globally
+    globalGradingTypeDropdown = gradingTypeDropdown;
+
+    // Add auto-selection indicator
+    const autoIndicator = createElement('span', {
+        text: ' (Auto-selected)',
+        className: 'auto-indicator',
+        style: {
+            fontSize: '12px',
+            color: '#666',
+            fontStyle: 'italic',
+            marginLeft: '8px',
+            display: 'none'
+        }
+    });
+
+    gradingTypeContainer.appendChild(gradingTypeLabel);
+    gradingTypeContainer.appendChild(gradingTypeDropdown);
+    gradingTypeLabel.appendChild(autoIndicator);
+
+    panel.appendChild(gradingTypeContainer);
+
+    // Add info box explaining auto-selection behavior
+    const infoBox = createElement('div', {
+        html: `
+            <strong>ℹ️ Auto-Selection Behavior:</strong><br>
+            This field auto-updates based on grading scheme selection:
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+                <li><strong>Grading scheme selected</strong> → Auto-selects "GPA Scale"</li>
+                <li><strong>No grading scheme</strong> → Auto-selects "Points"</li>
+            </ul>
+            You can manually override, but it will reset when you select/deselect a grading scheme.
+        `,
+        style: {
+            padding: '10px',
+            marginBottom: '12px',
+            background: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#856404',
+            lineHeight: '1.6'
+        }
+    });
+
+    panel.appendChild(infoBox);
 
     // Add "View Full Details" button
     const viewDetailsBtn = createElement('button', {
@@ -1569,7 +1739,7 @@ export function renderGradingSchemesPanel(root, schemes) {
     const gridContainer = createElement('div', {
         style: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '12px',
             marginTop: '12px'
         }
@@ -1676,16 +1846,6 @@ function renderGradingSchemeCard(parent, scheme, currentSchemeId = null, allSche
     metadata.appendChild(createElement('div', {
         html: `<strong>Context:</strong> ${escapeHtml(scheme.context_type || 'Unknown')}`
     }));
-
-    metadata.appendChild(createElement('div', {
-        html: `<strong>Scale Items:</strong> ${scaleCount}`
-    }));
-
-    if (scheme.scaling_factor) {
-        metadata.appendChild(createElement('div', {
-            html: `<strong>Scaling:</strong> ${scheme.scaling_factor}`
-        }));
-    }
 
     // Select button
     const selectBtn = createElement('button', {

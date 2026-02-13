@@ -8,7 +8,7 @@
  */
 
 import { CanvasApiClient } from "../utils/canvasApiClient.js";
-import { AVG_ASSIGNMENT_NAME, DEFAULT_MAX_POINTS } from "../config.js";
+import { AVG_ASSIGNMENT_NAME, DEFAULT_MAX_POINTS, DEFAULT_GRADING_SCHEME_ID, DEFAULT_GRADING_TYPE } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -55,20 +55,33 @@ export async function getAssignmentObjectFromOutcomeObj(courseId, outcomeObject,
  * @returns {Promise<string>} Created assignment ID
  */
 export async function createAssignment(courseId, apiClient) {
-    const payload = {
-        assignment: {
-            name: AVG_ASSIGNMENT_NAME,
-            // position: 1,
-            submission_types: ["none"], // no student submissions needed
-            published: true,
-            notify_of_update: true,
-            //points_possible: DEFAULT_MAX_POINTS,
-            points_possible: 0,
-            grading_type: "gpa_scale",
-            grading_standard_id: 7,
-            omit_from_final_grade: true,
-        }
+    // Build assignment payload
+    const assignmentData = {
+        name: AVG_ASSIGNMENT_NAME,
+        // position: 1,
+        submission_types: ["none"], // no student submissions needed
+        published: true,
+        notify_of_update: true,
+        //points_possible: DEFAULT_MAX_POINTS,
+        points_possible: 0,
+        grading_type: DEFAULT_GRADING_TYPE,
+        omit_from_final_grade: true,
     };
+
+    // Only include grading_standard_id if a grading scheme is selected
+    // When null/undefined, omit the field entirely (Canvas will un-set the grading standard)
+    if (DEFAULT_GRADING_SCHEME_ID !== null && DEFAULT_GRADING_SCHEME_ID !== undefined) {
+        assignmentData.grading_standard_id = DEFAULT_GRADING_SCHEME_ID;
+        logger.debug(`Using grading standard ID: ${DEFAULT_GRADING_SCHEME_ID}`);
+    } else {
+        logger.debug('No grading standard selected, omitting grading_standard_id from payload');
+    }
+
+    const payload = {
+        assignment: assignmentData
+    };
+
+    logger.debug('Assignment payload:', payload);
 
     const assignment = await apiClient.post(
         `/api/v1/courses/${courseId}/assignments`,

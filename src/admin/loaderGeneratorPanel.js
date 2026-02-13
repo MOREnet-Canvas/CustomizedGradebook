@@ -69,6 +69,7 @@ function parseConfigFromSectionB(sectionB) {
         excludedOutcomeKeywords: managed.config.EXCLUDED_OUTCOME_KEYWORDS || [],
         defaultGradingSchemeId: managed.config.DEFAULT_GRADING_SCHEME_ID || null,
         defaultGradingScheme: managed.config.DEFAULT_GRADING_SCHEME || null,
+        defaultGradingType: managed.config.DEFAULT_GRADING_TYPE || 'points',
         enableAccountFilter: managed.config.ENABLE_ACCOUNT_FILTER || false,
         allowedAccountIds: managed.config.ALLOWED_ACCOUNT_IDS || []
     };
@@ -195,7 +196,7 @@ function populateConfigurationControls(controls, parsedSettings) {
         controls.gradingSchemeId.value = parsedSettings.defaultGradingSchemeId.toString();
     }
 
-    // Account filter settings - populate window.CG_MANAGED.config so the account filter panel can read them
+    // Populate window.CG_MANAGED.config for other panels to read
     if (!window.CG_MANAGED) {
         window.CG_MANAGED = {};
     }
@@ -203,6 +204,7 @@ function populateConfigurationControls(controls, parsedSettings) {
         window.CG_MANAGED.config = {};
     }
 
+    // Account filter settings
     if (parsedSettings.enableAccountFilter !== undefined) {
         window.CG_MANAGED.config.ENABLE_ACCOUNT_FILTER = parsedSettings.enableAccountFilter;
         logger.debug('[LoaderGeneratorPanel] Set ENABLE_ACCOUNT_FILTER to', parsedSettings.enableAccountFilter);
@@ -211,6 +213,12 @@ function populateConfigurationControls(controls, parsedSettings) {
     if (parsedSettings.allowedAccountIds !== undefined) {
         window.CG_MANAGED.config.ALLOWED_ACCOUNT_IDS = parsedSettings.allowedAccountIds;
         logger.debug('[LoaderGeneratorPanel] Set ALLOWED_ACCOUNT_IDS to', parsedSettings.allowedAccountIds);
+    }
+
+    // Grading type setting
+    if (parsedSettings.defaultGradingType !== undefined) {
+        window.CG_MANAGED.config.DEFAULT_GRADING_TYPE = parsedSettings.defaultGradingType;
+        logger.debug('[LoaderGeneratorPanel] Set DEFAULT_GRADING_TYPE to', parsedSettings.defaultGradingType);
     }
 
     logger.debug('[LoaderGeneratorPanel] Configuration controls populated successfully');
@@ -1588,6 +1596,9 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         defaultGradingScheme = null; // No scheme object available from text input
     }
 
+    // Parse grading type - prioritize window.CG_MANAGED.config
+    let defaultGradingType = window.CG_MANAGED?.config?.DEFAULT_GRADING_TYPE || 'points';
+
     // Get version and channel from dropdown
     const selectedVersion = versionDropdown.value;
     const selectedOption = versionDropdown.options[versionDropdown.selectedIndex];
@@ -1622,6 +1633,7 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         excludedOutcomeKeywords,
         defaultGradingSchemeId,
         defaultGradingScheme,
+        defaultGradingType,
         enableAccountFilter: window.CG_MANAGED?.config?.ENABLE_ACCOUNT_FILTER || false,
         allowedAccountIds: window.CG_MANAGED?.config?.ALLOWED_ACCOUNT_IDS || []
     });

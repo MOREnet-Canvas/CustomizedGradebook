@@ -49,6 +49,7 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  * @param {Array} [options.excludedOutcomeKeywords] - Keywords to exclude from outcomes
  * @param {number|null} [options.defaultGradingSchemeId=null] - Default grading scheme ID
  * @param {Object|null} [options.defaultGradingScheme=null] - Default grading scheme object
+ * @param {string} [options.defaultGradingType='points'] - Default grading type for assignments
  * @param {boolean} [options.enableAccountFilter=false] - Enable account filtering
  * @param {Array<string>} [options.allowedAccountIds=[]] - Array of allowed account IDs
  * @returns {string} Managed config block content (Section B)
@@ -82,6 +83,7 @@ export function buildCGManagedBlock({
     excludedOutcomeKeywords = ["Homework Completion"],
     defaultGradingSchemeId = null,
     defaultGradingScheme = null,
+    defaultGradingType = 'points',
     enableAccountFilter = false,
     allowedAccountIds = []
 }) {
@@ -134,9 +136,10 @@ export function buildCGManagedBlock({
         `    // Outcome filtering`,
         `    EXCLUDED_OUTCOME_KEYWORDS: ${JSON.stringify(excludedOutcomeKeywords)},`,
         '',
-        `    // Grading scheme`,
+        `    // Grading scheme and type`,
         `    DEFAULT_GRADING_SCHEME_ID: ${defaultGradingSchemeId !== null ? defaultGradingSchemeId : 'null'},`,
         `    DEFAULT_GRADING_SCHEME: ${defaultGradingScheme !== null ? JSON.stringify(defaultGradingScheme, null, 8).replace(/\n/g, '\n    ') : 'null'},`,
+        `    DEFAULT_GRADING_TYPE: ${JSON.stringify(defaultGradingType)},`,
         '',
         `    // Account filtering`,
         `    ENABLE_ACCOUNT_FILTER: ${enableAccountFilter ? 'true' : 'false'},`,

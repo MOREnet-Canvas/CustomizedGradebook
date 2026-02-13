@@ -95,6 +95,13 @@ export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_R
 const defaultExcludedKeywords = [];
 export const EXCLUDED_OUTCOME_KEYWORDS = window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS ?? defaultExcludedKeywords;
 
+// Grading scheme configuration
+// DEFAULT_GRADING_SCHEME_ID: The Canvas grading standard ID to use for auto-created assignments
+// DEFAULT_GRADING_TYPE: The grading type for auto-created assignments
+// Supported grading types: pass_fail, percent, letter_grade, gpa_scale, points, not_graded
+export const DEFAULT_GRADING_SCHEME_ID = window.CG_CONFIG?.DEFAULT_GRADING_SCHEME_ID ?? null;
+export const DEFAULT_GRADING_TYPE = window.CG_CONFIG?.DEFAULT_GRADING_TYPE ?? 'points';
+
 // Standards-Based Course Detection (for all-grades page)
 // Array of patterns to match against course names to identify standards-based courses
 // Supports both string matching (case-insensitive) and regex patterns
