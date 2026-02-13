@@ -36,6 +36,7 @@ import { getRubricForAssignment, createRubric } from "../services/rubricService.
 import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOverrideVerification.js";
 import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from "../services/gradeOverride.js";
 import { enableCourseGradingScheme } from "../services/courseService.js";
+import { refreshMasteryForAssignment } from "../services/masteryRefreshService.js";
 
 /**
  * CHECKING_SETUP State Handler
@@ -260,8 +261,8 @@ export async function handleUpdatingGrades(stateMachine) {
 
         await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, apiClient, false);
 
-        logger.debug(`handleUpdatingGrades complete, transitioning to VERIFYING`);
-        return STATES.VERIFYING;
+        logger.debug(`handleUpdatingGrades complete, transitioning to REFRESHING_MASTERY`);
+        return STATES.REFRESHING_MASTERY;
     } else {
         // Bulk update
         const message = `Detected ${numberOfUpdates} changes - using bulk update`;
@@ -289,7 +290,35 @@ export async function handlePollingProgress(stateMachine) {
     // waitForBulkGrading handles the polling internally
     await waitForBulkGrading(banner, apiClient, stateMachine);
 
-    logger.debug(`handlePollingProgress complete, transitioning to VERIFYING`);
+    logger.debug(`handlePollingProgress complete, transitioning to REFRESHING_MASTERY`);
+    return STATES.REFRESHING_MASTERY;
+}
+
+/**
+ * REFRESHING_MASTERY State Handler
+ * Refreshes mastery levels for the avg assignment after grades are uploaded
+ */
+export async function handleRefreshingMastery(stateMachine) {
+    const { courseId, assignmentId, banner } = stateMachine.getContext();
+
+    if (!assignmentId) {
+        logger.warn('No assignmentId in context, skipping mastery refresh');
+        return STATES.VERIFYING;
+    }
+
+    try {
+        logger.debug('Refreshing mastery for avg assignment...');
+        banner.soft('Refreshing mastery levels...');
+
+        await refreshMasteryForAssignment(courseId, assignmentId);
+
+        logger.info('Mastery refresh completed for avg assignment');
+    } catch (error) {
+        logger.warn('Failed to refresh mastery for avg assignment, continuing anyway:', error);
+        // Don't fail the entire flow if mastery refresh fails
+    }
+
+    logger.debug(`handleRefreshingMastery complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
 }
 
@@ -490,6 +519,7 @@ export const STATE_HANDLERS = {
     [STATES.CALCULATING]: handleCalculating,
     [STATES.UPDATING_GRADES]: handleUpdatingGrades,
     [STATES.POLLING_PROGRESS]: handlePollingProgress,
+    [STATES.REFRESHING_MASTERY]: handleRefreshingMastery,
     [STATES.VERIFYING]: handleVerifying,
     [STATES.VERIFYING_OVERRIDES]: handleVerifyingOverrides,
     [STATES.COMPLETE]: handleComplete,
