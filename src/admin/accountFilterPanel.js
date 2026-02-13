@@ -249,7 +249,7 @@ function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccoun
 
     // Add recommendation label for root account (ID 1) in red
     if (node.id === 1) {
-        htmlLabelText += ' <span style="color: #cf1322; font-weight: 600;">(Strongly recommended for student dashboard & grades page customizations)</span>';
+        htmlLabelText += ' <span style="color: #cf1322; font-weight: 600;">(Required for student dashboard & grades page customizations)</span>';
         needsHtml = true;
     }
 
@@ -371,18 +371,36 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     );
 
     // Add some spacing around the checkbox
-    enableLabel.style.marginBottom = '16px';
+    enableLabel.style.marginBottom = '12px';
 
     logger.trace('[AccountFilter] Appending enable toggle to panel...');
     panel.appendChild(enableLabel);
     logger.trace('[AccountFilter] Enable toggle appended');
+
+    // Create warning message container (initially hidden) - placed after enable toggle
+    const warningDiv = createElement('div', {
+        id: 'account-filter-warning',
+        style: {
+            display: 'none',
+            padding: '12px',
+            marginBottom: '12px',
+            borderRadius: '4px',
+            border: '1px solid #faad14',
+            background: '#fffbe6',
+            color: '#d46b08',
+            fontSize: '13px',
+            fontWeight: 'bold'
+        }
+    });
+    warningDiv.textContent = '⚠️ Warning: The admin dashboard is currently running on this account. If this account is not enabled in the filter, the admin dashboard will not work after you upload the generated loader.';
+    panel.appendChild(warningDiv);
 
     // Account tree container
     logger.trace('[AccountFilter] Creating tree container...');
     const treeContainer = createElement('div', {
         id: 'account-tree-container',
         style: `
-            margin-top: 16px;
+            margin-top: 0px;
             max-height: 400px;
             overflow-y: auto;
             border: 1px solid #ddd;
@@ -447,24 +465,6 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         // Get current account ID
         const currentAccountId = getAccountId();
         logger.debug(`[AccountFilter] Current account ID: ${currentAccountId}`);
-
-        // Create warning message container (initially hidden)
-        const warningDiv = createElement('div', {
-            id: 'account-filter-warning',
-            style: {
-                display: 'none',
-                padding: '12px',
-                marginBottom: '12px',
-                borderRadius: '4px',
-                border: '1px solid #faad14',
-                background: '#fffbe6',
-                color: '#d46b08',
-                fontSize: '13px',
-                fontWeight: 'bold'
-            }
-        });
-        warningDiv.textContent = '⚠️ Warning: The admin dashboard is currently running on this account. If this account is not enabled in the filter, the admin dashboard will not work after you upload the generated loader.';
-        panel.appendChild(warningDiv);
 
         // Function to update warning visibility
         const updateWarningVisibility = () => {
