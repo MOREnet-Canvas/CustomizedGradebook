@@ -14,7 +14,9 @@ import { logger } from '../utils/logger.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import {
     DEFAULT_MAX_POINTS,
-    MASTERY_REFRESH_DELAY_MS
+    MASTERY_REFRESH_DELAY_MS,
+    DEFAULT_GRADING_SCHEME_ID,
+    DEFAULT_GRADING_TYPE
 } from '../config.js';
 
 /**
@@ -93,9 +95,21 @@ function deriveTempPoints(assignment) {
  * @returns {Promise<object>} Updated assignment object
  */
 async function updateAssignmentPoints(courseId, assignmentId, points, apiClient) {
+    const assignmentData = {
+        points_possible: points
+    };
+
+    // Only include grading scheme fields if a grading scheme is selected
+    if (DEFAULT_GRADING_SCHEME_ID !== null && DEFAULT_GRADING_SCHEME_ID !== undefined) {
+        assignmentData.grading_standard_id = DEFAULT_GRADING_SCHEME_ID;
+        assignmentData.grading_type = DEFAULT_GRADING_TYPE;
+        logger.debug(`[RefreshMastery] Including grading scheme in assignment update: grading_standard_id=${DEFAULT_GRADING_SCHEME_ID}, grading_type=${DEFAULT_GRADING_TYPE}`);
+    }
+
     const assignment = await apiClient.put(
         `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
-        { assignment: { points_possible: points } },
+        { assignment: assignmentData },
+        {},
         `updatePoints_${points}`
     );
     return assignment;
