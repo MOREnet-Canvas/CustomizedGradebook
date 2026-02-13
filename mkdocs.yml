@@ -1,0 +1,21 @@
+site_name: Customized Gradebook Docs
+site_description: Admin documentation for the Customized Gradebook Canvas Theme
+site_url: https://morenet-canvas.github.io/CustomizedGradebook/docs/
+
+repo_name: morenet-canvas/CustomizedGradebook
+repo_url: https://github.com/morenet-canvas/CustomizedGradebook
+
+docs_dir: docs-src
+site_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Admin Dashboard: admin-dashboard.md
+  - Account Filtering: account-filtering.md
