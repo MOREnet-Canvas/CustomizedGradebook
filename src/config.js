@@ -61,6 +61,13 @@ export const ENABLE_GRADE_OVERRIDE = window.CG_CONFIG?.ENABLE_GRADE_OVERRIDE ?? 
 // Default: false (preserves teacher autonomy)
 export const ENFORCE_COURSE_OVERRIDE = window.CG_CONFIG?.ENFORCE_COURSE_OVERRIDE ?? false;
 
+// ENFORCE_COURSE_GRADING_SCHEME: Controls whether the script automatically enables the course-level
+// grading scheme setting via API when a grading scheme is selected
+// - true: Script calls enableCourseGradingScheme() to set course grading scheme via Canvas API
+// - false: Teachers retain manual control over the course-level grading scheme setting in Canvas UI
+// Default: false (preserves teacher autonomy)
+export const ENFORCE_COURSE_GRADING_SCHEME = window.CG_CONFIG?.ENFORCE_COURSE_GRADING_SCHEME ?? false;
+
 // Grade scaling function (0-4 scale to 0-100 scale)
 // Default: multiply by 25 to convert 0-4 range to 0-100 range
 const defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));
