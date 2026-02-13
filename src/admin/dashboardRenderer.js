@@ -111,7 +111,13 @@ export function renderAdminDashboardPage() {
     logger.debug('[DashboardRenderer] Rendering account settings panel...');
     renderAccountSettingsPanel(root);
 
-    // Render account filter panel (after Configuration, before Grading Schemes)
+    // Render loader generator panel FIRST so it can populate window.CG_MANAGED.config
+    // before the account filter panel reads from it
+    logger.debug('[DashboardRenderer] Rendering loader generator panel...');
+    renderLoaderGeneratorPanel(root);
+
+    // Render account filter panel AFTER loader generator panel
+    // This ensures window.CG_MANAGED.config is populated before the panel reads it
     logger.debug('[DashboardRenderer] ========================================');
     logger.debug('[DashboardRenderer] About to call renderAccountFilterPanel()');
     logger.debug('[DashboardRenderer] ========================================');
@@ -122,10 +128,6 @@ export function renderAdminDashboardPage() {
     logger.debug('[DashboardRenderer] Calling renderAccountFilterPanel()...');
     renderAccountFilterPanel(root, currentConfig);
     logger.debug('[DashboardRenderer] renderAccountFilterPanel() call completed (async, may still be running)');
-
-    // Render loader generator panel
-    logger.debug('[DashboardRenderer] Rendering loader generator panel...');
-    renderLoaderGeneratorPanel(root);
 
     // Append to body
     document.body.appendChild(root);

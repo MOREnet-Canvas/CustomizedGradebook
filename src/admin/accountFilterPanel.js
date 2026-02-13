@@ -13,6 +13,7 @@
 import { logger } from '../utils/logger.js';
 import { createElement, createPanel } from './domHelpers.js';
 import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
+import { getAccountId } from './pageDetection.js';
 
 const CACHE_KEY = 'cg_admin_accounts_cache';
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
@@ -210,9 +211,10 @@ function countSubAccounts(node) {
  * @param {Set} selectedIds - Set of selected account IDs
  * @param {Function} onChange - Callback when checkbox changes
  * @param {number} level - Indentation level
+ * @param {string|null} currentAccountId - Current account ID (where dashboard is running)
  * @returns {HTMLElement} Tree node element
  */
-function renderAccountNode(node, selectedIds, onChange, level = 0) {
+function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccountId = null) {
     logger.trace(`[AccountFilter] Rendering node: ${node.name} (ID: ${node.id}, level: ${level})`);
 
     const isChecked = selectedIds.has(String(node.id));
@@ -237,9 +239,19 @@ function renderAccountNode(node, selectedIds, onChange, level = 0) {
 
     // Build label text with account info
     const subCount = countSubAccounts(node);
-    const labelText = subCount > 0
+    let labelText = subCount > 0
         ? `${node.name} (ID: ${node.id}) [${subCount} sub-account${subCount !== 1 ? 's' : ''}]`
         : `${node.name} (ID: ${node.id})`;
+
+    // Add recommendation label for root account (ID 1)
+    if (node.id === 1) {
+        labelText += ' (Strongly recommended for student dashboard & grades page customizations)';
+    }
+
+    // Add current account indicator
+    if (currentAccountId && String(node.id) === String(currentAccountId)) {
+        labelText += ' (Current account - this dashboard is running on this account)';
+    }
 
     // Create styled checkbox using the helper function
     const checkboxId = `account-checkbox-${node.id}`;
@@ -273,7 +285,7 @@ function renderAccountNode(node, selectedIds, onChange, level = 0) {
         logger.trace(`[AccountFilter] Node ${node.id} has ${node.children.length} children, rendering...`);
 
         node.children.forEach(child => {
-            nodeContainer.appendChild(renderAccountNode(child, selectedIds, onChange, level + 1));
+            nodeContainer.appendChild(renderAccountNode(child, selectedIds, onChange, level + 1, currentAccountId));
         });
     }
 
@@ -319,7 +331,8 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
 
     // Enable toggle (after all descriptive text)
     logger.trace('[AccountFilter] Creating enable toggle...');
-    const enabledState = currentConfig.ENABLE_ACCOUNT_FILTER || false;
+    // Read directly from window.CG_MANAGED.config to get the latest values
+    const enabledState = window.CG_MANAGED?.config?.ENABLE_ACCOUNT_FILTER || false;
     logger.debug(`[AccountFilter] Enable toggle initial state: ${enabledState}`);
 
     // Use the same checkbox styling as Feature Flags
@@ -392,8 +405,8 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         const tree = buildAccountTree(accounts);
         logger.debug(`[AccountFilter] Tree built with ${tree.length} root nodes`);
 
-        // Get selected account IDs from config
-        const allowedIds = currentConfig.ALLOWED_ACCOUNT_IDS || [];
+        // Get selected account IDs from config - read directly from window.CG_MANAGED.config
+        const allowedIds = window.CG_MANAGED?.config?.ALLOWED_ACCOUNT_IDS || [];
         logger.debug(`[AccountFilter] Allowed account IDs from config: ${JSON.stringify(allowedIds)}`);
         const selectedIds = new Set(allowedIds.map(id => String(id)));
         logger.debug(`[AccountFilter] Selected IDs set size: ${selectedIds.size}`);
@@ -402,6 +415,39 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         logger.trace('[AccountFilter] Clearing loading state...');
         treeContainer.innerHTML = '';
         logger.trace('[AccountFilter] Loading state cleared');
+
+        // Get current account ID
+        const currentAccountId = getAccountId();
+        logger.debug(`[AccountFilter] Current account ID: ${currentAccountId}`);
+
+        // Create warning message container (initially hidden)
+        const warningDiv = createElement('div', {
+            id: 'account-filter-warning',
+            style: {
+                display: 'none',
+                padding: '12px',
+                marginBottom: '12px',
+                borderRadius: '4px',
+                border: '1px solid #faad14',
+                background: '#fffbe6',
+                color: '#d46b08',
+                fontSize: '13px',
+                fontWeight: 'bold'
+            }
+        });
+        warningDiv.textContent = '⚠️ Warning: The admin dashboard is currently running on this account. If this account is not enabled in the filter, the admin dashboard will not work after you upload the generated loader.';
+        treeContainer.appendChild(warningDiv);
+
+        // Function to update warning visibility
+        const updateWarningVisibility = () => {
+            if (currentAccountId && enableCheckbox.checked && !selectedIds.has(String(currentAccountId))) {
+                warningDiv.style.display = 'block';
+                logger.debug('[AccountFilter] Warning displayed: current account not in allowed list');
+            } else {
+                warningDiv.style.display = 'none';
+                logger.debug('[AccountFilter] Warning hidden');
+            }
+        };
 
         // Render tree
         logger.debug('[AccountFilter] Rendering tree nodes...');
@@ -420,9 +466,15 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
                 // Update config
                 logger.debug(`[AccountFilter] Calling updateAccountFilterConfig with ${selectedIds.size} selected accounts`);
                 updateAccountFilterConfig(enableCheckbox.checked, Array.from(selectedIds));
-            }));
+
+                // Update warning visibility
+                updateWarningVisibility();
+            }, 0, currentAccountId));
         });
         logger.debug('[AccountFilter] Tree rendering complete');
+
+        // Initial warning visibility check
+        updateWarningVisibility();
 
         // Handle enable toggle
         logger.trace('[AccountFilter] Attaching enable toggle event listener...');
@@ -430,6 +482,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
             logger.debug(`[AccountFilter] Enable toggle changed: ${enableCheckbox.checked}`);
             updateTreeVisibility(enableCheckbox.checked);
             updateAccountFilterConfig(enableCheckbox.checked, Array.from(selectedIds));
+            updateWarningVisibility();
         });
         logger.trace('[AccountFilter] Enable toggle event listener attached');
 

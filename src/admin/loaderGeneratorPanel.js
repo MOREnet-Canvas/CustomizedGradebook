@@ -68,7 +68,9 @@ function parseConfigFromSectionB(sectionB) {
         outcomeAndRubricRatings: managed.config.OUTCOME_AND_RUBRIC_RATINGS || [],
         excludedOutcomeKeywords: managed.config.EXCLUDED_OUTCOME_KEYWORDS || [],
         defaultGradingSchemeId: managed.config.DEFAULT_GRADING_SCHEME_ID || null,
-        defaultGradingScheme: managed.config.DEFAULT_GRADING_SCHEME || null
+        defaultGradingScheme: managed.config.DEFAULT_GRADING_SCHEME || null,
+        enableAccountFilter: managed.config.ENABLE_ACCOUNT_FILTER || false,
+        allowedAccountIds: managed.config.ALLOWED_ACCOUNT_IDS || []
     };
 }
 
@@ -191,6 +193,24 @@ function populateConfigurationControls(controls, parsedSettings) {
     // Grading scheme ID
     if (parsedSettings.defaultGradingSchemeId !== undefined && parsedSettings.defaultGradingSchemeId !== null) {
         controls.gradingSchemeId.value = parsedSettings.defaultGradingSchemeId.toString();
+    }
+
+    // Account filter settings - populate window.CG_MANAGED.config so the account filter panel can read them
+    if (!window.CG_MANAGED) {
+        window.CG_MANAGED = {};
+    }
+    if (!window.CG_MANAGED.config) {
+        window.CG_MANAGED.config = {};
+    }
+
+    if (parsedSettings.enableAccountFilter !== undefined) {
+        window.CG_MANAGED.config.ENABLE_ACCOUNT_FILTER = parsedSettings.enableAccountFilter;
+        logger.debug('[LoaderGeneratorPanel] Set ENABLE_ACCOUNT_FILTER to', parsedSettings.enableAccountFilter);
+    }
+
+    if (parsedSettings.allowedAccountIds !== undefined) {
+        window.CG_MANAGED.config.ALLOWED_ACCOUNT_IDS = parsedSettings.allowedAccountIds;
+        logger.debug('[LoaderGeneratorPanel] Set ALLOWED_ACCOUNT_IDS to', parsedSettings.allowedAccountIds);
     }
 
     logger.debug('[LoaderGeneratorPanel] Configuration controls populated successfully');
