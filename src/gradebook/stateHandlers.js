@@ -19,6 +19,7 @@ import {
     ENABLE_OUTCOME_UPDATES,
     ENABLE_GRADE_OVERRIDE,
     ENFORCE_COURSE_OVERRIDE,
+    ENFORCE_COURSE_GRADING_SCHEME,
     OVERRIDE_SCALE
 } from "../config.js";
 import { UserCancelledError } from "../utils/errorHandler.js";
@@ -34,6 +35,7 @@ import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services
 import { getRubricForAssignment, createRubric } from "../services/rubricService.js";
 import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOverrideVerification.js";
 import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from "../services/gradeOverride.js";
+import { enableCourseGradingScheme } from "../services/courseService.js";
 
 /**
  * CHECKING_SETUP State Handler
@@ -133,6 +135,16 @@ export async function handleCheckingSetup(stateMachine) {
         } catch (error) {
             logger.warn('Failed to enable course override, continuing anyway:', error);
             // Don't fail the entire flow if override setup fails
+        }
+    }
+
+    // Enable course grading scheme if configured
+    if (ENFORCE_COURSE_GRADING_SCHEME) {
+        try {
+            await enableCourseGradingScheme(courseId, apiClient);
+        } catch (error) {
+            logger.warn('Failed to enable course grading scheme, continuing anyway:', error);
+            // Don't fail the entire flow if grading scheme setup fails
         }
     }
 
