@@ -1,6 +1,6 @@
 
 
-# Quick reference guide for new features added to the Customized Gradebook theme script.
+# Quick reference guide for new features 
 
 ---
 
@@ -173,7 +173,3 @@ To test Score Sync and see override grade changes:
 - Mastery levels display correctly in the gradebook
 
 ---
-
-## Support
-
-For questions or issues with these features, contact the MOREnet development team.
