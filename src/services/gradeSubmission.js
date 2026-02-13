@@ -104,6 +104,7 @@ export async function beginBulkUpdate(courseId, assignmentId, rubricCriterionId,
         logger.trace("userId:", userId, "score:", average);
         gradeData[userId] = {
             posted_grade: average,
+            prefer_points_over_scheme: true,
             text_comment: "Score: " + average + "  Updated: " + timeStamp,
             rubric_assessment: {
                 [rubricCriterionId.toString()]: {
@@ -364,4 +365,3 @@ export function downloadErrorSummary(retryCounts, failedUpdates) {
     link.click();
     URL.revokeObjectURL(url);
 }
-
