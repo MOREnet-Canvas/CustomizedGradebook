@@ -58,7 +58,7 @@ export async function createAssignment(courseId, apiClient) {
     const payload = {
         assignment: {
             name: AVG_ASSIGNMENT_NAME,
-            position: 1,
+            // position: 1,
             submission_types: ["none"], // no student submissions needed
             published: true,
             notify_of_update: true,
