@@ -64,7 +64,8 @@ export async function createAssignment(courseId, apiClient) {
             notify_of_update: true,
             //points_possible: DEFAULT_MAX_POINTS,
             points_possible: 0,
-            //grading_type: "gpa_scale",
+            grading_type: "gpa_scale",
+            grading_standard_id: 7,
             omit_from_final_grade: true,
         }
     };
