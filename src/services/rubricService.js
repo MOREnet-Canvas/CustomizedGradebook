@@ -78,7 +78,7 @@ export async function createRubric(courseId, assignmentId, outcomeId, apiClient)
                     'mastery_points': DEFAULT_MASTERY_THRESHOLD,
                     'learning_outcome_id': outcomeId,
                     'ratings': rubricRatings,
-                    'ignore_for_scoring': false, //equivalent to "Don't count this criterion toward the assignment's total points"
+                    'ignore_for_scoring': true, //equivalent to "Don't count this criterion toward the assignment's total points"
                 }
             }
         },
