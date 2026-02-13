@@ -243,19 +243,47 @@ function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccoun
         ? `${node.name} (ID: ${node.id}) [${subCount} sub-account${subCount !== 1 ? 's' : ''}]`
         : `${node.name} (ID: ${node.id})`;
 
-    // Add recommendation label for root account (ID 1)
+    // Track if we need HTML for colored text
+    let needsHtml = false;
+    let htmlLabelText = labelText;
+
+    // Add recommendation label for root account (ID 1) in red
     if (node.id === 1) {
-        labelText += ' (Strongly recommended for student dashboard & grades page customizations)';
+        htmlLabelText += ' <span style="color: #cf1322; font-weight: 600;">(Strongly recommended for student dashboard & grades page customizations)</span>';
+        needsHtml = true;
     }
 
     // Add current account indicator
     if (currentAccountId && String(node.id) === String(currentAccountId)) {
-        labelText += ' (Current account - this dashboard is running on this account)';
+        const currentAccountText = ' (Current account - this dashboard is running on this account)';
+        if (needsHtml) {
+            htmlLabelText += currentAccountText;
+        } else {
+            labelText += currentAccountText;
+        }
     }
 
-    // Create styled checkbox using the helper function
+    // Create checkbox manually to support HTML labels
     const checkboxId = `account-checkbox-${node.id}`;
-    const { checkbox, label } = createCheckbox(labelText, checkboxId, isChecked);
+    const checkbox = createElement('input', {
+        attrs: { type: 'checkbox', checked: isChecked ? 'true' : undefined, id: checkboxId }
+    });
+
+    const label = createElement('label', {
+        attrs: { for: checkboxId },
+        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '6px' }
+    });
+
+    label.appendChild(checkbox);
+
+    // Use HTML or text depending on whether we need colored text
+    if (needsHtml) {
+        const span = createElement('span', { html: htmlLabelText });
+        label.appendChild(span);
+    } else {
+        const span = createElement('span', { text: labelText });
+        label.appendChild(span);
+    }
 
     // Set the checkbox state
     checkbox.checked = isChecked;
@@ -436,7 +464,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
             }
         });
         warningDiv.textContent = '⚠️ Warning: The admin dashboard is currently running on this account. If this account is not enabled in the filter, the admin dashboard will not work after you upload the generated loader.';
-        treeContainer.appendChild(warningDiv);
+        panel.appendChild(warningDiv);
 
         // Function to update warning visibility
         const updateWarningVisibility = () => {
