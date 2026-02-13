@@ -269,17 +269,26 @@ function createMenuItemLike(menuElement) {
     if (textNode) {
         textNode.nodeValue = 'Refresh Mastery';
 
+        // Build body paragraphs dynamically based on grading scheme configuration
+        const bodyParagraphs = [
+            'Temporarily gives this assignment points so Canvas recalculates mastery results.',
+            'Does not change student grades.',
+            'Points possible are automatically set back to zero.',
+            'This does not update rubric scores, so outcome results are unchanged.'
+        ];
+
+        // Add grading scheme info if a scheme is selected
+        const gradingScheme = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME;
+        if (gradingScheme?.title) {
+            bodyParagraphs.push(`Ensures the assignment uses the "${gradingScheme.title}" grading scheme.`);
+        }
+
         // Add info icon with tooltip after the text
         const { iconContainer } = createInfoIconWithTooltip({
             tooltipId: 'cg-refresh-mastery-tooltip',
             ariaLabel: 'About Refresh Mastery',
             title: 'Refresh Mastery',
-            bodyParagraphs: [
-                'Temporarily gives this assignment points so Canvas recalculates mastery results.',
-                'Does not change student grades.',
-                'Points possible are automatically set back to zero.',
-                'This does not update rubric scores, so outcome results are unchanged.'
-            ],
+            bodyParagraphs: bodyParagraphs,
             footer: 'MOREnet Gradebook Customization',
             iconSize: 14,
             position: 'right',
