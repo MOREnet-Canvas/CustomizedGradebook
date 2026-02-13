@@ -1,5 +1,5 @@
 // buildScripts/export-all-mermaid.js
-// Batch export all .mmd files in ./docs (including subfolders) to .pdf using Mermaid CLI (ESM)
+// Batch export all .mmd files in ./documents (including subfolders) to .pdf using Mermaid CLI (ESM)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Root docs folder (contains statemachine.mmd and fileStructureDiagrams/)
-const docsDir = path.join(__dirname, "..", "docs");
+// Root documents folder (contains statemachine.mmd and fileStructureDiagrams/)
+const docsDir = path.join(__dirname, "..", "documents");
 
 function exportMermaidInDir(dir) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -20,7 +20,7 @@ function exportMermaidInDir(dir) {
         const fullPath = path.join(dir, entry.name);
 
         if (entry.isDirectory()) {
-            // Recurse into subfolder (e.g., docs/fileStructureDiagrams)
+            // Recurse into subfolder (e.g., documents/fileStructureDiagrams)
             exportMermaidInDir(fullPath);
         } else if (entry.isFile() && entry.name.endsWith(".mmd")) {
             const output = fullPath.replace(/\.mmd$/, ".pdf");

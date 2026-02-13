@@ -13,7 +13,7 @@
  * Design decision:
  * CSRF tokens are cached at initialization based on empirical testing showing
  * Canvas accepts previously-issued tokens even after cookie rotation.
- * See docs/CSRF-TOKEN-DECISION.md for full analysis.
+ * See documents/CSRF-TOKEN-DECISION.md for full analysis.
  * 
  * @example
  * const apiClient = new CanvasApiClient();
