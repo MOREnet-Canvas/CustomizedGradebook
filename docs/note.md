@@ -1,11 +1,4 @@
-pushing will automatically update dev
-
-to update production:
-npm run build:dev
-npm run build:prod
-then push
-
-
+# CustomizedGradebook - Notes
 For checking version in DevTools: CG.version
 
 
@@ -13,10 +6,11 @@ For checking version in DevTools: CG.version
 ## Next Steps
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Add Checks for assignments
-- have they had mastery refresh done?
-- do they have points possible set to 0?
-- what grading scheme are they using?
-- are all assignments using same grading scheme?
+   - have they had mastery refresh done?
+   - do they have points possible set to 0?
+   - what grading scheme are they using?
+   - are all assignments using same grading scheme?
+
 TODO: Need to add choices for current assignment configuration, and suggestions.
 
 TODO: refactor accountSettingsPanel.js it is a hot mess at this point
@@ -26,6 +20,8 @@ TODO: write out "production", clean up logging
 TODO: session key for debug
 
 TODO: clean up debugging
+
+TODO: add an assignment group for the current score assignment, and have it pushed to the bottom
 
 
 

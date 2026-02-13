@@ -52,7 +52,7 @@ export const ADMIN_DASHBOARD_LABEL = window.CG_CONFIG?.ADMIN_DASHBOARD_LABEL ?? 
 //   - Override only: ENABLE_OUTCOME_UPDATES=false, ENABLE_GRADE_OVERRIDE=true
 //   - Both (default): ENABLE_OUTCOME_UPDATES=true, ENABLE_GRADE_OVERRIDE=true
 export const ENABLE_OUTCOME_UPDATES = window.CG_CONFIG?.ENABLE_OUTCOME_UPDATES ?? true;
-export const ENABLE_GRADE_OVERRIDE = window.CG_CONFIG?.ENABLE_GRADE_OVERRIDE ?? true;
+export const ENABLE_GRADE_OVERRIDE = window.CG_CONFIG?.ENABLE_GRADE_OVERRIDE ?? false;
 
 // ENFORCE_COURSE_OVERRIDE: Controls whether the script automatically enables the Canvas course-level
 // "Allow Final Grade Override" setting via API when ENABLE_GRADE_OVERRIDE is true
