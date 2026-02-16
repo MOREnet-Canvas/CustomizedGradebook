@@ -234,15 +234,14 @@ function populateConfigurationControls(controls, parsedSettings) {
 }
 
 /**
- * Render loader generator panel
+ * Create the generator panel with all textareas and controls
  *
- * @param {HTMLElement} root - Root container element
+ * @param {HTMLSelectElement} versionDropdown - Version dropdown from version selector
+ * @param {Object} controls - Configuration controls from configuration panel
+ * @returns {Object} { panel, tryAutoLoad }
  */
-export function renderLoaderGeneratorPanel(root) {
-    logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
-
+function createGeneratorPanel(versionDropdown, controls) {
     const { panel, body } = createCollapsiblePanel('Generate Combined Loader (A+B+C Model)', false);
-    root.appendChild(panel);
 
     const installedUrl = getInstalledThemeJsUrl();
 
@@ -253,10 +252,7 @@ export function renderLoaderGeneratorPanel(root) {
         isGenerated: false
     };
 
-    // Version selector
-    const { versionSelector, versionDropdown } = createVersionSelector();
-
-    // Top note - explain A/B/C model (will be moved below config panel)
+    // Top note - explain A/B/C model
     const topNote = createElement('div', {
         attrs: { class: 'cg-status cg-status--info' },
         html: `
@@ -278,17 +274,9 @@ export function renderLoaderGeneratorPanel(root) {
         `
     });
 
-    // Load status display (will be moved below config panel)
+    // Load status display
     const loadStatus = createElement('div', {
         style: { marginBottom: '10px' }
-    });
-
-    // Configuration panel with all settings
-    const { container: configPanel, controls } = createConfigurationPanel();
-
-    // Grading Schemes Panel (will be populated async)
-    const gradingSchemesContainer = createElement('div', {
-        style: { marginBottom: '16px' }
     });
 
     // Textarea A: Other Theme Scripts (editable)
@@ -468,41 +456,60 @@ export function renderLoaderGeneratorPanel(root) {
     controls.keywordsInput.addEventListener('input', markAsChanged);
     versionDropdown.addEventListener('change', markAsChanged);
 
-    // Append all elements as separate panels at root level:
+    // Append all elements to panel body
+    body.appendChild(topNote);
+    body.appendChild(installedLine);
+    body.appendChild(loadStatus);
+
+    // Textarea A (Other Theme Scripts)
+    body.appendChild(baseLabel);
+    body.appendChild(helperText);
+    body.appendChild(baseTA);
+    body.appendChild(lockRow);
+
+    // Textarea B (Managed Config Preview)
+    body.appendChild(configLabel);
+    body.appendChild(configTA);
+
+    // Textarea C (CG Loader Template - collapsible)
+    body.appendChild(templateCollapsible);
+
+    // Action buttons (legacy, hidden)
+    body.appendChild(actions);
+
+    // Output textarea
+    body.appendChild(outLabel);
+    body.appendChild(outTA);
+    body.appendChild(hint);
+
+    return { panel, tryAutoLoad };
+}
+
+/**
+ * Render loader generator panel
+ *
+ * @param {HTMLElement} root - Root container element
+ */
+export function renderLoaderGeneratorPanel(root) {
+    logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
+
     // 1. Version selector (separate panel)
+    const { versionSelector, versionDropdown } = createVersionSelector();
     root.appendChild(versionSelector);
 
     // 2. Configuration panel (separate panel)
+    const { container: configPanel, controls } = createConfigurationPanel();
     root.appendChild(configPanel);
 
     // 3. Grading Schemes Panel (separate panel)
+    const gradingSchemesContainer = createElement('div', {
+        style: { marginBottom: '16px' }
+    });
     root.appendChild(gradingSchemesContainer);
 
-    // 4. Status messages (moved here from top)
-    panel.appendChild(topNote);
-    panel.appendChild(installedLine);
-    panel.appendChild(loadStatus);
-
-    // 4. Textarea A (Other Theme Scripts)
-    panel.appendChild(baseLabel);
-    panel.appendChild(helperText);
-    panel.appendChild(baseTA);
-    panel.appendChild(lockRow);
-
-    // 5. Textarea B (Managed Config Preview)
-    panel.appendChild(configLabel);
-    panel.appendChild(configTA);
-
-    // 6. Textarea C (CG Loader Template - collapsible)
-    panel.appendChild(templateCollapsible);
-
-    // 7. Action buttons (will be moved to sticky panel)
-    panel.appendChild(actions);
-
-    // 8. Output textarea
-    panel.appendChild(outLabel);
-    panel.appendChild(outTA);
-    panel.appendChild(hint);
+    // 4. Generate Combined Loader panel (LAST)
+    const { panel: generatorPanel, tryAutoLoad } = createGeneratorPanel(versionDropdown, controls);
+    root.appendChild(generatorPanel);
 
     // Fetch and render grading schemes panel (async)
     (async () => {
