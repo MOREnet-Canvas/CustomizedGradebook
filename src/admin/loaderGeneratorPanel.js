@@ -11,12 +11,19 @@
 
 import { logger } from '../utils/logger.js';
 import { getAccountId, getInstalledThemeJsUrl } from './pageDetection.js';
-import { createElement, createPanel, escapeHtml, downloadText } from './domHelpers.js';
+import { createElement, escapeHtml, downloadText } from './domHelpers.js';
 import { fetchTextWithTimeout } from './fetchHelpers.js';
 import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, extractSections } from './loaderGenerator.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
 import { refreshGradingSchemesGridExternal, fetchGradingSchemes, renderGradingSchemesPanel } from './accountSettingsPanel.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import {
+    createCollapsiblePanel,
+    createCheckbox,
+    createFormGroup,
+    createSelectGroup,
+    createButton
+} from './canvasFormHelpers.js';
 
 // Global reference to the change notification trigger function
 let globalMarkAsChanged = null;
@@ -236,7 +243,12 @@ function populateConfigurationControls(controls, parsedSettings) {
 export function renderLoaderGeneratorPanel(root) {
     logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
 
-    const panel = createPanel(root, 'Generate Combined Loader (A+B+C Model)');
+    const { panel } = createCollapsiblePanel({
+        title: 'Generate Combined Loader (A+B+C Model)',
+        initiallyExpanded: true
+    });
+    root.appendChild(panel);
+
     const installedUrl = getInstalledThemeJsUrl();
 
     // State management for change tracking and revert functionality
@@ -251,25 +263,23 @@ export function renderLoaderGeneratorPanel(root) {
 
     // Top note - explain A/B/C model (will be moved below config panel)
     const topNote = createElement('div', {
+        attrs: { class: 'cg-status cg-status--info' },
         html: `
-            <div style="color:#444; margin-bottom:10px; padding:12px; background:#f9f9f9; border-left:3px solid #0374B5; border-radius:6px;">
-                This tool generates a combined loader using the <strong>A+B+C model</strong>:
-                <ul style="margin:8px 0; padding-left:20px; font-size:13px;">
-                    <li><strong>A</strong> = Other Theme Scripts (preserved exactly as-is)</li>
-                    <li><strong>B</strong> = Managed config block (generated fresh from your settings)</li>
-                    <li><strong>C</strong> = CG loader template (stable logic from codebase)</li>
-                </ul>
-            </div>
+            This tool generates a combined loader using the <strong>A+B+C model</strong>:
+            <ul style="margin:8px 0; padding-left:20px; font-size:13px;">
+                <li><strong>A</strong> = Other Theme Scripts (preserved exactly as-is)</li>
+                <li><strong>B</strong> = Managed config block (generated fresh from your settings)</li>
+                <li><strong>C</strong> = CG loader template (stable logic from codebase)</li>
+            </ul>
         `
     });
 
     // Installed URL display (will be moved below config panel)
     const installedLine = createElement('div', {
+        attrs: { class: 'cg-status' },
         html: `
-            <div style="font-size:13px; color:#666; margin-bottom:10px; padding:10px; background:#f5f5f5; border-radius:6px;">
-                <strong>Detected installed Theme JS URL:</strong>
-                <div style="margin-top:4px; word-break:break-all; font-family:monospace; font-size:12px;">${escapeHtml(installedUrl || '(none)')}</div>
-            </div>
+            <strong>Detected installed Theme JS URL:</strong>
+            <div style="margin-top:4px; word-break:break-all; font-family:monospace; font-size:12px;">${escapeHtml(installedUrl || '(none)')}</div>
         `
     });
 
@@ -311,26 +321,16 @@ export function renderLoaderGeneratorPanel(root) {
 
         if (!installedUrl) {
             loadStatus.appendChild(createElement('div', {
-                text: '⚠️ No installed Theme JS URL detected. Paste the loader manually.',
-                style: {
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #f3d19e',
-                    background: '#fff7e6'
-                }
+                attrs: { class: 'cg-status cg-status--warning' },
+                text: '⚠️ No installed Theme JS URL detected. Paste the loader manually.'
             }));
             setLoaderText(baseTA, '', false, unlockBtn, relockBtn);
             return;
         }
 
         loadStatus.appendChild(createElement('div', {
-            html: `⏳ Loading current Theme JavaScript from installed URL… <span style="color:#666">(${escapeHtml(reason || 'auto')})</span>`,
-            style: {
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid #d9d9d9',
-                background: '#fafafa'
-            }
+            attrs: { class: 'cg-status' },
+            html: `⏳ Loading current Theme JavaScript from installed URL… <span style="color:#666">(${escapeHtml(reason || 'auto')})</span>`
         }));
 
         try {
@@ -393,13 +393,8 @@ export function renderLoaderGeneratorPanel(root) {
 
             loadStatus.innerHTML = '';
             loadStatus.appendChild(createElement('div', {
-                html: `✅ Loaded current Theme JavaScript automatically.<br><span style="color:#666; font-size:13px;">Sections extracted. Textarea A is locked to prevent accidental edits. Click "Unlock to edit" if needed.</span>`,
-                style: {
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #b7eb8f',
-                    background: '#f6ffed'
-                }
+                attrs: { class: 'cg-status cg-status--success' },
+                html: `✅ Loaded current Theme JavaScript automatically.<br><span style="color:#666; font-size:13px;">Sections extracted. Textarea A is locked to prevent accidental edits. Click "Unlock to edit" if needed.</span>`
             }));
 
             // Populate textareas with correct section assignments
@@ -414,13 +409,8 @@ export function renderLoaderGeneratorPanel(root) {
 
             loadStatus.innerHTML = '';
             loadStatus.appendChild(createElement('div', {
-                html: `⚠️ Could not auto-load the current Theme JavaScript (likely CORS).<br><span style="color:#666; font-size:13px;">Please copy/paste the loader contents manually from the Theme Editor.</span>`,
-                style: {
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #f3d19e',
-                    background: '#fff7e6'
-                }
+                attrs: { class: 'cg-status cg-status--warning' },
+                html: `⚠️ Could not auto-load the current Theme JavaScript (likely CORS).<br><span style="color:#666; font-size:13px;">Please copy/paste the loader contents manually from the Theme Editor.</span>`
             }));
 
             setLoaderText(baseTA, '', false, unlockBtn, relockBtn);
@@ -529,14 +519,8 @@ export function renderLoaderGeneratorPanel(root) {
         } catch (err) {
             logger.error('[LoaderGeneratorPanel] Failed to fetch grading schemes', err);
             gradingSchemesContainer.appendChild(createElement('div', {
-                text: 'Failed to load grading schemes. Please refresh the page.',
-                style: {
-                    padding: '10px',
-                    color: '#cf1322',
-                    background: '#fff2f0',
-                    border: '1px solid #ffccc7',
-                    borderRadius: '6px'
-                }
+                attrs: { class: 'cg-status cg-status--error' },
+                text: 'Failed to load grading schemes. Please refresh the page.'
             }));
         }
     })();
@@ -637,47 +621,20 @@ async function fetchAvailableVersions() {
  * Create version selector dropdown (fetches versions dynamically via async IIFE)
  */
 function createVersionSelector() {
-    const container = createElement('div', {
-        style: {
-            marginBottom: '16px',
-            padding: '12px',
-            border: '1px solid #0374B5',
-            borderRadius: '8px',
-            background: '#f0f7ff'
-        }
+    const { container, select: dropdown } = createSelectGroup({
+        label: 'Customized Gradebook Version',
+        id: 'cg-version-selector',
+        options: [
+            { value: '', text: 'Loading versions...', disabled: true, selected: true }
+        ]
     });
 
-    const label = createElement('label', {
-        html: '<strong>Customized Gradebook Version:</strong>',
-        style: {
-            display: 'block',
-            marginBottom: '8px',
-            fontSize: '14px',
-            color: '#2D3B45'
-        }
-    });
-
-    const dropdown = createElement('select', {
-        style: {
-            width: '100%',
-            padding: '8px 10px',
-            border: '1px solid #0374B5',
-            borderRadius: '6px',
-            fontSize: '13px',
-            background: '#fff',
-            cursor: 'pointer'
-        }
-    });
-
-    // Show loading indicator
-    const loadingOption = createElement('option', {
-        text: 'Loading versions...',
-        attrs: { disabled: 'true', selected: 'true' }
-    });
-    dropdown.appendChild(loadingOption);
-
-    container.appendChild(label);
-    container.appendChild(dropdown);
+    // Apply custom styling to container
+    container.style.marginBottom = '16px';
+    container.style.padding = '12px';
+    container.style.border = '1px solid #0374B5';
+    container.style.borderRadius = '8px';
+    container.style.background = '#f0f7ff';
 
     // Fetch versions asynchronously
     (async () => {
@@ -848,24 +805,9 @@ function generateDownloadFilename(version) {
  * Create configuration panel with all settings
  */
 function createConfigurationPanel() {
-    const container = createElement('details', {
-        attrs: { open: 'true' },
-        style: {
-            marginBottom: '16px',
-            padding: '16px',
-            border: '1px solid #d9d9d9',
-            borderRadius: '8px',
-            background: '#f9f9f9'
-        }
-    });
-
-    const title = createElement('summary', {
-        html: '<strong>⚙️ Configuration Settings</strong>',
-        style: {
-            marginBottom: '12px',
-            fontSize: '14px',
-            cursor: 'pointer'
-        }
+    const { panel: container } = createCollapsiblePanel({
+        title: '⚙️ Configuration Settings',
+        initiallyExpanded: true
     });
 
     // Feature Flags Section
@@ -888,16 +830,32 @@ function createConfigurationPanel() {
         }
     });
 
-    const enableStudentGrade = createCheckbox('Enable Student Grade Page Customization', 'cfg_enableStudentGrade', true);
-    const enableGradeOverride = createCheckbox('Enable Grade Override', 'cfg_enableGradeOverride', true);
-    const enforceCourseOverride = createCheckbox('Enforce Course Override Setting', 'cfg_enforceCourseOverride', false);
-    const enforceCourseGradingScheme = createCheckbox('Enforce Course Grading Scheme', 'cfg_enforceCourseGradingScheme', false);
+    const enableStudentGrade = createCheckbox({
+        label: 'Enable Student Grade Page Customization',
+        id: 'cfg_enableStudentGrade',
+        checked: true
+    });
+    const enableGradeOverride = createCheckbox({
+        label: 'Enable Grade Override',
+        id: 'cfg_enableGradeOverride',
+        checked: true
+    });
+    const enforceCourseOverride = createCheckbox({
+        label: 'Enforce Course Override Setting',
+        id: 'cfg_enforceCourseOverride',
+        checked: false
+    });
+    const enforceCourseGradingScheme = createCheckbox({
+        label: 'Enforce Course Grading Scheme',
+        id: 'cfg_enforceCourseGradingScheme',
+        checked: false
+    });
 
     featureSection.appendChild(featureTitle);
-    featureSection.appendChild(enableStudentGrade.label);
-    featureSection.appendChild(enableGradeOverride.label);
-    featureSection.appendChild(enforceCourseOverride.label);
-    featureSection.appendChild(enforceCourseGradingScheme.label);
+    featureSection.appendChild(enableStudentGrade.container);
+    featureSection.appendChild(enableGradeOverride.container);
+    featureSection.appendChild(enforceCourseOverride.container);
+    featureSection.appendChild(enforceCourseGradingScheme.container);
 
     // Excluded Keywords Section
     const keywordsSection = createElement('div', {
@@ -947,10 +905,30 @@ function createConfigurationPanel() {
         }
     });
 
-    const updateAvgButtonLabel = createTextInput('Update Button Label', 'Update Current Score');
-    const avgOutcomeName = createTextInput('Outcome Name', 'Current Score');
-    const avgAssignmentName = createTextInput('Assignment Name', 'Current Score Assignment');
-    const avgRubricName = createTextInput('Rubric Name', 'Current Score Rubric');
+    const updateAvgButtonLabel = createFormGroup({
+        label: 'Update Button Label',
+        id: 'cfg_updateAvgButtonLabel',
+        type: 'text',
+        value: 'Update Current Score'
+    });
+    const avgOutcomeName = createFormGroup({
+        label: 'Outcome Name',
+        id: 'cfg_avgOutcomeName',
+        type: 'text',
+        value: 'Current Score'
+    });
+    const avgAssignmentName = createFormGroup({
+        label: 'Assignment Name',
+        id: 'cfg_avgAssignmentName',
+        type: 'text',
+        value: 'Current Score Assignment'
+    });
+    const avgRubricName = createFormGroup({
+        label: 'Rubric Name',
+        id: 'cfg_avgRubricName',
+        type: 'text',
+        value: 'Current Score Rubric'
+    });
 
     const labelsGrid = createElement('div', {
         style: {
@@ -988,8 +966,20 @@ function createConfigurationPanel() {
         }
     });
 
-    const defaultMaxPoints = createNumberInput('Default Max Points', 4);
-    const defaultMasteryThreshold = createNumberInput('Default Mastery Threshold', 3);
+    const defaultMaxPoints = createFormGroup({
+        label: 'Default Max Points',
+        id: 'cfg_defaultMaxPoints',
+        type: 'number',
+        value: '4',
+        attrs: { min: '0', step: '0.5' }
+    });
+    const defaultMasteryThreshold = createFormGroup({
+        label: 'Default Mastery Threshold',
+        id: 'cfg_defaultMasteryThreshold',
+        type: 'number',
+        value: '3',
+        attrs: { min: '0', step: '0.5' }
+    });
 
     const outcomeGrid = createElement('div', {
         style: {
@@ -1053,13 +1043,13 @@ function createConfigurationPanel() {
     ratingsSection.appendChild(ratingsTitle);
     ratingsSection.appendChild(ratingsTextarea);
 
-    // Assemble container
-    container.appendChild(title);
-    container.appendChild(featureSection);
-    container.appendChild(keywordsSection);
-    container.appendChild(labelsSection);
-    container.appendChild(outcomeSection);
-    container.appendChild(ratingsSection);
+    // Assemble container (body is the content area of the collapsible panel)
+    const body = container.querySelector('.cg-panel-body');
+    body.appendChild(featureSection);
+    body.appendChild(keywordsSection);
+    body.appendChild(labelsSection);
+    body.appendChild(outcomeSection);
+    body.appendChild(ratingsSection);
 
     return {
         container,
@@ -1078,58 +1068,6 @@ function createConfigurationPanel() {
             keywordsInput
         }
     };
-}
-
-/**
- * Helper: Create checkbox with label
- */
-function createCheckbox(labelText, id, checked) {
-    const checkbox = createElement('input', {
-        attrs: { type: 'checkbox', checked: checked ? 'true' : undefined, id }
-    });
-    const label = createElement('label', {
-        attrs: { for: id },
-        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '6px' }
-    });
-    label.appendChild(checkbox);
-    label.appendChild(createElement('span', { text: labelText }));
-    return { checkbox, label };
-}
-
-/**
- * Helper: Create text input with label
- */
-function createTextInput(labelText, defaultValue) {
-    const container = createElement('div', { style: { marginBottom: '8px' } });
-    const label = createElement('div', {
-        text: labelText + ':',
-        style: { fontSize: '12px', marginBottom: '4px', color: '#555' }
-    });
-    const input = createElement('input', {
-        attrs: { type: 'text', value: defaultValue, spellcheck: 'false' },
-        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
-    });
-    container.appendChild(label);
-    container.appendChild(input);
-    return { container, input };
-}
-
-/**
- * Helper: Create number input with label
- */
-function createNumberInput(labelText, defaultValue) {
-    const container = createElement('div', { style: { marginBottom: '8px' } });
-    const label = createElement('div', {
-        text: labelText + ':',
-        style: { fontSize: '12px', marginBottom: '4px', color: '#555' }
-    });
-    const input = createElement('input', {
-        attrs: { type: 'number', value: defaultValue.toString(), min: '0', step: '0.5' },
-        style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
-    });
-    container.appendChild(label);
-    container.appendChild(input);
-    return { container, input };
 }
 
 /**
@@ -1257,15 +1195,7 @@ function createTemplateTextarea() {
 
     const toggleBtn = createElement('button', {
         text: 'Expand ▼',
-        style: {
-            padding: '4px 12px',
-            fontSize: '12px',
-            background: '#0374B5',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-        }
+        className: 'Button Button--small Button--primary'
     });
 
     templateLabel.appendChild(labelText);
@@ -1348,13 +1278,9 @@ function createStickyActionPanel() {
 
     // Change notification (initially hidden)
     const changeNotification = createElement('div', {
+        attrs: { class: 'cg-status cg-status--warning' },
         style: {
-            padding: '10px',
-            background: '#fff7e6',
-            border: '1px solid #f3d19e',
-            borderRadius: '6px',
             marginBottom: '12px',
-            fontSize: '13px',
             display: 'none'
         }
     });
