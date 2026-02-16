@@ -1532,10 +1532,11 @@ function generateGradingSchemeExamplesHTML() {
  * @param {Array} schemes - Array of grading schemes
  */
 export function renderGradingSchemesPanel(root, schemes) {
-    const panel = createPanel(root, `Grading Schemes (${schemes.length} found)`);
+    const { panel, body } = createCollapsiblePanel(`Grading Schemes (${schemes.length} found)`, false);
+    root.appendChild(panel);
 
     if (schemes.length === 0) {
-        panel.appendChild(createElement('div', {
+        body.appendChild(createElement('div', {
             text: 'No grading schemes configured at account level.',
             style: {
                 padding: '10px',
@@ -1579,7 +1580,7 @@ export function renderGradingSchemesPanel(root, schemes) {
     // Store reference globally for updates
     globalSelectedDisplay = selectedDisplay;
 
-    panel.appendChild(selectedDisplay);
+    body.appendChild(selectedDisplay);
 
     // Add grading type dropdown
     const gradingTypeContainer = createElement('div', {
@@ -1656,7 +1657,7 @@ export function renderGradingSchemesPanel(root, schemes) {
     gradingTypeContainer.appendChild(gradingTypeDropdown);
     gradingTypeLabel.appendChild(autoIndicator);
 
-    panel.appendChild(gradingTypeContainer);
+    body.appendChild(gradingTypeContainer);
 
     // Add info box explaining auto-selection behavior
     const infoBox = createElement('div', {
@@ -1681,7 +1682,7 @@ export function renderGradingSchemesPanel(root, schemes) {
         }
     });
 
-    panel.appendChild(infoBox);
+    body.appendChild(infoBox);
 
     // Add "View Full Details" button
     const viewDetailsBtn = createElement('button', {
@@ -1726,8 +1727,8 @@ export function renderGradingSchemesPanel(root, schemes) {
         }
     });
 
-    panel.appendChild(viewDetailsBtn);
-    panel.appendChild(viewExamplesBtn);
+    body.appendChild(viewDetailsBtn);
+    body.appendChild(viewExamplesBtn);
 
     // Create grid container for scheme cards
     const gridContainer = createElement('div', {
@@ -1748,7 +1749,7 @@ export function renderGradingSchemesPanel(root, schemes) {
         renderGradingSchemeCard(gridContainer, scheme, currentSchemeId, schemes);
     });
 
-    panel.appendChild(gridContainer);
+    body.appendChild(gridContainer);
 }
 
 /**

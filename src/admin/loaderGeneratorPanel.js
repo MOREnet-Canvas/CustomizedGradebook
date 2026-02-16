@@ -241,10 +241,7 @@ function populateConfigurationControls(controls, parsedSettings) {
 export function renderLoaderGeneratorPanel(root) {
     logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
 
-    const { panel } = createCollapsiblePanel({
-        title: 'Generate Combined Loader (A+B+C Model)',
-        initiallyExpanded: true
-    });
+    const { panel, body } = createCollapsiblePanel('Generate Combined Loader (A+B+C Model)', false);
     root.appendChild(panel);
 
     const installedUrl = getInstalledThemeJsUrl();
@@ -803,10 +800,7 @@ function generateDownloadFilename(version) {
  * Create configuration panel with all settings
  */
 function createConfigurationPanel() {
-    const { panel: container, body } = createCollapsiblePanel({
-        title: '⚙️ Configuration Settings',
-        initiallyExpanded: true
-    });
+    const { panel: container, body } = createCollapsiblePanel('⚙️ Configuration Settings', false);
 
     // Feature Flags Section
     const featureSection = createElement('div', {
