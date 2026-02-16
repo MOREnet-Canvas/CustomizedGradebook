@@ -14,6 +14,7 @@ import { createElement } from './domHelpers.js';
 import { renderThemeStatusPanels } from './themeStatusPanel.js';
 import { renderAccountSettingsPanel } from './accountSettingsPanel.js';
 import { renderAccountFilterPanel } from './accountFilterPanel.js';
+import { renderThemeCssEditorPanel } from './themeCssEditorPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
 
 /**
@@ -128,6 +129,10 @@ export function renderAdminDashboardPage() {
     logger.debug('[DashboardRenderer] Calling renderAccountFilterPanel()...');
     renderAccountFilterPanel(contentBox, currentConfig);
     logger.debug('[DashboardRenderer] renderAccountFilterPanel() call completed (async, may still be running)');
+
+    // Render Theme CSS Editor panel
+    logger.debug('[DashboardRenderer] Rendering theme CSS editor panel...');
+    renderThemeCssEditorPanel(contentBox);
 
     // Render loader generator panel AFTER account filter panel
     // The loader generator will populate window.CG_MANAGED.config, which the account filter
