@@ -330,18 +330,22 @@ export function createCollapsiblePanel(title, collapsed = false) {
         attrs: { class: 'cg-panel__header' }
     });
 
-    const headerTitle = createElement('div', {
+    // Toggle icon on the LEFT using Canvas icon font
+    const headerToggle = createElement('i', {
+        attrs: {
+            class: collapsed ? 'icon-mini-arrow-right cg-panel__header-toggle' : 'icon-mini-arrow-down cg-panel__header-toggle',
+            'aria-hidden': 'true'
+        }
+    });
+
+    const headerTitle = createElement('span', {
         attrs: { class: 'cg-panel__header-title' },
         text: title
     });
 
-    const headerToggle = createElement('div', {
-        attrs: { class: 'cg-panel__header-toggle' },
-        text: collapsed ? '▼' : '▲'
-    });
-
-    header.appendChild(headerTitle);
+    // Append toggle FIRST (left side), then title
     header.appendChild(headerToggle);
+    header.appendChild(headerTitle);
 
     const body = createElement('div', {
         attrs: { class: 'cg-panel__body' }
@@ -356,10 +360,10 @@ export function createCollapsiblePanel(title, collapsed = false) {
         const isCollapsed = panel.classList.contains('cg-panel--collapsed');
         if (isCollapsed) {
             panel.classList.remove('cg-panel--collapsed');
-            headerToggle.textContent = '▲';
+            headerToggle.className = 'icon-mini-arrow-down cg-panel__header-toggle';
         } else {
             panel.classList.add('cg-panel--collapsed');
-            headerToggle.textContent = '▼';
+            headerToggle.className = 'icon-mini-arrow-right cg-panel__header-toggle';
         }
     });
 
