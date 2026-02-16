@@ -8,31 +8,21 @@
  * - Enable/disable toggle
  * - Caches account data in sessionStorage
  * - Stores selected account IDs in config
+ *
+ * Refactored to use:
+ * - Canvas ic-* UI classes
+ * - Collapsible panel helper from canvasFormHelpers.js
+ * - Status message classes from dashboardStyles.css
  */
 
 import { logger } from '../utils/logger.js';
-import { createElement, createPanel } from './domHelpers.js';
+import { createElement } from './domHelpers.js';
+import { createCollapsiblePanel, createCheckbox } from './canvasFormHelpers.js';
 import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
 import { getAccountId } from './pageDetection.js';
 
 const CACHE_KEY = 'cg_admin_accounts_cache';
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
-
-/**
- * Helper: Create checkbox with label (matches Feature Flags styling)
- */
-function createCheckbox(labelText, id, checked) {
-    const checkbox = createElement('input', {
-        attrs: { type: 'checkbox', checked: checked ? 'true' : undefined, id }
-    });
-    const label = createElement('label', {
-        attrs: { for: id },
-        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '6px' }
-    });
-    label.appendChild(checkbox);
-    label.appendChild(createElement('span', { text: labelText }));
-    return { checkbox, label };
-}
 
 /**
  * Fetch all accounts with pagination
@@ -337,8 +327,8 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         return;
     }
 
-    logger.trace('[AccountFilter] Creating panel...');
-    const panel = createPanel(root, 'Account Filter');
+    logger.trace('[AccountFilter] Creating collapsible panel...');
+    const { panel, body } = createCollapsiblePanel('Account Filter');
     logger.trace('[AccountFilter] Panel created:', panel);
 
     // Add description at the top
@@ -347,7 +337,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         style: 'margin-bottom: 8px; color: #666; font-size: 14px;'
     });
     description.textContent = 'Configure which accounts the script should run on';
-    panel.appendChild(description);
+    body.appendChild(description);
     logger.trace('[AccountFilter] Description added');
 
     // Add help text at the top
@@ -355,7 +345,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         style: 'margin-bottom: 16px; font-size: 12px; color: #666;'
     });
     helpText.textContent = 'When enabled, the script will only run on selected accounts. When disabled, the script runs on all accounts.';
-    panel.appendChild(helpText);
+    body.appendChild(helpText);
 
     // Enable toggle (after all descriptive text)
     logger.trace('[AccountFilter] Creating enable toggle...');
@@ -363,53 +353,44 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     const enabledState = window.CG_MANAGED?.config?.ENABLE_ACCOUNT_FILTER || false;
     logger.debug(`[AccountFilter] Enable toggle initial state: ${enabledState}`);
 
-    // Use the same checkbox styling as Feature Flags
-    const { checkbox: enableCheckbox, label: enableLabel } = createCheckbox(
-        'Enable Account Filtering',
-        'enable-account-filter',
-        enabledState
-    );
-
-    // Add some spacing around the checkbox
-    enableLabel.style.marginBottom = '12px';
+    // Use Canvas checkbox helper
+    const { container: enableCheckboxContainer, checkbox: enableCheckbox } = createCheckbox({
+        label: 'Enable Account Filtering',
+        id: 'enable-account-filter',
+        checked: enabledState
+    });
 
     logger.trace('[AccountFilter] Appending enable toggle to panel...');
-    panel.appendChild(enableLabel);
+    body.appendChild(enableCheckboxContainer);
     logger.trace('[AccountFilter] Enable toggle appended');
 
     // Create warning message container (initially hidden) - placed after enable toggle
     const warningDiv = createElement('div', {
         id: 'account-filter-warning',
+        attrs: { class: 'cg-status cg-status--warning' },
         style: {
             display: 'none',
-            padding: '12px',
-            marginBottom: '12px',
-            borderRadius: '4px',
-            border: '1px solid #faad14',
-            background: '#fffbe6',
-            color: '#d46b08',
-            fontSize: '13px',
-            fontWeight: 'bold'
+            marginBottom: '12px'
         }
     });
     warningDiv.textContent = '⚠️ Warning: The admin dashboard is currently running on this account. If this account is not enabled in the filter, the admin dashboard will not work after you upload the generated loader.';
-    panel.appendChild(warningDiv);
+    body.appendChild(warningDiv);
 
     // Account tree container
     logger.trace('[AccountFilter] Creating tree container...');
     const treeContainer = createElement('div', {
         id: 'account-tree-container',
-        style: `
-            margin-top: 0px;
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 12px;
-            border-radius: 4px;
-            background: #fafafa;
-            display: ${enabledState ? 'block' : 'none'};
-            font-family: 'Courier New', monospace;
-        `
+        style: {
+            marginTop: '0px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            border: '1px solid #ddd',
+            padding: '12px',
+            borderRadius: '4px',
+            background: '#fafafa',
+            display: enabledState ? 'block' : 'none',
+            fontFamily: '"Courier New", monospace'
+        }
     });
 
     // Function to update tree container visibility
@@ -422,23 +403,26 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     // Loading state
     logger.trace('[AccountFilter] Creating loading indicator...');
     const loadingDiv = createElement('div', {
-        style: 'text-align: center; padding: 20px; color: #666;'
+        style: { textAlign: 'center', padding: '20px', color: '#666' }
     });
     loadingDiv.textContent = '⏳ Loading accounts...';
     treeContainer.appendChild(loadingDiv);
 
-    logger.trace('[AccountFilter] Appending tree container to panel...');
-    panel.appendChild(treeContainer);
+    logger.trace('[AccountFilter] Appending tree container to panel body...');
+    body.appendChild(treeContainer);
 
     // Status message
     logger.trace('[AccountFilter] Creating status div...');
     const statusDiv = createElement('div', {
         id: 'account-filter-status',
-        style: 'margin-top: 12px; padding: 8px; border-radius: 4px; display: none;'
+        attrs: { class: 'cg-status' },
+        style: { marginTop: '12px', display: 'none' }
     });
-    panel.appendChild(statusDiv);
+    body.appendChild(statusDiv);
 
-    logger.debug('[AccountFilter] Panel already appended to DOM by createPanel()');
+    // Append panel to root
+    root.appendChild(panel);
+    logger.debug('[AccountFilter] Panel appended to root');
 
     // Fetch and render accounts
     logger.debug('[AccountFilter] Starting account fetch and render...');
