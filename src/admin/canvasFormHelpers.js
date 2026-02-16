@@ -106,7 +106,7 @@ export function createSelectGroup({ label, id, options, value = '', tooltip = ''
 }
 
 /**
- * Create a Canvas-styled checkbox
+ * Create a Canvas native checkbox using .checkbox.flush pattern
  *
  * @param {Object} options - Checkbox options
  * @param {string} options.label - Label text
@@ -117,18 +117,29 @@ export function createSelectGroup({ label, id, options, value = '', tooltip = ''
  * @returns {Object} { container, checkbox, label }
  */
 export function createCheckbox({ label, id, checked = false, tooltip = '', attrs = {} }) {
-    const container = createElement('div', {
-        attrs: { class: 'ic-Checkbox-group' }
+    // Canvas native checkbox pattern: <label class="checkbox flush">
+    const container = createElement('label', {
+        attrs: {
+            class: 'checkbox flush',
+            for: id
+        }
     });
 
-    const formControl = createElement('div', {
-        attrs: { class: 'ic-Form-control ic-Form-control--checkbox' }
+    // Hidden input for unchecked state (Rails pattern)
+    const hiddenInput = createElement('input', {
+        attrs: {
+            type: 'hidden',
+            name: attrs.name || id,
+            value: '0'
+        }
     });
 
+    // Checkbox input
     const checkbox = createElement('input', {
         attrs: {
             type: 'checkbox',
             id,
+            value: '1',
             ...attrs
         }
     });
@@ -137,16 +148,22 @@ export function createCheckbox({ label, id, checked = false, tooltip = '', attrs
         checkbox.checked = true;
     }
 
-    const labelEl = createElement('label', {
-        attrs: { class: 'ic-Label', for: id },
-        html: label + (tooltip ? ` <span class="cg-tip" title="${tooltip}">&#9432;</span>` : '')
-    });
+    // Label text with optional tooltip
+    const labelText = label + (tooltip ? ` <span class="cg-tip" title="${tooltip}">&#9432;</span>` : '');
 
-    formControl.appendChild(checkbox);
-    formControl.appendChild(labelEl);
-    container.appendChild(formControl);
+    // Append elements to label container
+    container.appendChild(hiddenInput);
+    container.appendChild(checkbox);
 
-    return { container, checkbox, label: labelEl };
+    // Add text node or HTML content
+    if (tooltip) {
+        const span = createElement('span', { html: labelText });
+        container.appendChild(span);
+    } else {
+        container.appendChild(document.createTextNode(' ' + label));
+    }
+
+    return { container, checkbox, label: container };
 }
 
 /**
