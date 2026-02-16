@@ -89,13 +89,10 @@ function injectDashboardStyles() {
         }
     `;
     document.head.appendChild(style);
-    
-    // Load dashboard CSS file
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = new URL('./dashboardStyles.css', import.meta.url).href;
-    document.head.appendChild(link);
-    
+
+    // Note: Dashboard panel styles (.cg-panel, .cg-tip, etc.) are loaded via Canvas Theme CSS override
+    // The CSS is merged into the main theme CSS file (css_loader.css) and loaded by Canvas automatically
+
     // Update page title
     document.title = 'CG Admin Dashboard';
 }

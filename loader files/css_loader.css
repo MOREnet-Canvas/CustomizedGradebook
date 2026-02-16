@@ -30,3 +30,167 @@ body.responsive_student_grades_page.cg_processing_grades table.course_details.st
 /*********************************************************************/
 /***** END DESIGN TOOLS HEME IMPORT & CUSTOMIZATION   ****************/
 /*********************************************************************/
+
+
+/*********************************************************************/
+/***** BEGIN ADMIN DASHBOARD STYLES **********************************/
+/*********************************************************************/
+/**
+ * Admin Dashboard Custom Styles
+ *
+ * Minimal custom styling for dashboard panels and components.
+ * Relies primarily on Canvas ic-* classes for form controls and layout.
+ */
+
+/* ========================================
+   Panel Components
+   ======================================== */
+
+.cg-panel {
+    background: #fff;
+    border: 1px solid #C7CDD1;
+    border-radius: 4px;
+    margin-bottom: 24px;
+}
+
+.cg-panel__header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #C7CDD1;
+    background: #F5F5F5;
+    font-weight: 600;
+    font-size: 16px;
+    color: #2D3B45;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cg-panel__header:hover {
+    background: #EEEEEE;
+}
+
+.cg-panel__header-title {
+    flex: 1;
+}
+
+.cg-panel__header-toggle {
+    font-size: 14px;
+    color: #666;
+    margin-left: 12px;
+}
+
+.cg-panel__body {
+    padding: 20px;
+}
+
+.cg-panel__footer {
+    padding: 16px 20px;
+    border-top: 1px solid #C7CDD1;
+    background: #F5F5F5;
+}
+
+.cg-panel--collapsed .cg-panel__body {
+    display: none;
+}
+
+.cg-panel--collapsed .cg-panel__footer {
+    display: none;
+}
+
+/* ========================================
+   Tooltip
+   ======================================== */
+
+.cg-tip {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    text-align: center;
+    border-radius: 50%;
+    background: #0374B5;
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: help;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.cg-tip:hover {
+    background: #0056A3;
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+
+/* Note: .cg-admin-padding is defined above for backward compatibility */
+
+.cg-section {
+    margin-bottom: 24px;
+}
+
+.cg-section__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2D3B45;
+    margin-bottom: 12px;
+    padding-left: 8px;
+    border-left: 3px solid #0374B5;
+}
+
+.cg-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.cg-button-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+/* ========================================
+   Status Messages
+   ======================================== */
+
+.cg-status {
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.cg-status--info {
+    background: #F0F7FF;
+    border: 1px solid #0374B5;
+    color: #2D3B45;
+}
+
+.cg-status--success {
+    background: #F6FFED;
+    border: 1px solid #B7EB8F;
+    color: #2D3B45;
+}
+
+.cg-status--warning {
+    background: #FFF7E6;
+    border: 1px solid #F3D19E;
+    color: #2D3B45;
+}
+
+.cg-status--error {
+    background: #FFF1F0;
+    border: 1px solid #FFA39E;
+    color: #2D3B45;
+}
+
+/*********************************************************************/
+/***** END ADMIN DASHBOARD STYLES ************************************/
+/*********************************************************************/
