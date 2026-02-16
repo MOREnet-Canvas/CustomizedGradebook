@@ -72,11 +72,16 @@
 }
 
 .cg-panel__header-toggle {
-    font-size: 16px;
     color: #666;
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
+}
+
+/* Override Canvas icon font size for panel toggle arrows */
+.cg-panel__header-toggle.icon-mini-arrow-down::before,
+.cg-panel__header-toggle.icon-mini-arrow-right::before {
+    font-size: 32px !important;
 }
 
 .cg-panel__body {
