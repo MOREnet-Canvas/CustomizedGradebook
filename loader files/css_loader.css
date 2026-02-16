@@ -59,8 +59,8 @@
     cursor: pointer;
     user-select: none;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 8px;
 }
 
 .cg-panel__header:hover {
@@ -72,9 +72,11 @@
 }
 
 .cg-panel__header-toggle {
-    font-size: 14px;
+    font-size: 16px;
     color: #666;
-    margin-left: 12px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .cg-panel__body {
