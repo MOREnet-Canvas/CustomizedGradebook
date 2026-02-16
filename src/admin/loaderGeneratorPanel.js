@@ -202,10 +202,8 @@ function populateConfigurationControls(controls, parsedSettings) {
         controls.keywordsInput.value = parsedSettings.excludedOutcomeKeywords.join(', ');
     }
 
-    // Grading scheme ID
-    if (parsedSettings.defaultGradingSchemeId !== undefined && parsedSettings.defaultGradingSchemeId !== null) {
-        controls.gradingSchemeId.value = parsedSettings.defaultGradingSchemeId.toString();
-    }
+    // Note: Grading scheme ID is now handled by the Grading Schemes Panel
+    // and stored in window.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID
 
     // Populate window.CG_MANAGED.config for other panels to read
     if (!window.CG_MANAGED) {
@@ -1517,16 +1515,10 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
-    // Parse grading scheme ID and object - prioritize window.CG_MANAGED.config over text input
-    let defaultGradingSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID;
-    let defaultGradingScheme = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME;
-
-    // If not set in window.CG_MANAGED, fall back to text input
-    if (defaultGradingSchemeId === undefined || defaultGradingSchemeId === null) {
-        const gradingSchemeIdValue = controls.gradingSchemeId.value.trim();
-        defaultGradingSchemeId = gradingSchemeIdValue ? parseInt(gradingSchemeIdValue, 10) : null;
-        defaultGradingScheme = null; // No scheme object available from text input
-    }
+    // Parse grading scheme ID and object from Grading Schemes Panel
+    // (stored in window.CG_MANAGED.config by accountSettingsPanel.js)
+    let defaultGradingSchemeId = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME_ID || null;
+    let defaultGradingScheme = window.CG_MANAGED?.config?.DEFAULT_GRADING_SCHEME || null;
 
     // Parse grading type - prioritize window.CG_MANAGED.config
     let defaultGradingType = window.CG_MANAGED?.config?.DEFAULT_GRADING_TYPE || 'points';
