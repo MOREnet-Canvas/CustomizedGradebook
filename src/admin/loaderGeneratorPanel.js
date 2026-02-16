@@ -805,7 +805,7 @@ function generateDownloadFilename(version) {
  * Create configuration panel with all settings
  */
 function createConfigurationPanel() {
-    const { panel: container } = createCollapsiblePanel({
+    const { panel: container, body } = createCollapsiblePanel({
         title: '⚙️ Configuration Settings',
         initiallyExpanded: true
     });
@@ -1044,7 +1044,6 @@ function createConfigurationPanel() {
     ratingsSection.appendChild(ratingsTextarea);
 
     // Assemble container (body is the content area of the collapsible panel)
-    const body = container.querySelector('.cg-panel-body');
     body.appendChild(featureSection);
     body.appendChild(keywordsSection);
     body.appendChild(labelsSection);
