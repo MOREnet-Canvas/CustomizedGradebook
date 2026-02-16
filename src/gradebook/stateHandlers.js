@@ -37,6 +37,7 @@ import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOve
 import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from "../services/gradeOverride.js";
 import { enableCourseGradingScheme } from "../services/courseService.js";
 import { refreshMasteryForAssignment } from "../services/masteryRefreshService.js";
+import { clearAllSnapshots } from "../services/courseSnapshotService.js";
 
 /**
  * CHECKING_SETUP State Handler
@@ -164,6 +165,10 @@ export async function handleCreatingOutcome(stateMachine) {
     banner.setText(`Creating "${AVG_OUTCOME_NAME}" Outcome...`);
     await createOutcome(courseId, apiClient);
 
+    // Clear course snapshot cache to force re-detection of course type
+    clearAllSnapshots();
+    logger.debug('[UpdateFlow] Cleared course snapshots after creating outcome');
+
     return STATES.CHECKING_SETUP;
 }
 
@@ -178,6 +183,10 @@ export async function handleCreatingAssignment(stateMachine) {
     banner.setText(`Creating "${AVG_ASSIGNMENT_NAME}" Assignment...`);
     const assignmentId = await createAssignment(courseId, apiClient);
     stateMachine.updateContext({ assignmentId });
+
+    // Clear course snapshot cache to force re-detection of course type
+    clearAllSnapshots();
+    logger.debug('[UpdateFlow] Cleared course snapshots after creating assignment');
 
     return STATES.CHECKING_SETUP;
 }
