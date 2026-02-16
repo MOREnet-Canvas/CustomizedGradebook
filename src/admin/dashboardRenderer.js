@@ -61,15 +61,19 @@ export function renderAdminDashboardPage() {
 
     // Create root container
     const root = createElement('div', {
-        attrs: { id: 'cg-admin-root' },
+        attrs: { id: 'cg-admin-root' }
+    });
+
+    // Create Canvas layout wrapper
+    const layoutMain = createElement('div', {
+        attrs: { class: 'ic-Layout-contentMain' }
+    });
+
+    // Create Canvas content box
+    const contentBox = createElement('div', {
+        attrs: { class: 'content-box' },
         style: {
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-            padding: '32px',
-            maxWidth: '1100px',
-            margin: '0 auto',
-            background: '#fff',
-            minHeight: '100vh',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            padding: '32px'
         }
     });
 
@@ -99,17 +103,17 @@ export function renderAdminDashboardPage() {
         }
     });
 
-    root.appendChild(header);
-    root.appendChild(tagline);
-    root.appendChild(accountInfo);
+    contentBox.appendChild(header);
+    contentBox.appendChild(tagline);
+    contentBox.appendChild(accountInfo);
 
     // Render theme status panels (Installed Theme Overrides only)
     logger.debug('[DashboardRenderer] Rendering theme status panels...');
-    renderThemeStatusPanels(root);
+    renderThemeStatusPanels(contentBox);
 
     // Render account settings panels (Feature Flags & Grading Schemes)
     logger.debug('[DashboardRenderer] Rendering account settings panel...');
-    renderAccountSettingsPanel(root);
+    renderAccountSettingsPanel(contentBox);
 
     // Render account filter panel BEFORE loader generator panel
     // Note: The loader generator panel will populate window.CG_MANAGED.config asynchronously,
@@ -120,16 +124,20 @@ export function renderAdminDashboardPage() {
     // Get current config from window.CG_MANAGED if available
     const currentConfig = window.CG_MANAGED?.config || {};
     logger.debug('[DashboardRenderer] Current config:', currentConfig);
-    logger.debug('[DashboardRenderer] Root element:', root);
+    logger.debug('[DashboardRenderer] Root element:', contentBox);
     logger.debug('[DashboardRenderer] Calling renderAccountFilterPanel()...');
-    renderAccountFilterPanel(root, currentConfig);
+    renderAccountFilterPanel(contentBox, currentConfig);
     logger.debug('[DashboardRenderer] renderAccountFilterPanel() call completed (async, may still be running)');
 
     // Render loader generator panel AFTER account filter panel
     // The loader generator will populate window.CG_MANAGED.config, which the account filter
     // panel will read when it finishes loading accounts (async)
     logger.debug('[DashboardRenderer] Rendering loader generator panel...');
-    renderLoaderGeneratorPanel(root);
+    renderLoaderGeneratorPanel(contentBox);
+
+    // Assemble the layout structure
+    layoutMain.appendChild(contentBox);
+    root.appendChild(layoutMain);
 
     // Append to body
     document.body.appendChild(root);
