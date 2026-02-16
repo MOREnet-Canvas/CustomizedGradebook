@@ -106,7 +106,7 @@ export function createSelectGroup({ label, id, options, value = '', tooltip = ''
 }
 
 /**
- * Create a Canvas native checkbox using .checkbox.flush pattern
+ * Create a Canvas-styled checkbox
  *
  * @param {Object} options - Checkbox options
  * @param {string} options.label - Label text
@@ -114,56 +114,91 @@ export function createSelectGroup({ label, id, options, value = '', tooltip = ''
  * @param {boolean} [options.checked] - Checked state
  * @param {string} [options.tooltip] - Tooltip text
  * @param {Object} [options.attrs] - Additional checkbox attributes
+ * @param {string} [options.variant] - Checkbox variant: 'default' or 'flush'
  * @returns {Object} { container, checkbox, label }
  */
-export function createCheckbox({ label, id, checked = false, tooltip = '', attrs = {} }) {
-    // Canvas native checkbox pattern: <label class="checkbox flush">
-    const container = createElement('label', {
-        attrs: {
-            class: 'checkbox flush',
-            for: id
+export function createCheckbox({ label, id, checked = false, tooltip = '', attrs = {}, variant = 'default' }) {
+    if (variant === 'flush') {
+        // Canvas native flush pattern: <label class="checkbox flush">
+        const container = createElement('label', {
+            attrs: {
+                class: 'checkbox flush',
+                for: id
+            }
+        });
+
+        // Hidden input for unchecked state (Rails pattern)
+        const hiddenInput = createElement('input', {
+            attrs: {
+                type: 'hidden',
+                name: attrs.name || id,
+                value: '0'
+            }
+        });
+
+        // Checkbox input
+        const checkbox = createElement('input', {
+            attrs: {
+                type: 'checkbox',
+                id,
+                value: '1',
+                ...attrs
+            }
+        });
+
+        if (checked) {
+            checkbox.checked = true;
         }
-    });
 
-    // Hidden input for unchecked state (Rails pattern)
-    const hiddenInput = createElement('input', {
-        attrs: {
-            type: 'hidden',
-            name: attrs.name || id,
-            value: '0'
+        // Label text with optional tooltip
+        const labelText = label + (tooltip ? ` <span class="cg-tip" title="${tooltip}">&#9432;</span>` : '');
+
+        // Append elements to label container
+        container.appendChild(hiddenInput);
+        container.appendChild(checkbox);
+
+        // Add text node or HTML content
+        if (tooltip) {
+            const span = createElement('span', { html: labelText });
+            container.appendChild(span);
+        } else {
+            container.appendChild(document.createTextNode(' ' + label));
         }
-    });
 
-    // Checkbox input
-    const checkbox = createElement('input', {
-        attrs: {
-            type: 'checkbox',
-            id,
-            value: '1',
-            ...attrs
-        }
-    });
-
-    if (checked) {
-        checkbox.checked = true;
-    }
-
-    // Label text with optional tooltip
-    const labelText = label + (tooltip ? ` <span class="cg-tip" title="${tooltip}">&#9432;</span>` : '');
-
-    // Append elements to label container
-    container.appendChild(hiddenInput);
-    container.appendChild(checkbox);
-
-    // Add text node or HTML content
-    if (tooltip) {
-        const span = createElement('span', { html: labelText });
-        container.appendChild(span);
+        return { container, checkbox, label: container };
     } else {
-        container.appendChild(document.createTextNode(' ' + label));
-    }
+        // Default ic-Checkbox-group pattern
+        const container = createElement('div', {
+            attrs: { class: 'ic-Checkbox-group' }
+        });
 
-    return { container, checkbox, label: container };
+        const formControl = createElement('div', {
+            attrs: { class: 'ic-Form-control ic-Form-control--checkbox' }
+        });
+
+        const checkbox = createElement('input', {
+            attrs: {
+                type: 'checkbox',
+                id,
+                ...attrs
+            }
+        });
+
+        if (checked) {
+            checkbox.checked = true;
+        }
+
+        const labelEl = createElement('label', {
+            attrs: { class: 'ic-Label', for: id },
+            html: label + (tooltip ? ` <span class="cg-tip" title="${tooltip}">&#9432;</span>` : '')
+        });
+
+        formControl.appendChild(checkbox);
+        formControl.appendChild(labelEl);
+        container.appendChild(formControl);
+
+        return { container, checkbox, label: labelEl };
+    }
 }
 
 /**
