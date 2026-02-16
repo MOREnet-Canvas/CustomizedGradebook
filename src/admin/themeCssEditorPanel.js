@@ -1,94 +1,94 @@
 // src/admin/themeCssEditorPanel.js
 /**
  * Theme CSS Editor Panel Module
- * 
+ *
  * Renders a panel for editing and downloading theme CSS overrides.
+ *
+ * Refactored to use:
+ * - Canvas ic-* UI classes
+ * - Collapsible panel helper from canvasFormHelpers.js
+ * - Status message classes from dashboardStyles.css
  */
 
 import { logger } from '../utils/logger.js';
 import { getInstalledThemeCssUrl } from './pageDetection.js';
-import { createElement, createPanel, downloadText } from './domHelpers.js';
+import { createElement, downloadText } from './domHelpers.js';
+import { createCollapsiblePanel, createTextarea } from './canvasFormHelpers.js';
 import { fetchTextWithTimeout } from './fetchHelpers.js';
 
 /**
  * Render Theme CSS Editor panel
- * 
+ *
  * @param {HTMLElement} root - Root container element
  */
 export function renderThemeCssEditorPanel(root) {
     logger.debug('[ThemeCssEditorPanel] Rendering theme CSS editor panel');
 
-    const panel = createPanel(root, 'Theme CSS Editor');
+    const { panel, body } = createCollapsiblePanel('Theme CSS Editor');
     const installedCssUrl = getInstalledThemeCssUrl();
 
-    // Info message
+    // Info message using CSS class
     const infoMessage = createElement('div', {
-        html: `
-            <div style="color:#444; margin-bottom:12px; padding:12px; background:#f0f7ff; border-left:3px solid #0374B5; border-radius:6px; font-size:13px;">
-                Edit your theme CSS overrides here. Changes are not saved automatically - use the Download button to save your work.
-            </div>
-        `,
+        attrs: { class: 'cg-status cg-status--info' },
+        style: { marginBottom: '12px' },
+        text: 'Edit your theme CSS overrides here. Changes are not saved automatically - use the Download button to save your work.'
     });
 
     // Installed CSS URL display
     const urlDisplay = createElement('div', {
-        html: `
-            <div style="font-size:13px; color:#666; margin-bottom:10px; padding:10px; background:#f5f5f5; border-radius:6px;">
-                <strong>Detected installed Theme CSS URL:</strong>
-                <div style="margin-top:4px; word-break:break-all; font-family:monospace; font-size:12px;">${installedCssUrl || '(none)'}</div>
-            </div>
-        `,
+        style: {
+            fontSize: '13px',
+            color: '#666',
+            marginBottom: '10px',
+            padding: '10px',
+            background: '#f5f5f5',
+            borderRadius: '6px'
+        }
     });
+    urlDisplay.innerHTML = `
+        <strong>Detected installed Theme CSS URL:</strong>
+        <div style="margin-top:4px; word-break:break-all; font-family:monospace; font-size:12px;">${installedCssUrl || '(none)'}</div>
+    `;
 
     // Load status display
     const loadStatus = createElement('div', {
         style: { marginBottom: '10px' }
     });
 
-    // CSS Textarea
-    const cssLabel = createElement('div', {
-        html: '<strong>Theme CSS Overrides:</strong>',
-        style: { fontWeight: '700', marginBottom: '6px' }
+    // CSS Textarea using Canvas helper
+    const { container: cssTextareaContainer, textarea: cssTextarea } = createTextarea({
+        label: 'Theme CSS Overrides',
+        id: 'theme-css-textarea',
+        rows: 20,
+        placeholder: 'Paste your CSS here or load from installed URL...',
+        attrs: { spellcheck: 'false' }
     });
 
-    const cssTextarea = createElement('textarea', {
-        attrs: { rows: '20', spellcheck: 'false', placeholder: 'Paste your CSS here or load from installed URL...' },
-        style: {
-            width: '100%',
-            marginTop: '6px',
-            padding: '10px',
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            background: '#fafafa'
-        }
-    });
+    // Add monospace font to textarea
+    cssTextarea.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    cssTextarea.style.background = '#fafafa';
 
-    // Button row
+    // Button row using CSS class
     const buttonRow = createElement('div', {
-        style: {
-            display: 'flex',
-            gap: '10px',
-            marginTop: '12px',
-            flexWrap: 'wrap'
-        }
+        attrs: { class: 'cg-button-row' }
     });
 
     const loadBtn = createElement('button', {
         text: 'Load from installed CSS URL',
-        className: 'Button Button--small',
-        attrs: installedCssUrl ? {} : { disabled: 'true' }
+        attrs: {
+            class: 'Button Button--small',
+            ...(installedCssUrl ? {} : { disabled: 'true' })
+        }
     });
 
     const downloadBtn = createElement('button', {
         text: 'Download CSS',
-        className: 'Button Button--primary'
+        attrs: { class: 'Button Button--primary' }
     });
 
     const clearBtn = createElement('button', {
         text: 'Clear',
-        className: 'Button Button--small'
+        attrs: { class: 'Button Button--small' }
     });
 
     buttonRow.appendChild(loadBtn);
@@ -100,26 +100,16 @@ export function renderThemeCssEditorPanel(root) {
         if (!installedCssUrl) {
             loadStatus.innerHTML = '';
             loadStatus.appendChild(createElement('div', {
-                text: '⚠️ No installed Theme CSS URL detected.',
-                style: {
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #f3d19e',
-                    background: '#fff7e6'
-                }
+                attrs: { class: 'cg-status cg-status--warning' },
+                text: '⚠️ No installed Theme CSS URL detected.'
             }));
             return;
         }
 
         loadStatus.innerHTML = '';
         loadStatus.appendChild(createElement('div', {
-            html: '⏳ Loading CSS from installed URL...',
-            style: {
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid #d9d9d9',
-                background: '#fafafa'
-            }
+            attrs: { class: 'cg-status cg-status--info' },
+            text: '⏳ Loading CSS from installed URL...'
         }));
 
         try {
@@ -128,13 +118,8 @@ export function renderThemeCssEditorPanel(root) {
 
             loadStatus.innerHTML = '';
             loadStatus.appendChild(createElement('div', {
-                html: '✅ CSS loaded successfully from installed URL.',
-                style: {
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #b7eb8f',
-                    background: '#f6ffed'
-                }
+                attrs: { class: 'cg-status cg-status--success' },
+                text: '✅ CSS loaded successfully from installed URL.'
             }));
 
             cssTextarea.value = cssText;
@@ -143,15 +128,11 @@ export function renderThemeCssEditorPanel(root) {
             logger.warn('[ThemeCssEditorPanel] Failed to load CSS:', err);
 
             loadStatus.innerHTML = '';
-            loadStatus.appendChild(createElement('div', {
-                html: '⚠️ Could not load CSS from installed URL (likely CORS).<br><span style="color:#666; font-size:13px;">Please paste your CSS manually.</span>',
-                style: {
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #f3d19e',
-                    background: '#fff7e6'
-                }
-            }));
+            const warningMsg = createElement('div', {
+                attrs: { class: 'cg-status cg-status--warning' }
+            });
+            warningMsg.innerHTML = '⚠️ Could not load CSS from installed URL (likely CORS).<br><span style="color:#666; font-size:13px;">Please paste your CSS manually.</span>';
+            loadStatus.appendChild(warningMsg);
         }
     }
 
@@ -184,13 +165,15 @@ export function renderThemeCssEditorPanel(root) {
         loadStatus.innerHTML = '';
     });
 
-    // Append elements to panel
-    panel.appendChild(infoMessage);
-    panel.appendChild(urlDisplay);
-    panel.appendChild(loadStatus);
-    panel.appendChild(cssLabel);
-    panel.appendChild(cssTextarea);
-    panel.appendChild(buttonRow);
+    // Append elements to panel body
+    body.appendChild(infoMessage);
+    body.appendChild(urlDisplay);
+    body.appendChild(loadStatus);
+    body.appendChild(cssTextareaContainer);
+    body.appendChild(buttonRow);
+
+    // Append panel to root
+    root.appendChild(panel);
 
     // Auto-load on first render if URL exists
     if (installedCssUrl) {

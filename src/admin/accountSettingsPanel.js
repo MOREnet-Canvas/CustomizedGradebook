@@ -5,10 +5,16 @@
  * Renders diagnostic panels showing:
  * - Final Grade Override feature flag status
  * - Account-level grading schemes with IDs and scale data
+ *
+ * Refactored to use:
+ * - Canvas ic-* UI classes
+ * - Collapsible panel helper from canvasFormHelpers.js
+ * - Status message classes from dashboardStyles.css
  */
 
 import { logger } from '../utils/logger.js';
-import { createElement, createPanel, escapeHtml } from './domHelpers.js';
+import { createElement, escapeHtml } from './domHelpers.js';
+import { createCollapsiblePanel } from './canvasFormHelpers.js';
 import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
@@ -361,62 +367,49 @@ export async function renderAccountSettingsPanel(root) {
  * @param {Object|null} featureData - Feature flag data
  */
 function renderFeatureFlagPanel(root, featureData) {
-    const panel = createPanel(root, 'Final Grade Override Feature Status');
+    // Create collapsible panel
+    const { panel, body } = createCollapsiblePanel('Final Grade Override Feature Status');
 
     if (!featureData) {
-        panel.appendChild(createElement('div', {
-            text: '❌ Unable to fetch feature flag status. Check console for errors.',
-            style: {
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid #ffa39e',
-                background: '#fff1f0',
-                color: '#cf1322'
-            }
-        }));
+        const errorBox = createElement('div', {
+            attrs: { class: 'cg-status cg-status--error' },
+            text: '❌ Unable to fetch feature flag status. Check console for errors.'
+        });
+        body.appendChild(errorBox);
+        root.appendChild(panel);
         return;
     }
 
     const { state, locked, parent_state } = featureData;
 
-    // Determine visual indicator and message
+    // Determine visual indicator, message, and status class
     let indicator = '';
     let message = '';
-    let bgColor = '';
-    let borderColor = '';
+    let statusClass = 'cg-status--info';
 
     if (state === 'allowed_on' || state === 'on') {
         indicator = '✅';
         message = state === 'on'
             ? 'Final Grade Override: Enabled (forced on)'
             : 'Final Grade Override: Enabled (allowed on by default)';
-        bgColor = '#f6ffed';
-        borderColor = '#b7eb8f';
+        statusClass = 'cg-status--success';
     } else if (state === 'allowed') {
         indicator = '⚠️';
         message = 'Final Grade Override: Available (courses can enable)';
-        bgColor = '#fff7e6';
-        borderColor = '#f3d19e';
+        statusClass = 'cg-status--warning';
     } else {
         indicator = '❌';
         message = 'Final Grade Override: Disabled';
-        bgColor = '#fff1f0';
-        borderColor = '#ffa39e';
+        statusClass = 'cg-status--error';
     }
 
-    // Status box
+    // Status box using CSS classes
     const statusBox = createElement('div', {
-        html: `<strong>${indicator} ${escapeHtml(message)}</strong>`,
-        style: {
-            padding: '12px',
-            borderRadius: '8px',
-            border: `1px solid ${borderColor}`,
-            background: bgColor,
-            marginBottom: '10px'
-        }
+        attrs: { class: `cg-status ${statusClass}` },
+        html: `<strong>${indicator} ${escapeHtml(message)}</strong>`
     });
 
-    panel.appendChild(statusBox);
+    body.appendChild(statusBox);
 
     // Additional details
     const details = createElement('div', {
@@ -438,7 +431,8 @@ function renderFeatureFlagPanel(root, featureData) {
         }));
     }
 
-    panel.appendChild(details);
+    body.appendChild(details);
+    root.appendChild(panel);
 }
 
 
