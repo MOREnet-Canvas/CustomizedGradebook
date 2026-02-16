@@ -13,7 +13,7 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { createElement, escapeHtml } from './domHelpers.js';
+import { createElement, escapeHtml, createPanel } from './domHelpers.js';
 import { createCollapsiblePanel } from './canvasFormHelpers.js';
 import { getGradingSchemeExamples } from './data/gradingSchemeExamples.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';

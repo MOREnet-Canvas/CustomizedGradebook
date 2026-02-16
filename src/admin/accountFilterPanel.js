@@ -256,7 +256,7 @@ function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccoun
     // Create checkbox manually to support HTML labels
     const checkboxId = `account-checkbox-${node.id}`;
     const checkbox = createElement('input', {
-        attrs: { type: 'checkbox', checked: isChecked ? 'true' : undefined, id: checkboxId }
+        attrs: { type: 'checkbox', id: checkboxId }
     });
 
     const label = createElement('label', {
@@ -275,7 +275,7 @@ function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccoun
         label.appendChild(span);
     }
 
-    // Set the checkbox state
+    // Set the checkbox state using the property (not attribute)
     checkbox.checked = isChecked;
 
     // Add change event listener
