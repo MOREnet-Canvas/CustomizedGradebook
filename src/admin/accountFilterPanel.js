@@ -253,30 +253,38 @@ function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccoun
         }
     }
 
-    // Create checkbox manually to support HTML labels
+    // Create Canvas-native checkbox structure with ic-* classes
     const checkboxId = `account-checkbox-${node.id}`;
+
+    // Outer wrapper: ic-Checkbox-group
+    const checkboxGroup = createElement('div', {
+        attrs: { class: 'ic-Checkbox-group' }
+    });
+
+    // Inner wrapper: ic-Form-control ic-Form-control--checkbox
+    const formControl = createElement('div', {
+        attrs: { class: 'ic-Form-control ic-Form-control--checkbox' }
+    });
+
+    // Checkbox input
     const checkbox = createElement('input', {
         attrs: { type: 'checkbox', id: checkboxId }
     });
 
-    const label = createElement('label', {
-        attrs: { for: checkboxId },
-        style: { display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', marginBottom: '6px' }
-    });
+    // Set the checkbox state using the property (not attribute)
+    checkbox.checked = isChecked;
 
-    label.appendChild(checkbox);
+    // Label with ic-Label class
+    const label = createElement('label', {
+        attrs: { class: 'ic-Label', for: checkboxId }
+    });
 
     // Use HTML or text depending on whether we need colored text
     if (needsHtml) {
-        const span = createElement('span', { html: htmlLabelText });
-        label.appendChild(span);
+        label.innerHTML = htmlLabelText;
     } else {
-        const span = createElement('span', { text: labelText });
-        label.appendChild(span);
+        label.textContent = labelText;
     }
-
-    // Set the checkbox state using the property (not attribute)
-    checkbox.checked = isChecked;
 
     // Add change event listener
     checkbox.addEventListener('change', () => {
@@ -294,8 +302,13 @@ function renderAccountNode(node, selectedIds, onChange, level = 0, currentAccoun
         onChange(String(node.id), newCheckedState);
     });
 
-    // Append checkbox label to indent wrapper
-    indentWrapper.appendChild(label);
+    // Assemble the Canvas checkbox structure
+    formControl.appendChild(checkbox);
+    formControl.appendChild(label);
+    checkboxGroup.appendChild(formControl);
+
+    // Append checkbox to indent wrapper
+    indentWrapper.appendChild(checkboxGroup);
     nodeContainer.appendChild(indentWrapper);
 
     // Render children
