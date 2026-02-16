@@ -147,7 +147,7 @@ export function createCheckbox({ label, id, checked = false, tooltip = '', attrs
     container.appendChild(formControl);
 
     return { container, checkbox, label: labelEl };
-
+}
 
 /**
  * Create a Canvas Super Toggle (switch-style toggle)
