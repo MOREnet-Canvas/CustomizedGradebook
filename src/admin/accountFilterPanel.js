@@ -334,7 +334,11 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     // Add description at the top
     logger.trace('[AccountFilter] Adding description...');
     const description = createElement('div', {
-        style: 'margin-bottom: 8px; color: #666; font-size: 14px;'
+        style: {
+            marginBottom: '8px',
+            color: '#666',
+            fontSize: '14px'
+        }
     });
     description.textContent = 'Configure which accounts the script should run on';
     body.appendChild(description);
@@ -342,7 +346,11 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
 
     // Add help text at the top
     const helpText = createElement('div', {
-        style: 'margin-bottom: 16px; font-size: 12px; color: #666;'
+        style: {
+            marginBottom: '16px',
+            fontSize: '12px',
+            color: '#666'
+        }
     });
     helpText.textContent = 'When enabled, the script will only run on selected accounts. When disabled, the script runs on all accounts.';
     body.appendChild(helpText);
@@ -379,15 +387,14 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     // Account tree container
     logger.trace('[AccountFilter] Creating tree container...');
     const treeContainer = createElement('div', {
-        id: 'account-tree-container',
+        attrs: {
+            id: 'account-tree-container',
+            class: 'cg-panel-body'
+        },
         style: {
             marginTop: '0px',
             maxHeight: '400px',
             overflowY: 'auto',
-            border: '1px solid #ddd',
-            padding: '12px',
-            borderRadius: '4px',
-            background: '#fafafa',
             display: enabledState ? 'block' : 'none',
             fontFamily: '"Courier New", monospace'
         }
@@ -403,7 +410,11 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     // Loading state
     logger.trace('[AccountFilter] Creating loading indicator...');
     const loadingDiv = createElement('div', {
-        style: { textAlign: 'center', padding: '20px', color: '#666' }
+        style: {
+            textAlign: 'center',
+            padding: '20px',
+            color: '#666'
+        }
     });
     loadingDiv.textContent = '⏳ Loading accounts...';
     treeContainer.appendChild(loadingDiv);
@@ -505,7 +516,10 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
         logger.error('[AccountFilter] Error stack:', error.stack);
         treeContainer.innerHTML = '';
         const errorDiv = createElement('div', {
-            style: 'text-align: center; padding: 20px; color: #cf1322;'
+            attrs: { class: 'cg-status cg-status--error' },
+            style: {
+                textAlign: 'center'
+            }
         });
         errorDiv.textContent = `❌ Error loading accounts: ${error.message}`;
         treeContainer.appendChild(errorDiv);
@@ -551,9 +565,8 @@ function updateAccountFilterConfig(enabled, accountIds) {
     if (statusDiv) {
         logger.trace('[AccountFilter] Status div found, updating...');
         statusDiv.style.display = 'block';
-        statusDiv.style.background = '#e6f7ff';
-        statusDiv.style.border = '1px solid #91d5ff';
-        statusDiv.style.color = '#0050b3';
+        // Remove inline styles - use .cg-status--info class instead
+        statusDiv.className = 'cg-status cg-status--info';
 
         if (enabled) {
             statusDiv.textContent = `✅ Account filtering enabled for ${accountIds.length} account${accountIds.length !== 1 ? 's' : ''}`;
