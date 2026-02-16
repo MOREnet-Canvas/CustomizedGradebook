@@ -468,15 +468,15 @@ export function renderLoaderGeneratorPanel(root) {
     controls.keywordsInput.addEventListener('input', markAsChanged);
     versionDropdown.addEventListener('change', markAsChanged);
 
-    // Append all elements in new order:
-    // 1. Version selector
-    panel.appendChild(versionSelector);
+    // Append all elements as separate panels at root level:
+    // 1. Version selector (separate panel)
+    root.appendChild(versionSelector);
 
-    // 2. Configuration panel (all settings)
-    panel.appendChild(configPanel);
+    // 2. Configuration panel (separate panel)
+    root.appendChild(configPanel);
 
-    // 3. Grading Schemes Panel (after config, before topNote)
-    panel.appendChild(gradingSchemesContainer);
+    // 3. Grading Schemes Panel (separate panel)
+    root.appendChild(gradingSchemesContainer);
 
     // 4. Status messages (moved here from top)
     panel.appendChild(topNote);
@@ -616,6 +616,9 @@ async function fetchAvailableVersions() {
  * Create version selector dropdown (fetches versions dynamically via async IIFE)
  */
 function createVersionSelector() {
+    // Create collapsible panel wrapper
+    const { panel, body } = createCollapsiblePanel('📦 Customized Gradebook Version', false);
+
     const { container, select: dropdown } = createSelectGroup({
         label: 'Customized Gradebook Version',
         id: 'cg-version-selector',
@@ -624,12 +627,8 @@ function createVersionSelector() {
         ]
     });
 
-    // Apply custom styling to container
-    container.style.marginBottom = '16px';
-    container.style.padding = '12px';
-    container.style.border = '1px solid #0374B5';
-    container.style.borderRadius = '8px';
-    container.style.background = '#f0f7ff';
+    // Append the select group to the panel body
+    body.appendChild(container);
 
     // Fetch versions asynchronously
     (async () => {
@@ -776,7 +775,7 @@ function createVersionSelector() {
         }
     })();
 
-    return { versionSelector: container, versionDropdown: dropdown };
+    return { versionSelector: panel, versionDropdown: dropdown };
 }
 
 /**
