@@ -193,6 +193,130 @@
     border: 1px solid #FFA39E;
     color: #2D3B45;
 }
+.cg-header-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #f5f5f5;
+    padding: 12px 0;
+    border-bottom: 1px solid #d8dde3;
+}
+
+.cg-header-card {
+    background: #fff;
+    border: 1px solid #C7CDD1;   /* matches .cg-panel */
+    border-radius: 4px;          /* matches .cg-panel */
+    padding: 16px 20px;          /* matches panel spacing */
+}
+
+
+.cg-header-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: #2d3b45;
+}
+
+.cg-header-subtitle {
+    margin-top: 4px;
+    color: #6b7785;
+    font-size: 13px;
+}
+
+.cg-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    align-items: center;
+}
+
+.cg-status-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.cg-pill {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #e2e6ea;
+    background: #fafbfc;
+    font-size: 13px;
+    color: #2d3b45;
+}
+
+.cg-pill b {
+    font-weight: 600;
+}
+
+.cg-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: #f5f5f5;
+    border-bottom: 1px solid #c7cdd1;
+    padding: 10px 0;
+}
+
+.cg-toolbar__inner {
+    background: #fff;
+    border: 1px solid #c7cdd1;
+    border-radius: 4px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cg-toolbar__left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+
+.cg-toolbar__title {
+    font-weight: 600;
+    color: #2d3b45;
+    white-space: nowrap;
+}
+
+.cg-toolbar__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;   /* more space */
+    padding: 6px 14px;
+    margin-top: 6px;
+}
+
+
+.cg-toolbar__right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    min-width: 140px; /* prevents collapse */
+}
+
+.cg-toolbar__title {
+    font-weight: 700;
+    font-size: 28px;   /* larger */
+    color: #2d3b45;
+    margin-bottom: 2px;
+}
+
+.cg-toolbar__subtitle {
+    font-size: 14px;
+    color: #6b7785;
+    margin-bottom: 10px;
+}
+
+
 
 /*********************************************************************/
 /***** END ADMIN DASHBOARD STYLES ************************************/

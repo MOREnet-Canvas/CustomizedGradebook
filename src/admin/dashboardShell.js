@@ -148,7 +148,7 @@ function buildLayoutStructure() {
  * @param {HTMLElement} container - Container element
  */
 
-renderHeader(innerWrapper);
+
 
 // function renderHeader(container) {
 //     const header = createElement('h1', {
