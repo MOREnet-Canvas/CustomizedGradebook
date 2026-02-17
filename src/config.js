@@ -42,7 +42,7 @@ export const MASTERY_REFRESH_ENABLED = window.CG_CONFIG?.MASTERY_REFRESH_ENABLED
 
 // Admin Dashboard configuration
 export const ADMIN_DASHBOARD_ENABLED = window.CG_CONFIG?.ADMIN_DASHBOARD_ENABLED ?? true;
-export const ADMIN_DASHBOARD_LABEL = window.CG_CONFIG?.ADMIN_DASHBOARD_LABEL ?? "Open CG Admin Dashboard";
+export const ADMIN_DASHBOARD_LABEL = window.CG_CONFIG?.ADMIN_DASHBOARD_LABEL ?? "Open Manager";
 
 // Grading mode configuration
 // ENABLE_OUTCOME_UPDATES: Controls whether outcome scores (and assignments/rubrics) are updated
