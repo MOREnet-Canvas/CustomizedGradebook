@@ -13,12 +13,25 @@ export function renderHeader(container) {
     const inner = createElement("div", { attrs: { class: "cg-toolbar__inner" } });
 
     const left = createElement("div", { attrs: { class: "cg-toolbar__left" } });
-    const right = createElement("div", { attrs: { class: "cg-toolbar__right" } });
+
+
+    const titleBlock = createElement("div", {
+        attrs: { class: "cg-toolbar__titleBlock" }
+    });
 
     const title = createElement("div", {
         attrs: { class: "cg-toolbar__title" },
         text: "Release & Configuration Manager",
     });
+
+    const subtitle = createElement("div", {
+        attrs: { class: "cg-toolbar__subtitle" },
+        text: "by MOREnet",
+    });
+
+    titleBlock.appendChild(title);
+    titleBlock.appendChild(subtitle);
+
 
     const nav = createElement("div", { attrs: { class: "cg-toolbar__nav" } });
 
@@ -41,37 +54,15 @@ export function renderHeader(container) {
         nav.appendChild(btn);
     });
 
-    left.appendChild(title);
+    left.appendChild(titleBlock);
     left.appendChild(nav);
 
-    const generateBtn = createButton({
-        text: "Generate",
-        type: "primary",
-        onClick: () => window.dispatchEvent(new CustomEvent("cg:generate-loader")),
-    });
 
-    const downloadBtn = createButton({
-        text: "Download",
-        type: "secondary",
-        attrs: { class: "Button Button--secondary Button--small" },
 
-        onClick: () => window.dispatchEvent(new CustomEvent("cg:download-loader")),
-    });
 
-    const copyBtn = createButton({
-        text: "Copy",
-        type: "secondary",
-        attrs: { class: "Button Button--secondary Button--small" },
-
-        onClick: () => window.dispatchEvent(new CustomEvent("cg:copy-loader")),
-    });
-
-    right.appendChild(generateBtn);
-    right.appendChild(downloadBtn);
-    right.appendChild(copyBtn);
 
     inner.appendChild(left);
-    inner.appendChild(right);
+
     bar.appendChild(inner);
     container.appendChild(bar);
 }

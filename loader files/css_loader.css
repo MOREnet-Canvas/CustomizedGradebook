@@ -193,42 +193,10 @@
     border: 1px solid #FFA39E;
     color: #2D3B45;
 }
-.cg-header-bar {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: #f5f5f5;
-    padding: 12px 0;
-    border-bottom: 1px solid #d8dde3;
-}
-
-.cg-header-card {
-    background: #fff;
-    border: 1px solid #C7CDD1;   /* matches .cg-panel */
-    border-radius: 4px;          /* matches .cg-panel */
-    padding: 16px 20px;          /* matches panel spacing */
-}
 
 
-.cg-header-title {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 600;
-    color: #2d3b45;
-}
 
-.cg-header-subtitle {
-    margin-top: 4px;
-    color: #6b7785;
-    font-size: 13px;
-}
 
-.cg-header-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    align-items: center;
-}
 
 .cg-status-pills {
     display: flex;
@@ -280,11 +248,7 @@
 }
 
 
-.cg-toolbar__title {
-    font-weight: 600;
-    color: #2d3b45;
-    white-space: nowrap;
-}
+
 
 .cg-toolbar__nav {
     display: flex;
@@ -305,15 +269,21 @@
 
 .cg-toolbar__title {
     font-weight: 700;
-    font-size: 28px;   /* larger */
+    font-size: 28px;
     color: #2d3b45;
     margin-bottom: 2px;
+    white-space: nowrap;
 }
+
 
 .cg-toolbar__subtitle {
     font-size: 14px;
     color: #6b7785;
     margin-bottom: 10px;
+}
+.cg-toolbar__titleBlock {
+    display: flex;
+    flex-direction: column;
 }
 
 
