@@ -24,6 +24,20 @@ import {
     createSelectGroup,
     createButton
 } from './canvasFormHelpers.js';
+import {
+    DEFAULT_ENABLE_STUDENT_GRADE_CUSTOMIZATION,
+    DEFAULT_ENABLE_GRADE_OVERRIDE,
+    DEFAULT_ENFORCE_COURSE_OVERRIDE,
+    DEFAULT_ENFORCE_COURSE_GRADING_SCHEME,
+    DEFAULT_UPDATE_AVG_BUTTON_LABEL,
+    DEFAULT_AVG_OUTCOME_NAME,
+    DEFAULT_AVG_ASSIGNMENT_NAME,
+    DEFAULT_AVG_RUBRIC_NAME,
+    DEFAULT_MAX_POINTS,
+    DEFAULT_MASTERY_THRESHOLD,
+    DEFAULT_OUTCOME_AND_RUBRIC_RATINGS,
+    DEFAULT_EXCLUDED_OUTCOME_KEYWORDS
+} from './data/defaultConfigConstants.js';
 
 // Global reference to the change notification trigger function
 let globalMarkAsChanged = null;
@@ -831,22 +845,22 @@ function createConfigurationPanel() {
     const enableStudentGrade = createCheckbox({
         label: 'Enable Student Grade Page Customization',
         id: 'cfg_enableStudentGrade',
-        checked: true
+        checked: DEFAULT_ENABLE_STUDENT_GRADE_CUSTOMIZATION
     });
     const enableGradeOverride = createCheckbox({
         label: 'Enable Grade Override',
         id: 'cfg_enableGradeOverride',
-        checked: true
+        checked: DEFAULT_ENABLE_GRADE_OVERRIDE
     });
     const enforceCourseOverride = createCheckbox({
         label: 'Enforce Course Override Setting',
         id: 'cfg_enforceCourseOverride',
-        checked: false
+        checked: DEFAULT_ENFORCE_COURSE_OVERRIDE
     });
     const enforceCourseGradingScheme = createCheckbox({
         label: 'Enforce Course Grading Scheme',
         id: 'cfg_enforceCourseGradingScheme',
-        checked: false
+        checked: DEFAULT_ENFORCE_COURSE_GRADING_SCHEME
     });
 
     featureSection.appendChild(featureTitle);
@@ -876,7 +890,7 @@ function createConfigurationPanel() {
     });
 
     const keywordsInput = createElement('input', {
-        attrs: { type: 'text', value: 'Homework Completion', spellcheck: 'false' },
+        attrs: { type: 'text', value: DEFAULT_EXCLUDED_OUTCOME_KEYWORDS.join(', '), spellcheck: 'false' },
         style: { width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }
     });
 
@@ -907,25 +921,25 @@ function createConfigurationPanel() {
         label: 'Update Button Label',
         id: 'cfg_updateAvgButtonLabel',
         type: 'text',
-        value: 'Update Current Score'
+        value: DEFAULT_UPDATE_AVG_BUTTON_LABEL
     });
     const avgOutcomeName = createFormGroup({
         label: 'Outcome Name',
         id: 'cfg_avgOutcomeName',
         type: 'text',
-        value: 'Current Score'
+        value: DEFAULT_AVG_OUTCOME_NAME
     });
     const avgAssignmentName = createFormGroup({
         label: 'Assignment Name',
         id: 'cfg_avgAssignmentName',
         type: 'text',
-        value: 'Current Score Assignment'
+        value: DEFAULT_AVG_ASSIGNMENT_NAME
     });
     const avgRubricName = createFormGroup({
         label: 'Rubric Name',
         id: 'cfg_avgRubricName',
         type: 'text',
-        value: 'Current Score Rubric'
+        value: DEFAULT_AVG_RUBRIC_NAME
     });
 
     const labelsGrid = createElement('div', {
@@ -968,14 +982,14 @@ function createConfigurationPanel() {
         label: 'Default Max Points',
         id: 'cfg_defaultMaxPoints',
         type: 'number',
-        value: '4',
+        value: DEFAULT_MAX_POINTS.toString(),
         attrs: { min: '0', step: '0.5' }
     });
     const defaultMasteryThreshold = createFormGroup({
         label: 'Default Mastery Threshold',
         id: 'cfg_defaultMasteryThreshold',
         type: 'number',
-        value: '3',
+        value: DEFAULT_MASTERY_THRESHOLD.toString(),
         attrs: { min: '0', step: '0.5' }
     });
 
@@ -1013,18 +1027,6 @@ function createConfigurationPanel() {
         }
     });
 
-    const defaultRatings = [
-        { description: "Exemplary", points: 4 },
-        { description: "Beyond Target", points: 3.5 },
-        { description: "Target", points: 3 },
-        { description: "Approaching Target", points: 2.5 },
-        { description: "Developing", points: 2 },
-        { description: "Beginning", points: 1.5 },
-        { description: "Needs Partial Support", points: 1 },
-        { description: "Needs Full Support", points: 0.5 },
-        { description: "No Evidence", points: 0 }
-    ];
-
     const ratingsTextarea = createElement('textarea', {
         attrs: { rows: '6', spellcheck: 'false' },
         style: {
@@ -1036,7 +1038,7 @@ function createConfigurationPanel() {
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
         }
     });
-    ratingsTextarea.value = JSON.stringify(defaultRatings, null, 2);
+    ratingsTextarea.value = JSON.stringify(DEFAULT_OUTCOME_AND_RUBRIC_RATINGS, null, 2);
 
     ratingsSection.appendChild(ratingsTitle);
     ratingsSection.appendChild(ratingsTextarea);

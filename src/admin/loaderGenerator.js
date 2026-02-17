@@ -15,6 +15,29 @@
 
 import { logger } from '../utils/logger.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
+import {
+    DEFAULT_CHANNEL,
+    DEFAULT_VERSION,
+    DEFAULT_VERSION_TRACK,
+    DEFAULT_SOURCE,
+    DEFAULT_ENABLE_STUDENT_GRADE_CUSTOMIZATION,
+    DEFAULT_ENABLE_GRADE_OVERRIDE,
+    DEFAULT_ENFORCE_COURSE_OVERRIDE,
+    DEFAULT_ENFORCE_COURSE_GRADING_SCHEME,
+    DEFAULT_UPDATE_AVG_BUTTON_LABEL,
+    DEFAULT_AVG_OUTCOME_NAME,
+    DEFAULT_AVG_ASSIGNMENT_NAME,
+    DEFAULT_AVG_RUBRIC_NAME,
+    DEFAULT_MAX_POINTS,
+    DEFAULT_MASTERY_THRESHOLD,
+    DEFAULT_OUTCOME_AND_RUBRIC_RATINGS,
+    DEFAULT_EXCLUDED_OUTCOME_KEYWORDS,
+    DEFAULT_GRADING_SCHEME_ID,
+    DEFAULT_GRADING_SCHEME,
+    DEFAULT_GRADING_TYPE,
+    DEFAULT_ENABLE_ACCOUNT_FILTER,
+    DEFAULT_ALLOWED_ACCOUNT_IDS
+} from './data/defaultConfigConstants.js';
 
 // Sentinel markers for all sections
 const A_BEGIN = '/* ========== BEGIN SECTION A: EXTERNAL LOADER ========== */';
@@ -56,37 +79,27 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  */
 export function buildCGManagedBlock({
     accountId,
-    channel = 'prod',
-    version = 'v1.0.3',
-    versionTrack = null,
-    source = 'github_release',
-    enableStudentGradeCustomization = true,
-    enableGradeOverride = true,
-    enforceCourseOverride = false,
-    enforceCourseGradingScheme = false,
-    updateAvgButtonLabel = 'Update Current Score',
-    avgOutcomeName = 'Current Score',
-    avgAssignmentName = 'Current Score Assignment',
-    avgRubricName = 'Current Score Rubric',
-    defaultMaxPoints = 4,
-    defaultMasteryThreshold = 3,
-    outcomeAndRubricRatings = [
-        { description: "Exemplary", points: 4 },
-        { description: "Beyond Target", points: 3.5 },
-        { description: "Target", points: 3 },
-        { description: "Approaching Target", points: 2.5 },
-        { description: "Developing", points: 2 },
-        { description: "Beginning", points: 1.5 },
-        { description: "Needs Partial Support", points: 1 },
-        { description: "Needs Full Support", points: 0.5 },
-        { description: "No Evidence", points: 0 }
-    ],
-    excludedOutcomeKeywords = ["Homework Completion"],
-    defaultGradingSchemeId = null,
-    defaultGradingScheme = null,
-    defaultGradingType = 'points',
-    enableAccountFilter = false,
-    allowedAccountIds = []
+    channel = DEFAULT_CHANNEL,
+    version = DEFAULT_VERSION,
+    versionTrack = DEFAULT_VERSION_TRACK,
+    source = DEFAULT_SOURCE,
+    enableStudentGradeCustomization = DEFAULT_ENABLE_STUDENT_GRADE_CUSTOMIZATION,
+    enableGradeOverride = DEFAULT_ENABLE_GRADE_OVERRIDE,
+    enforceCourseOverride = DEFAULT_ENFORCE_COURSE_OVERRIDE,
+    enforceCourseGradingScheme = DEFAULT_ENFORCE_COURSE_GRADING_SCHEME,
+    updateAvgButtonLabel = DEFAULT_UPDATE_AVG_BUTTON_LABEL,
+    avgOutcomeName = DEFAULT_AVG_OUTCOME_NAME,
+    avgAssignmentName = DEFAULT_AVG_ASSIGNMENT_NAME,
+    avgRubricName = DEFAULT_AVG_RUBRIC_NAME,
+    defaultMaxPoints = DEFAULT_MAX_POINTS,
+    defaultMasteryThreshold = DEFAULT_MASTERY_THRESHOLD,
+    outcomeAndRubricRatings = DEFAULT_OUTCOME_AND_RUBRIC_RATINGS,
+    excludedOutcomeKeywords = DEFAULT_EXCLUDED_OUTCOME_KEYWORDS,
+    defaultGradingSchemeId = DEFAULT_GRADING_SCHEME_ID,
+    defaultGradingScheme = DEFAULT_GRADING_SCHEME,
+    defaultGradingType = DEFAULT_GRADING_TYPE,
+    enableAccountFilter = DEFAULT_ENABLE_ACCOUNT_FILTER,
+    allowedAccountIds = DEFAULT_ALLOWED_ACCOUNT_IDS
 }) {
     logger.debug('[LoaderGenerator] Building managed config block (Section B)', {
         accountId,
