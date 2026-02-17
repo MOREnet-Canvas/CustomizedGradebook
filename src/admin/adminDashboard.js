@@ -19,13 +19,13 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { 
-    isThemeEditorPage, 
-    isAdminDashboardPage, 
-    getAccountId 
+import {
+    isThemeEditorPage,
+    isAdminDashboardPage,
+    getAccountId
 } from './pageDetection.js';
 import { injectThemeEditorButton } from './themeEditorInjection.js';
-import { renderAdminDashboardPage } from './dashboardRenderer.js';
+import { renderAdminDashboard } from './dashboardShell.js';
 
 /**
  * Initialize admin dashboard module
@@ -41,7 +41,7 @@ export function initAdminDashboard() {
     // Virtual admin dashboard page
     if (isAdminDashboardPage()) {
         logger.info('[AdminDashboard] Rendering virtual admin dashboard page');
-        renderAdminDashboardPage();
+        renderAdminDashboard();
         return;
     }
 
@@ -74,4 +74,3 @@ export function initAdminDashboard() {
     // Not a relevant page
     logger.trace('[AdminDashboard] Not on Theme Editor or Admin Dashboard page, skipping');
 }
-
