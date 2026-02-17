@@ -27,6 +27,16 @@ import { renderAccountSettingsPanel } from './accountSettingsPanel.js';
 import { renderAccountFilterPanel } from './accountFilterPanel.js';
 import { renderThemeCssEditorPanel } from './themeCssEditorPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
+import {
+    createBreadcrumbs,
+    createGridRow,
+    createButton,
+    createDropdown,
+    createSuperToggle,
+    createContentBox
+} from './canvasFormHelpers.js';
+import {renderHeader} from "./newHeader.js";
+
 
 /**
  * Render the Admin Dashboard
@@ -137,34 +147,45 @@ function buildLayoutStructure() {
  *
  * @param {HTMLElement} container - Container element
  */
-function renderHeader(container) {
-    const header = createElement('h1', {
-        text: 'Customized Gradebook – Admin Dashboard'
-    });
 
-    const tagline = createElement('div', {
-        text: 'by MOREnet',
-        style: {
-            fontSize: '16px',
-            color: '#888',
-            marginTop: '-8px',
-            marginBottom: '12px',
-            fontWeight: '400'
-        }
-    });
+renderHeader(innerWrapper);
 
-    const accountInfo = createElement('p', {
-        html: `Account ID: <strong>${getAccountId() || 'unknown'}</strong>`,
-        style: {
-            color: '#666',
-            marginTop: '6px'
-        }
-    });
+// function renderHeader(container) {
+//     const header = createElement('h1', {
+//         text: 'Customized Gradebook – Release and Configuration Manager'
+//     });
+//
+//     const tagline = createElement('div', {
+//         text: 'by MOREnet',
+//         style: {
+//             fontSize: '16px',
+//             color: '#888',
+//             marginTop: '-8px',
+//             marginBottom: '12px',
+//             fontWeight: '400'
+//         }
+//     });
+//
+//     const accountInfo = createElement('p', {
+//         html: `Account ID: <strong>${getAccountId() || 'unknown'}</strong>`,
+//         style: {
+//             color: '#666',
+//             marginTop: '6px'
+//         }
+//     });
+//
+//     container.appendChild(header);
+//     container.appendChild(tagline);
+//     container.appendChild(accountInfo);
+// }
 
-    container.appendChild(header);
-    container.appendChild(tagline);
-    container.appendChild(accountInfo);
-}
+
+
+
+
+
+
+
 
 /**
  * Render all dashboard panels
