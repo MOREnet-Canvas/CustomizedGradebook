@@ -59,6 +59,7 @@ export async function setOverrideScoreGQL(enrollmentId, overrideScore, apiClient
 /**
  * Get all enrollment IDs for a course
  * Fetches and caches all enrollments if not already cached
+ * Uses pagination to handle courses with >100 students
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<Map<string, string>>} Map of userId -> enrollmentId
@@ -72,21 +73,19 @@ export async function getAllEnrollmentIds(courseId, apiClient) {
         return __enrollmentMapCache.get(courseKey);
     }
 
-    // Build the map (paginated)
-    const map = new Map();
-    let url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment&per_page=100`;
+    // Fetch all enrollments with pagination
+    const url = `/api/v1/courses/${courseKey}/enrollments?type[]=StudentEnrollment`;
+    const enrollments = await apiClient.getAllPages(url, {}, "getAllEnrollmentIds");
 
-    while (url) {
-        const data = await apiClient.get(url, {}, "getAllEnrollmentIds");
-        for (const e of data) {
-            if (e?.user_id && e?.id) map.set(String(e.user_id), String(e.id));
+    // Build the map
+    const map = new Map();
+    for (const e of enrollments) {
+        if (e?.user_id && e?.id) {
+            map.set(String(e.user_id), String(e.id));
         }
-        // pagination - Note: apiClient.get returns parsed JSON, not Response object
-        // Pagination would need to be handled differently with CanvasApiClient
-        // For now, relying on per_page=100 to get most enrollments in one request
-        // TODO: Implement proper pagination support in CanvasApiClient if needed
-        url = null;
     }
+
+    logger.debug(`[getAllEnrollmentIds] Fetched ${map.size} enrollment IDs for course ${courseKey}`);
 
     __enrollmentMapCache.set(courseKey, map);
     return map;
@@ -132,4 +131,3 @@ export async function queueOverride(courseId, userId, average, apiClient) {
         logger.warn(`[override/concurrent] failed for user ${userId}:`, e?.message || e);
     }
 }
-
