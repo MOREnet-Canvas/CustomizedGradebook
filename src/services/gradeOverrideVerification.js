@@ -48,6 +48,7 @@ export async function enableCourseOverride(courseId, apiClient) {
 
 /**
  * Fetch current override grades from Canvas
+ * Note: This endpoint returns an object (not an array), so pagination is handled automatically
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<Map<string, number>>} Map of userId -> percentage (keys are userIds, NOT enrollmentIds)
@@ -59,7 +60,8 @@ export async function fetchOverrideGrades(courseId, apiClient) {
     }
 
     try {
-        const response = await apiClient.get(
+        // Use getAllPages to handle pagination (though this endpoint returns an object, not array)
+        const response = await apiClient.getAllPages(
             `/courses/${courseId}/gradebook/final_grade_overrides`,
             {},
             "fetchOverrideGrades"
@@ -162,4 +164,3 @@ export async function verifyOverrideScores(courseId, averages, enrollmentMap, ap
         throw error;
     }
 }
-
