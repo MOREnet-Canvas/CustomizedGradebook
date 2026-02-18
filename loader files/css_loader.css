@@ -285,6 +285,28 @@
     display: flex;
     flex-direction: column;
 }
+.cg-summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+}
+
+.cg-summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.cg-summary-label {
+    color: #6b7785;
+}
+
+.cg-summary-value {
+    font-weight: 600;
+    color: #2d3b45;
+}
+
 
 
 

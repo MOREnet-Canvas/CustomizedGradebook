@@ -27,6 +27,8 @@ import { renderAccountSettingsPanel } from './accountSettingsPanel.js';
 import { renderAccountFilterPanel } from './accountFilterPanel.js';
 import { renderThemeCssEditorPanel } from './themeCssEditorPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
+import { renderSummaryPanel } from './summaryPanel.js';
+
 import {
     createBreadcrumbs,
     createGridRow,
@@ -202,6 +204,8 @@ function buildLayoutStructure() {
  */
 function renderPanels(container, ctx) {
     logger.debug('[DashboardShell] Rendering panels...');
+    // Panel 0: Summary
+    renderSummaryPanel(container, ctx);
 
     // Panel 1: Theme Status
     logger.debug('[DashboardShell] Rendering theme status panels...');
