@@ -8,7 +8,7 @@ import {
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
 export function renderSummaryPanel(container, ctx) {
-    const { panel, body } = createCollapsiblePanel("Summary", true);
+    const { panel, body } = createCollapsiblePanel("Summary", false);
 
     const accountId = getAccountId();
     const jsUrl = getInstalledThemeJsUrl();
@@ -191,7 +191,7 @@ function formatDefaultGradingScheme(config) {
 
     const title = scheme?.title || scheme?.name || "Unknown";
 
-    return `${id} — ${title}`;
+    return `${title} (ID:${id})`;
 }
 
 /* ---------------------------
@@ -205,23 +205,26 @@ function formatAccountFilter(config) {
         : [];
 
     if (!enabled) return "Off (runs on all accounts)";
-    if (!ids.length) return "On (no accounts selected)";
 
     const cacheMap = getAccountsCacheMap();
+    const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
 
-    const first3 = ids.slice(0, 3).map(id => {
-        const acct = cacheMap?.get(String(id));
-        return acct?.name
-            ? `${acct.name} (ID: ${id})`
-            : `ID: ${id}`;
-    });
+    if (!ids.length) return "On (no accounts selected)";
 
-    const more = ids.length > 3
-        ? ` +${ids.length - 3} more`
-        : "";
+    const rootId = ids[0];
+    const rootName = cacheMap?.get(String(rootId))?.name || `ID: ${rootId}`;
 
-    return `On — ${first3.join(" | ")}${more}`;
+    const subCount = Math.max(0, ids.length - 1);
+    const notIncluded = Math.max(0, allAccounts.length - ids.length);
+
+    return `
+        On — ${rootName} (ID: ${rootId})
+        · ${subCount} sub-account${subCount === 1 ? "" : "s"} selected
+        · ${notIncluded} account${notIncluded === 1 ? "" : "s"} not included
+    `;
 }
+
+
 
 /* ---------------------------
    Account Cache Helpers
