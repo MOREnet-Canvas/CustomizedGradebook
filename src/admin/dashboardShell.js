@@ -207,9 +207,9 @@ function renderPanels(container, ctx) {
     // Panel 0: Summary
     renderSummaryPanel(container, ctx);
 
-    // Panel 1: Theme Status
-    logger.debug('[DashboardShell] Rendering theme status panels...');
-    renderThemeStatusPanels(container);
+    // // Panel 1: Theme Status
+    // logger.debug('[DashboardShell] Rendering theme status panels...');
+    // renderThemeStatusPanels(container);
 
     // Panel 2: Account Settings (Feature Flags & Grading Schemes)
     logger.debug('[DashboardShell] Rendering account settings panel...');
