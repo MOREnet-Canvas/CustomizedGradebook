@@ -65,18 +65,17 @@ async function buildInstalledAccountCell(accountId) {
    Theme JS / CSS
 ---------------------------- */
 
-function formatThemeAsset(url, label, config) {
+function formatThemeAsset(url, label) {
     if (!url) return "Not installed";
+
+    const runtimeRelease = getReleaseInfoFromRuntime();
 
     const file = url.split("?")[0].split("/").pop();
     const dateMatch = file?.match(/\d{4}-\d{2}-\d{2}/);
     const date = dateMatch ? dateMatch[0] : null;
 
-    const channel = config.channel || config.CHANNEL || null;
-    const version = config.version || config.VERSION || config.CG_VERSION || null;
-
     const metaLines = [
-        [channel, version].filter(Boolean).join(" · "),
+        runtimeRelease,
         date ? `Build: ${date}` : null,
         file ? `File: ${file}` : null
     ].filter(Boolean);
@@ -98,6 +97,7 @@ function formatThemeAsset(url, label, config) {
         `
     };
 }
+
 
 /* ---------------------------
    Grading Scheme
@@ -176,6 +176,23 @@ async function fetchAccountName(accountId) {
         return null;
     }
 }
+function getReleaseInfoFromRuntime() {
+    const release = window.CG_MANAGED?.release;
+    if (!release) return null;
+
+    const { channel, version, versionTrack } = release;
+
+    if (channel === "auto-patch" && versionTrack) {
+        return `Auto-Patch (${versionTrack})`;
+    }
+
+    if (channel && version) {
+        return `${channel.toUpperCase()} · ${version}`;
+    }
+
+    return null;
+}
+
 
 /* ---------------------------
    Utility
