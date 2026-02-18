@@ -7,21 +7,20 @@ import {
 
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
-export async function renderSummaryPanel(container, ctx) {
+export function renderSummaryPanel(container, ctx) {
     const { panel, body } = createCollapsiblePanel("Summary", true);
 
     const accountId = getAccountId();
     const jsUrl = getInstalledThemeJsUrl();
     const cssUrl = getInstalledThemeCssUrl();
 
-    const config = ctx?.getConfig?.() || window.CG_MANAGED?.config || {};
-
+    // Build rows synchronously with placeholders
     const rows = [
-        ["Installed on account", await buildInstalledAccountCell(accountId)],
-        ["Theme JS", formatThemeAsset(jsUrl, "Theme JavaScript", config)],
-        ["Theme CSS", formatThemeAsset(cssUrl, "Theme CSS", config)],
-        ["Default grading scheme", formatDefaultGradingScheme(config)],
-        ["Account filter", formatAccountFilter(config)],
+        ["Installed on account", installedAccountPlaceholder(accountId)],
+        ["Theme JS", formatThemeAsset(jsUrl, "Theme JavaScript")],
+        ["Theme CSS", formatThemeAsset(cssUrl, "Theme CSS")],
+        ["Default grading scheme", formatDefaultGradingScheme(getConfigNow(ctx))],
+        ["Account filter", formatAccountFilter(getConfigNow(ctx))],
     ];
 
     const { table } = createTable({
@@ -31,12 +30,91 @@ export async function renderSummaryPanel(container, ctx) {
         striped: true
     });
 
-    // Reduce spacing without custom CSS
     table.classList.add("ic-Table--condensed");
 
     body.appendChild(table);
     container.appendChild(panel);
+
+    // Hydrate async bits AFTER render so ordering never changes
+    void hydrateInstalledAccountCell(accountId);
+    void hydrateDynamicConfigCells(ctx);
 }
+
+/* ---------------------------
+   Config access (safe)
+---------------------------- */
+
+function getConfigNow(ctx) {
+    return ctx?.getConfig?.() || window.CG_MANAGED?.config || {};
+}
+
+/* ---------------------------
+   Installed account hydration
+---------------------------- */
+
+function installedAccountPlaceholder(accountId) {
+    if (!accountId) return "Unknown";
+
+    // If cache has name, show immediately
+    const cacheMap = getAccountsCacheMap();
+    const cached = cacheMap?.get(String(accountId));
+    if (cached?.name) {
+        return {
+            html: `
+              <div>
+                <strong>${escapeHtml(cached.name)}</strong> (ID: ${escapeHtml(accountId)})
+                <div style="margin-top:4px; color:#6b7785; font-size:12px;">
+                  This is the account where the theme script is installed.
+                </div>
+              </div>
+            `
+        };
+    }
+
+    // Otherwise placeholder + data hook for later update
+    return {
+        html: `
+          <div data-cg-installed-account>
+            <strong>ID: ${escapeHtml(accountId)}</strong>
+            <div style="margin-top:4px; color:#6b7785; font-size:12px;">
+              Loading account name…
+            </div>
+          </div>
+        `
+    };
+}
+
+async function hydrateInstalledAccountCell(accountId) {
+    if (!accountId) return;
+
+    const el = document.querySelector("[data-cg-installed-account]");
+    if (!el) return; // already hydrated from cache
+
+    const cacheMap = getAccountsCacheMap();
+    const cached = cacheMap?.get(String(accountId));
+    const name = cached?.name || await fetchAccountName(accountId) || "Unknown";
+
+    el.innerHTML = `
+      <strong>${escapeHtml(name)}</strong> (ID: ${escapeHtml(accountId)})
+      <div style="margin-top:4px; color:#6b7785; font-size:12px;">
+        This is the account where the theme script is installed.
+      </div>
+    `;
+}
+
+/* ---------------------------
+   Dynamic config hydration
+   (optional but recommended)
+---------------------------- */
+
+function hydrateDynamicConfigCells(ctx) {
+    // If config isn't ready yet at first render, refresh those cells later.
+    // You can call this again when settings change or after loader generation.
+
+    // If you want, we can add data hooks to those cells too.
+    // For now, simplest is: no-op, or re-render table later.
+}
+
 
 /* ---------------------------
    Installed Account
@@ -68,14 +146,14 @@ async function buildInstalledAccountCell(accountId) {
 function formatThemeAsset(url, label) {
     if (!url) return "Not installed";
 
-    const runtimeRelease = getReleaseInfoFromRuntime();
-
     const file = url.split("?")[0].split("/").pop();
     const dateMatch = file?.match(/\d{4}-\d{2}-\d{2}/);
     const date = dateMatch ? dateMatch[0] : null;
 
+    const isJs = file?.toLowerCase().endsWith(".js");
+
     const metaLines = [
-        runtimeRelease,
+        isJs ? getFriendlyChannelLabel() : null,
         date ? `Build: ${date}` : null,
         file ? `File: ${file}` : null
     ].filter(Boolean);
@@ -97,6 +175,8 @@ function formatThemeAsset(url, label) {
         `
     };
 }
+
+
 
 
 /* ---------------------------
@@ -140,7 +220,7 @@ function formatAccountFilter(config) {
         ? ` +${ids.length - 3} more`
         : "";
 
-    return `On — ${first3.join(", ")}${more}`;
+    return `On — ${first3.join(" | ")}${more}`;
 }
 
 /* ---------------------------
@@ -190,6 +270,16 @@ function getReleaseInfoFromRuntime() {
         return `${channel.toUpperCase()} · ${version}`;
     }
 
+    return null;
+}
+
+function getFriendlyChannelLabel() {
+    const ch = window.CG_MANAGED?.release?.channel;
+    if (ch === "dev") return "Development";
+    if (ch === "prod" || ch === "production") return "Production";
+    if (ch === "auto-patch") {
+        return "Auto-patch (Large version updates will still need to be manually reloaded)";
+    }
     return null;
 }
 
