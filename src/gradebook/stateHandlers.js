@@ -403,31 +403,48 @@ export async function handleVerifyingOverrides(stateMachine) {
     }
 
     // Verify override scores with retry logic
+    // Option A: Reset counter when mismatches decrease
     const maxRetries = 3;
     const retryDelayMs = 2000; // 2 seconds between retries
     let overrideMismatches = [];
+    let previousMismatchCount = Infinity;
+    let attempt = 1;
 
     try {
         const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
 
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        while (attempt <= maxRetries) {
             banner.soft(`Verifying grade overrides... (attempt ${attempt}/${maxRetries})`);
             logger.debug(`Override verification attempt ${attempt}/${maxRetries}...`);
 
             overrideMismatches = await verifyOverrideScores(courseId, averages, enrollmentMap, apiClient);
+            const currentMismatchCount = overrideMismatches.length;
 
-            if (overrideMismatches.length === 0) {
+            if (currentMismatchCount === 0) {
                 logger.info(`All override scores verified successfully on attempt ${attempt}`);
                 break;
             }
 
-            // If mismatches found and not the last attempt, wait and retry
+            // Check if mismatches decreased (progress made)
+            if (currentMismatchCount < previousMismatchCount) {
+                logger.info(`Mismatches decreased from ${previousMismatchCount} to ${currentMismatchCount}, resetting retry counter`);
+                previousMismatchCount = currentMismatchCount;
+                attempt = 1; // Reset counter - we're making progress
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                continue;
+            }
+
+            // No progress made
+            previousMismatchCount = currentMismatchCount;
+
+            // If not the last attempt, wait and retry
             if (attempt < maxRetries) {
-                logger.warn(`Found ${overrideMismatches.length} override score mismatches on attempt ${attempt}, retrying in ${retryDelayMs/1000}s...`);
+                logger.warn(`Found ${currentMismatchCount} override score mismatches on attempt ${attempt}, retrying in ${retryDelayMs/1000}s...`);
+                attempt++;
                 await new Promise(resolve => setTimeout(resolve, retryDelayMs));
             } else {
                 // Last attempt - log final mismatches
-                logger.warn(`Found ${overrideMismatches.length} override score mismatches after ${maxRetries} attempts`);
+                logger.warn(`Found ${currentMismatchCount} override score mismatches after ${maxRetries} attempts with no progress`);
                 logger.warn('Final mismatches:', overrideMismatches.map(m => ({
                     userId: m.userId,
                     expected: m.expected,
@@ -435,10 +452,19 @@ export async function handleVerifyingOverrides(stateMachine) {
                 })));
 
                 // If all verifications failed and ENFORCE_COURSE_OVERRIDE is false, likely course setting not enabled
-                if (overrideMismatches.length === averages.length && !ENFORCE_COURSE_OVERRIDE) {
+                if (currentMismatchCount === averages.length && !ENFORCE_COURSE_OVERRIDE) {
                     stateMachine.updateContext({ overridesNotEnabled: true });
                 }
+
+                // Store mismatch count for completion message
+                stateMachine.updateContext({ overrideMismatchCount: currentMismatchCount });
+                break;
             }
+        }
+
+        // Store final mismatch count in context (even if zero)
+        if (overrideMismatches.length > 0) {
+            stateMachine.updateContext({ overrideMismatchCount: overrideMismatches.length });
         }
     } catch (error) {
         logger.warn('Override verification failed, continuing anyway:', error);
@@ -454,7 +480,7 @@ export async function handleVerifyingOverrides(stateMachine) {
  * Shows success message and cleans up
  */
 export async function handleComplete(stateMachine) {
-    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled } = stateMachine.getContext();
+    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled, overrideMismatchCount } = stateMachine.getContext();
 
     const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
@@ -480,7 +506,14 @@ export async function handleComplete(stateMachine) {
     }
 
     // Normal completion with updates
-    banner.setText(`${numberOfUpdates} student ${updateTarget} updated successfully! (elapsed time: ${elapsedTime}s)`);
+    let bannerText = `${numberOfUpdates} student ${updateTarget} updated successfully! (elapsed time: ${elapsedTime}s)`;
+
+    // Add warning to banner if there are override mismatches
+    if (overrideMismatchCount && overrideMismatchCount > 0) {
+        bannerText += ` ⚠️ ${overrideMismatchCount} override verification mismatches`;
+    }
+
+    banner.setText(bannerText);
 
     // Save completion data
     localStorage.setItem(`duration_${courseId}`, elapsedTime);
@@ -492,6 +525,11 @@ export async function handleComplete(stateMachine) {
     // Add warning if override grades were not enabled in the course
     if (overridesNotEnabled && ENABLE_GRADE_OVERRIDE && !ENFORCE_COURSE_OVERRIDE) {
         completionMessage += '\n\nOverride grades not enabled for this course';
+    }
+
+    // Add warning if there are override verification mismatches
+    if (overrideMismatchCount && overrideMismatchCount > 0) {
+        completionMessage += `\n\n⚠️ Update complete but ${overrideMismatchCount} students may not have correct override grades. Please try running again.`;
     }
 
     alert(completionMessage);

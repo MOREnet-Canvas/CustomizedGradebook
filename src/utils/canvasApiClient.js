@@ -57,6 +57,57 @@ export class CanvasApiClient {
     }
 
     /**
+     * Make a GET request and follow pagination to retrieve all pages
+     * Automatically follows Link headers with rel="next" to fetch all results
+     * @param {string} url - API endpoint URL (e.g., '/api/v1/courses/123/enrollments')
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<any>} All results combined (array or object depending on endpoint)
+     */
+    async getAllPages(url, options = {}, context = 'getAllPages') {
+        // Add per_page=100 to maximize page size
+        if (!url.includes('per_page=')) {
+            const separator = url.includes('?') ? '&' : '?';
+            url = `${url}${separator}per_page=100`;
+        }
+
+        const allData = [];
+        let currentUrl = url;
+        let pageCount = 0;
+
+        while (currentUrl) {
+            pageCount++;
+            logger.trace(`[${context}] Fetching page ${pageCount}: ${currentUrl}`);
+
+            // Make request and get response object (not parsed yet)
+            const response = await this.#makeRequestWithResponse(currentUrl, 'GET', null, options, context);
+
+            // Parse JSON from response
+            const data = await safeJsonParse(response, context);
+
+            // Handle both array and object responses
+            if (Array.isArray(data)) {
+                allData.push(...data);
+                logger.trace(`[${context}] Page ${pageCount} returned ${data.length} items (total: ${allData.length})`);
+            } else {
+                // For endpoints that return objects (like final_grade_overrides), return immediately
+                logger.trace(`[${context}] Endpoint returned object (not array), returning single response`);
+                return data;
+            }
+
+            // Parse Link header for next page
+            const linkHeader = response.headers.get('Link');
+            currentUrl = this.#parseLinkHeader(linkHeader);
+
+            if (!currentUrl) {
+                logger.trace(`[${context}] No more pages, pagination complete (${pageCount} pages, ${allData.length} total items)`);
+            }
+        }
+
+        return allData;
+    }
+
+    /**
      * Make a POST request to the Canvas API
      * @param {string} url - API endpoint URL
      * @param {Object} data - Request body data
@@ -186,5 +237,74 @@ export class CanvasApiClient {
 
         // Parse and return JSON response
         return await safeJsonParse(response, context);
+    }
+
+    /**
+     * Make an HTTP request and return the Response object (for pagination)
+     * @private
+     * @param {string} url - API endpoint URL
+     * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
+     * @param {Object|null} data - Request body data (for POST/PUT)
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging
+     * @returns {Promise<Response>} Response object with headers intact
+     */
+    async #makeRequestWithResponse(url, method, data, options = {}, context = 'request') {
+        // Build headers with CSRF token
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers,
+            'X-CSRF-Token': this.csrfToken
+        };
+
+        // Build request body
+        let body = null;
+        if (data) {
+            const contentType = headers['Content-Type'] || 'application/json';
+            const isJson = contentType.includes('application/json');
+
+            if (isJson) {
+                if (!data.authenticity_token) {
+                    data = { ...data, authenticity_token: this.csrfToken };
+                }
+                body = JSON.stringify(data);
+            } else {
+                body = data;
+            }
+        }
+
+        // Extract headers from options to prevent them from being spread again
+        const { headers: _optionsHeaders, ...restOptions } = options;
+
+        // Make request using safeFetch for consistent error handling
+        const response = await safeFetch(
+            url,
+            {
+                method,
+                credentials: 'same-origin',
+                headers,
+                body,
+                ...restOptions
+            },
+            context
+        );
+
+        // Return Response object (not parsed) so caller can access headers
+        return response;
+    }
+
+    /**
+     * Parse Link header to extract next page URL
+     * @private
+     * @param {string|null} linkHeader - Link header value from Canvas API response
+     * @returns {string|null} Next page URL or null if no next page
+     */
+    #parseLinkHeader(linkHeader) {
+        if (!linkHeader) return null;
+
+        // Canvas Link header format: <https://canvas.example.com/api/v1/...>; rel="next", <...>; rel="last"
+        // We want to extract the URL with rel="next"
+        const nextLinkMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        return nextLinkMatch ? nextLinkMatch[1] : null;
     }
 }
