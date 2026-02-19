@@ -179,7 +179,7 @@ window.CG_MANAGED.config = {
                         "points": 0.5
                 },
                 {
-                        "description": "No Evidence",
+                        "description": "Insufficient Evidence",
                         "points": 0
                 }
         ],

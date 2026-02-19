@@ -46,7 +46,7 @@
             { description: "Beginning", points: 1.5 },
             { description: "Needs Partial Support", points: 1 },
             { description: "Needs Full Support", points: 0.5 },
-            { description: "No Evidence", points: 0 }
+            { description: "Insufficient Evidence", points: 0 }
         ],
 
         // Outcome filtering

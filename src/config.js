@@ -84,7 +84,7 @@ export const DEFAULT_MAX_POINTS = window.CG_CONFIG?.DEFAULT_MAX_POINTS ?? 4;
 export const DEFAULT_MASTERY_THRESHOLD = window.CG_CONFIG?.DEFAULT_MASTERY_THRESHOLD ?? 3;
 
 // Rating scale for outcomes and rubrics
-// Default: 9-level scale from 0 (No Evidence) to 4 (Exemplary)
+// Default: 9-level scale from 0 (Insufficient Evidence) to 4 (Exemplary)
 const defaultRatings = [
     { description: "Exemplary", points: 4 },
     { description: "Beyond Target", points: 3.5 },
@@ -94,7 +94,7 @@ const defaultRatings = [
     { description: "Beginning", points: 1.5 },
     { description: "Needs Partial Support", points: 1 },
     { description: "Needs Full Support", points: 0.5 },
-    { description: "No Evidence", points: 0 }
+    { description: "Insufficient Evidence", points: 0 }
 ];
 export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_RATINGS ?? defaultRatings;
 

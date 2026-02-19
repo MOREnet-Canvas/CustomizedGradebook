@@ -42,7 +42,7 @@ export const DEFAULT_MASTERY_THRESHOLD = 3;
 
 /**
  * Rating scale for outcomes and rubrics
- * Default: 9-level scale from 0 (No Evidence) to 4 (Exemplary)
+ * Default: 9-level scale from 0 (Insufficient Evidence) to 4 (Exemplary)
  */
 export const DEFAULT_OUTCOME_AND_RUBRIC_RATINGS = [
     { description: "Exemplary", points: 4 },
@@ -53,7 +53,7 @@ export const DEFAULT_OUTCOME_AND_RUBRIC_RATINGS = [
     { description: "Beginning", points: 1.5 },
     { description: "Needs Partial Support", points: 1 },
     { description: "Needs Full Support", points: 0.5 },
-    { description: "No Evidence", points: 0 }
+    { description: "Insufficient Evidence", points: 0 }
 ];
 
 /**
@@ -73,4 +73,3 @@ export const DEFAULT_GRADING_TYPE = 'points';
  */
 export const DEFAULT_ENABLE_ACCOUNT_FILTER = false;
 export const DEFAULT_ALLOWED_ACCOUNT_IDS = [];
-
