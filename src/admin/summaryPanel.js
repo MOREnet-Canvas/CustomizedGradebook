@@ -37,12 +37,15 @@ export function renderSummaryPanel(container, ctx) {
     container.appendChild(panel);
 
     // Hydrate async bits AFTER render so ordering never changes
-    void hydrateInstalledAccountCell(accountId);
-    logger.debug('[SummaryPanel] Hydrating installed account cell...');
-    void hydrateAccountFilterCell(ctx);
-    logger.debug('[SummaryPanel] Hydrating account filter cell...');
-    void hydrateDynamicConfigCells(ctx);
-    logger.debug('[SummaryPanel] Hydrating dynamic config cells...');
+    // Use setTimeout to ensure DOM is fully updated before hydration
+    setTimeout(() => {
+        logger.debug('[SummaryPanel] Hydrating installed account cell...');
+        void hydrateInstalledAccountCell(accountId);
+        logger.debug('[SummaryPanel] Hydrating account filter cell...');
+        void hydrateAccountFilterCell(ctx);
+        logger.debug('[SummaryPanel] Hydrating dynamic config cells...');
+        void hydrateDynamicConfigCells(ctx);
+    }, 0);
 }
 
 /* ---------------------------
