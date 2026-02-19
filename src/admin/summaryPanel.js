@@ -109,19 +109,23 @@ async function hydrateInstalledAccountCell(accountId) {
 
 async function hydrateAccountFilterCell(ctx) {
     const el = document.querySelector("[data-cg-account-filter]");
-    if (!el) return; // already hydrated from cache
+    if (!el) return; // already hydrated
 
-    // Poll sessionStorage until cache is populated by Account Filter panel
+    // Poll until BOTH cache AND config are ready
     const maxAttempts = 40; // 40 attempts * 250ms = 10 seconds max wait
     const pollInterval = 250; // 250ms between checks
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const cacheMap = getAccountsCacheMap();
         const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
+        const cacheReady = cacheMap && allAccounts.length > 0;
 
-        if (cacheMap && allAccounts.length > 0) {
-            // Cache is ready, update the cell
-            const config = getConfigNow(ctx);
+        // Check if config is populated (Loader Generator has run)
+        const config = window.CG_MANAGED?.config || {};
+        const configReady = config.hasOwnProperty('ENABLE_ACCOUNT_FILTER');
+
+        // Wait for both cache and config to be ready
+        if (cacheReady && configReady) {
             const enabled = !!config.ENABLE_ACCOUNT_FILTER;
             const ids = Array.isArray(config.ALLOWED_ACCOUNT_IDS)
                 ? config.ALLOWED_ACCOUNT_IDS
@@ -155,9 +159,22 @@ async function hydrateAccountFilterCell(ctx) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
-    // Timeout - cache never populated
-    el.textContent = "Failed to load account information";
-    el.style.color = "#cf1322";
+    // Timeout - check what's missing
+    const cacheMap = getAccountsCacheMap();
+    const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
+    const cacheReady = cacheMap && allAccounts.length > 0;
+    const config = window.CG_MANAGED?.config || {};
+    const configReady = config.hasOwnProperty('ENABLE_ACCOUNT_FILTER');
+
+    if (cacheReady && !configReady) {
+        // Cache ready but config never populated - error
+        el.textContent = "Error: Configuration not loaded";
+        el.style.color = "#cf1322";
+    } else {
+        // Cache never populated
+        el.textContent = "Failed to load account information";
+        el.style.color = "#cf1322";
+    }
 }
 
 /* ---------------------------
@@ -257,40 +274,15 @@ function formatDefaultGradingScheme(config) {
 ---------------------------- */
 
 function formatAccountFilter(config) {
-    const enabled = !!config.ENABLE_ACCOUNT_FILTER;
-    const ids = Array.isArray(config.ALLOWED_ACCOUNT_IDS)
-        ? config.ALLOWED_ACCOUNT_IDS
-        : [];
-
-    if (!enabled) return "Off (runs on all accounts)";
-
-    const cacheMap = getAccountsCacheMap();
-    const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
-
-    // If cache is not ready yet, return placeholder
-    if (!cacheMap || allAccounts.length === 0) {
-        return {
-            html: `
-                <div data-cg-account-filter>
-                    Loading account information…
-                </div>
-            `
-        };
-    }
-
-    if (!ids.length) return "On (no accounts selected)";
-
-    const rootId = ids[0];
-    const rootName = cacheMap?.get(String(rootId))?.name || `ID: ${rootId}`;
-
-    const subCount = Math.max(0, ids.length - 1);
-    const notIncluded = Math.max(0, allAccounts.length - ids.length);
-
-    return `
-        On — ${rootName} (ID: ${rootId})
-        · ${subCount} sub-account${subCount === 1 ? "" : "s"} selected
-        · ${notIncluded} account${notIncluded === 1 ? "" : "s"} not included
-    `;
+    // Always return placeholder during initial render
+    // Config might not be populated yet (Loader Generator runs last)
+    return {
+        html: `
+            <div data-cg-account-filter>
+                Loading account information…
+            </div>
+        `
+    };
 }
 
 
