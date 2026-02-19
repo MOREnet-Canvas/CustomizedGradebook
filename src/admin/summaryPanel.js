@@ -116,7 +116,7 @@ async function hydrateAccountFilterCell(ctx) {
     if (!el) return; // already hydrated
 
     // Poll until BOTH cache AND config are ready
-    const maxAttempts = 40; // 40 attempts * 250ms = 10 seconds max wait
+    const maxAttempts = 120; // 120 attempts * 250ms = 30 seconds max wait
     const pollInterval = 250; // 250ms between checks
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
