@@ -113,7 +113,12 @@ async function hydrateInstalledAccountCell(accountId) {
 
 async function hydrateAccountFilterCell(ctx) {
     const el = document.querySelector("[data-cg-account-filter]");
-    if (!el) return; // already hydrated
+    if (!el) {
+        console.log("[SummaryPanel] Hydration: Element not found, returning early");
+        return; // already hydrated
+    }
+
+    console.log("[SummaryPanel] Hydration: Starting polling for cache and config");
 
     // Poll until BOTH cache AND config are ready
     const maxAttempts = 120; // 120 attempts * 250ms = 30 seconds max wait
@@ -128,8 +133,15 @@ async function hydrateAccountFilterCell(ctx) {
         const config = window.CG_MANAGED?.config || {};
         const configReady = config.hasOwnProperty('ENABLE_ACCOUNT_FILTER');
 
+        // Log every 10th attempt (every 2.5 seconds)
+        if (attempt % 10 === 0 || attempt === 1) {
+            console.log(`[SummaryPanel] Hydration attempt ${attempt}/${maxAttempts}: cache=${cacheReady} (${allAccounts.length} accounts), config=${configReady}`);
+        }
+
         // Wait for both cache and config to be ready
         if (cacheReady && configReady) {
+            console.log(`[SummaryPanel] Hydration: Both ready at attempt ${attempt}, updating element`);
+
             const enabled = !!config.ENABLE_ACCOUNT_FILTER;
             const ids = Array.isArray(config.ALLOWED_ACCOUNT_IDS)
                 ? config.ALLOWED_ACCOUNT_IDS
@@ -137,11 +149,13 @@ async function hydrateAccountFilterCell(ctx) {
 
             if (!enabled) {
                 el.textContent = "Off (runs on all accounts)";
+                console.log("[SummaryPanel] Hydration: Set to 'Off'");
                 return;
             }
 
             if (!ids.length) {
                 el.textContent = "On (no accounts selected)";
+                console.log("[SummaryPanel] Hydration: Set to 'On (no accounts selected)'");
                 return;
             }
 
@@ -156,6 +170,7 @@ async function hydrateAccountFilterCell(ctx) {
                 · ${subCount} sub-account${subCount === 1 ? "" : "s"} selected<br>
                 · ${notIncluded} account${notIncluded === 1 ? "" : "s"} not included
             `;
+            console.log(`[SummaryPanel] Hydration: Updated with root=${rootName}, sub=${subCount}, notIncluded=${notIncluded}`);
             return;
         }
 
@@ -164,20 +179,26 @@ async function hydrateAccountFilterCell(ctx) {
     }
 
     // Timeout - check what's missing
+    console.log("[SummaryPanel] Hydration: Timeout reached after 30 seconds");
     const cacheMap = getAccountsCacheMap();
     const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
     const cacheReady = cacheMap && allAccounts.length > 0;
     const config = window.CG_MANAGED?.config || {};
     const configReady = config.hasOwnProperty('ENABLE_ACCOUNT_FILTER');
 
+    console.log(`[SummaryPanel] Hydration timeout: cache=${cacheReady} (${allAccounts.length} accounts), config=${configReady}`);
+    console.log("[SummaryPanel] Config object:", config);
+
     if (cacheReady && !configReady) {
         // Cache ready but config never populated - error
         el.textContent = "Error: Configuration not loaded";
         el.style.color = "#cf1322";
+        console.log("[SummaryPanel] Hydration: Failed - config not loaded");
     } else {
         // Cache never populated
         el.textContent = "Failed to load account information";
         el.style.color = "#cf1322";
+        console.log("[SummaryPanel] Hydration: Failed - cache not loaded");
     }
 }
 
