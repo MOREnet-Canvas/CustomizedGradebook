@@ -4,6 +4,7 @@ import {
     getInstalledThemeJsUrl,
     getInstalledThemeCssUrl
 } from "./pageDetection.js";
+import {logger} from "../utils/logger.js";
 
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
@@ -37,11 +38,11 @@ export function renderSummaryPanel(container, ctx) {
 
     // Hydrate async bits AFTER render so ordering never changes
     void hydrateInstalledAccountCell(accountId);
-    logger.info('[SummaryPanel] Hydrating installed account cell...');
+    logger.debug('[SummaryPanel] Hydrating installed account cell...');
     void hydrateAccountFilterCell(ctx);
-    logger.info('[SummaryPanel] Hydrating account filter cell...');
+    logger.debug('[SummaryPanel] Hydrating account filter cell...');
     void hydrateDynamicConfigCells(ctx);
-    logger.info('[SummaryPanel] Hydrating dynamic config cells...');
+    logger.debug('[SummaryPanel] Hydrating dynamic config cells...');
 }
 
 /* ---------------------------
