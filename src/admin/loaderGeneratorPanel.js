@@ -15,7 +15,7 @@ import { createElement, escapeHtml, downloadText } from './domHelpers.js';
 import { fetchTextWithTimeout } from './fetchHelpers.js';
 import { buildCGManagedBlock, upsertCGBlockIntoLoader, validateLoaderOutput, extractSections } from './loaderGenerator.js';
 import { CG_LOADER_TEMPLATE } from './templates/cgLoaderTemplate.js';
-import { refreshGradingSchemesGridExternal, fetchGradingSchemes, renderGradingSchemesPanel } from './accountSettingsPanel.js';
+import { refreshGradingSchemesGridExternal, fetchGradingSchemes, renderGradingSchemesPanel } from './gradingSchemesPanel.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import {
     createCollapsiblePanel,
