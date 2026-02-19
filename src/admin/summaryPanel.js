@@ -37,6 +37,7 @@ export function renderSummaryPanel(container, ctx) {
 
     // Hydrate async bits AFTER render so ordering never changes
     void hydrateInstalledAccountCell(accountId);
+    void hydrateAccountFilterCell(ctx);
     void hydrateDynamicConfigCells(ctx);
 }
 
@@ -100,6 +101,63 @@ async function hydrateInstalledAccountCell(accountId) {
         This is the account where the theme script is installed.
       </div>
     `;
+}
+
+/* ---------------------------
+   Account Filter hydration
+---------------------------- */
+
+async function hydrateAccountFilterCell(ctx) {
+    const el = document.querySelector("[data-cg-account-filter]");
+    if (!el) return; // already hydrated from cache
+
+    // Poll sessionStorage until cache is populated by Account Filter panel
+    const maxAttempts = 40; // 40 attempts * 250ms = 10 seconds max wait
+    const pollInterval = 250; // 250ms between checks
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const cacheMap = getAccountsCacheMap();
+        const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
+
+        if (cacheMap && allAccounts.length > 0) {
+            // Cache is ready, update the cell
+            const config = getConfigNow(ctx);
+            const enabled = !!config.ENABLE_ACCOUNT_FILTER;
+            const ids = Array.isArray(config.ALLOWED_ACCOUNT_IDS)
+                ? config.ALLOWED_ACCOUNT_IDS
+                : [];
+
+            if (!enabled) {
+                el.textContent = "Off (runs on all accounts)";
+                return;
+            }
+
+            if (!ids.length) {
+                el.textContent = "On (no accounts selected)";
+                return;
+            }
+
+            const rootId = ids[0];
+            const rootName = cacheMap?.get(String(rootId))?.name || `ID: ${rootId}`;
+
+            const subCount = Math.max(0, ids.length - 1);
+            const notIncluded = Math.max(0, allAccounts.length - ids.length);
+
+            el.innerHTML = `
+                On — ${escapeHtml(rootName)} (ID: ${escapeHtml(rootId)})<br>
+                · ${subCount} sub-account${subCount === 1 ? "" : "s"} selected<br>
+                · ${notIncluded} account${notIncluded === 1 ? "" : "s"} not included
+            `;
+            return;
+        }
+
+        // Wait before next attempt
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    // Timeout - cache never populated
+    el.textContent = "Failed to load account information";
+    el.style.color = "#cf1322";
 }
 
 /* ---------------------------
@@ -208,6 +266,17 @@ function formatAccountFilter(config) {
 
     const cacheMap = getAccountsCacheMap();
     const allAccounts = cacheMap ? Array.from(cacheMap.values()) : [];
+
+    // If cache is not ready yet, return placeholder
+    if (!cacheMap || allAccounts.length === 0) {
+        return {
+            html: `
+                <div data-cg-account-filter>
+                    Loading account information…
+                </div>
+            `
+        };
+    }
 
     if (!ids.length) return "On (no accounts selected)";
 
