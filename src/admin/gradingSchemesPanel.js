@@ -506,6 +506,11 @@ function generateGradingSchemesHTML(schemes) {
                                         window.opener.refreshGradingSchemesGridExternal();
                                     }
 
+                                    // Trigger the configuration change notification
+                                    if (typeof window.opener.triggerConfigChangeNotification === 'function') {
+                                        window.opener.triggerConfigChangeNotification();
+                                    }
+
                                     alert('✓ Grading scheme deselected.\\n\\nThis change will be saved when you regenerate the loader in the Loader Generator panel.');
 
                                     // Close this window after successful deselection
@@ -530,6 +535,11 @@ function generateGradingSchemesHTML(schemes) {
                                     // Refresh the main panel's grading schemes grid
                                     if (typeof window.opener.refreshGradingSchemesGridExternal === 'function') {
                                         window.opener.refreshGradingSchemesGridExternal();
+                                    }
+
+                                    // Trigger the configuration change notification
+                                    if (typeof window.opener.triggerConfigChangeNotification === 'function') {
+                                        window.opener.triggerConfigChangeNotification();
                                     }
 
                                     alert('✓ Selected grading scheme: ' + schemeTitle + ' (ID: ' + schemeId + ')\\n\\nThis selection will be saved when you regenerate the loader in the Loader Generator panel.');
@@ -1786,5 +1796,6 @@ export function refreshGradingSchemesGridExternal() {
 if (!window.CG_ADMIN) window.CG_ADMIN = {};
 window.CG_ADMIN.openGradingSchemeEditor = openGradingSchemeEditor;
 
-// Expose refresh function globally so child windows can call it
+// Expose refresh and notification functions globally so child windows can call them
 window.refreshGradingSchemesGridExternal = refreshGradingSchemesGridExternal;
+window.triggerConfigChangeNotification = triggerConfigChangeNotification;
