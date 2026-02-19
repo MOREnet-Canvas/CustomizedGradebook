@@ -499,15 +499,44 @@ function generateGradingSchemesHTML(schemes) {
                                 if (isCurrentlySelected) {
                                     // Deselect
                                     window.opener.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = null;
+                                    window.opener.CG_MANAGED.config.DEFAULT_GRADING_SCHEME = null;
+
+                                    // Refresh the main panel's grading schemes grid
+                                    if (typeof window.opener.refreshGradingSchemesGridExternal === 'function') {
+                                        window.opener.refreshGradingSchemesGridExternal();
+                                    }
+
                                     alert('✓ Grading scheme deselected.\\n\\nThis change will be saved when you regenerate the loader in the Loader Generator panel.');
+
+                                    // Close this window after successful deselection
+                                    window.close();
                                 } else {
                                     // Select
                                     window.opener.CG_MANAGED.config.DEFAULT_GRADING_SCHEME_ID = schemeId;
-                                    alert('✓ Selected grading scheme: ' + schemeTitle + ' (ID: ' + schemeId + ')\\n\\nThis selection will be saved when you regenerate the loader in the Loader Generator panel.');
-                                }
 
-                                // Reload this window to show updated selection
-                                window.location.reload();
+                                    // Find and store the full scheme object
+                                    const fullScheme = ${JSON.stringify(schemes)}.find(s => s.id === schemeId);
+                                    if (fullScheme) {
+                                        window.opener.CG_MANAGED.config.DEFAULT_GRADING_SCHEME = {
+                                            id: fullScheme.id,
+                                            title: fullScheme.title,
+                                            scaling_factor: fullScheme.scaling_factor,
+                                            points_based: fullScheme.points_based,
+                                            grading_scheme: fullScheme.grading_scheme,
+                                            context_type: fullScheme.context_type
+                                        };
+                                    }
+
+                                    // Refresh the main panel's grading schemes grid
+                                    if (typeof window.opener.refreshGradingSchemesGridExternal === 'function') {
+                                        window.opener.refreshGradingSchemesGridExternal();
+                                    }
+
+                                    alert('✓ Selected grading scheme: ' + schemeTitle + ' (ID: ' + schemeId + ')\\n\\nThis selection will be saved when you regenerate the loader in the Loader Generator panel.');
+
+                                    // Close this window after successful selection
+                                    window.close();
+                                }
                             } else {
                                 alert('Unable to access parent window configuration. Please use the selection buttons in the main admin dashboard instead.');
                             }
@@ -1701,7 +1730,7 @@ function renderGradingSchemeCard(parent, scheme, currentSchemeId = null, allSche
 
     // Select button
     const selectBtn = createElement('button', {
-        text: isSelected ? 'Current Default' : 'Select as Default',
+        text: isSelected ? 'Current Default (click to deselect)' : 'Select as Default',
         style: {
             width: '100%',
             padding: '6px 12px',
@@ -1752,7 +1781,10 @@ export function refreshGradingSchemesGridExternal() {
     }
 }
 
-// Expose functions for child windows (grading scheme examples tab)
-// This allows the examples tab to reference parent window functions for future customization feature
+// Expose functions for child windows (grading scheme examples tab and full details tab)
+// This allows child windows to trigger updates in the parent window
 if (!window.CG_ADMIN) window.CG_ADMIN = {};
 window.CG_ADMIN.openGradingSchemeEditor = openGradingSchemeEditor;
+
+// Expose refresh function globally so child windows can call it
+window.refreshGradingSchemesGridExternal = refreshGradingSchemesGridExternal;
