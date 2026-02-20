@@ -36,7 +36,8 @@ import {
     DEFAULT_GRADING_SCHEME,
     DEFAULT_GRADING_TYPE,
     DEFAULT_ENABLE_ACCOUNT_FILTER,
-    DEFAULT_ALLOWED_ACCOUNT_IDS
+    DEFAULT_ALLOWED_ACCOUNT_IDS,
+    DEFAULT_CUSTOM_STATUS_ID
 } from './data/defaultConfigConstants.js';
 
 // Sentinel markers for all sections
@@ -75,6 +76,7 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  * @param {string} [options.defaultGradingType='points'] - Default grading type for assignments
  * @param {boolean} [options.enableAccountFilter=false] - Enable account filtering
  * @param {Array<string>} [options.allowedAccountIds=[]] - Array of allowed account IDs
+ * @param {string|null} [options.defaultCustomStatusId=null] - Default custom grade status ID
  * @returns {string} Managed config block content (Section B)
  */
 export function buildCGManagedBlock({
@@ -99,7 +101,8 @@ export function buildCGManagedBlock({
     defaultGradingScheme = DEFAULT_GRADING_SCHEME,
     defaultGradingType = DEFAULT_GRADING_TYPE,
     enableAccountFilter = DEFAULT_ENABLE_ACCOUNT_FILTER,
-    allowedAccountIds = DEFAULT_ALLOWED_ACCOUNT_IDS
+    allowedAccountIds = DEFAULT_ALLOWED_ACCOUNT_IDS,
+    defaultCustomStatusId = DEFAULT_CUSTOM_STATUS_ID
 }) {
     logger.debug('[LoaderGenerator] Building managed config block (Section B)', {
         accountId,
@@ -158,7 +161,10 @@ export function buildCGManagedBlock({
         '',
         `    // Account filtering`,
         `    ENABLE_ACCOUNT_FILTER: ${enableAccountFilter ? 'true' : 'false'},`,
-        `    ALLOWED_ACCOUNT_IDS: ${JSON.stringify(allowedAccountIds)}`,
+        `    ALLOWED_ACCOUNT_IDS: ${JSON.stringify(allowedAccountIds)},`,
+        '',
+        `    // Custom grade status`,
+        `    DEFAULT_CUSTOM_STATUS_ID: ${defaultCustomStatusId !== null ? JSON.stringify(defaultCustomStatusId) : 'null'}`,
         '};',
         '',
         B_END

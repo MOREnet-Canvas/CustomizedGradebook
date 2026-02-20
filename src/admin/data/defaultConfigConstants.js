@@ -73,3 +73,8 @@ export const DEFAULT_GRADING_TYPE = 'points';
  */
 export const DEFAULT_ENABLE_ACCOUNT_FILTER = false;
 export const DEFAULT_ALLOWED_ACCOUNT_IDS = [];
+
+/**
+ * Custom grade status defaults
+ */
+export const DEFAULT_CUSTOM_STATUS_ID = null;
