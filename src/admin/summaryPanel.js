@@ -21,6 +21,7 @@ export function renderSummaryPanel(container, ctx) {
         ["Theme JS", formatThemeAsset(jsUrl, "Theme JavaScript")],
         ["Theme CSS", formatThemeAsset(cssUrl, "Theme CSS")],
         ["Default grading scheme", formatDefaultGradingScheme(getConfigNow(ctx))],
+        ["Default custom status", formatCustomStatus(getConfigNow(ctx))],
         ["Account filter", formatAccountFilter(getConfigNow(ctx))],
     ];
 
@@ -295,6 +296,18 @@ function formatDefaultGradingScheme(config) {
     const title = scheme?.title || scheme?.name || "Unknown";
 
     return `${title} (ID:${id})`;
+}
+
+/* ---------------------------
+   Custom Status
+---------------------------- */
+
+function formatCustomStatus(config) {
+    const statusId = config.DEFAULT_CUSTOM_STATUS_ID;
+
+    if (!statusId) return "None selected";
+
+    return `ID: ${statusId}`;
 }
 
 /* ---------------------------

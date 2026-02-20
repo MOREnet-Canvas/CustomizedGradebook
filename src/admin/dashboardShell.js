@@ -28,6 +28,7 @@ import { renderAccountFilterPanel } from './accountFilterPanel.js';
 import { renderThemeCssEditorPanel } from './themeCssEditorPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
 import { renderSummaryPanel } from './summaryPanel.js';
+import { renderCustomGradeStatusPanel } from './customGradeStatusPanel.js';
 
 import {
     createBreadcrumbs,
@@ -193,11 +194,12 @@ function buildLayoutStructure() {
  * Render all dashboard panels
  *
  * Panels are rendered in this order:
- * 1. Theme Status (installed overrides)
- * 2. Account Settings (feature flags + grading schemes)
- * 3. Account Filter
- * 4. Theme CSS Editor
- * 5. Loader Generator (must be last - populates window.CG_MANAGED)
+ * 1. Summary
+ * 2. Custom Grade Status
+ * 3. Account Settings (feature flags + grading schemes)
+ * 4. Account Filter
+ * 5. Theme CSS Editor
+ * 6. Loader Generator (must be last - populates window.CG_MANAGED)
  *
  * @param {HTMLElement} container - Container element
  * @param {Object} ctx - Dashboard context
@@ -207,26 +209,30 @@ function renderPanels(container, ctx) {
     // Panel 0: Summary
     renderSummaryPanel(container, ctx);
 
-    // // Panel 1: Theme Status
+    // Panel 1: Custom Grade Status
+    logger.debug('[DashboardShell] Rendering custom grade status panel...');
+    renderCustomGradeStatusPanel(container, ctx);
+
+    // // Panel 2: Theme Status
     // logger.debug('[DashboardShell] Rendering theme status panels...');
     // renderThemeStatusPanels(container);
 
-    // Panel 2: Account Settings (Feature Flags & Grading Schemes)
+    // Panel 3: Account Settings (Feature Flags & Grading Schemes)
     logger.debug('[DashboardShell] Rendering account settings panel...');
     renderAccountSettingsPanel(container);
 
-    // Panel 3: Account Filter
+    // Panel 4: Account Filter
     // Note: The loader generator panel will populate window.CG_MANAGED.config asynchronously,
     // and the account filter panel will read from it when rendering the tree
     logger.debug('[DashboardShell] Rendering account filter panel...');
     const currentConfig = ctx.getConfig();
     renderAccountFilterPanel(container, currentConfig);
 
-    // Panel 4: Theme CSS Editor
+    // Panel 5: Theme CSS Editor
     logger.debug('[DashboardShell] Rendering theme CSS editor panel...');
     renderThemeCssEditorPanel(container);
 
-    // Panel 5: Loader Generator (MUST BE LAST)
+    // Panel 6: Loader Generator (MUST BE LAST)
     // The loader generator will populate window.CG_MANAGED.config, which the account filter
     // panel will read when it finishes loading accounts (async)
     logger.debug('[DashboardShell] Rendering loader generator panel...');
