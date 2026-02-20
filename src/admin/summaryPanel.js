@@ -22,6 +22,8 @@ export function renderSummaryPanel(container, ctx) {
         ["Theme CSS", formatThemeAsset(cssUrl, "Theme CSS")],
         ["Default grading scheme", formatDefaultGradingScheme(getConfigNow(ctx))],
         ["Default custom status", formatCustomStatus(getConfigNow(ctx))],
+        ["Custom status gate enabled", formatBoolean(getConfigNow(ctx).ENABLE_GRADE_CUSTOM_STATUS)],
+        ["Negative zero count enabled", formatBoolean(getConfigNow(ctx).ENABLE_NEGATIVE_ZERO_COUNT)],
         ["Account filter", formatAccountFilter(getConfigNow(ctx))],
     ];
 
@@ -308,6 +310,15 @@ function formatCustomStatus(config) {
     if (!statusId) return "None selected";
 
     return `ID: ${statusId}`;
+}
+
+/**
+ * Format boolean value as Yes/No
+ * @param {boolean} value - Boolean value
+ * @returns {string} "Yes" or "No"
+ */
+function formatBoolean(value) {
+    return value ? "Yes" : "No";
 }
 
 /* ---------------------------

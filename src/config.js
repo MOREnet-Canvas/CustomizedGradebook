@@ -68,6 +68,23 @@ export const ENFORCE_COURSE_OVERRIDE = window.CG_CONFIG?.ENFORCE_COURSE_OVERRIDE
 // Default: false (preserves teacher autonomy)
 export const ENFORCE_COURSE_GRADING_SCHEME = window.CG_CONFIG?.ENFORCE_COURSE_GRADING_SCHEME ?? false;
 
+// Custom grade status gate configuration
+// ENABLE_GRADE_CUSTOM_STATUS: Master switch for OutcomeCompletionGate
+// - true: OutcomeCompletionGate state runs and applies gate logic
+// - false: OutcomeCompletionGate state does not run at all
+// Default: false (gate disabled)
+export const ENABLE_GRADE_CUSTOM_STATUS = window.CG_CONFIG?.ENABLE_GRADE_CUSTOM_STATUS ?? false;
+
+// ENABLE_NEGATIVE_ZERO_COUNT: Controls numeric behavior when gate fails (one or more outcomes = 0)
+// - true: Set overrideScore = -zeroCount and apply custom grade status
+// - false: Set overrideScore = null and apply custom grade status
+// Default: false (use null override)
+export const ENABLE_NEGATIVE_ZERO_COUNT = window.CG_CONFIG?.ENABLE_NEGATIVE_ZERO_COUNT ?? false;
+
+// DEFAULT_CUSTOM_STATUS_ID: Custom grade status ID to apply when gate fails
+// Default: null (no custom status selected)
+export const DEFAULT_CUSTOM_STATUS_ID = window.CG_CONFIG?.DEFAULT_CUSTOM_STATUS_ID ?? null;
+
 // Grade scaling function (0-4 scale to 0-100 scale)
 // Default: multiply by 25 to convert 0-4 range to 0-100 range
 const defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));

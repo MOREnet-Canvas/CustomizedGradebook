@@ -18,7 +18,7 @@
 
 import { logger } from '../utils/logger.js';
 import { createElement, escapeHtml } from './domHelpers.js';
-import { createCollapsiblePanel, createSelectGroup, createButton } from './canvasFormHelpers.js';
+import { createCollapsiblePanel, createSelectGroup, createButton, createCheckbox } from './canvasFormHelpers.js';
 import { getAccountId } from './pageDetection.js';
 import { getRootCustomGradeStatuses } from '../services/gradeStatusService.js';
 import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
@@ -68,6 +68,19 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
     });
     body.appendChild(helperText);
 
+    // Read config for checkboxes
+    const config = ctx.getConfig();
+    const enableCustomStatus = config.ENABLE_GRADE_CUSTOM_STATUS || false;
+    const enableNegativeZeroCount = config.ENABLE_NEGATIVE_ZERO_COUNT || false;
+
+    // Create enable custom status gate checkbox
+    const { container: enableContainer, checkbox: enableCheckbox } = createCheckbox({
+        label: 'Enable Custom Status Gate',
+        id: 'enable-custom-status-gate',
+        checked: enableCustomStatus
+    });
+    body.appendChild(enableContainer);
+
     // Show warning if not on root account
     if (!isOnRootAccount) {
         const warningBox = createElement('div', {
@@ -86,7 +99,6 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
         body.appendChild(emptyBox);
     } else {
         // Create dropdown for status selection
-        const config = ctx.getConfig();
         const selectedStatusId = config.DEFAULT_CUSTOM_STATUS_ID || '';
 
         // Build options array
@@ -119,6 +131,34 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
 
         body.appendChild(statusSelect.container);
     }
+
+    // Create negative zero count checkbox
+    const { container: negativeZeroContainer, checkbox: negativeZeroCheckbox } = createCheckbox({
+        label: 'Use Negative Zero Count',
+        id: 'enable-negative-zero-count',
+        checked: enableNegativeZeroCount
+    });
+
+    // Initially hide if custom status gate is disabled
+    if (!enableCustomStatus) {
+        negativeZeroContainer.style.display = 'none';
+    }
+
+    body.appendChild(negativeZeroContainer);
+
+    // Add change handlers
+    enableCheckbox.addEventListener('change', () => {
+        ctx.updateConfig({ ENABLE_GRADE_CUSTOM_STATUS: enableCheckbox.checked });
+        triggerConfigChangeNotification();
+
+        // Show/hide negative zero count checkbox
+        negativeZeroContainer.style.display = enableCheckbox.checked ? 'block' : 'none';
+    });
+
+    negativeZeroCheckbox.addEventListener('change', () => {
+        ctx.updateConfig({ ENABLE_NEGATIVE_ZERO_COUNT: negativeZeroCheckbox.checked });
+        triggerConfigChangeNotification();
+    });
 
     // Add "Manage Custom Statuses" button/link
     const manageUrl = `/accounts/${rootAccountId}/grading_settings/statuses`;

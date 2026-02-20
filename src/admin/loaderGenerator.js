@@ -37,7 +37,9 @@ import {
     DEFAULT_GRADING_TYPE,
     DEFAULT_ENABLE_ACCOUNT_FILTER,
     DEFAULT_ALLOWED_ACCOUNT_IDS,
-    DEFAULT_CUSTOM_STATUS_ID
+    DEFAULT_CUSTOM_STATUS_ID,
+    DEFAULT_ENABLE_GRADE_CUSTOM_STATUS,
+    DEFAULT_ENABLE_NEGATIVE_ZERO_COUNT
 } from './data/defaultConfigConstants.js';
 
 // Sentinel markers for all sections
@@ -102,7 +104,9 @@ export function buildCGManagedBlock({
     defaultGradingType = DEFAULT_GRADING_TYPE,
     enableAccountFilter = DEFAULT_ENABLE_ACCOUNT_FILTER,
     allowedAccountIds = DEFAULT_ALLOWED_ACCOUNT_IDS,
-    defaultCustomStatusId = DEFAULT_CUSTOM_STATUS_ID
+    defaultCustomStatusId = DEFAULT_CUSTOM_STATUS_ID,
+    enableGradeCustomStatus = DEFAULT_ENABLE_GRADE_CUSTOM_STATUS,
+    enableNegativeZeroCount = DEFAULT_ENABLE_NEGATIVE_ZERO_COUNT
 }) {
     logger.debug('[LoaderGenerator] Building managed config block (Section B)', {
         accountId,
@@ -164,7 +168,11 @@ export function buildCGManagedBlock({
         `    ALLOWED_ACCOUNT_IDS: ${JSON.stringify(allowedAccountIds)},`,
         '',
         `    // Custom grade status`,
-        `    DEFAULT_CUSTOM_STATUS_ID: ${defaultCustomStatusId !== null ? JSON.stringify(defaultCustomStatusId) : 'null'}`,
+        `    DEFAULT_CUSTOM_STATUS_ID: ${defaultCustomStatusId !== null ? JSON.stringify(defaultCustomStatusId) : 'null'},`,
+        '',
+        `    // Custom grade status gate`,
+        `    ENABLE_GRADE_CUSTOM_STATUS: ${enableGradeCustomStatus ? 'true' : 'false'},`,
+        `    ENABLE_NEGATIVE_ZERO_COUNT: ${enableNegativeZeroCount ? 'true' : 'false'}`,
         '};',
         '',
         B_END
