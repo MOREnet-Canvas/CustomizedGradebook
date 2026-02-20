@@ -91,10 +91,10 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
 
         // Build options array
         const options = [
-            { value: '', label: '-- None selected --' },
+            { value: '', text: '-- None selected --' },
             ...statuses.map(status => ({
                 value: status._id,
-                label: `${status.name} (ID: ${status._id})`
+                text: `${status.name} (ID: ${status._id})`
             }))
         ];
 
@@ -123,8 +123,8 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
     // Add "Manage Custom Statuses" button/link
     const manageUrl = `/accounts/${rootAccountId}/grading_settings/statuses`;
     const manageButton = createButton({
-        label: '⚙️ Manage Custom Statuses (Root Account)',
-        variant: 'secondary',
+        text: '⚙️ Manage Custom Statuses (Root Account)',
+        type: 'secondary',
         onClick: () => {
             window.open(manageUrl, '_blank');
         }
