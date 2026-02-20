@@ -1563,7 +1563,9 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         defaultGradingType,
         enableAccountFilter: window.CG_MANAGED?.config?.ENABLE_ACCOUNT_FILTER || false,
         allowedAccountIds: window.CG_MANAGED?.config?.ALLOWED_ACCOUNT_IDS || [],
-        defaultCustomStatusId: window.CG_MANAGED?.config?.DEFAULT_CUSTOM_STATUS_ID || null
+        defaultCustomStatusId: window.CG_MANAGED?.config?.DEFAULT_CUSTOM_STATUS_ID || null,
+        enableGradeCustomStatus: window.CG_MANAGED?.config?.ENABLE_GRADE_CUSTOM_STATUS || false,
+        enableNegativeZeroCount: window.CG_MANAGED?.config?.ENABLE_NEGATIVE_ZERO_COUNT || false
     });
 
     // Update config preview textarea (C)
