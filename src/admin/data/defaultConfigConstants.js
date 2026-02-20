@@ -78,3 +78,9 @@ export const DEFAULT_ALLOWED_ACCOUNT_IDS = [];
  * Custom grade status defaults
  */
 export const DEFAULT_CUSTOM_STATUS_ID = null;
+
+/**
+ * Custom grade status gate defaults
+ */
+export const DEFAULT_ENABLE_GRADE_CUSTOM_STATUS = false;
+export const DEFAULT_ENABLE_NEGATIVE_ZERO_COUNT = false;
