@@ -9,6 +9,7 @@ This document captures what we have **validated in production behavior** for:
 - **Assignment submission-level custom status**
 - **Assignment “true clear” of grade via rubric (points removed)**
 - A **single unified GraphQL POST** that performs all layers atomically (in one request)
+- A **reliable, Gradebook-safe** method to fetch `rubricAssociationId` via REST (no SpeedGrader network inspection)
 
 ---
 
@@ -21,9 +22,10 @@ These IDs are from our confirmed test case and are safe to substitute with your 
 - User ID: `642`
 - Enrollment ID: `1875`
 - Submission ID (numeric works): `26031`
+- Rubric ID (REST rubric resource id): `1428`
 - Rubric Criterion ID: `_9586`
 - Rubric Assessment ID: `9771`
-- Rubric Association ID: `2645`
+- Rubric Association ID (what GraphQL `saveRubricAssessment` needs): `2645`
 - Custom Grade Status ID: `1` (label: “Insufficient” / “Insufficient Evidence”)
 
 ---
@@ -59,7 +61,7 @@ returned top-level GraphQL error:
 
 - `unprocessable_content`
 
-Therefore, the recommended way to obtain rubric association identifiers is to **read them from SpeedGrader’s own GraphQL payload**.
+Therefore, we use REST to discover `rubricAssociationId`.
 
 ---
 
@@ -68,9 +70,71 @@ Therefore, the recommended way to obtain rubric association identifiers is to **
 ### GraphQL
 - `POST /api/graphql`
 
-### REST (Validated for true-clear as an alternative approach)
+### REST (Validated / used for discovery)
+- `GET /api/v1/courses/:course_id/rubrics/:rubric_id?include=associations`
+    - **Reliable way to get `rubricAssociationId`** for an assignment
 - `PUT /api/v1/courses/:course_id/assignments/:assignment_id/submissions/:user_id`
-    - with body: `rubric_assessment["_9586"].points = null`
+    - with body: `rubric_assessment["_9586"].points = null` (REST true-clear alternative)
+
+---
+
+## Reliable Way to Get `rubricAssociationId` (Gradebook-safe)
+
+### Why we need this
+GraphQL `saveRubricAssessment` requires `rubricAssociationId` (example: `2645`), but GraphQL queries to fetch it are not available on this instance.
+
+### Working REST method
+Call:
+
+`GET /api/v1/courses/:course_id/rubrics/:rubric_id?include=associations`
+
+Response includes:
+
+```json
+"associations": [
+  {
+    "id": 2645,
+    "rubric_id": 1428,
+    "association_type": "Assignment",
+    "association_id": 3587,
+    ...
+  }
+]
+```
+
+- Use `associations[].id` as the **GraphQL `rubricAssociationId`**
+- Filter by:
+    - `association_type === "Assignment"`
+    - `association_id === <assignmentId>`
+
+### Browser Console helper (given courseId + rubricId + assignmentId)
+```javascript
+(async () => {
+  const courseId = 567;
+  const rubricId = 1428;       // REST rubric resource id
+  const assignmentId = 3587;
+
+  const res = await fetch(
+    `/api/v1/courses/${courseId}/rubrics/${rubricId}?include=associations`,
+    {
+      credentials: "same-origin",
+      headers: { accept: "application/json+canvas-string-ids" }
+    }
+  );
+
+  const json = await res.json();
+  const assoc = (json.associations || []).find(
+    (a) =>
+      String(a.association_type).toLowerCase() === "assignment" &&
+      String(a.association_id) === String(assignmentId)
+  );
+
+  console.log("rubricAssociationId:", assoc?.id);
+  console.log("association record:", assoc);
+})();
+```
+
+> Note: If you don’t already know `rubricId`, you can get it from the assignment payload under `rubric_settings.id` (on this instance, `rubric_settings.id === 1428` matched the rubric resource id).
 
 ---
 
@@ -103,21 +167,6 @@ Behavior:
 - Requires correct `rubricAssociationId` (`2645` in our case).
 - Requires `assessmentDetails` encoded as SpeedGrader does (stringified JSON).
 - True-clear on this instance requires **omitting `points` entirely**.
-
----
-
-## How to Get `rubricAssociationId` Reliably
-
-Because GraphQL queries for assignment data were not available, we used the SpeedGrader UI network payload:
-
-1. Open **SpeedGrader** for the assignment and student.
-2. DevTools → Network → filter `graphql`.
-3. Save a rubric assessment once.
-4. Inspect the `/api/graphql` payload for operation:
-    - `SpeedGrader_SaveRubricAssessment`
-5. Read:
-    - `variables.rubricAssociationId` → **this is the value to use** (`2645`).
-    - `variables.rubricAssessmentId` → rubricAssessment id (`9771`).
 
 ---
 
@@ -198,8 +247,7 @@ This performs, in one POST:
 
   // IMPORTANT: assessmentDetails must be a STRING (JSON scalar), matching SpeedGrader.
   // IMPORTANT: true-clear is achieved by OMITTING `points`.
-  // IMPORTANT: criterion key format is "criterion__<criterionId without leading underscore>" OR,
-  // as observed here: criterion__9586 for rubric criterion _9586.
+  // IMPORTANT: criterion key format observed here: "criterion__9586" for rubric criterion "_9586".
   const assessmentDetailsString = JSON.stringify({
     assessment_type: "grading",
     criterion__9586: {
@@ -252,7 +300,7 @@ We observed 422 when attempting to clear rubric points in GraphQL using:
 
 The server rejected the request before resolver-level errors could be returned in `data.saveRubricAssessment.errors`.
 
-This indicates the GraphQL layer (or downstream validator) enforces constraints on `assessmentDetails` that differ from REST behavior.
+However, sending the same `assessmentDetails` payload with the criterion present and **points omitted** succeeded, indicating the validator expects a “missing field” encoding for clears on this instance.
 
 ---
 
@@ -290,8 +338,9 @@ After the unified call:
 
 - Prefer cookie-derived `_csrf_token` when running in varied Canvas pages.
 - Use numeric submission IDs when validated to work (this instance accepts them).
-- Store `rubricAssociationId` per-assignment once discovered (from SpeedGrader payload),
-  since GraphQL queries for assignment metadata may be unavailable.
+- Use REST to discover `rubricAssociationId`:
+    - `GET /api/v1/courses/:course_id/rubrics/:rubric_id?include=associations`
+    - filter associations for `association_type=Assignment` and `association_id=<assignmentId>`
 - For “true clear” via GraphQL rubric save on this instance:
     - Use SpeedGrader’s `assessmentDetails` format and omit `points`.
 
