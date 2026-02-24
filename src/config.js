@@ -88,13 +88,18 @@ export const DEFAULT_CUSTOM_STATUS_ID = window.CG_CONFIG?.DEFAULT_CUSTOM_STATUS_
 // USE_UNIFIED_GRAPHQL_ONLY: Use GraphQL-only grading path instead of REST/bulk pipeline
 // - true: Skip bulk grade uploads, use unified GraphQL mutation for all operations
 // - false: Use existing REST/bulk pipeline (default behavior)
-// Default: false (use existing pipeline)
-export const USE_UNIFIED_GRAPHQL_ONLY = window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY ?? false;
+// - Automatically enabled if ENABLE_GRADE_CUSTOM_STATUS is true (custom status requires GraphQL)
+// Default: false (use existing pipeline), or true if ENABLE_GRADE_CUSTOM_STATUS is true
+export const USE_UNIFIED_GRAPHQL_ONLY = window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY ?? ENABLE_GRADE_CUSTOM_STATUS ?? false;
 
 // Debug logging for GraphQL mode
 if (typeof window !== 'undefined' && typeof console !== 'undefined') {
+    console.log('[CG Config] ENABLE_GRADE_CUSTOM_STATUS:', ENABLE_GRADE_CUSTOM_STATUS);
     console.log('[CG Config] USE_UNIFIED_GRAPHQL_ONLY:', USE_UNIFIED_GRAPHQL_ONLY);
     console.log('[CG Config] window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY:', window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY);
+    if (ENABLE_GRADE_CUSTOM_STATUS && !window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY) {
+        console.log('[CG Config] USE_UNIFIED_GRAPHQL_ONLY auto-enabled due to ENABLE_GRADE_CUSTOM_STATUS=true');
+    }
 }
 
 // Grade scaling function (0-4 scale to 0-100 scale)
