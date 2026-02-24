@@ -80,7 +80,7 @@ export async function handleCheckingSetup(stateMachine) {
 
         // Check for assignment
         let assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
-
+        logger.trace(`Assignment object from outcome:`, assignmentObj);
         // Fallback: try to find by name
         if (!assignmentObj) {
             const assignments = await apiClient.get(
@@ -108,6 +108,7 @@ export async function handleCheckingSetup(stateMachine) {
         const result = await getRubricForAssignment(courseId, assignmentId, apiClient);
         const rubricId = result?.rubricId;
         const rubricCriterionId = result?.criterionId;
+        logger.trace(`Rubric found:`, result);
 
         if (!rubricId) {
             const confirmCreate = confirm(`Rubric "${AVG_RUBRIC_NAME}" not found.\nWould you like to create it?`);
