@@ -487,6 +487,12 @@ export async function handleRefreshingMastery(stateMachine) {
         // Don't fail the entire flow if mastery refresh fails
     }
 
+    // GraphQL mode: Skip verification states (overrides already submitted in UPDATING_GRADES)
+    if (USE_UNIFIED_GRAPHQL_ONLY) {
+        logger.debug(`handleRefreshingMastery complete, transitioning to COMPLETE (GraphQL mode - verification skipped)`);
+        return STATES.COMPLETE;
+    }
+
     logger.debug(`handleRefreshingMastery complete, transitioning to VERIFYING`);
     return STATES.VERIFYING;
 }
