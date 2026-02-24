@@ -358,7 +358,7 @@ export async function handleUpdatingGrades(stateMachine) {
                 // IE case: Clear everything, set custom status
                 overrideScore = null;
                 rubricPoints = null;
-                comment = `Insufficient evidence for ${AVG_ASSIGNMENT_NAME} calculation: (${zeroCount} outcome${zeroCount === 1 ? '' : 's'} with zero score). Updated: ${timestamp}`;
+                comment = `Insufficient evidence for ${zeroCount} outcome${zeroCount === 1 ? '' : 's'}. ${AVG_OUTCOME_NAME} can not be calculated. Updated: ${timestamp}`;
             } else {
                 // SCORE case: Set scores
                 overrideScore = OVERRIDE_SCALE(average);
