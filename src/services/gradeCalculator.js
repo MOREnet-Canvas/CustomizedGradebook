@@ -241,3 +241,68 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
 
     return results;
 }
+
+/**
+ * Calculate student averages with Insufficient Evidence (IE) detection
+ * Used for GraphQL-only grading path
+ *
+ * Detects if ANY relevant outcome score is zero and marks as IE case.
+ * Returns action ("IE" or "SCORE") for each student.
+ *
+ * @param {Object} data - Canvas outcome rollup data
+ * @param {string} outcomeId - The ID of the "Current Score" outcome to exclude
+ * @returns {Array<{userId: string, average: number, hasZero: boolean, zeroCount: number, action: "IE"|"SCORE"}>}
+ */
+export function calculateStudentAveragesWithIE(data, outcomeId) {
+    logger.info("Calculating student averages with IE detection...");
+
+    const outcomeMap = buildOutcomeMap(data);
+    const excludedOutcomeIds = new Set([String(outcomeId)]);
+
+    const results = [];
+
+    for (const rollup of (data?.rollups ?? [])) {
+        const userId = rollup.links?.user;
+        if (!userId) continue;
+
+        const relevantScores = getRelevantScores(
+            rollup.scores ?? [],
+            outcomeMap,
+            excludedOutcomeIds,
+            EXCLUDED_OUTCOME_KEYWORDS
+        );
+
+        if (relevantScores.length === 0) continue;
+
+        // Check for zeros
+        let hasZero = false;
+        let zeroCount = 0;
+
+        for (const score of relevantScores) {
+            if (score.score === 0) {
+                hasZero = true;
+                zeroCount++;
+            }
+        }
+
+        const average = computeAverage(relevantScores);
+        const action = hasZero ? "IE" : "SCORE";
+
+        logger.trace(`User ${userId}: average=${average}, hasZero=${hasZero}, zeroCount=${zeroCount}, action=${action}`);
+
+        results.push({
+            userId,
+            average,
+            hasZero,
+            zeroCount,
+            action
+        });
+    }
+
+    logger.debug(`Calculation complete: ${results.length} students total`);
+    const ieCount = results.filter(r => r.action === "IE").length;
+    const scoreCount = results.filter(r => r.action === "SCORE").length;
+    logger.debug(`  IE cases: ${ieCount}, SCORE cases: ${scoreCount}`);
+
+    return results;
+}
