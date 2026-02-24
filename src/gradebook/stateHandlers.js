@@ -155,12 +155,14 @@ export async function handleCheckingSetup(stateMachine) {
     }
 
     // Branch based on grading mode
+    logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}, ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}`);
     if (USE_UNIFIED_GRAPHQL_ONLY && ENABLE_OUTCOME_UPDATES) {
         logger.debug('GraphQL-only mode enabled, transitioning to PRELOAD_SUBMISSIONS');
         return STATES.PRELOAD_SUBMISSIONS;
     }
 
     // All resources exist (or not needed), move to calculating
+    logger.debug('Using standard path, transitioning to CALCULATING');
     return STATES.CALCULATING;
 }
 
@@ -229,14 +231,20 @@ export async function handlePreloadSubmissions(stateMachine) {
     logger.debug('Fetching submission IDs and rubric association ID...');
 
     // Fetch all submissions
+    logger.trace('[Preload] Calling fetchAllSubmissions...');
     const { submissionIdByUserId, rubricAssociationId: cachedAssocId } =
         await fetchAllSubmissions(courseId, assignmentId, apiClient);
+
+    logger.trace(`[Preload] Fetched ${submissionIdByUserId.size} submissions`);
 
     let rubricAssociationId = cachedAssocId;
 
     // If not found in submissions or cache, fetch separately
     if (!rubricAssociationId) {
+        logger.trace('[Preload] No cached rubricAssociationId, fetching separately...');
         rubricAssociationId = await fetchRubricAssociationId(courseId, rubricId, assignmentId, apiClient);
+    } else {
+        logger.trace(`[Preload] Using cached rubricAssociationId: ${rubricAssociationId}`);
     }
 
     logger.debug(`Preloaded ${submissionIdByUserId.size} submission IDs, rubricAssociationId: ${rubricAssociationId}`);
@@ -267,11 +275,13 @@ export async function handleCalculating(stateMachine) {
     let numberOfUpdates;
 
     // Use IE-aware calculation for GraphQL-only mode
+    logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}, ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}`);
     if (USE_UNIFIED_GRAPHQL_ONLY && ENABLE_OUTCOME_UPDATES) {
         logger.debug('Using IE-aware calculation for GraphQL-only mode');
         averages = calculateStudentAveragesWithIE(rollupData, outcomeId);
         numberOfUpdates = averages.length;
     } else {
+        logger.debug('Using standard calculation');
         averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
         numberOfUpdates = averages.length;
     }
@@ -311,6 +321,7 @@ export async function handleUpdatingGrades(stateMachine) {
     }
 
     // GraphQL-only path
+    logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}`);
     if (USE_UNIFIED_GRAPHQL_ONLY) {
         logger.debug('Using GraphQL-only grading path');
         banner.setText(`Updating grades via GraphQL for ${numberOfUpdates} students...`);
@@ -324,6 +335,8 @@ export async function handleUpdatingGrades(stateMachine) {
 
         for (const student of averages) {
             const { userId, average, action, zeroCount } = student;
+
+            logger.trace(`[GraphQL] Processing student ${userId}: action=${action}, average=${average}, zeroCount=${zeroCount}`);
 
             // Get required IDs
             const enrollmentId = enrollmentMap.get(String(userId));
@@ -353,12 +366,15 @@ export async function handleUpdatingGrades(stateMachine) {
                 comment = `Score: ${average}  Updated: ${timestamp}`;
             }
 
+            logger.trace(`[GraphQL] Determined: overrideScore=${overrideScore}, rubricPoints=${rubricPoints}`);
+
             // Retry logic
             let attempt = 1;
             let success = false;
 
             while (attempt <= maxAttempts && !success) {
                 try {
+                    logger.trace(`[GraphQL] Calling submitUnifiedGrade for user ${userId} (attempt ${attempt}/${maxAttempts})`);
                     await submitUnifiedGrade({
                         enrollmentId,
                         submissionId,
@@ -399,6 +415,7 @@ export async function handleUpdatingGrades(stateMachine) {
     }
 
     // Existing REST/bulk pipeline (default behavior)
+    logger.debug('Using REST/bulk pipeline (default behavior)');
     // Decide update mode
     const usePerStudent = numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD;
     const updateMode = usePerStudent ? 'per-student' : 'bulk';
