@@ -300,13 +300,9 @@ export function calculateStudentAveragesWithIE(data, outcomeId) {
 
         // Check if update is needed based on action type
         if (action === "IE") {
-            // IE case: GraphQL mutation will clear the score (set to null)
-            // Only update if current score is NOT already null
-            if (oldAverage === null) {
-                skippedNoChange++;
-                logger.trace(`User ${userId}: No change needed (IE case, already null/cleared)`);
-                continue;
-            }
+            // IE case: Always update to ensure comment and status reflect current zero count
+            // Even if score is already null, the comment may need updating with latest zeroCount
+            logger.trace(`User ${userId}: IE case - will update (zeroCount=${zeroCount})`);
         } else {
             // SCORE case: Normal comparison
             if (oldAverage === newAverage) {
