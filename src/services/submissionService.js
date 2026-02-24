@@ -10,6 +10,7 @@ import { logger } from "../utils/logger.js";
 
 /**
  * Fetch all submissions for an assignment and extract submission IDs and rubric association ID
+ * Uses pagination to handle assignments with >100 students
  * @param {string} courseId - Course ID
  * @param {string} assignmentId - Assignment ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
@@ -17,10 +18,10 @@ import { logger } from "../utils/logger.js";
  */
 export async function fetchAllSubmissions(courseId, assignmentId, apiClient) {
     logger.debug(`Fetching submissions for assignment ${assignmentId}...`);
-    
+
     const submissionIdByUserId = new Map();
     let rubricAssociationId = null;
-    
+
     // Check localStorage cache for rubric association ID
     const cacheKey = `cg_rubric_assoc_${courseId}_${assignmentId}`;
     const cached = localStorage.getItem(cacheKey);
@@ -28,39 +29,33 @@ export async function fetchAllSubmissions(courseId, assignmentId, apiClient) {
         rubricAssociationId = cached;
         logger.debug(`Using cached rubricAssociationId: ${rubricAssociationId}`);
     }
-    
-    // Fetch submissions with full rubric assessment
-    let url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions?include[]=full_rubric_assessment`;
-    
-    while (url) {
-        const submissions = await apiClient.get(url, {}, "fetchAllSubmissions");
-        
-        for (const submission of submissions) {
-            if (submission.user_id && submission.id) {
-                submissionIdByUserId.set(String(submission.user_id), String(submission.id));
-            }
-            
-            // Extract rubric association ID from first submission with rubric data
-            if (!rubricAssociationId && submission.rubric_assessment) {
-                // The rubric_assessment object may contain metadata about the association
-                // However, Canvas API doesn't always include association ID in submission response
-                // We'll need to fetch it separately if not found
-            }
+
+    // Fetch all submissions with automatic pagination
+    const url = `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions?include[]=full_rubric_assessment`;
+    const allSubmissions = await apiClient.getAllPages(url, {}, "fetchAllSubmissions");
+
+    for (const submission of allSubmissions) {
+        if (submission.user_id && submission.id) {
+            submissionIdByUserId.set(String(submission.user_id), String(submission.id));
         }
-        
-        // TODO: Implement pagination if needed
-        url = null;
+
+        // Extract rubric association ID from first submission with rubric data
+        if (!rubricAssociationId && submission.rubric_assessment) {
+            // The rubric_assessment object may contain metadata about the association
+            // However, Canvas API doesn't always include association ID in submission response
+            // We'll need to fetch it separately if not found
+        }
     }
-    
-    logger.debug(`Fetched ${submissionIdByUserId.size} submission IDs`);
-    
+
+    logger.debug(`Fetched ${submissionIdByUserId.size} submission IDs for assignment ${assignmentId}`);
+
     // If rubric association ID not found in submissions, fetch it separately
     if (!rubricAssociationId) {
         logger.debug('Rubric association ID not found in submissions, fetching separately...');
         // We'll need the rubricId to fetch the association
         // This will be handled by the caller if needed
     }
-    
+
     return { submissionIdByUserId, rubricAssociationId };
 }
 
@@ -107,4 +102,3 @@ export async function fetchRubricAssociationId(courseId, rubricId, assignmentId,
         return null;
     }
 }
-
