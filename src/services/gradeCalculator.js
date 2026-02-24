@@ -285,13 +285,6 @@ export function calculateStudentAveragesWithIE(data, outcomeId) {
         // Calculate new average
         const newAverage = computeAverage(relevantScores);
 
-        // Check if update is needed (compare old vs new)
-        if (oldAverage === newAverage) {
-            skippedNoChange++;
-            logger.trace(`User ${userId}: No change needed (current=${oldAverage}, calculated=${newAverage})`);
-            continue;
-        }
-
         // Check for zeros (IE detection)
         let hasZero = false;
         let zeroCount = 0;
@@ -304,6 +297,24 @@ export function calculateStudentAveragesWithIE(data, outcomeId) {
         }
 
         const action = hasZero ? "IE" : "SCORE";
+
+        // Check if update is needed based on action type
+        if (action === "IE") {
+            // IE case: GraphQL mutation will clear the score (set to null)
+            // Only update if current score is NOT already null
+            if (oldAverage === null) {
+                skippedNoChange++;
+                logger.trace(`User ${userId}: No change needed (IE case, already null/cleared)`);
+                continue;
+            }
+        } else {
+            // SCORE case: Normal comparison
+            if (oldAverage === newAverage) {
+                skippedNoChange++;
+                logger.trace(`User ${userId}: No change needed (current=${oldAverage}, calculated=${newAverage})`);
+                continue;
+            }
+        }
 
         logger.trace(`User ${userId}: oldAverage=${oldAverage}, newAverage=${newAverage}, hasZero=${hasZero}, zeroCount=${zeroCount}, action=${action}`);
 
