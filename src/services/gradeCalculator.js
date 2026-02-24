@@ -248,6 +248,7 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
  *
  * Detects if ANY relevant outcome score is zero and marks as IE case.
  * Returns action ("IE" or "SCORE") for each student.
+ * Only includes students whose scores have changed (compares old vs new average).
  *
  * @param {Object} data - Canvas outcome rollup data
  * @param {string} outcomeId - The ID of the "Current Score" outcome to exclude
@@ -260,10 +261,17 @@ export function calculateStudentAveragesWithIE(data, outcomeId) {
     const excludedOutcomeIds = new Set([String(outcomeId)]);
 
     const results = [];
+    let totalStudents = 0;
+    let skippedNoChange = 0;
 
     for (const rollup of (data?.rollups ?? [])) {
         const userId = rollup.links?.user;
         if (!userId) continue;
+
+        totalStudents++;
+
+        // Get current outcome score
+        const oldAverage = getCurrentOutcomeScore(rollup.scores ?? [], outcomeId);
 
         const relevantScores = getRelevantScores(
             rollup.scores ?? [],
@@ -274,7 +282,17 @@ export function calculateStudentAveragesWithIE(data, outcomeId) {
 
         if (relevantScores.length === 0) continue;
 
-        // Check for zeros
+        // Calculate new average
+        const newAverage = computeAverage(relevantScores);
+
+        // Check if update is needed (compare old vs new)
+        if (oldAverage === newAverage) {
+            skippedNoChange++;
+            logger.trace(`User ${userId}: No change needed (current=${oldAverage}, calculated=${newAverage})`);
+            continue;
+        }
+
+        // Check for zeros (IE detection)
         let hasZero = false;
         let zeroCount = 0;
 
@@ -285,21 +303,20 @@ export function calculateStudentAveragesWithIE(data, outcomeId) {
             }
         }
 
-        const average = computeAverage(relevantScores);
         const action = hasZero ? "IE" : "SCORE";
 
-        logger.trace(`User ${userId}: average=${average}, hasZero=${hasZero}, zeroCount=${zeroCount}, action=${action}`);
+        logger.trace(`User ${userId}: oldAverage=${oldAverage}, newAverage=${newAverage}, hasZero=${hasZero}, zeroCount=${zeroCount}, action=${action}`);
 
         results.push({
             userId,
-            average,
+            average: newAverage,
             hasZero,
             zeroCount,
             action
         });
     }
 
-    logger.debug(`Calculation complete: ${results.length} students total`);
+    logger.debug(`Calculation complete: ${results.length} students need updates (${skippedNoChange} unchanged, ${totalStudents} total)`);
     const ieCount = results.filter(r => r.action === "IE").length;
     const scoreCount = results.filter(r => r.action === "SCORE").length;
     logger.debug(`  IE cases: ${ieCount}, SCORE cases: ${scoreCount}`);
