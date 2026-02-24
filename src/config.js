@@ -91,6 +91,12 @@ export const DEFAULT_CUSTOM_STATUS_ID = window.CG_CONFIG?.DEFAULT_CUSTOM_STATUS_
 // Default: false (use existing pipeline)
 export const USE_UNIFIED_GRAPHQL_ONLY = window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY ?? false;
 
+// Debug logging for GraphQL mode
+if (typeof window !== 'undefined' && typeof console !== 'undefined') {
+    console.log('[CG Config] USE_UNIFIED_GRAPHQL_ONLY:', USE_UNIFIED_GRAPHQL_ONLY);
+    console.log('[CG Config] window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY:', window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY);
+}
+
 // Grade scaling function (0-4 scale to 0-100 scale)
 // Default: multiply by 25 to convert 0-4 range to 0-100 range
 const defaultOverrideScale = (avg) => Number((avg * 25).toFixed(2));

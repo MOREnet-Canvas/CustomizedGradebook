@@ -42,7 +42,8 @@ export async function submitUnifiedGrade(params, apiClient) {
         comment
     } = params;
 
-    logger.trace(`[UnifiedGQL] Submitting ${action} for enrollment ${enrollmentId}`);
+    logger.debug(`[UnifiedGQL] Starting ${action} for enrollment ${enrollmentId}, submission ${submissionId}`);
+    logger.trace(`[UnifiedGQL] overrideScore=${overrideScore}, rubricPoints=${rubricPoints}`);
 
     // Build assessment details
     const criterionKey = "criterion_" + rubricCriterionId;
@@ -152,4 +153,3 @@ export async function submitUnifiedGrade(params, apiClient) {
 
     logger.trace(`[UnifiedGQL] ${action} submitted successfully for enrollment ${enrollmentId}`);
 }
-
