@@ -2,13 +2,13 @@ import { logger } from '../utils/logger.js';
 // src/parentMastery/parentMasteryInit.js
 export async function parentMasteryInit() {
     // Only run on: /courses/:id/pages/parent-mastery
-    const m = location.pathname.match(/^\/courses\/(\d+)\/pages\/parent-mastery\/?$/);
-    if (!m) return;
-
-    logger.debug('parentMasteryInit: running');
-    const courseId = Number(m[1]);
     const root = document.getElementById("parent-mastery-root");
     if (!root) return;
+
+    const m = location.pathname.match(/^\/courses\/(\d+)\//);
+    if (!m) return;
+
+    const courseId = Number(m[1]);
 
     root.innerHTML = `
     <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
@@ -46,9 +46,46 @@ export async function parentMasteryInit() {
         const r = await fetch(url, { credentials: "include" });
         const data = await r.json();
 
-        const scores = data.rollups?.[0]?.scores || [];
-        statusEl.textContent = `Loaded ${scores.length} scores for student ${studentId}.`;
-        outEl.textContent = JSON.stringify(scores.slice(0, 10), null, 2);
+        const rollup = data.rollups?.[0];
+        if (!rollup) {
+            statusEl.textContent = "No mastery data found.";
+            return;
+        }
+
+        const outcomesById = new Map(
+            (data.linked?.outcomes || []).map(o => [String(o.id), o])
+        );
+
+        const scores = rollup.scores || [];
+
+        statusEl.textContent = `Loaded ${scores.length} outcomes.`;
+        outEl.innerHTML = "";
+
+        scores.forEach(s => {
+            const outcome = outcomesById.get(String(s.links?.outcome));
+            if (!outcome) return;
+
+            const mastered = s.score >= outcome.mastery_points;
+
+            const card = document.createElement("div");
+            card.style.border = "1px solid #ddd";
+            card.style.borderRadius = "8px";
+            card.style.padding = "10px";
+            card.style.margin = "8px 0";
+
+            card.innerHTML = `
+    <div style="font-weight:600;">${outcome.title}</div>
+    <div>Score: <b>${s.score}</b> / Mastery: ${outcome.mastery_points}</div>
+    <div style="color:${mastered ? "#2e7d32" : "#c62828"}; font-weight:600;">
+      ${mastered ? "Mastered" : "Not Yet Mastered"}
+    </div>
+    <div style="font-size:12px; color:#666;">
+      Last Evidence: ${s.title}
+    </div>
+  `;
+
+            outEl.appendChild(card);
+        });
     } catch (err) {
         statusEl.textContent = "Error";
         outEl.textContent = String(err);

@@ -22,11 +22,11 @@
         pre.textContent += msg + "\n";
     }
 
-    add("✅ Mobile Theme JS Loaded");
-    add("location.href: " + (location && location.href));
-    add("document.URL: " + document.URL);
+    add("📱 Parent App Front Page Fingerprint");
+    add("href: " + location.href);
+    add("path: " + location.pathname);
+    add("title: " + document.title);
     add("has ENV: " + (typeof window.ENV !== "undefined"));
-    add("has jQuery: " + (typeof window.jQuery !== "undefined"));
     add("body id: " + (document.body && document.body.id));
     add("body class: " + (document.body && document.body.className));
 })();
