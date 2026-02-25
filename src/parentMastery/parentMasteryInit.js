@@ -1,9 +1,11 @@
+import { logger } from '../utils/logger.js';
 // src/parentMastery/parentMasteryInit.js
 export async function parentMasteryInit() {
     // Only run on: /courses/:id/pages/parent-mastery
     const m = location.pathname.match(/^\/courses\/(\d+)\/pages\/parent-mastery\/?$/);
     if (!m) return;
 
+    logger.debug('parentMasteryInit: running');
     const courseId = Number(m[1]);
     const root = document.getElementById("parent-mastery-root");
     if (!root) return;
