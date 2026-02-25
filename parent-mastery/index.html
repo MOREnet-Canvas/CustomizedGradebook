@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mastery (Observer)</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 16px; }
+        h1 { font-size: 18px; margin: 0 0 12px; }
+        .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        select, button { padding: 10px; font-size: 14px; }
+        button { cursor: pointer; }
+        .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin: 10px 0; }
+        .title { font-weight: 650; margin-bottom: 6px; }
+        .meta { color: #555; font-size: 13px; }
+        .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid #ccc; font-size: 12px; margin-left: 8px; }
+        .ok { border-color: #2e7d32; }
+        .no { border-color: #c62828; }
+        .muted { color: #666; font-size: 13px; }
+        .error { color: #b00020; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+<h1>Mastery (Observer)</h1>
+
+<div class="row">
+    <select id="studentSelect"></select>
+    <select id="courseSelect"></select>
+    <button id="loadBtn">Load</button>
+</div>
+
+<div id="status" class="muted"></div>
+<div id="error" class="error"></div>
+<div id="results"></div>
+
+<script>
+    async function api(path) {
+        const r = await fetch(path, { credentials: "include" });
+        if (!r.ok) {
+            const t = await r.text();
+            throw new Error(`${r.status} ${r.statusText}\n${t.slice(0, 500)}`);
+        }
+        return r.json();
+    }
+
+    function setStatus(msg) {
+        document.getElementById("status").textContent = msg || "";
+    }
+
+    function setError(err) {
+        document.getElementById("error").textContent = err ? String(err) : "";
+    }
+
+    function clearResults() {
+        document.getElementById("results").innerHTML = "";
+    }
+
+    function renderRows(rows) {
+        const wrap = document.getElementById("results");
+        wrap.innerHTML = "";
+
+        if (!rows.length) {
+            wrap.innerHTML = `<div class="muted">No outcome scores found.</div>`;
+            return;
+        }
+
+        // Sort: Current Score last, otherwise alphabetical
+        rows.sort((a, b) => {
+            const aIsCurrent = (a.outcomeTitle || "").toLowerCase().includes("current score");
+            const bIsCurrent = (b.outcomeTitle || "").toLowerCase().includes("current score");
+            if (aIsCurrent !== bIsCurrent) return aIsCurrent ? 1 : -1;
+            return (a.outcomeTitle || "").localeCompare(b.outcomeTitle || "");
+        });
+
+        for (const r of rows) {
+            const met = (r.mastery == null) ? "" : `Mastery: ${r.mastery}`;
+            const mastered = (r.mastery != null && r.score != null) ? (r.score >= r.mastery) : null;
+
+            const pill =
+                mastered == null ? "" :
+                    `<span class="pill ${mastered ? "ok" : "no"}">${mastered ? "Mastered" : "Not yet"}</span>`;
+
+            const div = document.createElement("div");
+            div.className = "card";
+            div.innerHTML = `
+          <div class="title">
+            ${escapeHtml(r.outcomeTitle)} ${pill}
+          </div>
+          <div class="meta">Score: <b>${escapeHtml(String(r.score))}</b> ${met ? " • " + escapeHtml(met) : ""}</div>
+          <div class="meta">Last evidence: ${escapeHtml(r.assignmentTitle || "")}</div>
+          <div class="meta">${escapeHtml(r.submitted_at || "")}</div>
+        `;
+            wrap.appendChild(div);
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+        }[c]));
+    }
+
+    async function loadStudentsAndCourses() {
+        setError("");
+        setStatus("Loading observer enrollments…");
+
+        const enrollments = await api("/api/v1/users/self/enrollments?per_page=100");
+
+        // Observer enrollments give us: course_id + associated_user_id (the student)
+        const obs = enrollments.filter(e => e.type === "ObserverEnrollment" && e.enrollment_state === "active");
+
+        if (!obs.length) {
+            setStatus("");
+            throw new Error("No active ObserverEnrollments found for this user.");
+        }
+
+        // Build student list (unique associated_user_id)
+        const studentIds = [...new Set(obs.map(e => String(e.associated_user_id)).filter(Boolean))];
+
+        // Resolve student names (optional but nicer)
+        // Note: /users/:id/profile should be allowed for observed users in many configs; if it fails, we’ll fall back to IDs.
+        const studentInfos = [];
+        for (const sid of studentIds) {
+            try {
+                const p = await api(`/api/v1/users/${sid}/profile`);
+                studentInfos.push({ id: sid, name: p.name || `Student ${sid}` });
+            } catch {
+                studentInfos.push({ id: sid, name: `Student ${sid}` });
+            }
+        }
+
+        // Courses: unique course_id from observer enrollments
+        const courseIds = [...new Set(obs.map(e => String(e.course_id)).filter(Boolean))];
+
+        // Resolve course names
+        const courseInfos = [];
+        for (const cid of courseIds) {
+            try {
+                const c = await api(`/api/v1/courses/${cid}`);
+                courseInfos.push({ id: cid, name: c.name || `Course ${cid}` });
+            } catch {
+                courseInfos.push({ id: cid, name: `Course ${cid}` });
+            }
+        }
+
+        // Populate selects
+        const studentSelect = document.getElementById("studentSelect");
+        studentSelect.innerHTML = studentInfos
+            .map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`)
+            .join("");
+
+        const courseSelect = document.getElementById("courseSelect");
+        courseSelect.innerHTML = courseInfos
+            .map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`)
+            .join("");
+
+        setStatus("Ready.");
+    }
+
+    async function loadOutcomeRollup() {
+        setError("");
+        clearResults();
+
+        const courseId = document.getElementById("courseSelect").value;
+        const studentId = document.getElementById("studentSelect").value;
+
+        setStatus(`Loading mastery (course ${courseId}, student ${studentId})…`);
+
+        const url =
+            `/api/v1/courses/${courseId}/outcome_rollups?user_ids[]=${studentId}` +
+            `&include[]=outcomes&include[]=outcome_groups&per_page=100`;
+
+        const data = await api(url);
+
+        const outcomesById = new Map((data.linked?.outcomes || []).map(o => [String(o.id), o]));
+        const scores = data.rollups?.[0]?.scores || [];
+
+        const rows = scores.map(s => {
+            const o = outcomesById.get(String(s.links?.outcome));
+            return {
+                outcomeId: String(s.links?.outcome),
+                outcomeTitle: o?.title || "(unknown outcome)",
+                score: s.score,
+                mastery: o?.mastery_points ?? null,
+                assignmentTitle: s.title,
+                submitted_at: s.submitted_at
+            };
+        });
+
+        renderRows(rows);
+        setStatus(`Loaded ${rows.length} outcomes.`);
+    }
+
+    document.getElementById("loadBtn").addEventListener("click", () => {
+        loadOutcomeRollup().catch(e => { setStatus(""); setError(e); });
+    });
+
+    // Boot
+    loadStudentsAndCourses().catch(e => { setStatus(""); setError(e); });
+</script>
+</body>
+</html>
