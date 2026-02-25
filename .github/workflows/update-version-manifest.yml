@@ -37,6 +37,10 @@ jobs:
           cp versions.json site/versions.json
           echo "Version manifest updated at $(date)" > site/index.html
           echo "<pre>$(cat versions.json)</pre>" >> site/index.html
+          
+           # --- Add Parent App Mastery page ---
+          # Copy entire parent-mastery directory
+          cp -r parent-mastery site/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -54,4 +58,3 @@ jobs:
           echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
           cat versions.json >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
