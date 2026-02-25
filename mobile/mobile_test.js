@@ -1,13 +1,16 @@
 (function () {
     function add(msg) {
         var pre = document.getElementById("cg-mobile-debug");
+        if (!/\/courses\/\d+\/pages\/mastery-dashboard/.test(location.pathname)) return;
         if (!pre) {
             pre = document.createElement("pre");
             pre.id = "cg-mobile-debug";
-            pre.style.position = "fixed";
-            pre.style.bottom = "0";
+            pre.style.position = "absolute";
             pre.style.left = "0";
             pre.style.right = "0";
+            pre.style.bottom = "0";
+            pre.style.width = "100%";
+            pre.style.boxSizing = "border-box";
             pre.style.zIndex = "999999";
             pre.style.maxHeight = "40%";
             pre.style.overflow = "auto";
@@ -29,4 +32,9 @@
     add("has ENV: " + (typeof window.ENV !== "undefined"));
     add("body id: " + (document.body && document.body.id));
     add("body class: " + (document.body && document.body.className));
+    // If the mastery dashboard root exists, prove we can inject content here
+    var root = document.getElementById("parent-mastery-root");
+    if (root) {
+        root.innerHTML = '<div style="padding:12px;border:1px solid #ddd;border-radius:10px;margin:12px 0;">✅ Mobile theme JS can inject into Mastery Dashboard</div>';
+    }
 })();
