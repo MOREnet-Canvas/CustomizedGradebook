@@ -33,6 +33,7 @@ import { isDashboardPage, isGradebookPage, isSpeedGraderPage, isTeacherViewingSt
 import { CanvasApiClient } from "./utils/canvasApiClient.js";
 import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
+import { parentMasteryInit } from "./parentMastery/parentMasteryInit";
 
 /**
  * Main initialization function
@@ -59,6 +60,8 @@ import { isAdminDashboardPage } from "./admin/pageDetection.js";
         logger.info('[Init] On admin dashboard page, skipping normal CG initialization');
         return;
     }
+
+
 
     // Gradebook functionality (teacher-side)
     // Only run on gradebook pages, NOT SpeedGrader
@@ -154,7 +157,7 @@ import { isAdminDashboardPage } from "./admin/pageDetection.js";
     if (!window.CG) window.CG = {};
     window.CG.clearAllSnapshots = clearAllSnapshots;
 
-
+    parentMasteryInit().catch(err => logger.error("[ParentMastery] init failed", err));
 
 
 })();
