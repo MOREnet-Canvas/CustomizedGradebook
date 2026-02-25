@@ -600,22 +600,27 @@ async function fetchAvailableVersions() {
 
         const releases = await releasesResponse.json();
 
-        // Filter to v1.0.x releases and sort by version (newest first)
-        const v10Releases = releases
-            .filter(r => r.tag_name && r.tag_name.startsWith('v1.0.'))
+        // Filter to all v1.x releases and sort by semantic version (newest first)
+        const allReleases = releases
+            .filter(r => r.tag_name && /^v\d+\.\d+\.\d+$/.test(r.tag_name))
             .map(r => r.tag_name)
             .sort((a, b) => {
-                // Extract patch numbers (e.g., "v1.0.6" → 6)
-                const patchA = parseInt(a.split('.')[2] || '0', 10);
-                const patchB = parseInt(b.split('.')[2] || '0', 10);
-                return patchB - patchA; // Descending order
+                // Parse semantic version (e.g., "v1.2.3" → [1, 2, 3])
+                const parseVersion = (v) => v.substring(1).split('.').map(n => parseInt(n, 10));
+                const [majorA, minorA, patchA] = parseVersion(a);
+                const [majorB, minorB, patchB] = parseVersion(b);
+
+                // Compare major, then minor, then patch (descending)
+                if (majorB !== majorA) return majorB - majorA;
+                if (minorB !== minorA) return minorB - minorA;
+                return patchB - patchA;
             });
 
-        logger.info('[LoaderGeneratorPanel] Found v1.0.x releases:', v10Releases);
+        logger.info('[LoaderGeneratorPanel] Found releases:', allReleases);
 
         cachedVersionData = {
             latestVersion,
-            v10Releases
+            allReleases
         };
 
         return cachedVersionData;
@@ -626,7 +631,7 @@ async function fetchAvailableVersions() {
         logger.info('[LoaderGeneratorPanel] Using fallback hardcoded versions');
         cachedVersionData = {
             latestVersion: 'v1.0.6',
-            v10Releases: ['v1.0.6', 'v1.0.5', 'v1.0.4', 'v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0']
+            allReleases: ['v1.0.6', 'v1.0.5', 'v1.0.4', 'v1.0.3', 'v1.0.2', 'v1.0.1', 'v1.0.0']
         };
 
         return cachedVersionData;
@@ -654,7 +659,7 @@ function createVersionSelector() {
     // Fetch versions asynchronously
     (async () => {
         try {
-            const { latestVersion, v10Releases } = await fetchAvailableVersions();
+            const { latestVersion, allReleases } = await fetchAvailableVersions();
 
             // Clear loading indicator
             dropdown.innerHTML = '';
@@ -664,18 +669,22 @@ function createVersionSelector() {
 
             // Limit production versions to 5 most recent + currently installed (if older)
             const MAX_VERSIONS_TO_SHOW = 5;
-            const versionsToShow = new Set(v10Releases.slice(0, MAX_VERSIONS_TO_SHOW));
+            const versionsToShow = new Set(allReleases.slice(0, MAX_VERSIONS_TO_SHOW));
 
             // If installed version exists and is a production version not in the recent 5, add it
-            if (installedVersionValue && installedVersionValue.startsWith('v1.0.')) {
+            if (installedVersionValue && /^v\d+\.\d+\.\d+$/.test(installedVersionValue)) {
                 versionsToShow.add(installedVersionValue);
             }
 
-            // Convert to array and sort (newest first)
+            // Convert to array and sort (newest first) using semantic versioning
             const sortedVersions = Array.from(versionsToShow).sort((a, b) => {
-                const patchA = parseInt(a.split('.')[2] || '0', 10);
-                const patchB = parseInt(b.split('.')[2] || '0', 10);
-                return patchB - patchA; // Descending order
+                const parseVersion = (v) => v.substring(1).split('.').map(n => parseInt(n, 10));
+                const [majorA, minorA, patchA] = parseVersion(a);
+                const [majorB, minorB, patchB] = parseVersion(b);
+
+                if (majorB !== majorA) return majorB - majorA;
+                if (minorB !== minorA) return minorB - minorA;
+                return patchB - patchA;
             });
 
             // Add production versions with appropriate labels
@@ -697,9 +706,43 @@ function createVersionSelector() {
                 });
             });
 
+            // Generate auto-patch options for each unique minor version
+            const minorVersions = new Set();
+            allReleases.forEach(version => {
+                const match = version.match(/^v(\d+)\.(\d+)\./);
+                if (match) {
+                    const minorVersion = `v${match[1]}.${match[2]}`;
+                    minorVersions.add(minorVersion);
+                }
+            });
+
+            // Sort minor versions (newest first)
+            const sortedMinorVersions = Array.from(minorVersions).sort((a, b) => {
+                const parseMinor = (v) => v.substring(1).split('.').map(n => parseInt(n, 10));
+                const [majorA, minorA] = parseMinor(a);
+                const [majorB, minorB] = parseMinor(b);
+
+                if (majorB !== majorA) return majorB - majorA;
+                return minorB - minorA;
+            });
+
+            // Add auto-patch options for each minor version
+            sortedMinorVersions.forEach((minorVersion, index) => {
+                const track = `${minorVersion}-latest`;
+                const label = index === 0
+                    ? `Auto-Patch ${minorVersion}.x (Recommended)`
+                    : `Auto-Patch ${minorVersion}.x`;
+
+                versions.push({
+                    value: track,
+                    label: label,
+                    channel: 'auto-patch',
+                    track: track
+                });
+            });
+
             // Add special options
             versions.push(
-                { value: 'v1.0-latest', label: 'Auto-Patch v1.0.x (Recommended)', channel: 'auto-patch', track: 'v1.0-latest' },
                 { value: 'latest', label: 'Beta - Latest Release (Any Version)', channel: 'beta' },
                 { value: 'dev', label: 'Dev - Unstable Builds', channel: 'dev' }
             );
@@ -737,14 +780,18 @@ function createVersionSelector() {
             const fallbackVersionsToShow = new Set(fallbackAllVersions.slice(0, MAX_VERSIONS_TO_SHOW));
 
             // If installed version exists and is a production version not in the recent 5, add it
-            if (installedVersionValue && installedVersionValue.startsWith('v1.0.')) {
+            if (installedVersionValue && /^v\d+\.\d+\.\d+$/.test(installedVersionValue)) {
                 fallbackVersionsToShow.add(installedVersionValue);
             }
 
-            // Convert to array and sort (newest first)
+            // Convert to array and sort (newest first) using semantic versioning
             const sortedFallbackVersions = Array.from(fallbackVersionsToShow).sort((a, b) => {
-                const patchA = parseInt(a.split('.')[2] || '0', 10);
-                const patchB = parseInt(b.split('.')[2] || '0', 10);
+                const parseVersion = (v) => v.substring(1).split('.').map(n => parseInt(n, 10));
+                const [majorA, minorA, patchA] = parseVersion(a);
+                const [majorB, minorB, patchB] = parseVersion(b);
+
+                if (majorB !== majorA) return majorB - majorA;
+                if (minorB !== minorA) return minorB - minorA;
                 return patchB - patchA;
             });
 
