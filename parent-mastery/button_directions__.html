@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Parent Mastery Dashboard Setup</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f6f8fa;
+      margin: 0;
+      padding: 40px 20px;
+      color: #1f2937;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 28px;
+    }
+
+    h2 {
+      margin-top: 40px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 8px;
+      font-size: 20px;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      margin-top: -10px;
+      margin-bottom: 30px;
+    }
+
+    .step {
+      margin-bottom: 24px;
+    }
+
+    .note {
+      background: #eef6ff;
+      padding: 16px;
+      border-left: 4px solid #2563eb;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+
+    code {
+      font-family: Consolas, Monaco, monospace;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    .important {
+      background: #fff7ed;
+      border-left: 4px solid #f97316;
+      padding: 16px;
+      border-radius: 6px;
+      margin-top: 30px;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>Parent Mastery Dashboard Setup Instructions</h1>
+  <div class="subtitle">For Canvas Admins</div>
+
+  <p>
+    This guide will add a <strong>“View Mastery Dashboard”</strong> button to the top of a course Front Page
+    for use in the Canvas Parent app.
+  </p>
+
+  <h2>Step 1 — Get the Course ID</h2>
+
+  <div class="step">
+    <ol>
+      <li>Open the course in Canvas.</li>
+      <li>Look at the URL in your browser.</li>
+    </ol>
+
+    <p>It will look like:</p>
+
+    <pre><code>https://yourdistrict.instructure.com/courses/38297</code></pre>
+
+    <p>The number after <code>/courses/</code> is the <strong>Course ID</strong>.</p>
+
+    <p>In this example:</p>
+
+    <pre><code>38297</code></pre>
+
+    <p>Make note of that number.</p>
+  </div>
+
+  <h2>Step 2 — Create the Mastery Dashboard Page</h2>
+
+  <div class="step">
+    <ol>
+      <li>Go to <strong>Pages</strong> in the course.</li>
+      <li>Click <strong>+ Page</strong>.</li>
+      <li>Title the page:</li>
+    </ol>
+
+    <pre><code>Mastery Dashboard</code></pre>
+
+    <ol start="4">
+      <li>Click <strong>HTML Editor</strong> and paste:</li>
+    </ol>
+
+    <pre><code>&lt;div id="parent-mastery-root"&gt;&lt;/div&gt;</code></pre>
+
+    <ol start="5">
+      <li>Click <strong>Save &amp; Publish</strong>.</li>
+    </ol>
+  </div>
+
+  <h2>Step 3 — Add the Button to the Front Page</h2>
+
+  <div class="step">
+    <ol>
+      <li>Go to <strong>Pages → Front Page</strong>.</li>
+      <li>Click <strong>Edit</strong>.</li>
+      <li>Switch to the <strong>HTML Editor</strong>.</li>
+      <li>At the very top of the page content, paste the button below. Entire code block needs to be pasted.</li>
+    </ol>
+
+    <div class="note">
+      <strong>Replace <code>COURSE_ID</code> with the number from Step 1. (Note there are two places to replace.)</strong>
+    </div>
+
+    <pre><code>&lt;div style="margin: 16px 0;"&gt;
+  &lt;a
+    href="/courses/COURSE_ID/pages/mastery-dashboard?cg_web=1"
+      data-api-endpoint="/api/v1/courses/COURSE_ID/pages/mastery-dashboard"
+      data-api-returntype="Page"
+    style="display:block; padding:14px; background:#005f9e; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:16px; font-weight:600;"
+  &gt;
+    View Mastery Dashboard
+  &lt;/a&gt;
+  &lt;div style="font-size:12px; color:#666; margin-top:6px; text-align:center;"&gt;
+    For parents/observers using the Canvas Parent app
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+    <p>Example using course ID <code>38297</code>:</p>
+
+    <pre><code>
+      href="/courses/38297/pages/mastery-dashboard?cg_web=1"
+      data-api-endpoint="/api/v1/courses/38297/pages/mastery-dashboard"
+    </code></pre>
+
+    <ol start="5">
+      <li>Click <strong>Save &amp; Publish</strong>.</li>
+    </ol>
+  </div>
+
+  <h2>Step 4 — Confirm Homepage Setting</h2>
+
+  <div class="step">
+    <ol>
+      <li>Go to <strong>Settings → Course Details</strong>.</li>
+      <li>Under <strong>Homepage</strong>, ensure it is set to:</li>
+    </ol>
+
+    <pre><code>Pages Front Page</code></pre>
+
+    <ol start="3">
+      <li>Click <strong>Update Course Details</strong>.</li>
+    </ol>
+  </div>
+
+  <div class="important">
+    <h2>Important Notes</h2>
+    <ul>
+      <li>The <code>?cg_web=1</code> parameter is required so the Parent app opens the page in its internal web view.</li>
+      <li>The Mastery Dashboard functionality depends on the Mobile Theme script being installed at the root account.</li>
+      <li>The button can remain visible to all users. The dashboard page will only render data for observers.</li>
+    </ul>
+  </div>
+
+</div>
+
+</body>
+</html>
