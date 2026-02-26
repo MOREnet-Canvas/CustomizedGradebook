@@ -46,13 +46,13 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
-          name: github-pages-manifest
+          name: github-pages-manifest-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          artifact_name: github-pages-manifest
+          artifact_name: github-pages-manifest-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Summary
         run: |
