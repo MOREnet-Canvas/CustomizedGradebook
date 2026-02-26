@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Parent Mastery Dashboard Setup Instructions</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6;">
+
+<h1>Parent Mastery Dashboard Setup Instructions</h1>
+<p><em>For Canvas Admins</em></p>
+
+<p>
+  This will add a <strong>“View Mastery Dashboard”</strong> button to the top of a course Front Page
+  for use in the Canvas Parent app.
+</p>
+
+<hr>
+
+<h2>Step 1 — Get the Course ID</h2>
+
+<ol>
+  <li>Open the course in Canvas.</li>
+  <li>Look at the URL in your browser.</li>
+</ol>
+
+<p>It will look like:</p>
+
+<pre>https://yourdistrict.instructure.com/courses/38297</pre>
+
+<p>
+  The number after <code>/courses/</code> is the <strong>Course ID</strong>.
+</p>
+
+<p>In this example:</p>
+
+<pre>38297</pre>
+
+<p>Make note of that number.</p>
+
+<hr>
+
+<h2>Step 2 — Create the Mastery Dashboard Page</h2>
+
+<ol>
+  <li>Go to <strong>Pages</strong> in the course.</li>
+  <li>Click <strong>+ Page</strong>.</li>
+  <li>Title the page: <strong>Mastery Dashboard</strong></li>
+  <li>Click <strong>HTML Editor</strong> and paste:</li>
+</ol>
+
+<pre>&lt;div id="parent-mastery-root"&gt;&lt;/div&gt;</pre>
+
+<ol start="5">
+  <li>Click <strong>Save &amp; Publish</strong>.</li>
+</ol>
+
+<hr>
+
+<h2>Step 3 — Add the Button to the Front Page</h2>
+
+<ol>
+  <li>Go to <strong>Pages → Front Page</strong>.</li>
+  <li>Click <strong>Edit</strong>.</li>
+  <li>Switch to the <strong>HTML Editor</strong>.</li>
+  <li>At the very top of the page content, paste the button below.</li>
+</ol>
+
+<h3>Replace <code>COURSE_ID</code> with the number from Step 1</h3>
+
+<pre>
+&lt;div style="margin: 16px 0;"&gt;
+  &lt;a
+    href="/courses/COURSE_ID/pages/mastery-dashboard?cg_web=1"
+    style="display:block; padding:14px; background:#005f9e; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:16px; font-weight:600;"
+  &gt;
+    View Mastery Dashboard
+  &lt;/a&gt;
+  &lt;div style="font-size:12px; color:#666; margin-top:6px; text-align:center;"&gt;
+    For parents/observers using the Canvas Parent app
+  &lt;/div&gt;
+&lt;/div&gt;
+  </pre>
+
+<p><strong>Example using course ID 38297:</strong></p>
+
+<pre>
+href="/courses/38297/pages/mastery-dashboard?cg_web=1"
+  </pre>
+
+<ol start="5">
+  <li>Click <strong>Save &amp; Publish</strong>.</li>
+</ol>
+
+<hr>
+
+<h2>Step 4 — Confirm Homepage Setting</h2>
+
+<ol>
+  <li>Go to <strong>Settings → Course Details</strong>.</li>
+  <li>
+    Under <strong>Homepage</strong>, ensure it is set to:
+    <pre>Pages Front Page</pre>
+  </li>
+  <li>Click <strong>Update Course Details</strong>.</li>
+</ol>
+
+<hr>
+
+<h2>Important Notes</h2>
+
+<ul>
+  <li>The <code>?cg_web=1</code> parameter is required so the Parent app opens the page in its internal web view.</li>
+  <li>The Mastery Dashboard functionality depends on the Mobile Theme script being installed at the root account.</li>
+  <li>The button can remain visible to all users. The dashboard page will only render data for observers.</li>
+</ul>
+
+</body>
+</html>
