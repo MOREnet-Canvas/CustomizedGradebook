@@ -141,11 +141,11 @@
       <li>Go to <strong>Pages → Front Page</strong>.</li>
       <li>Click <strong>Edit</strong>.</li>
       <li>Switch to the <strong>HTML Editor</strong>.</li>
-      <li>At the very top of the page content, paste the button below.</li>
+      <li>At the very top of the page content, paste the button below. Entire code block needs to be pasted.</li>
     </ol>
 
     <div class="note">
-      <strong>Replace <code>COURSE_ID</code> with the number from Step 1.</strong>
+      <strong>Replace <code>COURSE_ID</code> with the number from Step 1. (Note there are two places to replace.)</strong>
     </div>
 
     <pre><code>&lt;div style="margin: 16px 0;"&gt;
@@ -164,7 +164,10 @@
 
     <p>Example using course ID <code>38297</code>:</p>
 
-    <pre><code>href="/courses/38297/pages/mastery-dashboard?cg_web=1"</code></pre>
+    <pre><code>
+      href="/courses/38297/pages/mastery-dashboard?cg_web=1"
+      data-api-endpoint="/api/v1/courses/38297/pages/mastery-dashboard"
+    </code></pre>
 
     <ol start="5">
       <li>Click <strong>Save &amp; Publish</strong>.</li>
