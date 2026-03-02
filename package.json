@@ -13,8 +13,9 @@
     "release:patch": "npm version patch && git push --follow-tags && npm run deploy:prod && gh workflow run update-version-manifest.yml",
     "release:minor": "npm version minor && git push --follow-tags && npm run deploy:prod && gh workflow run update-version-manifest.yml",
     "release:major": "npm version major && git push --follow-tags && npm run deploy:prod && gh workflow run update-version-manifest.yml",
-    "release:mobile:patch": "cd mobile && npm version patch && cd .. && git push --follow-tags && npm run deploy:mobile",
-    "release:mobile:minor": "cd mobile && npm version minor && cd .. && git push --follow-tags && npm run deploy:mobile"
+    "release:mobile:patch": "node buildScripts/release-mobile.js patch",
+    "release:mobile:minor": "node buildScripts/release-mobile.js minor",
+    "release:mobile:major": "node buildScripts/release-mobile.js major"
   },
   "devDependencies": {
     "esbuild": "^0.27.0",
