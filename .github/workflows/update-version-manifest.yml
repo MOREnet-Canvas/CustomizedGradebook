@@ -35,9 +35,8 @@ jobs:
         run: |
           mkdir -p site
           cp versions.json site/versions.json
-          echo "Version manifest updated at $(date)" > site/index.html
-          echo "<pre>$(cat versions.json)</pre>" >> site/index.html
-          
+          cp github-pages/index.html site/index.html
+
            # --- Add Parent App Mastery page ---
           # Copy entire parent-mastery directory
           cp -r parent-mastery site/
