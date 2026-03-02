@@ -13,9 +13,19 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
+    - navigation.top
     - content.code.copy
+    - search.suggest
+    - search.highlight
 
 nav:
   - Home: index.md
   - Admin Dashboard: admin-dashboard.md
   - Account Filtering: account-filtering.md
+  - Mobile Module:
+      - Overview: mobile/overview.md
+      - Installation: mobile/installation.md
+      - Setup Guide: mobile/setup.md
+  - Development:
+      - Workflows: development/workflows.md
+      - Versioning: development/versioning.md
