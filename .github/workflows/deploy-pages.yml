@@ -1,0 +1,88 @@
+name: Deploy GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs-src/**'
+      - 'mkdocs.yml'
+      - 'github-pages/**'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history and tags
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install MkDocs
+        run: |
+          pip install mkdocs-material
+
+      - name: Generate version manifest
+        run: node buildScripts/update-version-manifest.js
+
+      - name: Build MkDocs documentation
+        run: mkdocs build
+
+      - name: Prepare unified Pages artifact
+        run: |
+          mkdir -p site
+          # Copy MkDocs output to /docs subdirectory
+          cp -r docs site/docs
+          # Copy versions.json to root
+          cp versions.json site/versions.json
+          # Copy landing page to root
+          cp github-pages/index.html site/index.html
+          # Copy button directions to root
+          cp github-pages/button_directions.html site/button_directions.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Summary
+        run: |
+          echo "## GitHub Pages Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### URLs:" >> $GITHUB_STEP_SUMMARY
+          echo "- Landing Page: https://morenet-canvas.github.io/CustomizedGradebook/" >> $GITHUB_STEP_SUMMARY
+          echo "- Documentation: https://morenet-canvas.github.io/CustomizedGradebook/docs/" >> $GITHUB_STEP_SUMMARY
+          echo "- Button Setup: https://morenet-canvas.github.io/CustomizedGradebook/button_directions.html" >> $GITHUB_STEP_SUMMARY
+          echo "- Version API: https://morenet-canvas.github.io/CustomizedGradebook/versions.json" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Version Manifest:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat versions.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
