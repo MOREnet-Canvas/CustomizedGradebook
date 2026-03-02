@@ -32,28 +32,26 @@ If you installed the mobile loader, the button will appear automatically once th
 2. Click **+ Page**
 3. Set the page title: **Mastery Dashboard**
 4. Click **HTML Editor** (top right)
-5. Paste this code:
-   ```html
-   <div id="parent-mastery-root"></div>
-   ```
+5. Paste this code:`<div id="parent-mastery-root"></div>`
 6. Click **Save & Publish**
 
 !!! note "Page Title Must Match"
     The page must be titled exactly **"Mastery Dashboard"** for the mobile module to find it.
 
-## Step 3: Verify the Button Appears
+## Step 3: Add Button to Course Front Page
 
-If you installed the mobile loader:
+You must manually add a button to each course's Front Page that links to the Mastery Dashboard.
 
-1. Open the Canvas Parent app
-2. Log in as a parent/observer
-3. Navigate to the course
-4. Open the **Front Page**
-5. You should see a **"View Mastery Dashboard"** button at the top
+1. Go to the [Button Setup Tool](https://morenet-canvas.github.io/CustomizedGradebook/button_directions.html)
+2. Enter the Course ID (from Step 1)
+3. Copy the generated button code
+4. In the course, go to **Pages → Front Page**
+5. Click **Edit**
+6. Switch to **HTML Editor**
+7. Paste the button code at the very top
+8. Click **Save & Publish**
 
-## Alternative: Manual Button Code
-
-If you prefer not to use the loader, you can add the button manually to each course:
+The button will appear on the Front Page for parents/observers in the Canvas Parent app.
 
 ### Generate Button Code
 
@@ -147,4 +145,3 @@ It only shows for parent/observer accounts.
 
 - [Workflows](../development/workflows.md) - Learn about dev/prod release workflows
 - [Versioning](../development/versioning.md) - Understand version tracks and updates
-
