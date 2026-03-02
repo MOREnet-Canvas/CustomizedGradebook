@@ -36,10 +36,7 @@ jobs:
           mkdir -p site
           cp versions.json site/versions.json
           cp github-pages/index.html site/index.html
-
-           # --- Add Parent App Mastery page ---
-          # Copy entire parent-mastery directory
-          cp -r parent-mastery site/
+          cp github-pages/button_directions.html site/button_directions.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
