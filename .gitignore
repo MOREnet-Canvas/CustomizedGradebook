@@ -17,3 +17,6 @@ node_modules/
 old_code/
 
 dist/
+
+# Generated documentation (built by MkDocs)
+/docs
