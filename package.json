@@ -9,9 +9,9 @@
     "test": "vitest",
     "deploy:dev": "npm run build:dev && gh release upload dev dist/dev/customGradebookInit.js dist/dev/customGradebookInit.js.map --clobber",
     "deploy:prod": "npm run build:prod && node buildScripts/deploy-prod.js",
-    "release:patch": "npm version patch && git push --follow-tags && npm run deploy:prod",
-    "release:minor": "npm version minor && git push --follow-tags && npm run deploy:prod",
-    "release:major": "npm version major && git push --follow-tags && npm run deploy:prod"
+    "release:patch": "npm version patch && git push --follow-tags && npm run deploy:prod && gh workflow run update-version-manifest.yml",
+    "release:minor": "npm version minor && git push --follow-tags && npm run deploy:prod && gh workflow run update-version-manifest.yml",
+    "release:major": "npm version major && git push --follow-tags && npm run deploy:prod && gh workflow run update-version-manifest.yml"
   },
   "devDependencies": {
     "esbuild": "^0.27.0",
