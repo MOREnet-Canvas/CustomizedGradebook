@@ -52,6 +52,40 @@
             margin: 20px 0;
         }
 
+        .prerequisite {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+
+        .important {
+            background: #fff7ed;
+            border-left: 4px solid #f97316;
+            padding: 16px;
+            border-radius: 6px;
+            margin-top: 30px;
+        }
+
+        .nav-links {
+            background: #f3f4f6;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .nav-links a {
+            color: #005f9e;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
         pre {
             background: #0f172a;
             color: #f8fafc;
@@ -97,27 +131,47 @@
             font-size: 14px;
             margin-left: 8px;
         }
-
-        .important {
-            background: #fff7ed;
-            border-left: 4px solid #f97316;
-            padding: 16px;
-            border-radius: 6px;
-            margin-top: 30px;
-        }
     </style>
 </head>
 <body>
 
 <div class="container">
 
+    <div class="nav-links">
+        ← <a href="/CustomizedGradebook/">Back to Home</a> |
+        <a href="/CustomizedGradebook/docs/">View Full Documentation</a>
+    </div>
+
     <h1>Parent Mastery Dashboard Setup Instructions</h1>
     <div class="subtitle">For Canvas Admins</div>
 
     <p>
-        This guide will add a <strong>“View Mastery Dashboard”</strong> button to the top of a course Front Page
-        for use in the Canvas Parent app.
+        This guide will help you enable the <strong>Parent Mastery Dashboard</strong> for courses in the Canvas Parent app.
+        Parents/observers will see a button on the course Front Page that links to a mastery tracking dashboard.
     </p>
+
+    <div class="prerequisite">
+        <h2 style="margin-top: 0; border: none; padding: 0;">⚠️ Prerequisite: Install Mobile Loader</h2>
+        <p><strong>Before setting up individual courses, you must install the Mobile Loader once in your Canvas Mobile Theme.</strong></p>
+        <p>The loader provides the JavaScript code that powers the Parent Mastery Dashboard. Without it, the dashboard will not function.</p>
+        <p><strong>Installation:</strong></p>
+        <ol>
+            <li>Go to <strong>Account → Themes → Mobile</strong></li>
+            <li>Click <strong>Edit</strong> on your mobile theme</li>
+            <li>Download the loader: <a href="https://github.com/MOREnet-Canvas/CustomizedGradebook/blob/main/loader%20files/mobile_loader.js" target="_blank">mobile_loader.js</a></li>
+            <li>Paste the entire file into the JavaScript section</li>
+            <li>Click <strong>Save</strong></li>
+        </ol>
+        <p><strong>Version selection:</strong> Edit the <code>MOBILE_VERSION</code> variable in the loader:</p>
+        <ul>
+            <li><code>"mobile-dev"</code> - Latest development build (auto-updated)</li>
+            <li><code>"mobile-v0.1.1"</code> - Specific stable release (recommended for production)</li>
+        </ul>
+        <p>📖 <a href="/CustomizedGradebook/docs/mobile/installation/">Detailed installation guide</a></p>
+    </div>
+
+    <h2>Per-Course Setup</h2>
+    <p>After installing the mobile loader, follow these steps for each course where you want to enable the Parent Mastery Dashboard:</p>
 
     <h2>Step 1 — Get the Course ID</h2>
 
@@ -142,7 +196,12 @@
         <li>Click <strong>Save & Publish</strong>.</li>
     </ol>
 
-    <h2>Step 3 — Generate the Button Code</h2>
+    <h2>Step 3 — Add Button to Front Page (Optional)</h2>
+
+    <div class="note">
+        <p><strong>Note:</strong> If you installed the mobile loader, the button may appear automatically.
+        If you prefer to add a custom button or the automatic button is not appearing, follow these steps:</p>
+    </div>
 
     <p>Enter the Course ID and copy the generated button code below.</p>
 
@@ -161,41 +220,14 @@
         <li>Click <strong>Save & Publish</strong>.</li>
     </ol>
 
-    <h2>Alternative: Use the Mobile Loader (Recommended)</h2>
-
-    <div class="note">
-        <p><strong>For easier management and automatic updates:</strong></p>
-        <p>Instead of adding buttons to each course, you can install the Mobile Loader once in your Canvas Mobile Theme. This will automatically load the Parent Mastery module for all courses.</p>
-
-        <p><strong>Benefits:</strong></p>
-        <ul>
-            <li>Install once, works for all courses</li>
-            <li>Easy to switch between dev and stable versions</li>
-            <li>Updates without touching Canvas Theme</li>
-        </ul>
-
-        <p><strong>Installation:</strong></p>
-        <ol>
-            <li>Go to <strong>Account → Themes → Mobile</strong></li>
-            <li>Click <strong>Edit</strong> on your mobile theme</li>
-            <li>Download the loader: <a href="https://github.com/MOREnet-Canvas/CustomizedGradebook/blob/main/loader%20files/mobile_loader.js" target="_blank">mobile_loader.js</a></li>
-            <li>Paste the entire file into the JavaScript section</li>
-            <li>Click <strong>Save</strong></li>
-        </ol>
-
-        <p><strong>Switching versions:</strong> Edit the <code>MOBILE_VERSION</code> variable in the loader:</p>
-        <ul>
-            <li><code>"mobile-dev"</code> - Latest development build (auto-updated)</li>
-            <li><code>"mobile-v0.1.1"</code> - Specific stable release</li>
-        </ul>
-    </div>
-
     <div class="important">
         <h2>Important Notes</h2>
         <ul>
+            <li>The mobile loader must be installed for the dashboard to work.</li>
             <li>The <code>?cg_web=1</code> parameter is required for the Parent app webview.</li>
             <li>All links are relative, so this works in test, beta, and production environments.</li>
-            <li>The dashboard only renders data for observers.</li>
+            <li>The dashboard only renders data for observers (parent accounts).</li>
+            <li>Each course needs its own "Mastery Dashboard" page created (Step 2).</li>
         </ul>
     </div>
 
