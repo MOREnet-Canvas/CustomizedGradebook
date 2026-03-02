@@ -161,6 +161,35 @@
         <li>Click <strong>Save & Publish</strong>.</li>
     </ol>
 
+    <h2>Alternative: Use the Mobile Loader (Recommended)</h2>
+
+    <div class="note">
+        <p><strong>For easier management and automatic updates:</strong></p>
+        <p>Instead of adding buttons to each course, you can install the Mobile Loader once in your Canvas Mobile Theme. This will automatically load the Parent Mastery module for all courses.</p>
+
+        <p><strong>Benefits:</strong></p>
+        <ul>
+            <li>Install once, works for all courses</li>
+            <li>Easy to switch between dev and stable versions</li>
+            <li>Updates without touching Canvas Theme</li>
+        </ul>
+
+        <p><strong>Installation:</strong></p>
+        <ol>
+            <li>Go to <strong>Account → Themes → Mobile</strong></li>
+            <li>Click <strong>Edit</strong> on your mobile theme</li>
+            <li>Download the loader: <a href="https://github.com/MOREnet-Canvas/CustomizedGradebook/blob/main/loader%20files/mobile_loader.js" target="_blank">mobile_loader.js</a></li>
+            <li>Paste the entire file into the JavaScript section</li>
+            <li>Click <strong>Save</strong></li>
+        </ol>
+
+        <p><strong>Switching versions:</strong> Edit the <code>MOBILE_VERSION</code> variable in the loader:</p>
+        <ul>
+            <li><code>"mobile-dev"</code> - Latest development build (auto-updated)</li>
+            <li><code>"mobile-v0.1.1"</code> - Specific stable release</li>
+        </ul>
+    </div>
+
     <div class="important">
         <h2>Important Notes</h2>
         <ul>
