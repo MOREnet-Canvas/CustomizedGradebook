@@ -554,7 +554,7 @@ export async function renderLoaderGeneratorPanel(root, currentConfig) {
     // 2. Account Filter (separate panel)
     logger.debug('[LoaderGeneratorPanel] Rendering account filter panel...');
     const { renderAccountFilterPanel } = await import('./accountFilterPanel.js');
-    renderAccountFilterPanel(root, currentConfig);
+    await renderAccountFilterPanel(root, currentConfig);
 
     // 3. Configuration panel (separate panel) - AWAIT because it fetches feature flag
     const { container: configPanel, controls } = await createConfigurationPanel();
@@ -568,7 +568,7 @@ export async function renderLoaderGeneratorPanel(root, currentConfig) {
         getConfig: () => currentConfig || window.CG_MANAGED?.config || {},
         updateConfig: () => {} // No-op for now
     };
-    renderCustomGradeStatusPanel(root, ctx);
+    await renderCustomGradeStatusPanel(root, ctx);
 
     // 5. Grading Schemes Panel (separate panel)
     const gradingSchemesContainer = createElement('div', {
