@@ -542,25 +542,41 @@ function createGeneratorPanel(versionDropdown, controls) {
  * Render loader generator panel
  *
  * @param {HTMLElement} root - Root container element
+ * @param {Object} currentConfig - Current configuration from context
  */
-export async function renderLoaderGeneratorPanel(root) {
+export async function renderLoaderGeneratorPanel(root, currentConfig) {
     logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
 
     // 1. Version selector (separate panel)
     const { versionSelector, versionDropdown } = createVersionSelector();
     root.appendChild(versionSelector);
 
-    // 2. Configuration panel (separate panel) - AWAIT because it fetches feature flag
+    // 2. Account Filter (separate panel)
+    logger.debug('[LoaderGeneratorPanel] Rendering account filter panel...');
+    const { renderAccountFilterPanel } = await import('./accountFilterPanel.js');
+    renderAccountFilterPanel(root, currentConfig);
+
+    // 3. Configuration panel (separate panel) - AWAIT because it fetches feature flag
     const { container: configPanel, controls } = await createConfigurationPanel();
     root.appendChild(configPanel);
 
-    // 3. Grading Schemes Panel (separate panel)
+    // 4. Custom Grade Statuses (separate panel)
+    logger.debug('[LoaderGeneratorPanel] Rendering custom grade status panel...');
+    const { renderCustomGradeStatusPanel } = await import('./customGradeStatusPanel.js');
+    // Create a minimal context object for the panel
+    const ctx = {
+        getConfig: () => currentConfig || window.CG_MANAGED?.config || {},
+        updateConfig: () => {} // No-op for now
+    };
+    renderCustomGradeStatusPanel(root, ctx);
+
+    // 5. Grading Schemes Panel (separate panel)
     const gradingSchemesContainer = createElement('div', {
         style: { marginBottom: '16px' }
     });
     root.appendChild(gradingSchemesContainer);
 
-    // 4. Generate Combined Loader panel (LAST)
+    // 6. Generate Combined Loader panel (LAST)
     const { panel: generatorPanel, tryAutoLoad } = createGeneratorPanel(versionDropdown, controls);
     root.appendChild(generatorPanel);
 
