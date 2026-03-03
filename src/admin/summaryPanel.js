@@ -301,7 +301,10 @@ async function buildInstalledAccountCell(accountId) {
 function formatThemeAsset(url, label) {
     if (!url) return "Not installed";
 
-    const file = url.split("?")[0].split("/").pop();
+    // Extract filename from URL and decode URL encoding (e.g., %20 → space, %28 → "(")
+    const encodedFile = url.split("?")[0].split("/").pop();
+    const file = decodeURIComponent(encodedFile);
+
     const dateMatch = file?.match(/\d{4}-\d{2}-\d{2}/);
     const date = dateMatch ? dateMatch[0] : null;
 
