@@ -18,7 +18,6 @@ export function renderSummaryPanel(container, ctx) {
     // Build rows synchronously with placeholders
     const rows = [
         ["Installed on Account", installedAccountPlaceholder(accountId)],
-        ["Current Version", formatCurrentVersion()],
         ["Account Filter", formatAccountFilter(getConfigNow(ctx))],
         ["Theme JS", formatThemeAsset(jsUrl, "Theme JavaScript")],
         ["Theme CSS", formatThemeAsset(cssUrl, "Theme CSS")],
@@ -389,54 +388,6 @@ function formatCustomStatus(config) {
  */
 function formatBoolean(value) {
     return value ? "Yes" : "No";
-}
-
-/* ---------------------------
-   Current Version
----------------------------- */
-
-/**
- * Format current version from window.CG_MANAGED.release
- * @returns {string|Object} Version string or HTML object
- */
-function formatCurrentVersion() {
-    const release = window.CG_MANAGED?.release;
-
-    if (!release) {
-        return {
-            html: `<span style="color:#999;">Not loaded yet</span>`
-        };
-    }
-
-    const { channel, version, versionTrack } = release;
-
-    // Format channel name
-    let channelLabel = channel;
-    if (channel === 'dev') channelLabel = 'Development';
-    else if (channel === 'prod' || channel === 'production') channelLabel = 'Production';
-    else if (channel === 'auto-patch') channelLabel = 'Auto-Patch';
-
-    // Build version display
-    let versionDisplay = '';
-
-    if (channel === 'auto-patch' && versionTrack) {
-        versionDisplay = `${channelLabel} (${versionTrack})`;
-    } else if (version) {
-        versionDisplay = `${channelLabel} · ${version}`;
-    } else {
-        versionDisplay = channelLabel;
-    }
-
-    return {
-        html: `
-            <div>
-                <strong>${escapeHtml(versionDisplay)}</strong>
-                <div style="margin-top:4px; color:#6b7785; font-size:12px;">
-                    Currently installed version
-                </div>
-            </div>
-        `
-    };
 }
 
 /* ---------------------------

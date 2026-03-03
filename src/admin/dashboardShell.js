@@ -23,11 +23,9 @@ import { createDashboardContext } from './dashboardContext.js';
 
 // Import existing panel renderers (will be refactored incrementally)
 import { renderThemeStatusPanels } from './themeStatusPanel.js';
-import { renderAccountFilterPanel } from './accountFilterPanel.js';
 import { renderThemeCssEditorPanel } from './themeCssEditorPanel.js';
 import { renderLoaderGeneratorPanel } from './loaderGeneratorPanel.js';
 import { renderSummaryPanel } from './summaryPanel.js';
-import { renderCustomGradeStatusPanel } from './customGradeStatusPanel.js';
 
 import {
     createBreadcrumbs,
