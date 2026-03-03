@@ -1428,7 +1428,7 @@ function generateGradingSchemeExamplesHTML() {
  * @param {Array} schemes - Array of grading schemes
  */
 export function renderGradingSchemesPanel(root, schemes) {
-    const { panel, body } = createCollapsiblePanel(`Grading Schemes (${schemes.length} found)`, false);
+    const { panel, body } = createCollapsiblePanel(`Grading Schemes (${schemes.length} found)`, true);
     root.appendChild(panel);
 
     if (schemes.length === 0) {
