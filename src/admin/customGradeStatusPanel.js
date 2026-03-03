@@ -32,8 +32,8 @@ import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
 export async function renderCustomGradeStatusPanel(container, ctx) {
     logger.debug('[CustomGradeStatusPanel] Rendering custom grade status panel');
 
-    // Create collapsible panel
-    const { panel, body } = createCollapsiblePanel('📊 Custom Grade Statuses', false, 'cg-section-settings');
+    // Create collapsible panel (collapsed by default)
+    const { panel, body } = createCollapsiblePanel('📊 Custom Grade Statuses', true, 'cg-section-settings');
 
     // Show loading state
     const loadingEl = createElement('div', {

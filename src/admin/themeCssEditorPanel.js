@@ -24,7 +24,7 @@ import { fetchTextWithTimeout } from './fetchHelpers.js';
 export function renderThemeCssEditorPanel(root) {
     logger.debug('[ThemeCssEditorPanel] Rendering theme CSS editor panel');
 
-    const { panel, body } = createCollapsiblePanel('Theme CSS Editor');
+    const { panel, body } = createCollapsiblePanel('Theme CSS Editor', true);
     const installedCssUrl = getInstalledThemeCssUrl();
 
     // Info message using CSS class

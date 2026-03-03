@@ -341,7 +341,7 @@ export async function renderAccountFilterPanel(root, currentConfig = {}) {
     }
 
     logger.trace('[AccountFilter] Creating collapsible panel...');
-    const { panel, body } = createCollapsiblePanel('Account Filter', false, 'cg-section-account-filter');
+    const { panel, body } = createCollapsiblePanel('Account Filter', true, 'cg-section-account-filter');
     logger.trace('[AccountFilter] Panel created:', panel);
 
     // Add description at the top
