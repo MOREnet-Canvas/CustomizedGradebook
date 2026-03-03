@@ -301,9 +301,16 @@ async function buildInstalledAccountCell(accountId) {
 function formatThemeAsset(url, label) {
     if (!url) return "Not installed";
 
-    // Extract filename from URL and decode URL encoding (e.g., %20 → space, %28 → "(")
+    // Extract filename from URL and decode URL encoding (handles double-encoding)
     const encodedFile = url.split("?")[0].split("/").pop();
-    const file = decodeURIComponent(encodedFile);
+    let file = decodeURIComponent(encodedFile);
+
+    // Decode again to handle double-encoding (e.g., %2528 → %28 → "(")
+    try {
+        file = decodeURIComponent(file);
+    } catch (e) {
+        // If second decode fails, use the first decoded version
+    }
 
     const dateMatch = file?.match(/\d{4}-\d{2}-\d{2}/);
     const date = dateMatch ? dateMatch[0] : null;
