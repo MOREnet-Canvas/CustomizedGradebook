@@ -43,6 +43,45 @@ import {
 let globalMarkAsChanged = null;
 
 /**
+ * Fetch final grade override feature flag status
+ *
+ * @param {string} accountId - Account ID
+ * @returns {Promise<Object|null>} Feature flag data or null on error
+ */
+async function fetchFinalGradeOverrideStatus(accountId) {
+    logger.debug(`[LoaderGeneratorPanel] Checking final_grades_override feature for account: ${accountId}`);
+
+    const url = `/api/v1/accounts/${accountId}/features/flags/final_grades_override`;
+
+    try {
+        const res = await fetch(url, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { Accept: "application/json" }
+        });
+
+        const ct = res.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+            logger.warn('[LoaderGeneratorPanel] Expected JSON but got:', ct);
+            return null;
+        }
+
+        if (!res.ok) {
+            logger.warn(`[LoaderGeneratorPanel] HTTP ${res.status}: ${res.statusText}`);
+            return null;
+        }
+
+        const data = await res.json();
+        logger.debug('[LoaderGeneratorPanel] Feature flag data:', data);
+
+        return data;
+    } catch (err) {
+        logger.warn('[LoaderGeneratorPanel] Error fetching feature flag:', err);
+        return null;
+    }
+}
+
+/**
  * Parse configuration settings from Section B (CG_MANAGED block)
  *
  * @param {string} sectionB - Section B content
@@ -255,7 +294,7 @@ function populateConfigurationControls(controls, parsedSettings) {
  * @returns {Object} { panel, tryAutoLoad }
  */
 function createGeneratorPanel(versionDropdown, controls) {
-    const { panel, body } = createCollapsiblePanel('Generate Combined Loader (A+B+C Model)', false, 'cg-section-loader');
+    const { panel, body } = createCollapsiblePanel('Generate Combined Loader (A+B+C Model)', true, 'cg-section-loader');
 
     const installedUrl = getInstalledThemeJsUrl();
 
@@ -504,15 +543,15 @@ function createGeneratorPanel(versionDropdown, controls) {
  *
  * @param {HTMLElement} root - Root container element
  */
-export function renderLoaderGeneratorPanel(root) {
+export async function renderLoaderGeneratorPanel(root) {
     logger.debug('[LoaderGeneratorPanel] Rendering loader generator panel');
 
     // 1. Version selector (separate panel)
     const { versionSelector, versionDropdown } = createVersionSelector();
     root.appendChild(versionSelector);
 
-    // 2. Configuration panel (separate panel)
-    const { container: configPanel, controls } = createConfigurationPanel();
+    // 2. Configuration panel (separate panel) - AWAIT because it fetches feature flag
+    const { container: configPanel, controls } = await createConfigurationPanel();
     root.appendChild(configPanel);
 
     // 3. Grading Schemes Panel (separate panel)
@@ -643,7 +682,7 @@ async function fetchAvailableVersions() {
  */
 function createVersionSelector() {
     // Create collapsible panel wrapper
-    const { panel, body } = createCollapsiblePanel('📦 Customized Gradebook Version', false);
+    const { panel, body } = createCollapsiblePanel('📦 Customized Gradebook Version', true);
 
     const { container, select: dropdown } = createSelectGroup({
         label: 'Customized Gradebook Version',
@@ -866,8 +905,15 @@ function generateDownloadFilename(version) {
 /**
  * Create configuration panel with all settings
  */
-function createConfigurationPanel() {
-    const { panel: container, body } = createCollapsiblePanel('⚙️ Configuration Settings', false);
+async function createConfigurationPanel() {
+    const { panel: container, body } = createCollapsiblePanel('⚙️ Configuration Settings', true);
+
+    // Fetch Final Grade Override feature flag status
+    const accountId = getAccountId();
+    const featureData = await fetchFinalGradeOverrideStatus(accountId);
+
+    // Determine if Grade Override is enabled at root account
+    const isGradeOverrideEnabled = featureData && (featureData.state === 'allowed_on' || featureData.state === 'on' || featureData.state === 'allowed');
 
     // Feature Flags Section
     const featureSection = createElement('div', {
@@ -894,11 +940,22 @@ function createConfigurationPanel() {
         id: 'cfg_enableStudentGrade',
         checked: DEFAULT_ENABLE_STUDENT_GRADE_CUSTOMIZATION
     });
+
+    // Enable Grade Override checkbox with conditional tooltip and disabled state
     const enableGradeOverride = createCheckbox({
         label: 'Enable Grade Override',
         id: 'cfg_enableGradeOverride',
-        checked: DEFAULT_ENABLE_GRADE_OVERRIDE
+        checked: isGradeOverrideEnabled ? DEFAULT_ENABLE_GRADE_OVERRIDE : false,
+        tooltip: isGradeOverrideEnabled ? '' : 'Must be enabled in Canvas at the root account before it can be enabled here',
+        attrs: isGradeOverrideEnabled ? {} : { disabled: true }
     });
+
+    // If disabled, add visual styling to indicate it's disabled
+    if (!isGradeOverrideEnabled) {
+        enableGradeOverride.container.style.opacity = '0.5';
+        enableGradeOverride.container.style.cursor = 'not-allowed';
+    }
+
     const enforceCourseOverride = createCheckbox({
         label: 'Enforce Course Override Setting',
         id: 'cfg_enforceCourseOverride',
