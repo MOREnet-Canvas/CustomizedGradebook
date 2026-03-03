@@ -42,8 +42,16 @@ function navigateToPanel(targetId) {
         }
     });
 
-    // Scroll to the target panel
-    targetPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Scroll to the target panel with offset for sticky header
+    const header = document.querySelector('.cg-toolbar');
+    const headerHeight = header ? header.offsetHeight : 0;
+    const panelTop = targetPanel.getBoundingClientRect().top + window.scrollY;
+    const offset = 20; // 20px padding above the panel
+
+    window.scrollTo({
+        top: panelTop - headerHeight - offset,
+        behavior: "smooth"
+    });
 }
 
 export function renderHeader(container) {
