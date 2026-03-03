@@ -33,7 +33,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
     logger.debug('[CustomGradeStatusPanel] Rendering custom grade status panel');
 
     // Create collapsible panel
-    const { panel, body } = createCollapsiblePanel('📊 Custom Grade Statuses');
+    const { panel, body } = createCollapsiblePanel('📊 Custom Grade Statuses', false, 'cg-section-settings');
 
     // Show loading state
     const loadingEl = createElement('div', {
@@ -76,13 +76,38 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
     const enableCustomStatus = config.ENABLE_GRADE_CUSTOM_STATUS || false;
     const enableNegativeZeroCount = config.ENABLE_NEGATIVE_ZERO_COUNT || false;
 
-    // Create enable custom status gate checkbox
+    // Create enable custom status checkbox
     const { container: enableContainer, checkbox: enableCheckbox } = createCheckbox({
-        label: 'Enable Custom Status Gate',
+        label: 'Enable Custom Grade Statuses',
         id: 'enable-custom-status-gate',
         checked: enableCustomStatus
     });
     body.appendChild(enableContainer);
+
+    // Create grouped section for dependent settings (shown only when enabled)
+    const dependentSettings = createElement('div', {
+        style: {
+            marginLeft: '24px',
+            marginTop: '12px',
+            padding: '16px',
+            background: '#f9f9f9',
+            borderLeft: '3px solid #0374B5',
+            borderRadius: '4px',
+            display: enableCustomStatus ? 'block' : 'none'
+        }
+    });
+
+    // Add helper text explaining the section
+    const sectionHelper = createElement('div', {
+        style: {
+            fontSize: '12px',
+            color: '#666',
+            marginBottom: '16px',
+            fontStyle: 'italic'
+        },
+        text: 'Configure how custom statuses are applied to student grades:'
+    });
+    dependentSettings.appendChild(sectionHelper);
 
     // Show warning if not on root account
     if (!isOnRootAccount) {
@@ -90,7 +115,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             attrs: { class: 'cg-status cg-status--warning' },
             html: `<strong>⚠️ Not on Root Account</strong><br>You are currently on account ${escapeHtml(currentAccountId)}. Custom statuses are managed at the root account (ID 1).`
         });
-        body.appendChild(warningBox);
+        dependentSettings.appendChild(warningBox);
     }
 
     // Handle empty statuses
@@ -99,7 +124,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             attrs: { class: 'cg-status cg-status--info' },
             text: 'ℹ️ No custom grade statuses found. Create custom statuses in the root account grading settings.'
         });
-        body.appendChild(emptyBox);
+        dependentSettings.appendChild(emptyBox);
     } else {
         // Create dropdown for status selection
         const selectedStatusId = config.DEFAULT_CUSTOM_STATUS_ID || '';
@@ -139,30 +164,41 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             triggerConfigChangeNotification();
         });
 
-        body.appendChild(statusSelect.container);
+        dependentSettings.appendChild(statusSelect.container);
     }
 
     // Create negative zero count checkbox
     const { container: negativeZeroContainer, checkbox: negativeZeroCheckbox } = createCheckbox({
-        label: 'Use Negative Zero Count',
+        label: 'Count Negative Zeros as Insufficient',
         id: 'enable-negative-zero-count',
         checked: enableNegativeZeroCount
     });
 
-    // Initially hide if custom status gate is disabled
-    if (!enableCustomStatus) {
-        negativeZeroContainer.style.display = 'none';
-    }
+    // Add help text for negative zero count
+    const negativeZeroHelp = createElement('div', {
+        style: {
+            fontSize: '11px',
+            color: '#999',
+            marginTop: '4px',
+            marginLeft: '24px',
+            lineHeight: '1.4'
+        },
+        text: 'When enabled, grades of 0 will be marked with the selected custom status (e.g., "Insufficient")'
+    });
+    negativeZeroContainer.appendChild(negativeZeroHelp);
 
-    body.appendChild(negativeZeroContainer);
+    dependentSettings.appendChild(negativeZeroContainer);
+
+    // Append dependent settings section to body
+    body.appendChild(dependentSettings);
 
     // Add change handlers
     enableCheckbox.addEventListener('change', () => {
         ctx.updateConfig({ ENABLE_GRADE_CUSTOM_STATUS: enableCheckbox.checked });
         triggerConfigChangeNotification();
 
-        // Show/hide negative zero count checkbox
-        negativeZeroContainer.style.display = enableCheckbox.checked ? 'block' : 'none';
+        // Show/hide entire dependent settings section
+        dependentSettings.style.display = enableCheckbox.checked ? 'block' : 'none';
     });
 
     negativeZeroCheckbox.addEventListener('change', () => {

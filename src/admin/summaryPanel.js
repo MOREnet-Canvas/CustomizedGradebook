@@ -9,7 +9,7 @@ import {logger} from "../utils/logger.js";
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
 export function renderSummaryPanel(container, ctx) {
-    const { panel, body } = createCollapsiblePanel("Summary", false);
+    const { panel, body } = createCollapsiblePanel("Summary", false, "cg-section-summary");
 
     const accountId = getAccountId();
     const jsUrl = getInstalledThemeJsUrl();

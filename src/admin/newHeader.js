@@ -37,7 +37,6 @@ export function renderHeader(container) {
 
     const navItems = [
         ["Summary", "cg-section-summary"],
-        ["Installed Theme", "cg-section-theme-status"],
         ["Account Filter", "cg-section-account-filter"],
         ["Settings", "cg-section-settings"],
         ["Loader Builder", "cg-section-loader"],

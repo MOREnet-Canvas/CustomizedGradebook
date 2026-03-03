@@ -319,11 +319,15 @@ export function createTextarea({ label, id, value = '', placeholder = '', rows =
  *
  * @param {string} title - Panel title
  * @param {boolean} [collapsed] - Initial collapsed state
+ * @param {string} [id] - Optional ID for the panel (for navigation)
  * @returns {Object} { panel, header, body, footer, toggle }
  */
-export function createCollapsiblePanel(title, collapsed = false) {
+export function createCollapsiblePanel(title, collapsed = false, id = '') {
     const panel = createElement('div', {
-        attrs: { class: collapsed ? 'cg-panel cg-panel--collapsed' : 'cg-panel' }
+        attrs: {
+            class: collapsed ? 'cg-panel cg-panel--collapsed' : 'cg-panel',
+            ...(id ? { id } : {})
+        }
     });
 
     const header = createElement('div', {
