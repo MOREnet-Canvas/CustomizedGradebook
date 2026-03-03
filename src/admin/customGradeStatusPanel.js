@@ -67,7 +67,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             background: '#f5f5f5',
             borderRadius: '4px'
         },
-        text: 'Custom statuses are managed at the root account level and can be applied to individual student grades.'
+        text: 'Custom grade statuses are applied to individual student grades when there is no evidence of mastery for an outcome.'
     });
     body.appendChild(helperText);
 
@@ -105,7 +105,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             marginBottom: '16px',
             fontStyle: 'italic'
         },
-        text: 'Configure custom status labels for avg_assignment and course_override scores:'
+        text: 'Configure custom status labels for avg_assignment, avg_outcome, and course_override scores:'
     });
     dependentSettings.appendChild(sectionHelper);
 
