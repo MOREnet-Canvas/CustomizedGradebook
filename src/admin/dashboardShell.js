@@ -194,16 +194,15 @@ function buildLayoutStructure() {
  *
  * Panels are rendered in this order:
  * 1. Summary (always visible)
- * 2. Custom Grade Status (collapsed)
+ * 2. Customized Gradebook Version (collapsed)
  * 3. Account Filter (collapsed)
- * 4. Loader Generator (collapsed) - contains 4 sub-panels:
- *    - Customized Gradebook Version
- *    - Configuration Settings
- *    - Grading Schemes
- *    - Generate Combined Loader
- * 5. Theme CSS Editor (collapsed, at bottom)
+ * 4. Configuration Settings (collapsed)
+ * 5. Custom Grade Statuses (collapsed)
+ * 6. Grading Schemes (collapsed)
+ * 7. Generate Combined Loader (collapsed)
+ * 8. Theme CSS Editor (collapsed, at bottom)
  *
- * Note: Loader Generator must be last to populate window.CG_MANAGED.config
+ * Note: Loader Generator must be rendered to populate window.CG_MANAGED.config
  *
  * @param {HTMLElement} container - Container element
  * @param {Object} ctx - Dashboard context
@@ -214,29 +213,20 @@ async function renderPanels(container, ctx) {
     // Panel 1: Summary (always visible)
     renderSummaryPanel(container, ctx);
 
-    // Panel 2: Custom Grade Status (collapsed)
-    logger.debug('[DashboardShell] Rendering custom grade status panel...');
-    renderCustomGradeStatusPanel(container, ctx);
-
-    // Panel 3: Account Filter (collapsed)
-    // Note: The loader generator panel will populate window.CG_MANAGED.config asynchronously,
-    // and the account filter panel will read from it when rendering the tree
-    logger.debug('[DashboardShell] Rendering account filter panel...');
-    const currentConfig = ctx.getConfig();
-    renderAccountFilterPanel(container, currentConfig);
-
-    // Panel 4: Loader Generator (collapsed, MUST BE LAST)
-    // The loader generator will populate window.CG_MANAGED.config, which the account filter
-    // panel will read when it finishes loading accounts (async)
-    // Contains 4 sub-panels:
-    // - Customized Gradebook Version
-    // - Configuration Settings (includes Enable Grade Override with tooltip)
-    // - Grading Schemes
-    // - Generate Combined Loader
+    // Panels 2-7: Loader Generator panels (renders 6 sub-panels)
+    // The loader generator will populate window.CG_MANAGED.config asynchronously
+    // Renders in this order:
+    // - Panel 2: Customized Gradebook Version
+    // - Panel 3: Account Filter
+    // - Panel 4: Configuration Settings (includes Enable Grade Override with tooltip)
+    // - Panel 5: Custom Grade Statuses
+    // - Panel 6: Grading Schemes
+    // - Panel 7: Generate Combined Loader
     logger.debug('[DashboardShell] Rendering loader generator panel...');
-    await renderLoaderGeneratorPanel(container);
+    const currentConfig = ctx.getConfig();
+    await renderLoaderGeneratorPanel(container, currentConfig);
 
-    // Panel 5: Theme CSS Editor (collapsed, at bottom - advanced feature)
+    // Panel 8: Theme CSS Editor (collapsed, at bottom - advanced feature)
     logger.debug('[DashboardShell] Rendering theme CSS editor panel...');
     renderThemeCssEditorPanel(container);
 
