@@ -33,7 +33,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
     logger.debug('[CustomGradeStatusPanel] Rendering custom grade status panel');
 
     // Create collapsible panel (collapsed by default)
-    const { panel, body } = createCollapsiblePanel('📊 Custom Grade Statuses', true, 'cg-section-settings');
+    const { panel, body } = createCollapsiblePanel('📊 Custom Grade Statuses', true, 'cg-section-custom-status');
 
     // Show loading state
     const loadingEl = createElement('div', {

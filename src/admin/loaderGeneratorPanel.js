@@ -925,7 +925,7 @@ function generateDownloadFilename(version) {
  * Create configuration panel with all settings
  */
 async function createConfigurationPanel() {
-    const { panel: container, body } = createCollapsiblePanel('⚙️ Configuration Settings', true);
+    const { panel: container, body } = createCollapsiblePanel('⚙️ Configuration Settings', true, 'cg-section-settings');
 
     // Fetch Final Grade Override feature flag status
     const accountId = getAccountId();
