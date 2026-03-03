@@ -563,10 +563,13 @@ export async function renderLoaderGeneratorPanel(root, currentConfig) {
     // 4. Custom Grade Statuses (separate panel)
     logger.debug('[LoaderGeneratorPanel] Rendering custom grade status panel...');
     const { renderCustomGradeStatusPanel } = await import('./customGradeStatusPanel.js');
+    const { CanvasApiClient } = await import('../utils/canvasApiClient.js');
     // Create a minimal context object for the panel
     const ctx = {
         getConfig: () => currentConfig || window.CG_MANAGED?.config || {},
-        updateConfig: () => {} // No-op for now
+        updateConfig: () => {}, // No-op for now
+        logger: logger, // Add logger to prevent "Cannot read properties of undefined" error
+        api: new CanvasApiClient() // Add API client for fetching custom grade statuses
     };
     await renderCustomGradeStatusPanel(root, ctx);
 
