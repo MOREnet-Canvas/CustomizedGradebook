@@ -44,7 +44,7 @@ import {renderHeader} from "./newHeader.js";
  * This is the main entry point for the dashboard.
  * It sets up the layout, context, and renders all panels.
  */
-export async function renderAdminDashboard() {
+export function renderAdminDashboard() {
     logger.info('[DashboardShell] Rendering admin dashboard');
 
     // Clear body content
@@ -62,10 +62,10 @@ export async function renderAdminDashboard() {
     // Render header
     renderHeader(innerWrapper);
 
-    // Render all panels (async because Loader Generator fetches feature flag)
-    await renderPanels(innerWrapper, ctx);
+    // Render all panels (async operations happen in background)
+    renderPanels(innerWrapper, ctx);
 
-    // Append to body
+    // Append to body IMMEDIATELY so DOM elements are available for hydration
     document.body.appendChild(root);
 
     logger.debug('[DashboardShell] Dashboard rendered successfully');
@@ -191,16 +191,17 @@ function buildLayoutStructure() {
  * Render all dashboard panels
  *
  * Panels are rendered in this order:
- * 1. Customized Gradebook Version (collapsed)
- * 2. Account Filter (collapsed)
- * 3. Configuration Settings (collapsed)
- * 4. Custom Grade Statuses (collapsed)
- * 5. Grading Schemes (collapsed)
- * 6. Generate Combined Loader (collapsed)
- * 7. Summary (always visible) - RENDERED LAST so all data is available
+ * 1. Summary (always visible) - Renders with placeholders, hydrates async
+ * 2. Customized Gradebook Version (collapsed)
+ * 3. Account Filter (collapsed)
+ * 4. Configuration Settings (collapsed)
+ * 5. Custom Grade Statuses (collapsed)
+ * 6. Grading Schemes (collapsed)
+ * 7. Generate Combined Loader (collapsed)
  * 8. Theme CSS Editor (collapsed, at bottom)
  *
- * Note: Loader Generator must be rendered BEFORE Summary to populate window.CG_MANAGED.config
+ * Note: Summary renders first with placeholders, then hydrates when data becomes available.
+ * Loader Generator populates window.CG_MANAGED.config asynchronously in background.
  *
  * @param {HTMLElement} container - Container element
  * @param {Object} ctx - Dashboard context
@@ -208,23 +209,22 @@ function buildLayoutStructure() {
 async function renderPanels(container, ctx) {
     logger.debug('[DashboardShell] Rendering panels...');
 
-    // Panels 1-6: Loader Generator panels (renders 6 sub-panels)
+    // Panel 1: Summary (always visible) - Renders with placeholders, hydrates when data ready
+    logger.debug('[DashboardShell] Rendering summary panel...');
+    renderSummaryPanel(container, ctx);
+
+    // Panels 2-7: Loader Generator panels (renders 6 sub-panels)
     // The loader generator will populate window.CG_MANAGED.config asynchronously
     // Renders in this order:
-    // - Panel 1: Customized Gradebook Version
-    // - Panel 2: Account Filter
-    // - Panel 3: Configuration Settings (includes Enable Grade Override with tooltip)
-    // - Panel 4: Custom Grade Statuses
-    // - Panel 5: Grading Schemes
-    // - Panel 6: Generate Combined Loader
+    // - Panel 2: Customized Gradebook Version
+    // - Panel 3: Account Filter
+    // - Panel 4: Configuration Settings (includes Enable Grade Override with tooltip)
+    // - Panel 5: Custom Grade Statuses
+    // - Panel 6: Grading Schemes
+    // - Panel 7: Generate Combined Loader
     logger.debug('[DashboardShell] Rendering loader generator panel...');
     const currentConfig = ctx.getConfig();
     await renderLoaderGeneratorPanel(container, currentConfig);
-
-    // Panel 7: Summary (always visible) - RENDERED AFTER Loader Generator so all data is available
-    // This ensures window.CG_MANAGED.config, window.cgCustomStatuses, and account cache are populated
-    logger.debug('[DashboardShell] Rendering summary panel...');
-    renderSummaryPanel(container, ctx);
 
     // Panel 8: Theme CSS Editor (collapsed, at bottom - advanced feature)
     logger.debug('[DashboardShell] Rendering theme CSS editor panel...');
