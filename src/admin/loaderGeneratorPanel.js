@@ -255,7 +255,7 @@ function populateConfigurationControls(controls, parsedSettings) {
  * @returns {Object} { panel, tryAutoLoad }
  */
 function createGeneratorPanel(versionDropdown, controls) {
-    const { panel, body } = createCollapsiblePanel('Generate Combined Loader (A+B+C Model)', false);
+    const { panel, body } = createCollapsiblePanel('Generate Combined Loader (A+B+C Model)', false, 'cg-section-loader');
 
     const installedUrl = getInstalledThemeJsUrl();
 
