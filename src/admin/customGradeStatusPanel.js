@@ -51,6 +51,9 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
     // Fetch custom grade statuses from root account
     const statuses = await getRootCustomGradeStatuses({ ctx });
 
+    // Store statuses globally for Summary Panel hydration
+    window.cgCustomStatuses = statuses;
+
     // Clear loading state
     body.innerHTML = '';
 
@@ -122,8 +125,15 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             const newStatusId = statusSelect.select.value || null;
             logger.debug(`[CustomGradeStatusPanel] Status changed to: ${newStatusId}`);
 
-            // Update config
-            ctx.updateConfig({ DEFAULT_CUSTOM_STATUS_ID: newStatusId });
+            // Find the status name
+            const selectedStatus = statuses.find(s => s._id === newStatusId);
+            const statusName = selectedStatus?.name || null;
+
+            // Update config with both ID and name
+            ctx.updateConfig({
+                DEFAULT_CUSTOM_STATUS_ID: newStatusId,
+                DEFAULT_CUSTOM_STATUS_NAME: statusName
+            });
 
             // Trigger change notification
             triggerConfigChangeNotification();

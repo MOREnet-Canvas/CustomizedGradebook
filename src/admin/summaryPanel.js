@@ -17,14 +17,12 @@ export function renderSummaryPanel(container, ctx) {
 
     // Build rows synchronously with placeholders
     const rows = [
-        ["Installed on account", installedAccountPlaceholder(accountId)],
+        ["Installed on Account", installedAccountPlaceholder(accountId)],
+        ["Account Filter", formatAccountFilter(getConfigNow(ctx))],
         ["Theme JS", formatThemeAsset(jsUrl, "Theme JavaScript")],
         ["Theme CSS", formatThemeAsset(cssUrl, "Theme CSS")],
-        ["Default grading scheme", formatDefaultGradingScheme(getConfigNow(ctx))],
-        ["Default custom status", formatCustomStatus(getConfigNow(ctx))],
-        ["Custom status gate enabled", formatBoolean(getConfigNow(ctx).ENABLE_GRADE_CUSTOM_STATUS)],
-        ["Negative zero count enabled", formatBoolean(getConfigNow(ctx).ENABLE_NEGATIVE_ZERO_COUNT)],
-        ["Account filter", formatAccountFilter(getConfigNow(ctx))],
+        ["Grading Scheme", formatDefaultGradingScheme(getConfigNow(ctx))],
+        ["Custom Grade Status", formatCustomStatus(getConfigNow(ctx))],
     ];
 
     const { table } = createTable({
@@ -46,6 +44,8 @@ export function renderSummaryPanel(container, ctx) {
         void hydrateInstalledAccountCell(accountId);
         logger.debug('[SummaryPanel] Hydrating account filter cell...');
         void hydrateAccountFilterCell(ctx);
+        logger.debug('[SummaryPanel] Hydrating custom status cell...');
+        void hydrateCustomStatusCell(ctx);
         logger.debug('[SummaryPanel] Hydrating dynamic config cells...');
         void hydrateDynamicConfigCells(ctx);
     }, 0);
@@ -209,6 +209,55 @@ async function hydrateAccountFilterCell(ctx) {
 }
 
 /* ---------------------------
+   Custom Status hydration
+---------------------------- */
+
+async function hydrateCustomStatusCell(ctx) {
+    const el = document.querySelector("[data-cg-custom-status]");
+    if (!el) return; // already has name
+
+    const config = getConfigNow(ctx);
+    const statusId = config.DEFAULT_CUSTOM_STATUS_ID;
+
+    if (!statusId) {
+        el.textContent = "Not enabled";
+        return;
+    }
+
+    // Poll for custom statuses to be loaded by Custom Grade Status Panel
+    // The panel stores statuses in window.cgCustomStatuses after fetching
+    const maxAttempts = 60; // 60 attempts * 250ms = 15 seconds max wait
+    const pollInterval = 250; // 250ms between checks
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        // Check if Custom Grade Status Panel has populated the statuses
+        const statuses = window.cgCustomStatuses;
+
+        if (statuses && Array.isArray(statuses) && statuses.length > 0) {
+            // Find the status by ID
+            const status = statuses.find(s => s._id === statusId);
+
+            if (status) {
+                // Update the cell with the actual name
+                el.textContent = `${status.name} (ID: ${statusId})`;
+                logger.debug(`[SummaryPanel] Custom status hydrated: ${status.name} (ID: ${statusId})`);
+
+                // Also save the name to config for future renders
+                ctx.updateConfig({ DEFAULT_CUSTOM_STATUS_NAME: status.name });
+                return;
+            }
+        }
+
+        // Wait before next attempt
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    // Timeout - status not found
+    logger.warn(`[SummaryPanel] Custom status hydration timeout for ID: ${statusId}`);
+    el.innerHTML = `<span style="color:#cf1322;">Unknown (ID: ${escapeHtml(statusId)})</span>`;
+}
+
+/* ---------------------------
    Dynamic config hydration
    (optional but recommended)
 ---------------------------- */
@@ -297,7 +346,7 @@ function formatDefaultGradingScheme(config) {
 
     const title = scheme?.title || scheme?.name || "Unknown";
 
-    return `${title} (ID:${id})`;
+    return `${title} (ID: ${id})`;
 }
 
 /* ---------------------------
@@ -305,11 +354,21 @@ function formatDefaultGradingScheme(config) {
 ---------------------------- */
 
 function formatCustomStatus(config) {
+    const enabled = config.ENABLE_GRADE_CUSTOM_STATUS;
     const statusId = config.DEFAULT_CUSTOM_STATUS_ID;
+    const statusName = config.DEFAULT_CUSTOM_STATUS_NAME;
 
-    if (!statusId) return "None selected";
+    if (!enabled) return "Not enabled";
+    if (!statusId) return "Not enabled";
 
-    return `ID: ${statusId}`;
+    // If name not available, return placeholder with data hook for hydration
+    if (!statusName) {
+        return {
+            html: `<div data-cg-custom-status>ID: ${escapeHtml(statusId)} <span style="color:#999;">(Loading...)</span></div>`
+        };
+    }
+
+    return `${statusName} (ID: ${statusId})`;
 }
 
 /**
