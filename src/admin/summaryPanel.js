@@ -307,17 +307,17 @@ function formatThemeAsset(url, label) {
 
     const isJs = file?.toLowerCase().endsWith(".js");
 
+    // Build metadata lines (excluding filename since it's now the link text)
     const metaLines = [
         isJs ? getFriendlyChannelLabel() : null,
-        date ? `Build: ${date}` : null,
-        file ? `File: ${file}` : null
+        date ? `Build: ${date}` : null
     ].filter(Boolean);
 
     return {
         html: `
             <div>
                 <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">
-                    ${escapeHtml(label)}
+                    ${escapeHtml(file || label)}
                 </a>
                 ${
             metaLines.length
