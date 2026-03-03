@@ -105,7 +105,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             marginBottom: '16px',
             fontStyle: 'italic'
         },
-        text: 'Configure how custom statuses are applied to student grades:'
+        text: 'Configure custom status labels for avg_assignment and course_override scores:'
     });
     dependentSettings.appendChild(sectionHelper);
 
@@ -169,7 +169,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
 
     // Create negative zero count checkbox
     const { container: negativeZeroContainer, checkbox: negativeZeroCheckbox } = createCheckbox({
-        label: 'Count Negative Zeros as Insufficient',
+        label: 'Enable Zero Grade Penalty',
         id: 'enable-negative-zero-count',
         checked: enableNegativeZeroCount
     });
@@ -183,7 +183,7 @@ export async function renderCustomGradeStatusPanel(container, ctx) {
             marginLeft: '24px',
             lineHeight: '1.4'
         },
-        text: 'When enabled, grades of 0 will be marked with the selected custom status (e.g., "Insufficient")'
+        text: 'When enabled, each zero grade subtracts 1 point from zero (1 zero = -1, 2 zeros = -2, etc.). The custom status label remains applied.'
     });
     negativeZeroContainer.appendChild(negativeZeroHelp);
 
