@@ -119,8 +119,8 @@ export async function hasAvgAssignment(courseId, apiClient) {
  * 1. Name pattern test (first, short-circuit): If course name matches pattern → "standards"
  * 2. Assignment presence test (only if name does NOT match): If AVG_ASSIGNMENT_NAME exists → "standards", else → "traditional"
  *
- * Pure detection function - does NOT cache results.
- * Caching is handled by courseSnapshotService.
+ * Caching: Checks sessionStorage for existing snapshot before performing detection.
+ * If a snapshot exists with model data, returns cached result to avoid redundant API calls.
  *
  * @param {Object} course - Course data
  * @param {string} course.courseId - Course ID (required)
@@ -128,7 +128,7 @@ export async function hasAvgAssignment(courseId, apiClient) {
  * @param {Object} sessionData - Session data (unused, for future compatibility)
  * @param {Object} options - Detection options
  * @param {Object} options.apiClient - CanvasApiClient instance (required for assignment check)
- * @returns {Promise<{model: "standards"|"traditional", reason: "name-pattern"|"avg-assignment"}>}
+ * @returns {Promise<{model: "standards"|"traditional", reason: "name-pattern"|"avg-assignment"|"cached"}>}
  *
  * @example
  * const result = await determineCourseModel(
@@ -137,11 +137,30 @@ export async function hasAvgAssignment(courseId, apiClient) {
  *   { apiClient }
  * );
  * console.log(result.model); // "standards" or "traditional"
- * console.log(result.reason); // "name-pattern" or "avg-assignment"
+ * console.log(result.reason); // "name-pattern" or "avg-assignment" or "cached"
  */
 export async function determineCourseModel(course, sessionData, options) {
     const { courseId, courseName } = course;
     const { apiClient } = options;
+
+    // Check sessionStorage for existing snapshot (avoids redundant API calls)
+    const SNAPSHOT_KEY_PREFIX = 'cg_courseSnapshot_';
+    const cachedSnapshot = sessionStorage.getItem(`${SNAPSHOT_KEY_PREFIX}${courseId}`);
+
+    if (cachedSnapshot) {
+        try {
+            const snapshot = JSON.parse(cachedSnapshot);
+            if (snapshot.model && snapshot.modelReason) {
+                logger.trace(`[CourseModel] Using cached model from snapshot: ${snapshot.model} (reason: ${snapshot.modelReason})`);
+                return {
+                    model: snapshot.model,
+                    reason: snapshot.modelReason
+                };
+            }
+        } catch (error) {
+            logger.trace(`[CourseModel] Failed to parse cached snapshot, will detect fresh:`, error.message);
+        }
+    }
 
     if (!courseId || !courseName) {
         logger.warn('[CourseModel] determineCourseModel called without required courseId or courseName');
