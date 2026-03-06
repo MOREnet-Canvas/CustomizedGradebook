@@ -1,5 +1,4 @@
 // src/utils/canvas.js
-import { AVG_ASSIGNMENT_NAME } from "../config.js";
 import { logger } from "./logger.js";
 
 /**
@@ -105,30 +104,4 @@ export function getUserRoleGroup() {
     );
 
     return group;
-}
-
-export async function courseHasAvgAssignment() {
-    const courseId = getCourseId();
-    if (!courseId) return false;
-
-    const cacheKey = `hasAvgAssignment_${courseId}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached !== null) {
-        return cached === "true";
-    }
-
-    try {
-        const response = await fetch(
-            `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(
-                AVG_ASSIGNMENT_NAME
-            )}`
-        );
-        const assignments = await response.json();
-        const hasAvg = assignments.some(a => a.name === AVG_ASSIGNMENT_NAME);
-        sessionStorage.setItem(cacheKey, hasAvg ? "true" : "false");
-        return hasAvg;
-    } catch (e) {
-        console.warn("Could not verify assignment existence:", e);
-        return false;
-    }
 }
