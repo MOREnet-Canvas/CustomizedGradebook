@@ -1,7 +1,7 @@
 # SpeedGrader Unnecessary API Calls Issue
 
-**Date**: 2026-02-11  
-**Status**: Identified, Not Fixed  
+**Date**: 2026-02-11
+**Status**: ✅ RESOLVED (2026-03-06)
 **Severity**: Low (performance/efficiency issue, not functional)
 
 ## Problem Summary
@@ -150,3 +150,63 @@ This would:
 - The `per_page=100` parameter is automatically added by `CanvasApiClient.get()` to avoid pagination limits
 - SpeedGrader is already restricted to teachers by Canvas, so the role check was redundant (fixed separately)
 
+---
+
+## Resolution (2026-03-06)
+
+**Implemented Solution**: Option B - Added caching to `determineCourseModel()`
+
+### Changes Made:
+
+#### Q1: Added Snapshot Caching to `determineCourseModel()`
+**File**: `src/utils/courseDetection.js`
+
+Modified `determineCourseModel()` to check sessionStorage for existing snapshot before performing detection:
+- Checks for `cg_courseSnapshot_{courseId}` in sessionStorage
+- If snapshot exists with `model` and `modelReason` fields, returns cached result immediately
+- Only performs API-based detection if no cached data exists
+- Uses direct sessionStorage access to avoid circular dependencies
+
+**Result**:
+- ✅ Zero `/assignments/search` API calls on page refresh
+- ✅ Course model detection is fully cached across page navigations
+- ✅ Benefits all modules that use `determineCourseModel()` (SpeedGrader, All-Grades, Dashboard, etc.)
+
+#### Q2: Removed Legacy `courseHasAvgAssignment()` Function
+**File**: `src/utils/canvas.js`
+
+Removed the deprecated `courseHasAvgAssignment()` function that duplicated detection logic:
+- Function was unused (no imports found)
+- Duplicated caching logic that's now in `determineCourseModel()`
+- Cleaned up legacy code
+
+#### Q3: Removed Legacy `isStandardsBasedCourse()` Function
+**File**: `src/utils/courseDetection.js`
+
+Removed the deprecated `isStandardsBasedCourse()` function:
+- Function was unused (no imports found)
+- Duplicated detection logic already in `determineCourseModel()`
+- All modules now use `determineCourseModel()` or read from snapshots
+
+### Testing Results:
+
+**Network Tab Analysis** (All-Grades page):
+- **Before**: 8 calls to `/assignments/search` on every page load
+- **After**: 0 calls to `/assignments/search` on refresh ✅
+
+**Snapshot Validation**:
+- ✅ Snapshots persist across page refreshes
+- ✅ User validation working correctly (clears on user change)
+- ✅ TTL expiration working (10-minute cache)
+
+**Performance Impact**:
+- Traditional courses: Reduced from 2 API calls to 1 (only grade fetch, no detection)
+- Standards-based courses: Reduced from 1 API call to 0 (fully cached)
+- Significant reduction in API load for multi-course pages (Dashboard, All-Grades)
+
+### Related Issues:
+
+- **Double Processing**: Identified separate issue with All-Grades page observer triggering duplicate processing
+  - Documented in `documents/TODOs/ALLGRADES_DOUBLE_PROCESSING.md`
+  - Not causing duplicate API calls due to caching (Q1 fix)
+  - Marked as Medium priority for future fix
