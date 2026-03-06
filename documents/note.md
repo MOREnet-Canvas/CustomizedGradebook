@@ -4,6 +4,7 @@ For checking version in DevTools: CG.version
 
 
 ## Next Steps
+TODO: Fix Observer Grades page
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Add Checks for assignments
    - have they had mastery refresh done?
@@ -47,7 +48,7 @@ TODO: Mastery Refresh: This does not update rubric scores, so outcome results ar
 TODO: remove legacy code
 
 ## Admin Dashboard
- - [ ] **determine grading scheme**
+ - [x] **determine grading scheme**
  - [ ] determine rubric ratings
  - [x] if override is enabled for account
  - [x] if override should be enforced for course

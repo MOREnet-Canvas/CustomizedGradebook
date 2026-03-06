@@ -227,7 +227,7 @@ export async function handlePreloadSubmissions(stateMachine) {
     const { courseId, assignmentId, rubricId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    banner.setText('Preloading submission data for GraphQL grading...');
+    banner.setText('Preloading submission data for grading...');
     logger.debug('Fetching submission IDs and rubric association ID...');
 
     // Fetch all submissions
@@ -324,7 +324,7 @@ export async function handleUpdatingGrades(stateMachine) {
     logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}`);
     if (USE_UNIFIED_GRAPHQL_ONLY) {
         logger.debug('Using GraphQL-only grading path');
-        banner.setText(`Updating grades via GraphQL for ${numberOfUpdates} students...`);
+        banner.setText(`Updating grades for ${numberOfUpdates} students...`);
 
         // Get enrollment map
         const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
@@ -400,14 +400,14 @@ export async function handleUpdatingGrades(stateMachine) {
 
             // Update banner periodically
             if (successCount % 5 === 0) {
-                banner.soft(`Updated ${successCount}/${numberOfUpdates} students via GraphQL...`);
+                banner.soft(`Updated ${successCount}/${numberOfUpdates} students...`);
             }
         }
 
-        logger.info(`GraphQL grading complete: ${successCount}/${numberOfUpdates} successful, ${errors.length} errors`);
+        logger.info(`Grading complete: ${successCount}/${numberOfUpdates} successful, ${errors.length} errors`);
 
         if (errors.length > 0) {
-            logger.warn('GraphQL grading errors:', errors);
+            logger.warn('Grading errors:', errors);
         }
 
         logger.debug(`handleUpdatingGrades complete, transitioning to REFRESHING_MASTERY`);
