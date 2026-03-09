@@ -65,3 +65,19 @@ export async function updatePage(courseId, pageUrl, pageData, apiClient) {
     );
     return page;
 }
+
+/**
+ * Set course default view to wiki (front page)
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object>} Updated course object
+ */
+export async function setCourseDefaultViewToWiki(courseId, apiClient) {
+    const course = await apiClient.put(
+        `/api/v1/courses/${courseId}`,
+        { course: { default_view: 'wiki' } },
+        {},
+        'setCourseDefaultView'
+    );
+    return course;
+}
