@@ -19,12 +19,12 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
  */
 export async function getFrontPage(courseId, apiClient) {
     try {
-        const response = await apiClient.get(
+        const frontPage = await apiClient.get(
             `/api/v1/courses/${courseId}/front_page`,
             {},
             'getFrontPage'
         );
-        return await response.json();
+        return frontPage;
     } catch (error) {
         logger.debug(`Front page not found for course ${courseId}`);
         return null;
@@ -39,13 +39,13 @@ export async function getFrontPage(courseId, apiClient) {
  * @returns {Promise<Object>} Created page object
  */
 export async function createPage(courseId, pageData, apiClient) {
-    const response = await apiClient.post(
+    const page = await apiClient.post(
         `/api/v1/courses/${courseId}/pages`,
         { wiki_page: pageData },
         {},
         'createPage'
     );
-    return await response.json();
+    return page;
 }
 
 /**
@@ -57,12 +57,11 @@ export async function createPage(courseId, pageData, apiClient) {
  * @returns {Promise<Object>} Updated page object
  */
 export async function updatePage(courseId, pageUrl, pageData, apiClient) {
-    const response = await apiClient.put(
+    const page = await apiClient.put(
         `/api/v1/courses/${courseId}/pages/${pageUrl}`,
         { wiki_page: pageData },
         {},
         'updatePage'
     );
-    return await response.json();
+    return page;
 }
-
