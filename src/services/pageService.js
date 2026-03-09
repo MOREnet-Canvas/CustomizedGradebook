@@ -71,7 +71,7 @@ export async function updatePage(courseId, pageUrl, pageData, apiClient) {
  * @param {string} courseId - Course ID
  * @param {string} pageUrl - Page URL slug
  * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @returns {Promise<Object|null>} Page object or null if not found
+ * @returns {Promise<Object|null>} Page object or null if not found or deleted
  */
 export async function getPage(courseId, pageUrl, apiClient) {
     try {
@@ -80,6 +80,13 @@ export async function getPage(courseId, pageUrl, apiClient) {
             {},
             'getPage'
         );
+
+        // Only return page if it's not deleted (Canvas soft-delete)
+        if (page && page.workflow_state === 'deleted') {
+            logger.debug(`Page ${pageUrl} exists but is deleted (workflow_state: deleted)`);
+            return null;
+        }
+
         return page;
     } catch (error) {
         logger.debug(`Page ${pageUrl} not found for course ${courseId}`);
