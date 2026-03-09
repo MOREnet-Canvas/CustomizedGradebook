@@ -32,7 +32,7 @@ If you installed the mobile loader, the button will appear automatically once th
 2. Click **+ Page**
 3. Set the page title: **Mastery Dashboard**
 4. Click **HTML Editor** (top right)
-5. Paste this code:`<div id="parent-mastery-root"></div>`
+5. Paste this code:`<div id="mastery-dashboard-root"></div>`
 6. Click **Save & Publish**
 
 !!! note "Page Title Must Match"
@@ -82,7 +82,7 @@ The button is injected into the Front Page and:
 When a parent clicks the button:
 
 1. Canvas loads the Mastery Dashboard page
-2. The mobile module detects the `#parent-mastery-root` div
+2. The mobile module detects the `#mastery-dashboard-root` div
 3. The module fetches student mastery data from Canvas API
 4. The dashboard renders with color-coded mastery indicators
 
@@ -128,7 +128,7 @@ It only shows for parent/observer accounts.
 ### Dashboard Not Loading
 
 **Check:**
-- The Mastery Dashboard page has `<div id="parent-mastery-root"></div>`
+- The Mastery Dashboard page has `<div id="mastery-dashboard-root"></div>`
 - The URL includes `?cg_web=1` parameter
 - The course has outcomes/standards configured
 - The student is enrolled in the course

@@ -1,6 +1,6 @@
 (function () {
     function ensureHost() {
-        var root = document.getElementById("parent-mastery-root");
+        var root = document.getElementById("mastery-dashboard-root");
         if (!root) return null;
 
         root.style.display = "block";
