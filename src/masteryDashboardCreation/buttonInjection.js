@@ -11,7 +11,7 @@ import { logger } from '../utils/logger.js';
 import { makeButton } from '../ui/buttons.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getFrontPage, createPage, updatePage } from '../services/pageService.js';
+import { getFrontPage, createPage, updatePage, setCourseDefaultViewToWiki } from '../services/pageService.js';
 import { handleError } from '../utils/errorHandler.js';
 import { isCourseSettingsPage } from '../utils/pageDetection.js';
 
@@ -85,14 +85,13 @@ async function createMasteryDashboard(button) {
             logger.debug('[MasteryDashboard] Updating existing front page');
             const currentBody = frontPage.body || '';
             const newBody = masteryButtonHtml + '\n' + currentBody;
-            
+
             await updatePage(courseId, frontPage.url, {
                 body: newBody,
                 published: true
             }, apiClient);
-            
+
             logger.info('[MasteryDashboard] Front page updated with button');
-            alert('✅ Mastery Dashboard button added to front page!\n\nRefresh the course home page to see it.');
         } else {
             // Create new front page with button
             logger.debug('[MasteryDashboard] Creating new front page');
@@ -102,10 +101,17 @@ async function createMasteryDashboard(button) {
                 published: true,
                 front_page: true
             }, apiClient);
-            
+
             logger.info('[MasteryDashboard] New front page created with button');
-            alert('✅ New front page created with Mastery Dashboard button!\n\nRefresh the course home page to see it.');
         }
+
+        // Step 3: Set course default view to wiki (front page)
+        logger.debug('[MasteryDashboard] Setting course default view to wiki');
+        await setCourseDefaultViewToWiki(courseId, apiClient);
+        logger.info('[MasteryDashboard] Course default view set to wiki (front page)');
+
+        // Show success message
+        alert('✅ Mastery Dashboard setup complete!\n\n• Mastery Dashboard page created\n• Front page updated with button\n• Course home page set to display front page\n\nRefresh the course home page to see it.');
 
         // Reset button
         button.disabled = false;
