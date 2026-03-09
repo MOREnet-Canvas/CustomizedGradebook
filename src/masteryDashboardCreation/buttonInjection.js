@@ -11,7 +11,7 @@ import { logger } from '../utils/logger.js';
 import { makeButton } from '../ui/buttons.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getFrontPage, createPage, updatePage, setCourseDefaultViewToWiki } from '../services/pageService.js';
+import { getFrontPage, createPage, updatePage, setCourseDefaultViewToWiki, getPage } from '../services/pageService.js';
 import { handleError } from '../utils/errorHandler.js';
 import { isCourseSettingsPage } from '../utils/pageDetection.js';
 
@@ -22,17 +22,25 @@ const MASTERY_PAGE_BODY = '<div id="parent-mastery-root"></div>';
 
 /**
  * Create mastery dashboard button HTML for front page
+ * Uses Canvas theme colors and includes HTML comment markers for reliable detection
  * @param {string} baseUrl - Canvas base URL
  * @param {string} courseId - Course ID
  * @returns {string} Button HTML
  */
 function createMasteryButtonHtml(baseUrl, courseId) {
-    return `<div style="margin: 16px 0;">
-    <a style="display: block; padding: 14px; background: #005f9e; color: white; text-align: center; border-radius: 8px; text-decoration: none; font-size: 16px; margin-bottom: 8px;" href="${baseUrl}/courses/${courseId}/pages/${MASTERY_PAGE_URL}?cg_web=1" data-api-endpoint="${baseUrl}/api/v1/courses/${courseId}/pages/${MASTERY_PAGE_URL}" data-api-returntype="Page">
+    // Get Canvas theme colors
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
+    const textColor = rootStyles.getPropertyValue("--ic-brand-button--primary-text").trim() || "#ffffff";
+
+    return `<!-- CG-MASTERY-BUTTON-START - DO NOT DELETE: This button is required for the Canvas Parent app mastery dashboard feature -->
+<div style="margin: 16px 0;">
+    <a style="display: block; padding: 14px; background: ${primaryButtonColor}; color: ${textColor}; text-align: center; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; margin-bottom: 8px;" href="${baseUrl}/courses/${courseId}/pages/${MASTERY_PAGE_URL}?cg_web=1" data-api-endpoint="${baseUrl}/api/v1/courses/${courseId}/pages/${MASTERY_PAGE_URL}" data-api-returntype="Page">
         View Mastery Dashboard
     </a>
     <p style="font-size: 12px; color: #666; margin: 0; text-align: center;">For parents/observers using the Canvas Parent app</p>
-</div>`;
+</div>
+<!-- CG-MASTERY-BUTTON-END -->`;
 }
 
 /**
@@ -55,36 +63,66 @@ async function createMasteryDashboard(button) {
         button.textContent = 'Creating...';
         logger.info('[MasteryDashboard] Starting creation process');
 
-        // Step 1: Create mastery dashboard page (if it doesn't exist)
-        logger.debug('[MasteryDashboard] Creating mastery dashboard page');
-        try {
-            await createPage(courseId, {
-                title: MASTERY_PAGE_TITLE,
-                url: MASTERY_PAGE_URL,
-                body: MASTERY_PAGE_BODY,
-                published: true
-            }, apiClient);
-            logger.info('[MasteryDashboard] Mastery dashboard page created');
-        } catch (error) {
-            // Page might already exist (400 error)
-            if (error.message?.includes('400')) {
-                logger.info('[MasteryDashboard] Mastery dashboard page already exists');
-            } else {
-                throw error;
-            }
+        // Step 1: Check if mastery dashboard page already exists
+        logger.debug('[MasteryDashboard] Checking if mastery dashboard page exists');
+        const existingPage = await getPage(courseId, MASTERY_PAGE_URL, apiClient);
+
+        if (existingPage) {
+            // Page exists - alert user to delete manually
+            logger.info('[MasteryDashboard] Mastery dashboard page already exists');
+            alert(
+                '⚠️ Mastery Dashboard page already exists!\n\n' +
+                'Please delete the existing "Mastery Dashboard" page first, then try again.\n\n' +
+                'To delete:\n' +
+                '1. Go to Pages\n' +
+                '2. Find "Mastery Dashboard"\n' +
+                '3. Click the three dots menu\n' +
+                '4. Select "Delete"\n\n' +
+                'Or use the "Delete Mastery Dashboard Setup" link below.'
+            );
+
+            // Reset button
+            button.disabled = false;
+            button.textContent = '🎯 Create Mastery Dashboard Button';
+            return;
         }
+
+        // Create mastery dashboard page
+        logger.debug('[MasteryDashboard] Creating mastery dashboard page');
+        await createPage(courseId, {
+            title: MASTERY_PAGE_TITLE,
+            url: MASTERY_PAGE_URL,
+            body: MASTERY_PAGE_BODY,
+            published: true
+        }, apiClient);
+        logger.info('[MasteryDashboard] Mastery dashboard page created');
 
         // Step 2: Get or create front page
         logger.debug('[MasteryDashboard] Checking front page');
         let frontPage = await getFrontPage(courseId, apiClient);
-        
+
         const masteryButtonHtml = createMasteryButtonHtml(baseUrl, courseId);
 
         if (frontPage) {
-            // Update existing front page - prepend button
+            // Update existing front page
             logger.debug('[MasteryDashboard] Updating existing front page');
             const currentBody = frontPage.body || '';
-            const newBody = masteryButtonHtml + '\n' + currentBody;
+
+            // Check if button already exists
+            const buttonExists = currentBody.includes('<!-- CG-MASTERY-BUTTON-START -->');
+            let newBody;
+
+            if (buttonExists) {
+                logger.debug('[MasteryDashboard] Button already exists, replacing with updated version');
+
+                // Replace existing button HTML with new version (preserves current theme colors)
+                const buttonPattern = /<!-- CG-MASTERY-BUTTON-START -->[\s\S]*?<!-- CG-MASTERY-BUTTON-END -->/;
+                newBody = currentBody.replace(buttonPattern, masteryButtonHtml);
+            } else {
+                logger.debug('[MasteryDashboard] Button does not exist, prepending to front page');
+                // Prepend button to existing content
+                newBody = masteryButtonHtml + '\n' + currentBody;
+            }
 
             await updatePage(courseId, frontPage.url, {
                 body: newBody,
@@ -128,6 +166,107 @@ async function createMasteryDashboard(button) {
 }
 
 /**
+ * Delete mastery dashboard setup (page and front page button)
+ * @param {HTMLAnchorElement} linkElement - Delete link element to update state
+ */
+async function deleteMasteryDashboard(linkElement) {
+    const courseId = getCourseId();
+    if (!courseId) {
+        alert('Could not determine course ID');
+        return;
+    }
+
+    // Confirm deletion
+    const confirmed = confirm(
+        '⚠️ Delete Mastery Dashboard Setup?\n\n' +
+        'This will:\n' +
+        '• Delete the "Mastery Dashboard" page\n' +
+        '• Remove the button from the front page\n\n' +
+        'Are you sure you want to continue?'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const apiClient = new CanvasApiClient();
+    const originalText = linkElement.textContent;
+
+    try {
+        // Update link during operation
+        linkElement.style.pointerEvents = 'none';
+        linkElement.style.opacity = '0.5';
+        linkElement.textContent = 'Deleting...';
+        logger.info('[MasteryDashboard] Starting deletion process');
+
+        // Step 1: Delete mastery dashboard page
+        logger.debug('[MasteryDashboard] Deleting mastery dashboard page');
+        try {
+            await apiClient.delete(
+                `/api/v1/courses/${courseId}/pages/${MASTERY_PAGE_URL}`,
+                {},
+                'deleteMasteryPage'
+            );
+            logger.info('[MasteryDashboard] Mastery dashboard page deleted');
+        } catch (error) {
+            // Page might not exist (404 error)
+            if (error.message?.includes('404')) {
+                logger.info('[MasteryDashboard] Mastery dashboard page does not exist');
+            } else {
+                throw error;
+            }
+        }
+
+        // Step 2: Remove button from front page
+        logger.debug('[MasteryDashboard] Removing button from front page');
+        const frontPage = await getFrontPage(courseId, apiClient);
+
+        if (frontPage) {
+            const currentBody = frontPage.body || '';
+
+            // Check if button exists
+            const buttonExists = currentBody.includes('<!-- CG-MASTERY-BUTTON-START -->');
+
+            if (buttonExists) {
+                logger.debug('[MasteryDashboard] Removing button from front page');
+
+                // Remove button HTML using regex
+                const buttonPattern = /<!-- CG-MASTERY-BUTTON-START -->[\s\S]*?<!-- CG-MASTERY-BUTTON-END -->\n?/;
+                const newBody = currentBody.replace(buttonPattern, '');
+
+                await updatePage(courseId, frontPage.url, {
+                    body: newBody,
+                    published: true
+                }, apiClient);
+
+                logger.info('[MasteryDashboard] Button removed from front page');
+            } else {
+                logger.info('[MasteryDashboard] Button not found on front page');
+            }
+        } else {
+            logger.info('[MasteryDashboard] No front page found');
+        }
+
+        // Show success message
+        alert('✅ Mastery Dashboard setup deleted!\n\n• Mastery Dashboard page removed\n• Button removed from front page\n\nRefresh the page to see changes.');
+
+        // Reset link
+        linkElement.style.pointerEvents = 'auto';
+        linkElement.style.opacity = '1';
+        linkElement.textContent = originalText;
+
+    } catch (error) {
+        logger.error('[MasteryDashboard] Error deleting mastery dashboard:', error);
+        handleError(error, 'deleteMasteryDashboard', { showAlert: true });
+
+        // Reset link
+        linkElement.style.pointerEvents = 'auto';
+        linkElement.style.opacity = '1';
+        linkElement.textContent = originalText;
+    }
+}
+
+/**
  * Inject mastery dashboard creation button into settings sidebar
  */
 export function injectMasteryDashboardButton() {
@@ -162,8 +301,40 @@ export function injectMasteryDashboardButton() {
         description.style.cssText = 'font-size: 12px; color: #666; text-align: center; margin-top: 8px;';
         description.textContent = 'Creates the Mastery Dashboard page and adds a button to the course front page';
 
+        // Create delete link (styled as text link, not button)
+        const deleteLink = document.createElement('a');
+        deleteLink.href = '#';
+        deleteLink.textContent = 'Delete Mastery Dashboard Setup';
+        deleteLink.style.cssText = `
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 11px;
+            color: #c62828;
+            text-decoration: none;
+            cursor: pointer;
+            opacity: 0.8;
+        `;
+
+        // Hover effect
+        deleteLink.addEventListener('mouseenter', () => {
+            deleteLink.style.textDecoration = 'underline';
+            deleteLink.style.opacity = '1';
+        });
+        deleteLink.addEventListener('mouseleave', () => {
+            deleteLink.style.textDecoration = 'none';
+            deleteLink.style.opacity = '0.8';
+        });
+
+        // Click handler
+        deleteLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            deleteMasteryDashboard(deleteLink);
+        });
+
         container.appendChild(button);
         container.appendChild(description);
+        container.appendChild(deleteLink);
 
         // Try to insert after "Validate Links in Content" button
         const validateLinksButton = Array.from(sidebar.querySelectorAll('a')).find(a =>

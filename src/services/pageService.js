@@ -67,6 +67,27 @@ export async function updatePage(courseId, pageUrl, pageData, apiClient) {
 }
 
 /**
+ * Get a specific wiki page by URL slug
+ * @param {string} courseId - Course ID
+ * @param {string} pageUrl - Page URL slug
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object|null>} Page object or null if not found
+ */
+export async function getPage(courseId, pageUrl, apiClient) {
+    try {
+        const page = await apiClient.get(
+            `/api/v1/courses/${courseId}/pages/${pageUrl}`,
+            {},
+            'getPage'
+        );
+        return page;
+    } catch (error) {
+        logger.debug(`Page ${pageUrl} not found for course ${courseId}`);
+        return null;
+    }
+}
+
+/**
  * Set course default view to wiki (front page)
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
