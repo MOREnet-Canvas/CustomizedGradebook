@@ -29,10 +29,11 @@ import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGrade
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
 import { clearAllSnapshots, debugSnapshots, validateAllSnapshots, getCourseSnapshot, populateCourseSnapshot } from "./services/courseSnapshotService.js";
 import { getUserRoleGroup, getCourseId } from "./utils/canvas.js";
-import { isDashboardPage, isGradebookPage, isSpeedGraderPage, isTeacherViewingStudentGrades } from "./utils/pageDetection.js";
+import { isDashboardPage, isGradebookPage, isSpeedGraderPage, isTeacherViewingStudentGrades, isCourseSettingsPage } from "./utils/pageDetection.js";
 import { CanvasApiClient } from "./utils/canvasApiClient.js";
 import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
+import { initMasteryDashboardCreation } from "./masteryDashboardCreation/masteryDashboardCreationInit.js";
 
 /**
  * Main initialization function
@@ -60,7 +61,11 @@ import { isAdminDashboardPage } from "./admin/pageDetection.js";
         return;
     }
 
-
+    // Mastery Dashboard Creation (course settings page)
+    if (isCourseSettingsPage()) {
+        logger.debug('[Init] On course settings page, initializing mastery dashboard creation');
+        initMasteryDashboardCreation();
+    }
 
     // Gradebook functionality (teacher-side)
     // Only run on gradebook pages, NOT SpeedGrader

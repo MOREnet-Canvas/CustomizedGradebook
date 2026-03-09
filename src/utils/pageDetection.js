@@ -144,6 +144,19 @@ export function isSpeedGraderPage() {
 }
 
 /**
+ * Check if current page is course settings page
+ *
+ * Matches:
+ * - /courses/:id/settings
+ *
+ * @returns {boolean} True if on course settings page
+ */
+export function isCourseSettingsPage() {
+    const path = window.location.pathname;
+    return /^\/courses\/\d+\/settings/.test(path);
+}
+
+/**
  * Extract student ID from teacher viewing student grades page
  *
  * @returns {string|null} Student ID or null if not on teacher viewing student grades page
