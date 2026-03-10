@@ -208,90 +208,71 @@ export async function renderMasteryDashboard() {
         }
     }
 
-    // Fetch outcome results for the student
+    // Fetch outcome rollups for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
-    const results = await apiJson(
-        `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&per_page=100&include[]=outcomes&include[]=alignments`
+    const data = await apiJson(
+        `/api/v1/courses/${courseId}/outcome_rollups?user_ids[]=${studentId}&include[]=outcomes&per_page=100`
     );
 
-    debugLog(`Outcome results fetched: ${results.outcome_results?.length || 0}`);
-    debugStatus(statusEl, `Processing ${results.outcome_results?.length || 0} outcome results...`);
+    debugLog(`Rollup data fetched`);
+    debugStatus(statusEl, `Processing rollup data...`);
 
-    if (!results.outcome_results || results.outcome_results.length === 0) {
+    const rollup = data.rollups && data.rollups[0];
+    if (!rollup || !rollup.scores || rollup.scores.length === 0) {
         statusEl.textContent = "No mastery data available for this course.";
-        debugLog("No outcome results found");
+        debugLog("No rollup scores found");
         return;
     }
 
     // Build outcome map
     const outcomeMap = {};
-    if (results.linked?.outcomes) {
-        results.linked.outcomes.forEach(o => {
+    if (data.linked?.outcomes) {
+        data.linked.outcomes.forEach(o => {
             outcomeMap[o.id] = o;
         });
     }
     debugLog(`Outcomes mapped: ${Object.keys(outcomeMap).length}`);
 
-    // Group results by outcome
-    const grouped = {};
-    results.outcome_results.forEach(r => {
-        const oid = r.links.learning_outcome;
-        if (!grouped[oid]) grouped[oid] = [];
-        grouped[oid].push(r);
-    });
-    debugLog(`Outcomes with results: ${Object.keys(grouped).length}`);
+    const scores = rollup.scores;
+    debugLog(`Outcome scores: ${scores.length}`);
 
     // Clear status in production, keep in dev
     if (!ENV_DEV) {
         statusEl.textContent = "";
     } else {
-        statusEl.textContent = `✓ Loaded ${Object.keys(grouped).length} outcomes`;
+        statusEl.textContent = `✓ Loaded ${scores.length} outcomes`;
     }
 
-    // Sort outcomes: AVG_OUTCOME first, then by most recent submission
-    const sortedOutcomeIds = Object.keys(grouped).sort((oidA, oidB) => {
-        const outcomeA = outcomeMap[oidA];
-        const outcomeB = outcomeMap[oidB];
+    // Sort scores: AVG_OUTCOME first, then by most recent submission
+    const sortedScores = scores.sort((a, b) => {
+        const outcomeA = outcomeMap[a.links.outcome];
+        const outcomeB = outcomeMap[b.links.outcome];
 
         // AVG_OUTCOME always first
         if (outcomeA?.title === AVG_OUTCOME_NAME) return -1;
         if (outcomeB?.title === AVG_OUTCOME_NAME) return 1;
 
         // Sort by most recent submission
-        const latestA = grouped[oidA].reduce((a, b) =>
-            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
-        );
-        const latestB = grouped[oidB].reduce((a, b) =>
-            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
-        );
-
-        const dateA = new Date(latestA.submitted_or_assessed_at);
-        const dateB = new Date(latestB.submitted_or_assessed_at);
+        const dateA = new Date(a.submitted_at || 0);
+        const dateB = new Date(b.submitted_at || 0);
 
         return dateB - dateA; // Most recent first
     });
 
     // Render cards
     const cards = [];
-    for (const oid of sortedOutcomeIds) {
+    for (const scoreData of sortedScores) {
+        const oid = scoreData.links.outcome;
         const outcome = outcomeMap[oid];
         if (!outcome) continue;
 
-        const outcomeResults = grouped[oid];
+        const score = scoreData.score != null ? scoreData.score : "—";
+        const assignmentName = scoreData.title || "No assignment data";
 
-        // Sort assignments by most recent first
-        const sortedResults = outcomeResults.sort((a, b) => {
-            const dateA = new Date(a.submitted_or_assessed_at);
-            const dateB = new Date(b.submitted_or_assessed_at);
-            return dateB - dateA;
-        });
-
-        const latest = sortedResults[0];
-
-        const score = latest.score != null ? latest.score : "—";
-        const possible = latest.possible != null ? latest.possible : "—";
-        const percent = latest.percent != null ? Math.round(latest.percent * 100) : null;
+        // Calculate percentage based on points_possible
+        const possible = outcome.points_possible || 4;
+        const percent = scoreData.score != null ? Math.round((scoreData.score / possible) * 100) : null;
 
         let masteryColor = "#999";
         if (percent != null) {
@@ -300,30 +281,14 @@ export async function renderMasteryDashboard() {
             else masteryColor = "#f66";
         }
 
-        // Build assignment list HTML
-        const assignmentListHtml = sortedResults.map(result => {
-            const assignmentScore = result.score != null ? result.score : "—";
-            const assignmentPossible = result.possible != null ? result.possible : "—";
-            const letterGrade = result.score != null ? getLetterGrade(result.score) : "";
-            const assignmentName = result.title || "Unnamed Assignment";
-
-            return `
-                <div style="padding:6px 0; border-bottom:1px solid #eee;">
-                    <div style="font-weight:500; font-size:0.9em;">${escapeHtml(assignmentName)}</div>
-                    <div style="font-size:0.85em; color:#666; margin-top:2px;">
-                        ${assignmentScore} / ${assignmentPossible}${letterGrade ? ` - ${escapeHtml(letterGrade)}` : ""}
-                    </div>
-                </div>
-            `;
-        }).join("");
-
         cards.push(`
-            <div data-outcome-id="${oid}" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;">
+            <div data-outcome-id="${oid}" data-student-id="${studentId}" data-course-id="${courseId}" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                     <span class="expand-arrow" style="font-size:0.8em; transition:transform 0.2s;">▶</span>
                     <div style="font-weight:600; flex:1;">${escapeHtml(outcome.title)}</div>
                 </div>
                 <div style="font-size:0.9em; color:#666; margin-bottom:6px; margin-left:20px;">${escapeHtml(outcome.description || "")}</div>
+                <div style="font-size:0.85em; color:#888; margin-bottom:4px; margin-left:20px;">Latest: ${escapeHtml(assignmentName)}</div>
                 <div style="display:flex; align-items:center; gap:8px; margin-left:20px;">
                     <div style="font-size:1.2em; font-weight:700; color:${masteryColor};">
                         ${score} / ${possible}
@@ -331,8 +296,7 @@ export async function renderMasteryDashboard() {
                     ${percent != null ? `<div style="font-size:0.9em; color:#666;">(${percent}%)</div>` : ""}
                 </div>
                 <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #ddd; margin-left:20px;">
-                    <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Aligned Assignments:</div>
-                    ${assignmentListHtml}
+                    <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Loading assignments...</div>
                 </div>
             </div>
         `);
@@ -340,16 +304,71 @@ export async function renderMasteryDashboard() {
 
     cardsEl.innerHTML = cards.join("");
 
-    // Add click handlers to toggle expansion
+    // Add click handlers to toggle expansion and lazy-load contributing scores
     cardsEl.querySelectorAll('[data-outcome-id]').forEach(card => {
-        card.addEventListener('click', (e) => {
+        card.addEventListener('click', async (e) => {
             // Don't toggle if clicking on a link (future-proofing)
             if (e.target.tagName === 'A') return;
 
             const details = card.querySelector('.assignment-details');
             const arrow = card.querySelector('.expand-arrow');
+            const outcomeId = card.dataset.outcomeId;
+            const studentIdForCard = card.dataset.studentId;
+            const courseIdForCard = card.dataset.courseId;
 
             if (details.style.display === 'none') {
+                // Expanding - load contributing scores if not already loaded
+                if (!card.dataset.loaded) {
+                    details.innerHTML = '<div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Loading assignments...</div>';
+
+                    try {
+                        const contributingData = await apiJson(
+                            `/api/v1/courses/${courseIdForCard}/outcome_results/${outcomeId}/rollups?user_ids[]=${studentIdForCard}&include[]=outcomes`
+                        );
+
+                        debugLog(`Contributing scores loaded for outcome ${outcomeId}`);
+
+                        // Parse contributing scores
+                        const rollupData = contributingData.rollups && contributingData.rollups[0];
+                        if (rollupData && rollupData.scores && rollupData.scores.length > 0) {
+                            // Sort by most recent first
+                            const sortedContributing = rollupData.scores.sort((a, b) => {
+                                const dateA = new Date(a.submitted_at || 0);
+                                const dateB = new Date(b.submitted_at || 0);
+                                return dateB - dateA;
+                            });
+
+                            const assignmentListHtml = sortedContributing.map(result => {
+                                const assignmentScore = result.score != null ? result.score : "—";
+                                const assignmentPossible = outcomeMap[outcomeId]?.points_possible || 4;
+                                const letterGrade = result.score != null ? getLetterGrade(result.score) : "";
+                                const assignmentName = result.title || "Unnamed Assignment";
+
+                                return `
+                                    <div style="padding:6px 0; border-bottom:1px solid #eee;">
+                                        <div style="font-weight:500; font-size:0.9em;">${escapeHtml(assignmentName)}</div>
+                                        <div style="font-size:0.85em; color:#666; margin-top:2px;">
+                                            ${assignmentScore} / ${assignmentPossible}${letterGrade ? ` - ${escapeHtml(letterGrade)}` : ""}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join("");
+
+                            details.innerHTML = `
+                                <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Aligned Assignments:</div>
+                                ${assignmentListHtml}
+                            `;
+                        } else {
+                            details.innerHTML = '<div style="font-size:0.9em; color:#666;">No assignment data available.</div>';
+                        }
+
+                        card.dataset.loaded = 'true';
+                    } catch (err) {
+                        console.error('[MasteryDashboard] Failed to load contributing scores:', err);
+                        details.innerHTML = '<div style="font-size:0.9em; color:#c62828;">Failed to load assignments.</div>';
+                    }
+                }
+
                 details.style.display = 'block';
                 arrow.style.transform = 'rotate(90deg)';
                 arrow.textContent = '▼';
@@ -361,5 +380,5 @@ export async function renderMasteryDashboard() {
         });
     });
 
-    debugLog(`Rendered ${cards.length} outcome cards with expandable assignment lists`);
+    debugLog(`Rendered ${cards.length} outcome cards with lazy-loaded assignment lists`);
 }
