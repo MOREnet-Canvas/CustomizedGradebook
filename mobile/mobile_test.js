@@ -42,8 +42,10 @@
         }
         var courseId = Number(m[1]);
 
-        // find observed student for this course
+        // Determine which student's data to show
         var enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
+
+        // Try to find observer enrollment first (parent viewing child)
         var obs = enrollments.find(function (e) {
             return e.type === "ObserverEnrollment" &&
                 String(e.course_id) === String(courseId) &&
@@ -51,12 +53,28 @@
                 e.associated_user_id;
         });
 
-        if (!obs) {
-            statusEl.textContent = "No observed student found for this course.";
-            return;
-        }
+        var studentId;
 
-        var studentId = obs.associated_user_id;
+        if (obs) {
+            // Observer (parent) viewing observed student's data
+            studentId = obs.associated_user_id;
+        } else {
+            // Try to find student enrollment (student viewing own data)
+            var studentEnrollment = enrollments.find(function (e) {
+                return e.type === "StudentEnrollment" &&
+                    String(e.course_id) === String(courseId) &&
+                    e.enrollment_state === "active";
+            });
+
+            if (studentEnrollment) {
+                // Student viewing their own data
+                studentId = studentEnrollment.user_id;
+            } else {
+                // Not an observer or student in this course
+                statusEl.textContent = "No mastery data available for this user.";
+                return;
+            }
+        }
 
         var data = await apiJson(
             "/api/v1/courses/" + courseId +
