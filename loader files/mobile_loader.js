@@ -38,12 +38,15 @@
     window.CG_MOBILE_LOADED = true;
     
     console.log(`[CG Mobile] Loading version: ${MOBILE_VERSION}`);
-    
+
     // Create and inject script tag
     const script = document.createElement("script");
     script.id = "cg-mobile-bundle";
-    script.src = `https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/download/${MOBILE_VERSION}/mobile_test.js`;
-    
+
+    // Add cache busting for dev builds to ensure latest version is always loaded
+    const cacheBuster = MOBILE_VERSION === "mobile-dev" ? `?v=${Date.now()}` : "";
+    script.src = `https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/download/${MOBILE_VERSION}/mobile_test.js${cacheBuster}`;
+
     script.onload = function() {
         console.log(`[CG Mobile] Loaded successfully (${MOBILE_VERSION})`);
     };
@@ -56,4 +59,3 @@
     document.head.appendChild(script);
     
 })();
-
