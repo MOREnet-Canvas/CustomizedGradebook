@@ -17,7 +17,6 @@ const tag = `mobile-v${pkg.version}`;
 try {
     execSync(`gh release create ${tag} --title "Mobile ${tag}" --notes "Parent Mastery mobile release ${tag}"`, { stdio: "ignore" });
 } catch {}
-execSync(`gh release upload ${tag} mobile/mobile_test.js --clobber`, { stdio: "inherit" });
+execSync(`gh release upload ${tag} dist/mobile/prod/mobileInit.js --clobber`, { stdio: "inherit" });
 
 console.log(`[CG Mobile] Uploaded mobile module to release ${tag}`);
-

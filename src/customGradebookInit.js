@@ -34,6 +34,7 @@ import { CanvasApiClient } from "./utils/canvasApiClient.js";
 import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
 import { initMasteryDashboardCreation } from "./masteryDashboardCreation/masteryDashboardCreationInit.js";
+import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
 
 /**
  * Main initialization function
@@ -66,6 +67,10 @@ import { initMasteryDashboardCreation } from "./masteryDashboardCreation/mastery
         logger.debug('[Init] On course settings page, initializing mastery dashboard creation');
         initMasteryDashboardCreation();
     }
+
+    // Mastery Dashboard Viewer (web version)
+    // Only runs if ?cg_web=1 is present in the URL
+    initMasteryDashboardViewer();
 
     // Gradebook functionality (teacher-side)
     // Only run on gradebook pages, NOT SpeedGrader
