@@ -14,8 +14,6 @@
  * - Teachers see an error message (future: dropdown to select student)
  */
 
-import { logger } from '../utils/logger.js';
-
 /**
  * Ensure the host container exists and is properly configured
  * @returns {HTMLElement|null} The root element, or null if not found
@@ -70,7 +68,7 @@ function escapeHtml(str) {
  */
 function debugLog(message) {
     if (ENV_DEV) {
-        logger.debug(`[MasteryDashboard] ${message}`);
+        console.log(`[MasteryDashboard] ${message}`);
     }
 }
 
