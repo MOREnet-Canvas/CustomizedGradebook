@@ -35,6 +35,36 @@
 ////////////////////////////////////////////////////
 
 (function () {
+    // ========================================================================
+    // DEV MODE DETECTION
+    // ========================================================================
+    var IS_DEV = (function() {
+        var scripts = document.querySelectorAll('script[src*="mobile_test.js"]');
+        for (var i = 0; i < scripts.length; i++) {
+            if (scripts[i].src.includes('/mobile-dev/')) {
+                return true;
+            }
+        }
+        return false;
+    })();
+
+    // Debug logging helpers (only active in dev builds)
+    function debugLog(message) {
+        if (IS_DEV) {
+            console.log('[CG Mobile Debug]', message);
+        }
+    }
+
+    function debugStatus(statusEl, message) {
+        if (IS_DEV) {
+            statusEl.textContent = message;
+        }
+    }
+
+    // ========================================================================
+    // MAIN CODE
+    // ========================================================================
+
     function ensureHost() {
         var root = document.getElementById("mastery-dashboard-root");
         if (!root) return null;
@@ -70,48 +100,85 @@
         var statusEl = document.getElementById("pm-status");
         var cardsEl = document.getElementById("pm-cards");
 
+        debugLog('Mastery Dashboard initializing...');
+        debugLog('Dev mode: ' + IS_DEV);
+
         // courseId from URL
         var m = location.pathname.match(/^\/courses\/(\d+)\//);
         if (!m) {
             statusEl.textContent = "Could not detect course.";
+            debugLog('ERROR: Could not extract course ID from URL: ' + location.pathname);
             return;
         }
         var courseId = Number(m[1]);
+        debugLog('Course ID: ' + courseId);
+
+        // DEBUG: Show fetching status
+        debugStatus(statusEl, "Fetching enrollments...");
 
         // Determine which student's data to show
         var enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
+        debugLog('Total enrollments fetched: ' + enrollments.length);
+
+        // DEBUG: Show enrollment count
+        debugStatus(statusEl, "Found " + enrollments.length + " enrollments. Analyzing...");
+
+        // Filter enrollments for this course
+        var courseEnrollments = enrollments.filter(function(e) {
+            return String(e.course_id) === String(courseId) && e.enrollment_state === "active";
+        });
+        debugLog('Course enrollments: ' + courseEnrollments.length);
+
+        // DEBUG: Show course-specific enrollments
+        var enrollmentTypes = courseEnrollments.map(function(e) { return e.type; }).join(", ");
+        debugLog('Enrollment types for this course: ' + enrollmentTypes);
+        debugStatus(statusEl, "Course enrollments: " + (enrollmentTypes || "none") + ". Determining role...");
 
         // Try to find observer enrollment first (parent viewing child)
-        var obs = enrollments.find(function (e) {
-            return e.type === "ObserverEnrollment" &&
-                String(e.course_id) === String(courseId) &&
-                e.enrollment_state === "active" &&
-                e.associated_user_id;
+        var obs = courseEnrollments.find(function (e) {
+            return e.type === "ObserverEnrollment" && e.associated_user_id;
         });
 
         var studentId;
+        var userRole;
 
         if (obs) {
             // Observer (parent) viewing observed student's data
             studentId = obs.associated_user_id;
+            userRole = "Observer (Parent)";
+            debugLog('User role: ' + userRole);
+            debugLog('Observed student ID: ' + studentId);
+            debugStatus(statusEl, "Role: " + userRole + ". Loading observed student's data...");
         } else {
             // Try to find student enrollment (student viewing own data)
-            var studentEnrollment = enrollments.find(function (e) {
-                return e.type === "StudentEnrollment" &&
-                    String(e.course_id) === String(courseId) &&
-                    e.enrollment_state === "active";
+            var studentEnrollment = courseEnrollments.find(function (e) {
+                return e.type === "StudentEnrollment";
             });
 
             if (studentEnrollment) {
                 // Student viewing their own data
                 studentId = studentEnrollment.user_id;
+                userRole = "Student";
+                debugLog('User role: ' + userRole);
+                debugLog('Student ID: ' + studentId);
+                debugStatus(statusEl, "Role: " + userRole + ". Loading your mastery data...");
             } else {
                 // Not an observer or student in this course
-                statusEl.textContent = "No mastery data available for this user.";
+                debugLog('ERROR: No valid enrollment found');
+                debugLog('Available enrollment types: ' + enrollmentTypes);
+
+                statusEl.innerHTML =
+                    '<div style="color:#c62828;">No mastery data available.</div>' +
+                    (IS_DEV ?
+                        '<div style="font-size:11px; color:#666; margin-top:8px;">Debug: Found enrollments: ' + enrollmentTypes + '</div>' +
+                        '<div style="font-size:11px; color:#666;">You must be enrolled as a student or observer in this course.</div>'
+                        : '');
                 return;
             }
         }
 
+        // Fetch mastery data
+        debugLog('Fetching outcome rollups for student ' + studentId);
         var data = await apiJson(
             "/api/v1/courses/" + courseId +
             "/outcome_rollups?user_ids[]=" + studentId +
@@ -121,6 +188,7 @@
         var rollup = data.rollups && data.rollups[0];
         if (!rollup) {
             statusEl.textContent = "No mastery data found.";
+            debugLog('ERROR: No rollup data returned from API');
             return;
         }
 
@@ -128,6 +196,7 @@
         var outcomesById = new Map(outcomes.map(function (o) { return [String(o.id), o]; }));
 
         var scores = rollup.scores || [];
+        debugLog('Loaded ' + scores.length + ' outcome scores');
         statusEl.textContent = "Loaded " + scores.length + " outcomes.";
 
         // render cards
@@ -154,6 +223,8 @@
 
             cardsEl.appendChild(card);
         });
+
+        debugLog('Rendering complete');
     }
 
     function escapeHtml(s) {
@@ -163,9 +234,20 @@
     }
 
     // Run after DOM is ready
+    debugLog('Script loaded, waiting for DOM...');
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", function () { run().catch(console.error); });
+        document.addEventListener("DOMContentLoaded", function () {
+            debugLog('DOM ready, starting run()');
+            run().catch(function(err) {
+                console.error('[CG Mobile] Error:', err);
+                debugLog('ERROR: ' + err.message);
+            });
+        });
     } else {
-        run().catch(console.error);
+        debugLog('DOM already ready, starting run()');
+        run().catch(function(err) {
+            console.error('[CG Mobile] Error:', err);
+            debugLog('ERROR: ' + err.message);
+        });
     }
 })();
