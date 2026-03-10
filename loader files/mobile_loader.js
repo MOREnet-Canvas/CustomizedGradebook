@@ -7,7 +7,7 @@
  * CONFIGURATION:
  * - Change MOBILE_VERSION to switch between dev and stable versions
  * - "mobile-dev" = Latest development build (auto-updated)
- * - "mobile-v0.1.1" = Specific stable release
+ * - "mobile-v0.2.0" = Specific stable release (example)
  * 
  * INSTALLATION:
  * 1. Go to Account → Themes → Mobile
@@ -45,7 +45,7 @@
 
     // Add cache busting for dev builds to ensure latest version is always loaded
     const cacheBuster = MOBILE_VERSION === "mobile-dev" ? `?v=${Date.now()}` : "";
-    script.src = `https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/download/${MOBILE_VERSION}/mobile_test.js${cacheBuster}`;
+    script.src = `https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/download/${MOBILE_VERSION}/mobileInit.js${cacheBuster}`;
 
     script.onload = function() {
         console.log(`[CG Mobile] Loaded successfully (${MOBILE_VERSION})`);

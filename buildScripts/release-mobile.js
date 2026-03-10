@@ -56,13 +56,16 @@ console.log(`[CG Mobile] Created tag: ${tag}`);
 execSync(`git push --follow-tags`, { stdio: "inherit" });
 console.log(`[CG Mobile] Pushed to GitHub with tags`);
 
+// Build production bundle
+console.log(`[CG Mobile] Building production bundle...`);
+execSync(`npm run build:mobile:prod`, { stdio: "inherit" });
+
 // Deploy to GitHub Release
 try {
     execSync(`gh release create ${tag} --title "Mobile ${tag}" --notes "Parent Mastery mobile release ${tag}"`, { stdio: "ignore" });
 } catch {
     // Release might already exist, that's okay
 }
-execSync(`gh release upload ${tag} mobile/mobile_test.js --clobber`, { stdio: "inherit" });
+execSync(`gh release upload ${tag} dist/mobile/prod/mobileInit.js --clobber`, { stdio: "inherit" });
 
 console.log(`[CG Mobile] ✓ Released ${tag} successfully!`);
-
