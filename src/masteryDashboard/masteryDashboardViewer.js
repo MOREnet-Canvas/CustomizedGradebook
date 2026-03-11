@@ -127,7 +127,7 @@ export async function renderMasteryDashboard() {
     debugLog(`Course ID: ${courseId}`);
 
     // Fetch enrollments to get course name
-    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
+    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100&include[]=course");
     debugLog(`Total enrollments fetched: ${enrollments.length}`);
 
     // Filter enrollments for this course
