@@ -329,7 +329,8 @@ export async function renderMasteryDashboard() {
                 assignmentListData.push({
                     name: alignment.name || "Unnamed Assignment",
                     score: result?.score,
-                    submitted_at: result?.submitted_or_assessed_at
+                    submitted_at: result?.submitted_or_assessed_at,
+                    html_url: alignment.html_url
                 });
             });
         }
@@ -339,6 +340,13 @@ export async function renderMasteryDashboard() {
 
         // Get letter grade for display
         const letterGrade = latest.score != null ? getLetterGrade(latest.score) : "";
+
+        // Format date for display
+        const latestDate = latest.submitted_or_assessed_at ? new Date(latest.submitted_or_assessed_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }) : "";
 
         cards.push(`
             <div data-outcome-id="${oid}" data-assignment-data="${escapeHtml(assignmentDataJson)}" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;">
@@ -353,6 +361,7 @@ export async function renderMasteryDashboard() {
                             ${score}
                         </div>
                         ${letterGrade ? `<div style="font-size:0.9em; color:#666; margin-top:2px;">${escapeHtml(letterGrade)}</div>` : ""}
+                        ${latestDate ? `<div style="font-size:0.85em; color:#999; margin-top:2px;">${latestDate}</div>` : ""}
                     </div>
                 </div>
                 <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #ddd; margin-left:20px;">
@@ -407,7 +416,11 @@ export async function renderMasteryDashboard() {
 
                                 return `
                                     <div style="padding:6px 0; border-bottom:1px solid #eee;">
-                                        <div style="font-weight:500; font-size:0.9em;">${escapeHtml(assignment.name)}</div>
+                                        <div style="font-weight:500; font-size:0.9em;">
+                                            <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
+                                                ${escapeHtml(assignment.name)}
+                                            </a>
+                                        </div>
                                         <div style="font-size:0.85em; color:#666; margin-top:2px;">
                                             ${assignmentScore} - ${escapeHtml(letterGrade)}${date ? ` - ${date}` : ""}
                                         </div>
