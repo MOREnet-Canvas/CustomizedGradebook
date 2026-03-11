@@ -14,27 +14,13 @@
  * - Teachers see an error message (future: dropdown to select student)
  */
 
-/**
- * Rating scale for calculating letter grades
- * Hardcoded to avoid dependency on config.js (mobile bundle is standalone)
- */
-const RATINGS = [
-    { description: "Exemplary", points: 4 },
-    { description: "Beyond Target", points: 3.5 },
-    { description: "Target", points: 3 },
-    { description: "Approaching Target", points: 2.5 },
-    { description: "Developing", points: 2 },
-    { description: "Beginning", points: 1.5 },
-    { description: "Needs Partial Support", points: 1 },
-    { description: "Needs Full Support", points: 0.5 },
-    { description: "Insufficient Evidence", points: 0 }
-];
+import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 
 /**
- * AVG_OUTCOME_NAME - used to identify which outcome should be displayed first
- * Hardcoded to avoid dependency on config.js
+ * Rating scale for calculating letter grades
+ * Uses imported OUTCOME_AND_RUBRIC_RATINGS from config.js
  */
-const AVG_OUTCOME_NAME = "Current Score";
+const RATINGS = OUTCOME_AND_RUBRIC_RATINGS;
 
 /**
  * Calculate letter grade from score
@@ -149,6 +135,9 @@ export async function renderMasteryDashboard() {
         String(e.course_id) === String(courseId) && e.enrollment_state === "active"
     );
     debugLog(`Course enrollments: ${courseEnrollments.length}`);
+
+    // DEBUG: Log enrollment object to find course name path
+    console.log('DEBUG - Enrollment object:', courseEnrollments[0]);
 
     // Get course name from enrollment
     const courseName = courseEnrollments[0]?.course?.name || courseEnrollments[0]?.course_name || "Mastery Dashboard";
@@ -279,12 +268,25 @@ export async function renderMasteryDashboard() {
     });
 
     // Calculate mastery count (>= 80% is considered mastered)
+    // Exclude AVG_OUTCOME and any outcomes matching EXCLUDED_OUTCOME_KEYWORDS
     let masteredCount = 0;
-    const totalCount = sortedOutcomeIds.length;
+    let totalCount = 0;
 
     for (const oid of sortedOutcomeIds) {
         const outcome = outcomeMap[oid];
         if (!outcome) continue;
+
+        // Skip AVG_OUTCOME (Current Score) - it's not a learning outcome
+        if (outcome.title === AVG_OUTCOME_NAME) continue;
+
+        // Skip excluded outcomes
+        const isExcluded = EXCLUDED_OUTCOME_KEYWORDS.some(keyword =>
+            outcome.title.includes(keyword)
+        );
+        if (isExcluded) continue;
+
+        // Count this as a valid learning outcome
+        totalCount++;
 
         const outcomeResults = grouped[oid];
         const latest = outcomeResults.reduce((a, b) =>
