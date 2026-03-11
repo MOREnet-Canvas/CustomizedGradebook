@@ -15,6 +15,7 @@
  */
 
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 /**
  * Rating scale for calculating letter grades
@@ -66,17 +67,19 @@ function ensureHost(courseName = "Mastery Dashboard") {
 }
 
 /**
- * Fetch JSON from Canvas API
- * @param {string} path - API path
- * @returns {Promise<any>} JSON response
+ * Fetch course name from Canvas API
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<string>} Course name
  */
-async function apiJson(path) {
-    const response = await fetch(path, { credentials: "include" });
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`${response.status} ${response.statusText}\n${text.slice(0, 400)}`);
+async function fetchCourseName(courseId, apiClient) {
+    try {
+        const course = await apiClient.get(`/api/v1/courses/${courseId}`, {}, 'fetchCourseName');
+        return course.name || "Mastery Dashboard";
+    } catch (error) {
+        debugLog(`Error fetching course name: ${error.message}`);
+        return "Mastery Dashboard";
     }
-    return response.json();
 }
 
 /**
@@ -126,8 +129,11 @@ export async function renderMasteryDashboard() {
     const courseId = Number(match[1]);
     debugLog(`Course ID: ${courseId}`);
 
-    // Get course name from Canvas ENV (available on all course pages)
-    const courseName = window.ENV?.current_context?.name || "Mastery Dashboard";
+    // Initialize Canvas API client
+    const apiClient = new CanvasApiClient();
+
+    // Fetch course name from Canvas API
+    const courseName = await fetchCourseName(courseId, apiClient);
     debugLog(`Course name: ${courseName}`);
 
     // Initialize host with course name
@@ -145,7 +151,7 @@ export async function renderMasteryDashboard() {
 
     // Fetch enrollments for role detection
     debugStatus(statusEl, "Fetching enrollments...");
-    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
+    const enrollments = await apiClient.get("/api/v1/users/self/enrollments", {}, 'fetchEnrollments');
     debugLog(`Total enrollments fetched: ${enrollments.length}`);
 
     // Filter enrollments for this course
@@ -196,8 +202,10 @@ export async function renderMasteryDashboard() {
     // Fetch outcome results with alignments for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
-    const data = await apiJson(
-        `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments&per_page=100`
+    const data = await apiClient.get(
+        `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments`,
+        {},
+        'fetchOutcomeResults'
     );
 
     debugLog(`Outcome results fetched`);
