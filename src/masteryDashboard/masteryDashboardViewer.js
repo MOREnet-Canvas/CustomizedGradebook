@@ -126,21 +126,8 @@ export async function renderMasteryDashboard() {
     const courseId = Number(match[1]);
     debugLog(`Course ID: ${courseId}`);
 
-    // Fetch enrollments to get course name
-    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100&include[]=course");
-    debugLog(`Total enrollments fetched: ${enrollments.length}`);
-
-    // Filter enrollments for this course
-    const courseEnrollments = enrollments.filter(e =>
-        String(e.course_id) === String(courseId) && e.enrollment_state === "active"
-    );
-    debugLog(`Course enrollments: ${courseEnrollments.length}`);
-
-    // DEBUG: Log enrollment object to find course name path
-    console.log('DEBUG - Enrollment object:', courseEnrollments[0]);
-
-    // Get course name from enrollment
-    const courseName = courseEnrollments[0]?.course?.name || courseEnrollments[0]?.course_name || "Mastery Dashboard";
+    // Get course name from Canvas ENV (available on all course pages)
+    const courseName = window.ENV?.current_context?.name || "Mastery Dashboard";
     debugLog(`Course name: ${courseName}`);
 
     // Initialize host with course name
@@ -156,8 +143,15 @@ export async function renderMasteryDashboard() {
     debugLog('Mastery Dashboard initializing...');
     debugLog(`Dev mode: ${ENV_DEV}`);
 
-    // DEBUG: Show fetching status
+    // Fetch enrollments for role detection
     debugStatus(statusEl, "Fetching enrollments...");
+    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
+    debugLog(`Total enrollments fetched: ${enrollments.length}`);
+
+    // Filter enrollments for this course
+    const courseEnrollments = enrollments.filter(e =>
+        String(e.course_id) === String(courseId) && e.enrollment_state === "active"
+    );
 
     // DEBUG: Show course-specific enrollments
     const enrollmentTypes = courseEnrollments.map(e => e.type).join(", ");
