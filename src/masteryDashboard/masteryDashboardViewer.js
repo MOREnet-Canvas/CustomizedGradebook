@@ -337,18 +337,23 @@ export async function renderMasteryDashboard() {
         // Store assignment data in dataset for lazy rendering
         const assignmentDataJson = JSON.stringify(assignmentListData);
 
+        // Get letter grade for display
+        const letterGrade = latest.score != null ? getLetterGrade(latest.score) : "";
+
         cards.push(`
             <div data-outcome-id="${oid}" data-assignment-data="${escapeHtml(assignmentDataJson)}" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                    <span class="expand-arrow" style="font-size:0.8em; transition:transform 0.2s;">▶</span>
-                    <div style="font-weight:600; flex:1;">${escapeHtml(outcome.title)}</div>
-                </div>
-                <div style="font-size:0.9em; color:#666; margin-bottom:6px; margin-left:20px;">${escapeHtml(outcome.description || "")}</div>
-                <div style="display:flex; align-items:center; gap:8px; margin-left:20px;">
-                    <div style="font-size:1.2em; font-weight:700; color:${masteryColor};">
-                        ${score} / ${possible}
+                <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
+                    <span class="expand-arrow" style="font-size:0.8em; transition:transform 0.2s; margin-top:2px;">▶</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">${escapeHtml(outcome.title)}</div>
+                        <div style="font-size:0.9em; color:#666; margin-top:4px;">${escapeHtml(outcome.description || "")}</div>
                     </div>
-                    ${percent != null ? `<div style="font-size:0.9em; color:#666;">(${percent}%)</div>` : ""}
+                    <div style="text-align:right;">
+                        <div style="font-size:1.2em; font-weight:700; color:${masteryColor};">
+                            ${score}
+                        </div>
+                        ${letterGrade ? `<div style="font-size:0.9em; color:#666; margin-top:2px;">${escapeHtml(letterGrade)}</div>` : ""}
+                    </div>
                 </div>
                 <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #ddd; margin-left:20px;">
                     <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Loading assignments...</div>
@@ -376,26 +381,35 @@ export async function renderMasteryDashboard() {
                         const assignmentDataJson = card.dataset.assignmentData;
                         const assignmentList = assignmentDataJson ? JSON.parse(assignmentDataJson) : [];
 
-                        debugLog(`Rendering ${assignmentList.length} assignments for outcome ${outcomeId}`);
+                        // Filter out unscored assignments
+                        const scoredAssignments = assignmentList.filter(a => a.score != null);
 
-                        if (assignmentList.length > 0) {
+                        debugLog(`Rendering ${scoredAssignments.length} scored assignments for outcome ${outcomeId}`);
+
+                        if (scoredAssignments.length > 0) {
                             // Sort by most recent first
-                            const sortedAssignments = assignmentList.sort((a, b) => {
+                            const sortedAssignments = scoredAssignments.sort((a, b) => {
                                 const dateA = new Date(a.submitted_at || 0);
                                 const dateB = new Date(b.submitted_at || 0);
                                 return dateB - dateA;
                             });
 
                             const assignmentListHtml = sortedAssignments.map(assignment => {
-                                const assignmentScore = assignment.score != null ? assignment.score : "—";
-                                const assignmentPossible = outcomeMap[outcomeId]?.points_possible || 4;
-                                const letterGrade = assignment.score != null ? getLetterGrade(assignment.score) : "";
+                                const assignmentScore = assignment.score;
+                                const letterGrade = getLetterGrade(assignment.score);
+
+                                // Format date
+                                const date = assignment.submitted_at ? new Date(assignment.submitted_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                }) : "";
 
                                 return `
                                     <div style="padding:6px 0; border-bottom:1px solid #eee;">
                                         <div style="font-weight:500; font-size:0.9em;">${escapeHtml(assignment.name)}</div>
                                         <div style="font-size:0.85em; color:#666; margin-top:2px;">
-                                            ${assignmentScore} / ${assignmentPossible}${letterGrade ? ` - ${escapeHtml(letterGrade)}` : ""}
+                                            ${assignmentScore} - ${escapeHtml(letterGrade)}${date ? ` - ${date}` : ""}
                                         </div>
                                     </div>
                                 `;
