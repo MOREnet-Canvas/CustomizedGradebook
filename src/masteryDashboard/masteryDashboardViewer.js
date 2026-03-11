@@ -268,7 +268,6 @@ export async function renderMasteryDashboard() {
         if (!outcome) continue;
 
         const score = scoreData.score != null ? scoreData.score : "—";
-        const assignmentName = scoreData.title || "No assignment data";
 
         // Calculate percentage based on points_possible
         const possible = outcome.points_possible || 4;
@@ -288,7 +287,6 @@ export async function renderMasteryDashboard() {
                     <div style="font-weight:600; flex:1;">${escapeHtml(outcome.title)}</div>
                 </div>
                 <div style="font-size:0.9em; color:#666; margin-bottom:6px; margin-left:20px;">${escapeHtml(outcome.description || "")}</div>
-                <div style="font-size:0.85em; color:#888; margin-bottom:4px; margin-left:20px;">Latest: ${escapeHtml(assignmentName)}</div>
                 <div style="display:flex; align-items:center; gap:8px; margin-left:20px;">
                     <div style="font-size:1.2em; font-weight:700; color:${masteryColor};">
                         ${score} / ${possible}
@@ -323,26 +321,28 @@ export async function renderMasteryDashboard() {
 
                     try {
                         const contributingData = await apiJson(
-                            `/api/v1/courses/${courseIdForCard}/outcome_results/${outcomeId}/rollups?user_ids[]=${studentIdForCard}&include[]=outcomes`
+                            `/api/v1/courses/${courseIdForCard}/outcomes/${outcomeId}/contributing_scores?user_ids[]=${studentIdForCard}`
                         );
 
                         debugLog(`Contributing scores loaded for outcome ${outcomeId}`);
 
-                        // Parse contributing scores
-                        const rollupData = contributingData.rollups && contributingData.rollups[0];
-                        if (rollupData && rollupData.scores && rollupData.scores.length > 0) {
-                            // Sort by most recent first
-                            const sortedContributing = rollupData.scores.sort((a, b) => {
-                                const dateA = new Date(a.submitted_at || 0);
-                                const dateB = new Date(b.submitted_at || 0);
-                                return dateB - dateA;
+                        // Parse contributing scores from the new API format
+                        // Response: { outcome: {...}, alignments: [...], scores: [{user_id, alignment_id, score}] }
+                        if (contributingData.scores && contributingData.scores.length > 0 && contributingData.alignments) {
+                            // Build alignment map for looking up assignment names
+                            const alignmentMap = {};
+                            contributingData.alignments.forEach(alignment => {
+                                alignmentMap[alignment.alignment_id] = alignment.associated_asset_name || "Unnamed Assignment";
                             });
 
-                            const assignmentListHtml = sortedContributing.map(result => {
-                                const assignmentScore = result.score != null ? result.score : "—";
+                            // Filter scores for this student and map to assignments
+                            const studentScores = contributingData.scores.filter(s => String(s.user_id) === String(studentIdForCard));
+
+                            const assignmentListHtml = studentScores.map(scoreItem => {
+                                const assignmentScore = scoreItem.score != null ? scoreItem.score : "—";
                                 const assignmentPossible = outcomeMap[outcomeId]?.points_possible || 4;
-                                const letterGrade = result.score != null ? getLetterGrade(result.score) : "";
-                                const assignmentName = result.title || "Unnamed Assignment";
+                                const letterGrade = scoreItem.score != null ? getLetterGrade(scoreItem.score) : "";
+                                const assignmentName = alignmentMap[scoreItem.alignment_id] || "Unnamed Assignment";
 
                                 return `
                                     <div style="padding:6px 0; border-bottom:1px solid #eee;">
@@ -354,10 +354,14 @@ export async function renderMasteryDashboard() {
                                 `;
                             }).join("");
 
-                            details.innerHTML = `
-                                <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Aligned Assignments:</div>
-                                ${assignmentListHtml}
-                            `;
+                            if (assignmentListHtml) {
+                                details.innerHTML = `
+                                    <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Aligned Assignments:</div>
+                                    ${assignmentListHtml}
+                                `;
+                            } else {
+                                details.innerHTML = '<div style="font-size:0.9em; color:#666;">No assignment data available.</div>';
+                            }
                         } else {
                             details.innerHTML = '<div style="font-size:0.9em; color:#666;">No assignment data available.</div>';
                         }
