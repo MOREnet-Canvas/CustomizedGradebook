@@ -57,9 +57,10 @@ function getLetterGrade(score) {
 
 /**
  * Ensure the host container exists and is properly configured
+ * @param {string} courseName - The name of the course to display
  * @returns {HTMLElement|null} The root element, or null if not found
  */
-function ensureHost() {
+function ensureHost(courseName = "Mastery Dashboard") {
     const root = document.getElementById("mastery-dashboard-root");
     if (!root) return null;
 
@@ -70,7 +71,7 @@ function ensureHost() {
 
     root.innerHTML = `
       <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
-        <div style="font-weight:700; margin-bottom:8px;">Mastery Dashboard</div>
+        <div style="font-weight:700; margin-bottom:8px;">${escapeHtml(courseName)}</div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -130,7 +131,31 @@ function debugStatus(statusEl, message) {
  * Fetches and displays mastery data for the current user
  */
 export async function renderMasteryDashboard() {
-    const root = ensureHost();
+    // Get course ID from URL first (needed for enrollment filtering)
+    const match = location.pathname.match(/^\/courses\/(\d+)\//);
+    if (!match) {
+        console.error('[MasteryDashboard] Could not extract course ID from URL:', location.pathname);
+        return;
+    }
+    const courseId = Number(match[1]);
+    debugLog(`Course ID: ${courseId}`);
+
+    // Fetch enrollments to get course name
+    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
+    debugLog(`Total enrollments fetched: ${enrollments.length}`);
+
+    // Filter enrollments for this course
+    const courseEnrollments = enrollments.filter(e =>
+        String(e.course_id) === String(courseId) && e.enrollment_state === "active"
+    );
+    debugLog(`Course enrollments: ${courseEnrollments.length}`);
+
+    // Get course name from enrollment
+    const courseName = courseEnrollments[0]?.course?.name || courseEnrollments[0]?.course_name || "Mastery Dashboard";
+    debugLog(`Course name: ${courseName}`);
+
+    // Initialize host with course name
+    const root = ensureHost(courseName);
     if (!root) {
         debugLog('No mastery-dashboard-root element found, exiting');
         return; // Only runs on mastery-dashboard page
@@ -142,31 +167,8 @@ export async function renderMasteryDashboard() {
     debugLog('Mastery Dashboard initializing...');
     debugLog(`Dev mode: ${ENV_DEV}`);
 
-    // Get course ID from URL
-    const match = location.pathname.match(/^\/courses\/(\d+)\//);
-    if (!match) {
-        statusEl.textContent = "Could not detect course.";
-        debugLog(`ERROR: Could not extract course ID from URL: ${location.pathname}`);
-        return;
-    }
-    const courseId = Number(match[1]);
-    debugLog(`Course ID: ${courseId}`);
-
     // DEBUG: Show fetching status
     debugStatus(statusEl, "Fetching enrollments...");
-
-    // Determine which student's data to show
-    const enrollments = await apiJson("/api/v1/users/self/enrollments?per_page=100");
-    debugLog(`Total enrollments fetched: ${enrollments.length}`);
-
-    // DEBUG: Show enrollment count
-    debugStatus(statusEl, `Found ${enrollments.length} enrollments. Analyzing...`);
-
-    // Filter enrollments for this course
-    const courseEnrollments = enrollments.filter(e => 
-        String(e.course_id) === String(courseId) && e.enrollment_state === "active"
-    );
-    debugLog(`Course enrollments: ${courseEnrollments.length}`);
 
     // DEBUG: Show course-specific enrollments
     const enrollmentTypes = courseEnrollments.map(e => e.type).join(", ");
@@ -253,13 +255,6 @@ export async function renderMasteryDashboard() {
     });
     debugLog(`Outcomes with results: ${Object.keys(grouped).length}`);
 
-    // Clear status in production, keep in dev
-    if (!ENV_DEV) {
-        statusEl.textContent = "";
-    } else {
-        statusEl.textContent = `✓ Loaded ${Object.keys(grouped).length} outcomes`;
-    }
-
     // Sort outcomes: AVG_OUTCOME first, then by most recent submission
     const sortedOutcomeIds = Object.keys(grouped).sort((oidA, oidB) => {
         const outcomeA = outcomeMap[oidA];
@@ -282,6 +277,32 @@ export async function renderMasteryDashboard() {
 
         return dateB - dateA; // Most recent first
     });
+
+    // Calculate mastery count (>= 80% is considered mastered)
+    let masteredCount = 0;
+    const totalCount = sortedOutcomeIds.length;
+
+    for (const oid of sortedOutcomeIds) {
+        const outcome = outcomeMap[oid];
+        if (!outcome) continue;
+
+        const outcomeResults = grouped[oid];
+        const latest = outcomeResults.reduce((a, b) =>
+            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
+        );
+
+        const possible = outcome.points_possible || 4;
+        const percent = latest.score != null ? Math.round((latest.score / possible) * 100) : null;
+
+        // Count as mastered if >= 80%
+        if (percent != null && percent >= 80) {
+            masteredCount++;
+        }
+    }
+
+    // Update status with mastery count
+    statusEl.textContent = `${masteredCount} of ${totalCount} Mastered`;
+    debugLog(`Mastery count: ${masteredCount} of ${totalCount}`);
 
     // Render cards
     const cards = [];
