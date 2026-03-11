@@ -304,8 +304,10 @@ export async function renderMasteryDashboard() {
     statusEl.textContent = `${masteredCount} of ${totalCount} Mastered`;
     debugLog(`Mastery count: ${masteredCount} of ${totalCount}`);
 
-    // Render cards
-    const cards = [];
+    // Separate AVG_OUTCOME from regular outcomes
+    let avgOutcomeHtml = null;
+    const regularCards = [];
+
     for (const oid of sortedOutcomeIds) {
         const outcome = outcomeMap[oid];
         if (!outcome) continue;
@@ -328,6 +330,34 @@ export async function renderMasteryDashboard() {
             if (percent >= 80) masteryColor = "#0c6";
             else if (percent >= 60) masteryColor = "#fc3";
             else masteryColor = "#f66";
+        }
+
+        // Check if this is the AVG_OUTCOME (Course Grade)
+        if (outcome.title === AVG_OUTCOME_NAME) {
+            // Get letter grade
+            const letterGrade = latest.score != null ? getLetterGrade(latest.score) : "";
+
+            // Get AVG assignment URL from alignments
+            let avgAssignmentUrl = "#";
+            if (outcome.alignments && outcome.alignments.length > 0) {
+                const avgAssignmentAlignment = outcome.alignments.find(id => id.startsWith("assignment_"));
+                if (avgAssignmentAlignment && alignmentMap[avgAssignmentAlignment]) {
+                    avgAssignmentUrl = alignmentMap[avgAssignmentAlignment].html_url || "#";
+                }
+            }
+
+            // Build simple one-line course grade display
+            avgOutcomeHtml = `
+                <a href="${avgAssignmentUrl}" target="_blank"
+                   style="display:block; padding:12px 0; text-decoration:none; color:#333; font-size:1.1em; margin-bottom:16px;">
+                    <span style="font-weight:600;">${escapeHtml(outcome.title)}:</span>
+                    <span style="font-size:1.3em; font-weight:700; color:${masteryColor}; margin:0 8px;">${score}</span>
+                    <span style="font-weight:600; color:#666;">${escapeHtml(letterGrade)}</span>
+                </a>
+            `;
+
+            // Skip adding to regular cards
+            continue;
         }
 
         // Pre-build assignment list from outcome results and alignments
@@ -369,7 +399,7 @@ export async function renderMasteryDashboard() {
             year: 'numeric'
         }) : "";
 
-        cards.push(`
+        regularCards.push(`
             <div data-outcome-id="${oid}" data-assignment-data="${escapeHtml(assignmentDataJson)}" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;">
                 <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
                     <span class="expand-arrow" style="font-size:0.8em; transition:transform 0.2s; margin-top:2px;">▶</span>
@@ -392,7 +422,14 @@ export async function renderMasteryDashboard() {
         `);
     }
 
-    cardsEl.innerHTML = cards.join("");
+    // Render: Course grade section first, then regular outcomes
+    cardsEl.innerHTML = `
+        ${avgOutcomeHtml || ""}
+        ${regularCards.length > 0 ? `
+            <div style="font-size:0.9em; font-weight:600; color:#666; margin-bottom:8px; margin-top:8px;">Learning Outcomes</div>
+            ${regularCards.join("")}
+        ` : ""}
+    `;
 
     // Add click handlers to toggle expansion and render pre-loaded assignment data
     cardsEl.querySelectorAll('[data-outcome-id]').forEach(card => {
@@ -475,5 +512,5 @@ export async function renderMasteryDashboard() {
         });
     });
 
-    debugLog(`Rendered ${cards.length} outcome cards with lazy-loaded assignment lists`);
+    debugLog(`Rendered ${avgOutcomeHtml ? '1 course grade + ' : ''}${regularCards.length} outcome cards`);
 }
