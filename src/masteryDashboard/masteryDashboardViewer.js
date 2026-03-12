@@ -537,22 +537,25 @@ export async function renderMasteryDashboard() {
                                     year: 'numeric'
                                 }) : "";
 
-                                // Build status pill (Canvas style)
-                                let statusPill = "";
+                                // Build status indicator (SVG icon + text)
+                                let statusIndicator = "";
                                 if (assignment.excused) {
-                                    statusPill = `<span style="display:inline-block; margin-left:6px;"><span style="display:inline-block;"><div style="display:inline-flex; align-items:center; padding:0 8px; height:20px; border-radius:10px; background-color:#6B7780; font-size:11px; font-weight:600; line-height:20px;"><div style="color:#FFFFFF;">excused</div></div></span></span>`;
+                                    // Excused: Red circle with white check
+                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="#EE0612" stroke="none"/><path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="color:#6B7780; font-weight:600; font-size:0.9em;">excused</span></span>`;
                                 } else if (assignment.late_policy_status === 'late') {
-                                    statusPill = `<span style="display:inline-block; margin-left:6px;"><span style="display:inline-block;"><div style="display:inline-flex; align-items:center; padding:0 8px; height:20px; border-radius:10px; background-color:#FC5E13; font-size:11px; font-weight:600; line-height:20px;"><div style="color:#FFFFFF;">late</div></div></span></span>`;
+                                    // Late: Orange clock (thinner stroke)
+                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="8" y2="4.5" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="11" y2="8" stroke="#FC5E13" stroke-width="1.5"/></svg><span style="color:#FC5E13; font-weight:600; font-size:0.9em;">late</span></span>`;
                                 } else if (assignment.late_policy_status === 'missing') {
-                                    statusPill = `<span style="display:inline-block; margin-left:6px;"><span style="display:inline-block;"><div style="display:inline-flex; align-items:center; padding:0 8px; height:20px; border-radius:10px; background-color:#EE0612; font-size:11px; font-weight:600; line-height:20px;"><div style="color:#FFFFFF;">missing</div></div></span></span>`;
+                                    // Missing: Red circle with slash (bolder stroke)
+                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#EE0612" stroke-width="2"/><line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="#EE0612" stroke-width="2"/></svg><span style="color:#EE0612; font-weight:700; font-size:0.9em;">missing</span></span>`;
                                 }
 
                                 return `
                                     <div style="padding:8px 0; border-bottom:1px solid #c8c8c8;">
-                                        <div style="font-weight:500; font-size:0.9em;">
+                                        <div style="font-weight:500; font-size:1em;">
                                             <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
                                                 ${escapeHtml(assignment.name)}
-                                            </a>${statusPill}
+                                            </a>${statusIndicator}
                                         </div>
                                         <div style="font-size:0.85em; color:#333; margin-top:2px;">
                                             <span style="color:${assignmentMasteryColor}; font-size:1.1em; line-height:1;">●</span>
