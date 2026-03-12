@@ -474,7 +474,8 @@ export async function renderMasteryDashboard() {
                     <span class="expand-arrow" style="font-size:0.8rem; transition:transform 0.2s; margin-top:2px;">▶</span>
                     <div style="flex:1;">
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.title)}</div>
-                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.description || "")}</div>
+                        <!-- Outcome description commented out - renders HTML as text -->
+                        <!-- <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.description || "")}</div> -->
                     </div>
                     <div style="text-align:right;">
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
