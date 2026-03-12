@@ -199,17 +199,35 @@ export async function renderMasteryDashboard() {
         }
     }
 
-    // Fetch outcome results with alignments for the student
+    // Fetch outcome results and submissions in parallel for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
-    const data = await apiClient.get(
-        `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments`,
-        {},
-        'fetchOutcomeResults'
-    );
+    const [data, submissions] = await Promise.all([
+        apiClient.get(
+            `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments`,
+            {},
+            'fetchOutcomeResults'
+        ),
+        apiClient.get(
+            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}&per_page=100`,
+            {},
+            'fetchStudentSubmissions'
+        )
+    ]);
 
-    debugLog(`Outcome results fetched`);
+    debugLog(`Outcome results and submissions fetched`);
     debugStatus(statusEl, `Processing outcome data...`);
+
+    // Build submission map: assignment_id → submission data
+    const submissionMap = {};
+    submissions.forEach(sub => {
+        submissionMap[sub.assignment_id] = {
+            late_policy_status: sub.late_policy_status,
+            excused: sub.excused,
+            workflow_state: sub.workflow_state
+        };
+    });
+    debugLog(`Submissions mapped: ${Object.keys(submissionMap).length}`);
 
     if (!data.outcome_results || data.outcome_results.length === 0) {
         statusEl.textContent = "No mastery data available for this course.";
@@ -395,17 +413,26 @@ export async function renderMasteryDashboard() {
                 const alignment = alignmentMap[alignmentId];
                 if (!alignment) return;
 
+                // Extract assignment ID from alignment ID (format: "assignment_123")
+                const assignmentId = alignmentId.split("_")[1];
+
                 // Find the result for this alignment
                 const result = outcomeResults.find(r => {
                     const resultAlignmentId = r.links?.alignment;
                     return resultAlignmentId && String(resultAlignmentId) === alignmentId;
                 });
 
+                // Get submission status for this assignment
+                const submission = submissionMap[assignmentId];
+
                 assignmentListData.push({
                     name: alignment.name || "Unnamed Assignment",
                     score: result?.score,
                     submitted_at: result?.submitted_or_assessed_at,
-                    html_url: alignment.html_url
+                    html_url: alignment.html_url,
+                    assignment_id: assignmentId,
+                    late_policy_status: submission?.late_policy_status,
+                    excused: submission?.excused
                 });
             });
         }
@@ -510,12 +537,22 @@ export async function renderMasteryDashboard() {
                                     year: 'numeric'
                                 }) : "";
 
+                                // Build status pill (Canvas style)
+                                let statusPill = "";
+                                if (assignment.excused) {
+                                    statusPill = `<span style="display:inline-block; margin-left:6px;"><span style="display:inline-block;"><div style="display:inline-flex; align-items:center; padding:0 8px; height:20px; border-radius:10px; background-color:#6B7780; font-size:11px; font-weight:600; line-height:20px;"><div style="color:#FFFFFF;">excused</div></div></span></span>`;
+                                } else if (assignment.late_policy_status === 'late') {
+                                    statusPill = `<span style="display:inline-block; margin-left:6px;"><span style="display:inline-block;"><div style="display:inline-flex; align-items:center; padding:0 8px; height:20px; border-radius:10px; background-color:#FC5E13; font-size:11px; font-weight:600; line-height:20px;"><div style="color:#FFFFFF;">late</div></div></span></span>`;
+                                } else if (assignment.late_policy_status === 'missing') {
+                                    statusPill = `<span style="display:inline-block; margin-left:6px;"><span style="display:inline-block;"><div style="display:inline-flex; align-items:center; padding:0 8px; height:20px; border-radius:10px; background-color:#EE0612; font-size:11px; font-weight:600; line-height:20px;"><div style="color:#FFFFFF;">missing</div></div></span></span>`;
+                                }
+
                                 return `
                                     <div style="padding:8px 0; border-bottom:1px solid #c8c8c8;">
                                         <div style="font-weight:500; font-size:0.9em;">
                                             <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
                                                 ${escapeHtml(assignment.name)}
-                                            </a>
+                                            </a>${statusPill}
                                         </div>
                                         <div style="font-size:0.85em; color:#333; margin-top:2px;">
                                             <span style="color:${assignmentMasteryColor}; font-size:1.1em; line-height:1;">●</span>
