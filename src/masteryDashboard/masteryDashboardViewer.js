@@ -429,7 +429,7 @@ export async function renderMasteryDashboard() {
                  role="button"
                  aria-expanded="false"
                  style="border:1px solid #ddd; border-left:4px solid ${masteryColor}; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;"
-                 onfocus="this.style.outline='3px solid #555'; this.style.outlineOffset='2px';"
+                 onfocus="this.style.outline='3px solid rgb(39, 53, 64)'; this.style.outlineOffset='2px';"
                  onblur="this.style.outline='none';">
                 <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
                     <span class="expand-arrow" style="font-size:0.8em; transition:transform 0.2s; margin-top:2px;">▶</span>
