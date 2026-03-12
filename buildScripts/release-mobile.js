@@ -69,3 +69,13 @@ try {
 execSync(`gh release upload ${tag} dist/mobile/prod/mobileInit.js --clobber`, { stdio: "inherit" });
 
 console.log(`[CG Mobile] ✓ Released ${tag} successfully!`);
+
+// Trigger version manifest update
+console.log(`[CG Mobile] Triggering version manifest update...`);
+try {
+    execSync(`gh workflow run update-mobile-version-manifest.yml`, { stdio: "inherit" });
+    console.log(`[CG Mobile] ✓ Triggered manifest update workflow`);
+} catch (error) {
+    console.warn(`[CG Mobile] Warning: Failed to trigger manifest update: ${error.message}`);
+    console.warn(`[CG Mobile] You may need to manually run: gh workflow run update-mobile-version-manifest.yml`);
+}
