@@ -31,8 +31,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add versions.json
-          git commit -m "Update version manifest [skip ci]" || echo "No changes to commit"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to versions.json - skipping commit"
+          else
+            git commit -m "Update version manifest [skip ci]"
+            git push
+            echo "Version manifest updated and pushed"
+          fi
 
       - name: Trigger Pages deployment
         run: gh workflow run deploy-pages.yml
