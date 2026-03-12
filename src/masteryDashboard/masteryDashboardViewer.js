@@ -438,7 +438,7 @@ export async function renderMasteryDashboard() {
                         <div style="font-size:0.9em; color:#555; margin-top:4px;">${escapeHtml(outcome.description || "")}</div>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-size:20px; font-weight:700; color:${masteryColor};">
+                        <div style="font-size:24px; font-weight:700; color:${masteryColor};">
                             ${score}
                         </div>
                         ${letterGrade ? `<div style="font-size:0.9em; font-weight:600; color:#333; margin-top:4px;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
@@ -495,6 +495,14 @@ export async function renderMasteryDashboard() {
                                 const assignmentScore = assignment.score;
                                 const letterGrade = getLetterGrade(assignment.score);
 
+                                // Calculate mastery color for assignment
+                                let assignmentMasteryColor = "#E62429"; // Red - default
+                                if (assignmentScore >= 4) assignmentMasteryColor = "#02672D";      // Dark green
+                                else if (assignmentScore >= 3) assignmentMasteryColor = "#03893D"; // Medium green
+                                else if (assignmentScore >= 2) assignmentMasteryColor = "#FAB901"; // Yellow
+                                else if (assignmentScore >= 1) assignmentMasteryColor = "#FD5D10"; // Orange
+                                else assignmentMasteryColor = "#E62429";                            // Red
+
                                 // Format date
                                 const date = assignment.submitted_at ? new Date(assignment.submitted_at).toLocaleDateString('en-US', {
                                     month: 'short',
@@ -503,21 +511,22 @@ export async function renderMasteryDashboard() {
                                 }) : "";
 
                                 return `
-                                    <div style="padding:6px 0; border-bottom:1px solid #c8c8c8;">
+                                    <div style="padding:8px 0; border-bottom:1px solid #c8c8c8;">
                                         <div style="font-weight:500; font-size:0.9em;">
                                             <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
                                                 ${escapeHtml(assignment.name)}
                                             </a>
                                         </div>
-                                        <div style="font-size:0.85em; color:#555; margin-top:2px;">
-                                            ${assignmentScore} - ${escapeHtml(letterGrade)}${date ? ` - ${date}` : ""}
+                                        <div style="font-size:0.85em; color:#333; margin-top:2px;">
+                                            <span style="color:${assignmentMasteryColor}; font-size:1.1em; line-height:1;">●</span>
+                                            ${escapeHtml(letterGrade)} (${assignmentScore})${date ? ` – ${date}` : ""}
                                         </div>
                                     </div>
                                 `;
                             }).join("");
 
                             details.innerHTML = `
-                                <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Aligned Assignments:</div>
+                                <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Assignments for this outcome:</div>
                                 ${assignmentListHtml}
                             `;
                         } else {
