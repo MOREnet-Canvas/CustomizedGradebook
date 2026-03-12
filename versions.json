@@ -1,10 +1,10 @@
 {
-  "v1.3-latest": "v1.3.0",
+  "v1.3-latest": "v1.3.1",
   "v1.2-latest": "v1.2.2",
   "v1.1-latest": "v1.1.0",
   "v1.0-latest": "v1.0.11",
-  "latest": "v1.3.0",
-  "stable": "v1.3.0",
-  "_generated": "2026-03-12T19:13:41.784Z",
-  "_totalVersions": 17
+  "latest": "v1.3.1",
+  "stable": "v1.3.1",
+  "_generated": "2026-03-12T20:42:50.291Z",
+  "_totalVersions": 18
 }
