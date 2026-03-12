@@ -39,7 +39,7 @@ function createMasteryButtonHtml(baseUrl, courseId, pageUrl) {
     <a style="display: block; padding: 14px; background: ${primaryButtonColor}; color: ${textColor}; text-align: center; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; margin-bottom: 8px;" href="${baseUrl}/courses/${courseId}/pages/${pageUrl}?cg_web=1" data-api-endpoint="${baseUrl}/api/v1/courses/${courseId}/pages/${pageUrl}" data-api-returntype="Page">
         View ${MASTERY_PAGE_TITLE}
     </a>
-    <p style="font-size: 12px; color: #666; margin: 0; text-align: center;">For parents/observers using the Canvas Parent app</p>
+    
 </div>`;
 }
 
