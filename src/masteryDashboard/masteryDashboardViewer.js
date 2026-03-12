@@ -391,7 +391,7 @@ export async function renderMasteryDashboard() {
                                 <span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(letterGrade)})
                             </span>
                         </div>
-                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#999; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
+                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
                     </a>
                 `;
             } else {
@@ -405,7 +405,7 @@ export async function renderMasteryDashboard() {
                                 <span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence
                             </span>
                         </div>
-                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#999; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
+                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
                     </a>
                 `;
             }
