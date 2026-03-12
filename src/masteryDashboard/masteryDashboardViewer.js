@@ -338,9 +338,6 @@ export async function renderMasteryDashboard() {
 
         // Check if this is the AVG_OUTCOME (Course Grade)
         if (outcome.title === AVG_OUTCOME_NAME) {
-            // Get letter grade
-            const letterGrade = latest.score != null ? getLetterGrade(latest.score) : "";
-
             // Get AVG assignment URL from alignments
             let avgAssignmentUrl = "#";
             if (outcome.alignments && outcome.alignments.length > 0) {
@@ -351,13 +348,26 @@ export async function renderMasteryDashboard() {
             }
 
             // Build native-like course grade display (matches Canvas Parent app)
-            avgOutcomeHtml = `
-                <a href="${avgAssignmentUrl}" target="_blank"
-                   style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                    <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
-                    <span style="font-size:1.2em; font-weight:600; color:#00A9CE;">${score} (${escapeHtml(letterGrade)})</span>
-                </a>
-            `;
+            if (latest.score != null) {
+                // Has score - show score with letter grade and mastery color
+                const letterGrade = getLetterGrade(latest.score);
+                avgOutcomeHtml = `
+                    <a href="${avgAssignmentUrl}" target="_blank"
+                       style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
+                        <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
+                        <span style="font-size:1.2em; font-weight:600; color:${masteryColor};">${score} (${escapeHtml(letterGrade)})</span>
+                    </a>
+                `;
+            } else {
+                // No score - show "Insufficient Evidence" in red
+                avgOutcomeHtml = `
+                    <a href="${avgAssignmentUrl}" target="_blank"
+                       style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
+                        <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
+                        <span style="font-size:1.2em; font-weight:600; color:#f66;">Insufficient Evidence</span>
+                    </a>
+                `;
+            }
 
             // Skip adding to regular cards
             continue;
