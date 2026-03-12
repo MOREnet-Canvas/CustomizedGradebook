@@ -1,5 +1,6 @@
 import { getCourseId } from "./canvas.js";
 import { logger } from "./logger.js";
+//TODO: remove this file safely
 
 /**
  * Clean up legacy localStorage entries if they exist.
@@ -24,6 +25,7 @@ export function cleanUpLocalStorage() {
     } catch (error) {
         logger.error('Failed to clean up localStorage:', error);
     }
+
 }
 
 /**
@@ -48,4 +50,3 @@ export function safeParse(s) {
         return null; 
     }
 }
-
