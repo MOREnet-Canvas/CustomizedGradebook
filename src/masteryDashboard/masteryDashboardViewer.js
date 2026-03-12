@@ -287,7 +287,7 @@ export async function renderMasteryDashboard() {
         return dateB - dateA; // Most recent first
     });
 
-    // Calculate mastery count (>= 80% is considered mastered)
+    // Calculate mastery count (score >= 3 is considered mastered)
     // Exclude AVG_OUTCOME and any outcomes matching EXCLUDED_OUTCOME_KEYWORDS
     let masteredCount = 0;
     let totalCount = 0;
@@ -313,11 +313,8 @@ export async function renderMasteryDashboard() {
             (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
         );
 
-        const possible = outcome.points_possible || 4;
-        const percent = latest.score != null ? Math.round((latest.score / possible) * 100) : null;
-
-        // Count as mastered if >= 80%
-        if (percent != null && percent >= 80) {
+        // Count as mastered if score >= 3 (matches Canvas gradebook)
+        if (latest.score != null && latest.score >= 3) {
             masteredCount++;
         }
     }
