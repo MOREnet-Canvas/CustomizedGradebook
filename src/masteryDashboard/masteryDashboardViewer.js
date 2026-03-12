@@ -379,8 +379,8 @@ export async function renderMasteryDashboard() {
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
                        style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                        <span style="font-size:0.9rem; color:#666; font-weight:400;">Total</span>
-                        <span style="font-size:1.2rem; font-weight:600; color:#333;">
+                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
+                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.25rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
                             <span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(letterGrade)})
                         </span>
                     </a>
@@ -390,8 +390,8 @@ export async function renderMasteryDashboard() {
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
                        style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                        <span style="font-size:0.9rem; color:#666; font-weight:400;">Total</span>
-                        <span style="font-size:1.2rem; font-weight:600; color:#333;">
+                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
+                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.25rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
                             <span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence
                         </span>
                     </a>
@@ -461,19 +461,19 @@ export async function renderMasteryDashboard() {
                 <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
                     <span class="expand-arrow" style="font-size:0.8rem; transition:transform 0.2s; margin-top:2px;">▶</span>
                     <div style="flex:1;">
-                        <div style="font-weight:600; font-size:1rem; color:#333;">${escapeHtml(outcome.title)}</div>
-                        <div style="font-size:0.9rem; color:#555; margin-top:4px;">${escapeHtml(outcome.description || "")}</div>
+                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1.125rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.title)}</div>
+                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.description || "")}</div>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-size:1.5rem; font-weight:700; color:${masteryColor};">
+                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
                             ${score}
                         </div>
-                        ${letterGrade ? `<div style="font-size:0.9rem; font-weight:600; color:#333; margin-top:4px;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
-                        ${latestDate ? `<div style="font-size:0.875rem; color:#555; margin-top:4px;">${latestDate}</div>` : ""}
+                        ${letterGrade ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; font-weight:600; color:#333; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
+                        ${latestDate ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${latestDate}</div>` : ""}
                     </div>
                 </div>
                 <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #c8c8c8; margin-left:20px;">
-                    <div style="font-weight:600; font-size:0.9rem; margin-bottom:8px; color:#333;">Loading assignments...</div>
+                    <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; margin-bottom:8px; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">Loading assignments...</div>
                 </div>
             </div>
         `);
@@ -483,7 +483,7 @@ export async function renderMasteryDashboard() {
     cardsEl.innerHTML = `
         ${avgOutcomeHtml || ""}
         ${regularCards.length > 0 ? `
-            <div style="font-size:0.9rem; font-weight:600; color:#666; margin-bottom:8px; margin-top:8px;">Learning Outcomes</div>
+            <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; font-weight:600; color:#666; margin-bottom:8px; margin-top:8px; line-height:1.5; -webkit-font-smoothing:antialiased;">Learning Outcomes</div>
             ${regularCards.join("")}
         ` : ""}
     `;
@@ -541,23 +541,23 @@ export async function renderMasteryDashboard() {
                                 let statusIndicator = "";
                                 if (assignment.excused) {
                                     // Excused: Red circle with white check
-                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="#EE0612" stroke="none"/><path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="color:#333; font-weight:600; font-size:0.8125rem;">Excused</span></span>`;
+                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="#EE0612" stroke="none"/><path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:600; font-size:0.9375rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Excused</span></span>`;
                                 } else if (assignment.late_policy_status === 'late') {
                                     // Late: Orange clock (thinner stroke)
-                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="8" y2="4.5" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="11" y2="8" stroke="#FC5E13" stroke-width="1.5"/></svg><span style="color:#333; font-weight:600; font-size:0.8125rem;">Late</span></span>`;
+                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="8" y2="4.5" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="11" y2="8" stroke="#FC5E13" stroke-width="1.5"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:600; font-size:0.9375rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Late</span></span>`;
                                 } else if (assignment.late_policy_status === 'missing') {
                                     // Missing: Red circle with slash (bolder stroke)
-                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#EE0612" stroke-width="2"/><line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="#EE0612" stroke-width="2"/></svg><span style="color:#333; font-weight:700; font-size:0.8125rem;">Missing</span></span>`;
+                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#EE0612" stroke-width="2"/><line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="#EE0612" stroke-width="2"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:700; font-size:0.9375rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Missing</span></span>`;
                                 }
 
                                 return `
                                     <div style="padding:8px 0; border-bottom:1px solid #c8c8c8;">
-                                        <div style="font-weight:500; font-size:1rem;">
+                                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:400; font-size:1.125rem; line-height:1.5; -webkit-font-smoothing:antialiased;">
                                             <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
                                                 ${escapeHtml(assignment.name)}
                                             </a>${statusIndicator}
                                         </div>
-                                        <div style="font-size:0.875rem; color:#333; margin-top:2px;">
+                                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1rem; color:#333; margin-top:2px; line-height:1.5; -webkit-font-smoothing:antialiased;">
                                             <span style="color:${assignmentMasteryColor}; font-size:1.1em; line-height:1;">●</span>
                                             ${assignmentScore} (${escapeHtml(letterGrade)})${date ? ` – ${date}` : ""}
                                         </div>
@@ -566,17 +566,17 @@ export async function renderMasteryDashboard() {
                             }).join("");
 
                             details.innerHTML = `
-                                <div style="font-weight:600; font-size:0.9rem; margin-bottom:8px; color:#333;">Assignments for this outcome:</div>
+                                <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; margin-bottom:8px; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">Assignments for this outcome:</div>
                                 ${assignmentListHtml}
                             `;
                         } else {
-                            details.innerHTML = '<div style="font-size:0.9rem; color:#555;">No assignment data available.</div>';
+                            details.innerHTML = '<div style="font-family:LatoWeb,\'Lato Extended\',Lato,\'Helvetica Neue\',Helvetica,Arial,sans-serif; font-size:1rem; color:#555; line-height:1.5; -webkit-font-smoothing:antialiased;">No assignment data available.</div>';
                         }
 
                         card.dataset.loaded = 'true';
                     } catch (err) {
                         console.error('[MasteryDashboard] Failed to render assignments:', err);
-                        details.innerHTML = '<div style="font-size:0.9rem; color:#c62828;">Failed to load assignments.</div>';
+                        details.innerHTML = '<div style="font-family:LatoWeb,\'Lato Extended\',Lato,\'Helvetica Neue\',Helvetica,Arial,sans-serif; font-size:1rem; color:#c62828; line-height:1.5; -webkit-font-smoothing:antialiased;">Failed to load assignments.</div>';
                     }
                 }
 
