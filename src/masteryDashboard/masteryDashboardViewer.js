@@ -350,13 +350,12 @@ export async function renderMasteryDashboard() {
                 }
             }
 
-            // Build simple one-line course grade display
+            // Build native-like course grade display (matches Canvas Parent app)
             avgOutcomeHtml = `
                 <a href="${avgAssignmentUrl}" target="_blank"
-                   style="display:block; padding:12px 0; text-decoration:none; color:#333; font-size:1.1em; margin-bottom:16px;">
-                    <span style="font-weight:600;">${escapeHtml(outcome.title)}:</span>
-                    <span style="font-size:1.3em; font-weight:700; color:${masteryColor}; margin:0 8px;">${score}</span>
-                    <span style="font-weight:600; color:#666;">${escapeHtml(letterGrade)}</span>
+                   style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
+                    <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
+                    <span style="font-size:1.2em; font-weight:600; color:#00A9CE;">${score} (${escapeHtml(letterGrade)})</span>
                 </a>
             `;
 
