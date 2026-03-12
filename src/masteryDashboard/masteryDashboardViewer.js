@@ -356,22 +356,26 @@ export async function renderMasteryDashboard() {
 
             // Build native-like course grade display (matches Canvas Parent app)
             if (latest.score != null) {
-                // Has score - show score with letter grade and mastery color
+                // Has score - show score with letter grade and colored dot
                 const letterGrade = getLetterGrade(latest.score);
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
                        style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
                         <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
-                        <span style="font-size:1.2em; font-weight:600; color:${masteryColor};">${score} (${escapeHtml(letterGrade)})</span>
+                        <span style="font-size:1.2em; font-weight:600; color:#333;">
+                            <span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(letterGrade)})
+                        </span>
                     </a>
                 `;
             } else {
-                // No score - show "Insufficient Evidence" in red
+                // No score - show "Insufficient Evidence" with red dot
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
                        style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
                         <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
-                        <span style="font-size:1.2em; font-weight:600; color:#E62429;">Insufficient Evidence</span>
+                        <span style="font-size:1.2em; font-weight:600; color:#333;">
+                            <span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence
+                        </span>
                     </a>
                 `;
             }
@@ -437,7 +441,7 @@ export async function renderMasteryDashboard() {
                         <div style="font-size:20px; font-weight:700; color:${masteryColor};">
                             ${score}
                         </div>
-                        ${letterGrade ? `<div style="background:#F3F4F6; padding:2px 8px; border-radius:6px; font-weight:600; font-size:0.85em; color:${masteryColor}; margin-top:4px; display:inline-block;">${escapeHtml(letterGrade)}</div>` : ""}
+                        ${letterGrade ? `<div style="font-size:0.9em; font-weight:600; color:#333; margin-top:4px;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
                         ${latestDate ? `<div style="font-size:0.85em; color:#555; margin-top:4px;">${latestDate}</div>` : ""}
                     </div>
                 </div>
