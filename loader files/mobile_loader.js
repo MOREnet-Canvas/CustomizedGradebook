@@ -1,61 +1,39 @@
 /**
  * CustomizedGradebook - Mobile Loader
- * 
- * This loader should be pasted into the Canvas Mobile Theme (Account → Themes → Mobile)
- * It loads the Parent Mastery module for the Canvas Parent mobile app.
- * 
+ *
+ * Paste into: Account → Themes → Mobile → JavaScript
+ *
  * CONFIGURATION:
- * - Change MOBILE_VERSION to switch between dev and stable versions
- * - "mobile-dev" = Latest development build (auto-updated)
- * - "mobile-v0.2.0" = Specific stable release (example)
- * 
- * INSTALLATION:
- * 1. Go to Account → Themes → Mobile
- * 2. Click "Edit" on your mobile theme
- * 3. Paste this entire file into the JavaScript section
- * 4. Click "Save"
+ * - "auto-patch" = Auto-updates to latest patch (recommended)
+ * - "mobile-dev" = Latest dev build
+ * - "mobile-v1.0.0" = Specific version
  */
 
 (function() {
     'use strict';
-    
-    // ========================================================================
-    // CONFIGURATION
-    // ========================================================================
-    
-    // Change this to switch between dev and stable versions
-    const MOBILE_VERSION = "mobile-dev"; // or "mobile-v0.1.1" for stable
-    
-    // ========================================================================
-    // LOADER
-    // ========================================================================
-    
-    // Prevent duplicate loading
-    if (window.CG_MOBILE_LOADED) {
-        console.log("[CG Mobile] Already loaded; skipping");
-        return;
-    }
+
+    // ========== CONFIGURATION ==========
+    const VERSION = "auto-patch";        // or "mobile-dev" or "mobile-v1.0.0"
+    const TRACK = "mobile-v1.0-latest";  // for auto-patch only
+    const FALLBACK = "mobile-v1.0.0";    // if auto-patch fails
+
+    // ========== LOADER ==========
+    if (window.CG_MOBILE_LOADED) return;
     window.CG_MOBILE_LOADED = true;
-    
-    console.log(`[CG Mobile] Loading version: ${MOBILE_VERSION}`);
 
-    // Create and inject script tag
-    const script = document.createElement("script");
-    script.id = "cg-mobile-bundle";
+    function load(version) {
+        const script = document.createElement("script");
+        script.src = `https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/download/${version}/mobileInit.js` +
+                     (version === "mobile-dev" ? `?v=${Date.now()}` : "");
+        document.head.appendChild(script);
+    }
 
-    // Add cache busting for dev builds to ensure latest version is always loaded
-    const cacheBuster = MOBILE_VERSION === "mobile-dev" ? `?v=${Date.now()}` : "";
-    script.src = `https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/download/${MOBILE_VERSION}/mobileInit.js${cacheBuster}`;
-
-    script.onload = function() {
-        console.log(`[CG Mobile] Loaded successfully (${MOBILE_VERSION})`);
-    };
-    
-    script.onerror = function() {
-        console.error(`[CG Mobile] Failed to load from GitHub Release: ${MOBILE_VERSION}`);
-        console.error("[CG Mobile] Check that the release exists and the file is uploaded");
-    };
-    
-    document.head.appendChild(script);
-    
+    if (VERSION === "auto-patch") {
+        fetch("https://morenet-canvas.github.io/CustomizedGradebook/mobile-versions.json")
+            .then(r => r.json())
+            .then(m => load(m[TRACK] || FALLBACK))
+            .catch(() => load(FALLBACK));
+    } else {
+        load(VERSION);
+    }
 })();

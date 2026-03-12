@@ -44,6 +44,9 @@ jobs:
       - name: Generate version manifest
         run: node buildScripts/update-version-manifest.js
 
+      - name: Generate mobile version manifest
+        run: node buildScripts/update-mobile-version-manifest.js
+
       - name: Build MkDocs documentation
         run: mkdocs build
 
@@ -54,6 +57,8 @@ jobs:
           cp -r docs site/docs
           # Copy versions.json to root
           cp versions.json site/versions.json
+          # Copy mobile-versions.json to root
+          cp mobile-versions.json site/mobile-versions.json
           # Copy landing page to root
           cp github-pages/index.html site/index.html
           # Copy button directions to root
@@ -80,9 +85,14 @@ jobs:
           echo "- Documentation: https://morenet-canvas.github.io/CustomizedGradebook/docs/" >> $GITHUB_STEP_SUMMARY
           echo "- Button Setup: https://morenet-canvas.github.io/CustomizedGradebook/button_directions.html" >> $GITHUB_STEP_SUMMARY
           echo "- Version API: https://morenet-canvas.github.io/CustomizedGradebook/versions.json" >> $GITHUB_STEP_SUMMARY
+          echo "- Mobile Version API: https://morenet-canvas.github.io/CustomizedGradebook/mobile-versions.json" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Version Manifest:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
           cat versions.json >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Mobile Version Manifest:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat mobile-versions.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
