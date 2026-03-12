@@ -420,22 +420,28 @@ export async function renderMasteryDashboard() {
         }) : "";
 
         regularCards.push(`
-            <div data-outcome-id="${oid}" data-assignment-data="${escapeHtml(assignmentDataJson)}" style="border:1px solid #ddd; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;">
+            <div data-outcome-id="${oid}" data-assignment-data="${escapeHtml(assignmentDataJson)}"
+                 tabindex="0"
+                 role="button"
+                 aria-expanded="false"
+                 style="border:1px solid #ddd; border-left:4px solid ${masteryColor}; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;"
+                 onfocus="this.style.outline='3px solid #2d72d2'; this.style.outlineOffset='2px';"
+                 onblur="this.style.outline='none';">
                 <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
                     <span class="expand-arrow" style="font-size:0.8em; transition:transform 0.2s; margin-top:2px;">▶</span>
                     <div style="flex:1;">
-                        <div style="font-weight:600;">${escapeHtml(outcome.title)}</div>
-                        <div style="font-size:0.9em; color:#666; margin-top:4px;">${escapeHtml(outcome.description || "")}</div>
+                        <div style="font-weight:600; color:#333;">${escapeHtml(outcome.title)}</div>
+                        <div style="font-size:0.9em; color:#555; margin-top:4px;">${escapeHtml(outcome.description || "")}</div>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-size:1.2em; font-weight:700; color:${masteryColor};">
+                        <div style="font-size:20px; font-weight:700; color:${masteryColor};">
                             ${score}
                         </div>
-                        ${letterGrade ? `<div style="font-size:0.9em; color:#666; margin-top:2px;">${escapeHtml(letterGrade)}</div>` : ""}
-                        ${latestDate ? `<div style="font-size:0.85em; color:#999; margin-top:2px;">${latestDate}</div>` : ""}
+                        ${letterGrade ? `<div style="background:#F3F4F6; padding:2px 8px; border-radius:6px; font-weight:600; font-size:0.85em; color:${masteryColor}; margin-top:4px; display:inline-block;">${escapeHtml(letterGrade)}</div>` : ""}
+                        ${latestDate ? `<div style="font-size:0.85em; color:#555; margin-top:4px;">${latestDate}</div>` : ""}
                     </div>
                 </div>
-                <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #ddd; margin-left:20px;">
+                <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #c8c8c8; margin-left:20px;">
                     <div style="font-weight:600; font-size:0.9em; margin-bottom:8px; color:#333;">Loading assignments...</div>
                 </div>
             </div>
@@ -451,9 +457,9 @@ export async function renderMasteryDashboard() {
         ` : ""}
     `;
 
-    // Add click handlers to toggle expansion and render pre-loaded assignment data
+    // Add click and keyboard handlers to toggle expansion and render pre-loaded assignment data
     cardsEl.querySelectorAll('[data-outcome-id]').forEach(card => {
-        card.addEventListener('click', async (e) => {
+        const toggleCard = async (e) => {
             // Don't toggle if clicking on a link (future-proofing)
             if (e.target.tagName === 'A') return;
 
@@ -493,13 +499,13 @@ export async function renderMasteryDashboard() {
                                 }) : "";
 
                                 return `
-                                    <div style="padding:6px 0; border-bottom:1px solid #eee;">
+                                    <div style="padding:6px 0; border-bottom:1px solid #c8c8c8;">
                                         <div style="font-weight:500; font-size:0.9em;">
                                             <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
                                                 ${escapeHtml(assignment.name)}
                                             </a>
                                         </div>
-                                        <div style="font-size:0.85em; color:#666; margin-top:2px;">
+                                        <div style="font-size:0.85em; color:#555; margin-top:2px;">
                                             ${assignmentScore} - ${escapeHtml(letterGrade)}${date ? ` - ${date}` : ""}
                                         </div>
                                     </div>
@@ -511,7 +517,7 @@ export async function renderMasteryDashboard() {
                                 ${assignmentListHtml}
                             `;
                         } else {
-                            details.innerHTML = '<div style="font-size:0.9em; color:#666;">No assignment data available.</div>';
+                            details.innerHTML = '<div style="font-size:0.9em; color:#555;">No assignment data available.</div>';
                         }
 
                         card.dataset.loaded = 'true';
@@ -524,10 +530,23 @@ export async function renderMasteryDashboard() {
                 details.style.display = 'block';
                 arrow.style.transform = 'rotate(90deg)';
                 arrow.textContent = '▼';
+                card.setAttribute('aria-expanded', 'true');
             } else {
                 details.style.display = 'none';
                 arrow.style.transform = 'rotate(0deg)';
                 arrow.textContent = '▶';
+                card.setAttribute('aria-expanded', 'false');
+            }
+        };
+
+        // Add click handler
+        card.addEventListener('click', toggleCard);
+
+        // Add keyboard handler (Enter or Space)
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleCard(e);
             }
         });
     });
