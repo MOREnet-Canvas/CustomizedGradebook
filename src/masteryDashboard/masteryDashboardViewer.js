@@ -329,11 +329,18 @@ export async function renderMasteryDashboard() {
         const possible = outcome.points_possible || 4;
         const percent = latest.score != null ? Math.round((latest.score / possible) * 100) : null;
 
-        let masteryColor = "#999";
-        if (percent != null) {
-            if (percent >= 80) masteryColor = "#0c6";
-            else if (percent >= 60) masteryColor = "#fc3";
-            else masteryColor = "#f66";
+        // Determine mastery color based on actual score value
+        let masteryColor = "#E62429"; // Red - Insufficient Evidence (null/no score)
+
+        if (latest.score != null) {
+            const scoreValue = latest.score;
+
+            // Map score directly to color ranges (inclusive of whole number)
+            if (scoreValue >= 4) masteryColor = "#02672D";      // 4.0+ - Exceeds Mastery (dark green)
+            else if (scoreValue >= 3) masteryColor = "#03893D"; // 3.0-3.99 - Mastery (medium green)
+            else if (scoreValue >= 2) masteryColor = "#FAB901"; // 2.0-2.99 - Near Mastery (yellow/gold)
+            else if (scoreValue >= 1) masteryColor = "#FD5D10"; // 1.0-1.99 - Below Mastery (orange)
+            else masteryColor = "#E62429";                       // 0.0-0.99 - Well Below Mastery (red)
         }
 
         // Check if this is the AVG_OUTCOME (Course Grade)
@@ -364,7 +371,7 @@ export async function renderMasteryDashboard() {
                     <a href="${avgAssignmentUrl}" target="_blank"
                        style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
                         <span style="font-size:0.9em; color:#666; font-weight:400;">Total</span>
-                        <span style="font-size:1.2em; font-weight:600; color:#f66;">Insufficient Evidence</span>
+                        <span style="font-size:1.2em; font-weight:600; color:#E62429;">Insufficient Evidence</span>
                     </a>
                 `;
             }
