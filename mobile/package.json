@@ -1,6 +1,6 @@
 {
   "name": "customized-gradebook-mobile",
-  "version": "0.2.0",
-  "description": "Parent Mastery module for Canvas Mobile Theme",
+  "version": "1.0.0",
+  "description": "Mastery dashboard module for Canvas Mobile Theme",
   "type": "module"
 }
