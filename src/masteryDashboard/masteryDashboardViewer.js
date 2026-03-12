@@ -372,28 +372,43 @@ export async function renderMasteryDashboard() {
                 }
             }
 
+            // Format the last updated date
+            const lastUpdated = latest.submitted_or_assessed_at
+                ? new Date(latest.submitted_or_assessed_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })
+                : null;
+
             // Build native-like course grade display (matches Canvas Parent app)
             if (latest.score != null) {
                 // Has score - show score with letter grade and colored dot
                 const letterGrade = getLetterGrade(latest.score);
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
-                       style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
-                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                            <span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(letterGrade)})
-                        </span>
+                       style="display:flex; flex-direction:column; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
+                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
+                                <span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(letterGrade)})
+                            </span>
+                        </div>
+                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#999; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
                     </a>
                 `;
             } else {
                 // No score - show "Insufficient Evidence" with red dot
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
-                       style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
-                        <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                            <span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence
-                        </span>
+                       style="display:flex; flex-direction:column; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
+                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
+                                <span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence
+                            </span>
+                        </div>
+                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#999; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
                     </a>
                 `;
             }
