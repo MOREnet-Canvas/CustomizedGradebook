@@ -164,23 +164,6 @@ function injectStyles() {
             display: none;
         }
 
-        /* Rotated tab */
-        #cg-scoresync-tab.orientation-rotated {
-            padding: 0.5rem 0.75rem;
-        }
-
-        #cg-scoresync-tab.orientation-rotated .cg-scoresync-tab-score {
-            display: none;
-        }
-
-        #cg-scoresync-root.side-right #cg-scoresync-tab.orientation-rotated {
-            transform: rotate(-90deg) translateX(50%);
-        }
-
-        #cg-scoresync-root.side-left #cg-scoresync-tab.orientation-rotated {
-            transform: rotate(90deg) translateX(-50%);
-        }
-
         /* Expanded panel - WHITE BACKGROUND, GREEN BORDER */
         #cg-scoresync-panel {
             position: absolute;
@@ -525,7 +508,7 @@ function updateTabScore(score) {
  * Update text orientation
  */
 function setTextOrientation(orientation) {
-    if (!['horizontal', 'vertical', 'rotated'].includes(orientation)) {
+    if (!['horizontal', 'vertical'].includes(orientation)) {
         logger.warn('[DockedPanel] Invalid orientation:', orientation);
         return;
     }
@@ -725,7 +708,6 @@ function addPanelSettingsSection() {
     orientationSelect.innerHTML = `
         <option value="horizontal">Horizontal</option>
         <option value="vertical">Vertical</option>
-        <option value="rotated">Rotated</option>
     `;
     orientationSelect.value = panelState.textOrientation;
     orientationSelect.addEventListener('change', (e) => setTextOrientation(e.target.value));
