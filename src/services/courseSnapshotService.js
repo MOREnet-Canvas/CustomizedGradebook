@@ -23,6 +23,8 @@
  *   isStandardsBased: boolean,           // DEPRECATED: Use model === "standards"
  *   score: number,                       // Raw score (percentage or points depending on source)
  *   letterGrade: string|null,            // Raw letter grade from API
+ *   customGradeStatusId: string|null,    // Custom grade status ID (e.g., "1" for Insufficient Evidence)
+ *   overrideScore: number|null,          // Override score from enrollment
  *   gradeSource: 'assignment' | 'enrollment',
  *   displayScore: number,                // Display-ready score (converted to points for SBG)
  *   displayLetterGrade: string|null,     // Display-ready letter grade
@@ -332,6 +334,8 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         let displayType = null;
         let score = null;
         let letterGrade = null;
+        let customGradeStatusId = null;
+        let overrideScore = null;
         let gradeSource = null;
 
         if (gradeData) {
@@ -339,6 +343,8 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
 
             score = gradeData.score;
             letterGrade = gradeData.letterGrade;
+            customGradeStatusId = gradeData.customGradeStatusId ?? null;
+            overrideScore = gradeData.overrideScore ?? null;
             gradeSource = gradeData.source;
             displayScore = gradeData.score;
             displayLetterGrade = gradeData.letterGrade;
@@ -394,6 +400,8 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
             isStandardsBased, // DEPRECATED: for backward compatibility
             score,
             letterGrade,
+            customGradeStatusId,
+            overrideScore,
             gradeSource,
             displayScore,
             displayLetterGrade,

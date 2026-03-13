@@ -98,15 +98,44 @@ function goToLearningMasteryTab() {
 }
 
 /**
+ * Check if grade data indicates Insufficient Evidence status
+ * @param {Object} snapshot - Course snapshot data
+ * @returns {boolean} True if insufficient evidence detected
+ */
+function isInsufficientEvidence(snapshot) {
+    // Check if custom grade status is set (indicates IE)
+    if (snapshot.customGradeStatusId) {
+        logger.trace(`[IE Detection] Custom grade status detected: ${snapshot.customGradeStatusId}`);
+        return true;
+    }
+
+    // Check if override score is null AND letter grade indicates IE
+    if (snapshot.overrideScore === null && snapshot.letterGrade &&
+        snapshot.letterGrade.toLowerCase().includes('insufficient')) {
+        logger.trace(`[IE Detection] Null override with IE letter grade: ${snapshot.letterGrade}`);
+        return true;
+    }
+
+    // Check if score is 0 (from AVG assignment)
+    if (snapshot.score === 0 && snapshot.gradeSource === 'assignment') {
+        logger.trace(`[IE Detection] AVG assignment score is 0`);
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Update the grade display in the existing right sidebar
  * Preserves all other sidebar content (announcements, to-do items, etc.)
  *
  * @param {Object} gradeData - Grade data object
  * @param {string} gradeData.score - The mastery score to display (e.g., "2.74")
  * @param {string|null} gradeData.letterGrade - The letter grade (e.g., "Target")
+ * @param {boolean} gradeData.isInsufficient - Whether to display as Insufficient
  */
 function replaceRightSidebar(gradeData) {
-    const { score, letterGrade } = gradeData;
+    const { score, letterGrade, isInsufficient } = gradeData;
 
     const rightSide = getRightSideElement();
 
@@ -129,10 +158,24 @@ function replaceRightSidebar(gradeData) {
         const letterGradeSpan = finalGradeDiv.querySelector('.letter_grade');
 
         if (gradeSpan) {
-            gradeSpan.textContent = typeof score === 'number' ? score.toFixed(2) : String(score);
+            if (isInsufficient) {
+                gradeSpan.textContent = 'null';
+                gradeSpan.style.color = '';
+            } else {
+                gradeSpan.textContent = typeof score === 'number' ? score.toFixed(2) : String(score);
+                gradeSpan.style.color = '';
+            }
         }
-        if (letterGradeSpan && letterGrade) {
-            letterGradeSpan.textContent = letterGrade;
+        if (letterGradeSpan) {
+            if (isInsufficient) {
+                letterGradeSpan.textContent = 'Insufficient';
+                letterGradeSpan.style.color = '#E62429';
+                letterGradeSpan.style.fontWeight = 'bold';
+            } else if (letterGrade) {
+                letterGradeSpan.textContent = letterGrade;
+                letterGradeSpan.style.color = '';
+                letterGradeSpan.style.fontWeight = '';
+            }
         }
 
         logger.trace('Grade display updated in existing sidebar');
@@ -144,16 +187,30 @@ function replaceRightSidebar(gradeData) {
     const letterGradeSpan = finalGradeDiv.querySelector('.letter_grade');
 
     if (gradeSpan) {
-        gradeSpan.textContent = typeof score === 'number' ? score.toFixed(2) : String(score);
+        if (isInsufficient) {
+            gradeSpan.textContent = 'null';
+            gradeSpan.style.color = '';
+        } else {
+            gradeSpan.textContent = typeof score === 'number' ? score.toFixed(2) : String(score);
+            gradeSpan.style.color = '';
+        }
     }
-    if (letterGradeSpan && letterGrade) {
-        letterGradeSpan.textContent = letterGrade;
+    if (letterGradeSpan) {
+        if (isInsufficient) {
+            letterGradeSpan.textContent = 'Insufficient';
+            letterGradeSpan.style.color = '#E62429';
+            letterGradeSpan.style.fontWeight = 'bold';
+        } else if (letterGrade) {
+            letterGradeSpan.textContent = letterGrade;
+            letterGradeSpan.style.color = '';
+            letterGradeSpan.style.fontWeight = '';
+        }
     }
 
     // Mark as processed
     rightSide.dataset.processed = 'true';
 
-    const displayValue = formatGradeDisplay(score, letterGrade);
+    const displayValue = isInsufficient ? 'null (Insufficient)' : formatGradeDisplay(score, letterGrade);
     logger.debug(`Sidebar grade updated to: ${displayValue}`);
 }
 
@@ -164,10 +221,11 @@ function replaceRightSidebar(gradeData) {
  * @param {Object} gradeData - Grade data object
  * @param {string} gradeData.score - The mastery score to display
  * @param {string|null} gradeData.letterGrade - The letter grade
+ * @param {boolean} gradeData.isInsufficient - Whether to display as Insufficient
  */
 function updateBottomGradeRow(gradeData) {
-    const { score, letterGrade } = gradeData;
-    const displayValue = formatGradeDisplay(score, letterGrade);
+    const { score, letterGrade, isInsufficient } = gradeData;
+    const displayValue = isInsufficient ? 'Insufficient' : formatGradeDisplay(score, letterGrade);
 
     document.querySelectorAll("tr.student_assignment.hard_coded.final_grade").forEach(row => {
         const gradeEl = row.querySelector(".assignment_score .tooltip .grade");
@@ -178,6 +236,15 @@ function updateBottomGradeRow(gradeData) {
             if (gradeEl.textContent !== displayValue) {
                 gradeEl.textContent = displayValue;
                 gradeEl.dataset.normalized = 'true';
+
+                // Style insufficient in red
+                if (isInsufficient) {
+                    gradeEl.style.color = '#E62429';
+                    gradeEl.style.fontWeight = 'bold';
+                } else {
+                    gradeEl.style.color = '';
+                    gradeEl.style.fontWeight = '';
+                }
             }
         }
 
@@ -260,13 +327,17 @@ async function runOnce() {
         return false;
     }
 
+    // Check for Insufficient Evidence status
+    const isInsufficient = isInsufficientEvidence(snapshot);
+
     // Extract display-ready grade data from snapshot
     const gradeData = {
         score: snapshot.displayScore,
-        letterGrade: snapshot.displayLetterGrade
+        letterGrade: snapshot.displayLetterGrade,
+        isInsufficient
     };
 
-    logger.trace(`Using display grade data from snapshot: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, type=${snapshot.displayType}`);
+    logger.trace(`Using display grade data from snapshot: score=${gradeData.score}, letterGrade=${gradeData.letterGrade}, type=${snapshot.displayType}, isInsufficient=${isInsufficient}`);
 
     return applyCustomizations(gradeData);
 }
