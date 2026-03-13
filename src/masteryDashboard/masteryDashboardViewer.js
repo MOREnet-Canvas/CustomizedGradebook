@@ -537,11 +537,10 @@ export async function renderMasteryDashboard() {
 
                                 // Calculate mastery color for assignment
                                 let assignmentMasteryColor = "#E62429"; // Red - default
-                                if (assignmentScore >= 4) assignmentMasteryColor = "#02672D";      // Dark green
-                                else if (assignmentScore >= 3) assignmentMasteryColor = "#03893D"; // Medium green
-                                else if (assignmentScore >= 2) assignmentMasteryColor = "#FAB901"; // Yellow
-                                else if (assignmentScore >= 1) assignmentMasteryColor = "#FD5D10"; // Orange
-                                else assignmentMasteryColor = "#E62429";                            // Red
+                                if (assignment.score >= 4) assignmentMasteryColor = "#02672D";      // Dark green
+                                else if (assignment.score >= 3) assignmentMasteryColor = "#03893D"; // Medium green
+                                else if (assignment.score >= 2) assignmentMasteryColor = "#FAB901"; // Yellow
+                                else if (assignment.score >= 1) assignmentMasteryColor = "#FD5D10"; // Orange
 
                                 // Format date
                                 const date = assignment.submitted_at ? new Date(assignment.submitted_at).toLocaleDateString('en-US', {
