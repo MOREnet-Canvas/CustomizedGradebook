@@ -113,6 +113,18 @@ export function calculateDisplayValue(options) {
     let displayValue;
     let ariaLabel;
 
+    // Handle null/undefined scores (e.g., Insufficient Evidence status)
+    if (score === null || score === undefined) {
+        logger.trace(`[Grade Display] Score is null/undefined, using letter grade only: "${letterGrade}"`);
+        displayValue = letterGrade || 'N/A';
+        ariaLabel = letterGrade ? `Grade: ${letterGrade}` : 'Grade: Not available';
+
+        if (includeAriaLabel) {
+            return { displayValue, ariaLabel };
+        }
+        return { displayValue };
+    }
+
     if (source === DISPLAY_SOURCE.ASSIGNMENT) {
         // AVG assignment: 0-4 scale, show with 2 decimals and letter grade if available
         const scoreStr = score.toFixed(2);

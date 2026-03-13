@@ -116,12 +116,14 @@ async function fetchEnrollmentScore(courseId, apiClient) {
     }
 
     // Allow null scores if custom grade status is set (e.g., Insufficient Evidence)
-    if (gradeData.score === null && gradeData.score === undefined && !gradeData.customGradeStatusId) {
+    // Only return null if there's no score AND no custom status
+    if ((gradeData.score === null || gradeData.score === undefined) && !gradeData.customGradeStatusId) {
         logger.trace(`No enrollment score found for course ${courseId}`);
         return null;
     }
 
-    logger.trace(`Enrollment data for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || 'no letter grade'}), customStatus=${gradeData.customGradeStatusId || 'none'}`);
+    const scoreDisplay = gradeData.score !== null && gradeData.score !== undefined ? `${gradeData.score}%` : 'null';
+    logger.trace(`Enrollment data for course ${courseId}: ${scoreDisplay} (${gradeData.letterGrade || 'no letter grade'}), customStatus=${gradeData.customGradeStatusId || 'none'}`);
 
     return {
         score: gradeData.score,
