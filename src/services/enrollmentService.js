@@ -12,33 +12,35 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Parses grade information from a Canvas enrollment object.
- * 
+ *
  * Canvas API can return grades in two different structures:
  * 1. Nested in 'grades' object: grades.current_score, grades.final_score
  * 2. Top-level fields: computed_current_score, calculated_current_score, etc.
- * 
+ *
  * This function handles both structures and returns a normalized grade object.
- * 
+ *
  * @param {Object} enrollmentData - Canvas enrollment object
  * @param {Object} [enrollmentData.grades] - Nested grades object (most common)
  * @param {number} [enrollmentData.grades.current_score] - Current score percentage
  * @param {number} [enrollmentData.grades.final_score] - Final score percentage
  * @param {string} [enrollmentData.grades.current_grade] - Current letter grade
  * @param {string} [enrollmentData.grades.final_grade] - Final letter grade
+ * @param {string} [enrollmentData.grades.customGradeStatusId] - Custom grade status ID
+ * @param {number} [enrollmentData.grades.override_score] - Override score
  * @param {number} [enrollmentData.computed_current_score] - Alternative: computed current score
  * @param {number} [enrollmentData.calculated_current_score] - Alternative: calculated current score
  * @param {string} [enrollmentData.computed_current_grade] - Alternative: computed current grade
  * @param {string} [enrollmentData.calculated_current_grade] - Alternative: calculated current grade
- * @returns {{score: number|null, letterGrade: string|null}|null} Normalized grade object or null if no grade data
- * 
+ * @returns {{score: number|null, letterGrade: string|null, customGradeStatusId: string|null, overrideScore: number|null}|null} Normalized grade object or null if no grade data
+ *
  * @example
  * // With nested grades object
  * const enrollment = {
  *   grades: { current_score: 85.5, current_grade: 'B' }
  * };
  * const grade = parseEnrollmentGrade(enrollment);
- * // Returns: { score: 85.5, letterGrade: 'B' }
- * 
+ * // Returns: { score: 85.5, letterGrade: 'B', customGradeStatusId: null, overrideScore: null }
+ *
  * @example
  * // With top-level fields
  * const enrollment = {
@@ -46,7 +48,20 @@ import { logger } from '../utils/logger.js';
  *   computed_current_grade: 'A-'
  * };
  * const grade = parseEnrollmentGrade(enrollment);
- * // Returns: { score: 92.0, letterGrade: 'A-' }
+ * // Returns: { score: 92.0, letterGrade: 'A-', customGradeStatusId: null, overrideScore: null }
+ *
+ * @example
+ * // With custom grade status (Insufficient Evidence)
+ * const enrollment = {
+ *   grades: {
+ *     current_score: null,
+ *     current_grade: 'Insufficient Evidence',
+ *     customGradeStatusId: '1',
+ *     override_score: null
+ *   }
+ * };
+ * const grade = parseEnrollmentGrade(enrollment);
+ * // Returns: { score: null, letterGrade: 'Insufficient Evidence', customGradeStatusId: '1', overrideScore: null }
  */
 export function parseEnrollmentGrade(enrollmentData) {
     if (!enrollmentData) {
@@ -55,6 +70,8 @@ export function parseEnrollmentGrade(enrollmentData) {
 
     let score = null;
     let letterGrade = null;
+    let customGradeStatusId = null;
+    let overrideScore = null;
 
     // Try nested grades object first (most common structure with include[]=total_scores)
     if (enrollmentData.grades) {
@@ -64,6 +81,10 @@ export function parseEnrollmentGrade(enrollmentData) {
         letterGrade = (enrollmentData.grades.current_grade
             ?? enrollmentData.grades.final_grade
             ?? null)?.trim() ?? null;
+
+        // Extract custom grade status and override score
+        customGradeStatusId = enrollmentData.grades.customGradeStatusId ?? null;
+        overrideScore = enrollmentData.grades.override_score ?? null;
     }
 
     // Fallback to top-level fields (alternative API response structure)
@@ -83,11 +104,11 @@ export function parseEnrollmentGrade(enrollmentData) {
     }
 
     // Return null if no grade data found
-    if (score === null && letterGrade === null) {
+    if (score === null && letterGrade === null && customGradeStatusId === null) {
         return null;
     }
 
-    return { score, letterGrade };
+    return { score, letterGrade, customGradeStatusId, overrideScore };
 }
 
 /**

@@ -99,7 +99,7 @@ async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
  *
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client
- * @returns {Promise<{score: number, letterGrade: string}|null>} Grade data or null if not found
+ * @returns {Promise<{score: number, letterGrade: string, customGradeStatusId: string|null, overrideScore: number|null}|null>} Grade data or null if not found
  */
 async function fetchEnrollmentScore(courseId, apiClient) {
     // Use shared enrollment service to fetch and parse enrollment data
@@ -110,16 +110,24 @@ async function fetchEnrollmentScore(courseId, apiClient) {
 
     // Parse enrollment grade using shared service
     const gradeData = parseEnrollmentGrade(studentEnrollment);
-    if (!gradeData || gradeData.score === null || gradeData.score === undefined) {
+    if (!gradeData) {
+        logger.trace(`No enrollment data found for course ${courseId}`);
+        return null;
+    }
+
+    // Allow null scores if custom grade status is set (e.g., Insufficient Evidence)
+    if (gradeData.score === null && gradeData.score === undefined && !gradeData.customGradeStatusId) {
         logger.trace(`No enrollment score found for course ${courseId}`);
         return null;
     }
 
-    logger.trace(`Enrollment data for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || 'no letter grade'})`);
+    logger.trace(`Enrollment data for course ${courseId}: ${gradeData.score}% (${gradeData.letterGrade || 'no letter grade'}), customStatus=${gradeData.customGradeStatusId || 'none'}`);
 
     return {
         score: gradeData.score,
-        letterGrade: gradeData.letterGrade
+        letterGrade: gradeData.letterGrade,
+        customGradeStatusId: gradeData.customGradeStatusId,
+        overrideScore: gradeData.overrideScore
     };
 }
 
@@ -175,6 +183,8 @@ export async function getCourseGrade(courseId, apiClient) {
         return {
             score: enrollmentData.score,
             letterGrade: enrollmentData.letterGrade,
+            customGradeStatusId: enrollmentData.customGradeStatusId,
+            overrideScore: enrollmentData.overrideScore,
             source: GRADE_SOURCE.ENROLLMENT
         };
     }
