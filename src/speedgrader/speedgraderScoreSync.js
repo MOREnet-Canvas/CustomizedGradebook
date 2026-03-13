@@ -665,22 +665,32 @@ function createUIControls(courseId, assignmentId) {
     try {
         logger.trace('[ScoreSync] createUIControls called');
 
-        // Find the Canvas flex container that holds the rubric view controls
-        logger.trace('[ScoreSync] Looking for Canvas flex container: span[dir="ltr"][wrap="wrap"]');
-        const flexContainer = document.querySelector('span[dir="ltr"][wrap="wrap"][direction="row"]');
+        // Use stable selector: find rubric tab and navigate to tabs wrapper
+        logger.trace('[ScoreSync] Looking for rubric feedback tab');
+        const rubricTab = document.querySelector('#tab-rubric-feedback-tab');
 
-        if (!flexContainer) {
-            logger.trace('[ScoreSync] Flex container not found, trying fallback selector');
-            // Fallback: find by class pattern
-            const fallbackContainer = document.querySelector('span.css-jf6rsx-view--flex-flex');
-            if (!fallbackContainer) {
-                logger.trace('[ScoreSync] Canvas flex container not found in DOM');
+        if (!rubricTab) {
+            logger.trace('[ScoreSync] Rubric tab not found, trying fallback to tablist');
+            // Fallback: find any tablist in the rubric area
+            const tablist = document.querySelector('[role="tablist"]');
+            if (!tablist) {
+                logger.trace('[ScoreSync] No tablist found in DOM');
                 return false;
             }
-            logger.trace('[ScoreSync] Found flex container via fallback selector');
+            logger.trace('[ScoreSync] Found tablist via fallback');
         }
 
-        const targetContainer = flexContainer || document.querySelector('span.css-jf6rsx-view--flex-flex');
+        // Navigate up to find the tabs wrapper
+        const tabElement = rubricTab || document.querySelector('[role="tablist"]');
+        const tabsWrapper = tabElement.closest('[class*="view-tabs"]') ||
+                           tabElement.closest('div[class*="tabs"]');
+
+        if (!tabsWrapper) {
+            logger.trace('[ScoreSync] Could not find tabs wrapper');
+            return false;
+        }
+
+        logger.trace('[ScoreSync] Found tabs wrapper, will insert Score Sync controls after it');
 
         // Remove existing UI if present (handles navigation)
         const existing = document.querySelector('[data-cg-scoresync-ui]');
@@ -689,7 +699,7 @@ function createUIControls(courseId, assignmentId) {
             existing.remove();
         }
 
-        logger.trace('[ScoreSync] Canvas flex container found, creating UI controls');
+        logger.trace('[ScoreSync] Creating UI controls');
         const settings = getSettings(courseId, assignmentId);
         logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
 
@@ -697,13 +707,11 @@ function createUIControls(courseId, assignmentId) {
         container.setAttribute('data-cg-scoresync-ui', 'true');
         container.setAttribute('data-cg-enabled', settings.enabled ? 'true' : 'false');
         container.style.cssText = `
-            display: inline-flex;
+            display: flex;
             align-items: stretch;
             gap: 0.75rem;
-            margin-left: 0.75rem;
-            padding-left: 0.75rem;
-            padding-right: 0;
-            height: 3rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
             border-radius: 0.35rem;
             background: ${UI_COLORS.CONTAINER_BG};
             border: 1px solid ${UI_COLORS.CONTAINER_BORDER};
@@ -760,8 +768,8 @@ function createUIControls(courseId, assignmentId) {
             logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
         });
 
-        logger.trace('[ScoreSync] Appending UI container as flex item');
-        targetContainer.appendChild(container);
+        logger.trace('[ScoreSync] Inserting UI container after tabs wrapper');
+        tabsWrapper.insertAdjacentElement('afterend', container);
         logger.info('[ScoreSync] ✅ UI controls created and inserted into DOM');
         return true;
     } catch (error) {
