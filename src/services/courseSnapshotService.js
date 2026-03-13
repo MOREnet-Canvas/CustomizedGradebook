@@ -346,44 +346,54 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
             customGradeStatusId = gradeData.customGradeStatusId ?? null;
             overrideScore = gradeData.overrideScore ?? null;
             gradeSource = gradeData.source;
-            displayScore = gradeData.score;
-            displayLetterGrade = gradeData.letterGrade;
-            displayType = 'percentage';
 
-            // Map GRADE_SOURCE to DISPLAY_SOURCE for calculateDisplayValue
-            const displaySource = gradeData.source === GRADE_SOURCE.ASSIGNMENT
-                ? DISPLAY_SOURCE.ASSIGNMENT
-                : DISPLAY_SOURCE.ENROLLMENT;
-
-            // Use shared display calculation to determine how to show the grade
-            const displayCalc = calculateDisplayValue({
-                score: gradeData.score,
-                letterGrade: gradeData.letterGrade,
-                source: displaySource,
-                includeAriaLabel: false
-            });
-
-            // Parse the display value to determine if it was converted to points
-            // calculateDisplayValue returns "2.74 (Developing)" for SBG or "68.50%" for traditional
-            if (displayCalc.displayValue.includes('(') && !displayCalc.displayValue.includes('%')) {
-                // Points format: "2.74 (Developing)"
+            // Insufficient Evidence: null score with a custom grade status ID
+            // Skip numeric display calculation entirely to avoid .toFixed(null) errors
+            if (score === null && customGradeStatusId) {
+                displayScore = null;
+                displayLetterGrade = 'Insufficient Evidence';
                 displayType = 'points';
-                const match = displayCalc.displayValue.match(/^([\d.]+)\s*\(([^)]+)\)/);
-                if (match) {
-                    displayScore = parseFloat(match[1]);
-                    displayLetterGrade = match[2];
-                }
-            } else if (displayCalc.displayValue.includes('%')) {
-                // Percentage format: "68.50%" or "68.50% (B)"
-                displayType = 'percentage';
-                const match = displayCalc.displayValue.match(/^([\d.]+)%/);
-                if (match) {
-                    displayScore = parseFloat(match[1]);
-                }
+                logger.trace(`[Snapshot] IE detected (customGradeStatusId=${customGradeStatusId}): skipping numeric display calculation`);
             } else {
-                // Just a number (points without letter grade): "2.74"
-                displayType = 'points';
-                displayScore = parseFloat(displayCalc.displayValue);
+                displayScore = gradeData.score;
+                displayLetterGrade = gradeData.letterGrade;
+                displayType = 'percentage';
+
+                // Map GRADE_SOURCE to DISPLAY_SOURCE for calculateDisplayValue
+                const displaySource = gradeData.source === GRADE_SOURCE.ASSIGNMENT
+                    ? DISPLAY_SOURCE.ASSIGNMENT
+                    : DISPLAY_SOURCE.ENROLLMENT;
+
+                // Use shared display calculation to determine how to show the grade
+                const displayCalc = calculateDisplayValue({
+                    score: gradeData.score,
+                    letterGrade: gradeData.letterGrade,
+                    source: displaySource,
+                    includeAriaLabel: false
+                });
+
+                // Parse the display value to determine if it was converted to points
+                // calculateDisplayValue returns "2.74 (Developing)" for SBG or "68.50%" for traditional
+                if (displayCalc.displayValue.includes('(') && !displayCalc.displayValue.includes('%')) {
+                    // Points format: "2.74 (Developing)"
+                    displayType = 'points';
+                    const match = displayCalc.displayValue.match(/^([\d.]+)\s*\(([^)]+)\)/);
+                    if (match) {
+                        displayScore = parseFloat(match[1]);
+                        displayLetterGrade = match[2];
+                    }
+                } else if (displayCalc.displayValue.includes('%')) {
+                    // Percentage format: "68.50%" or "68.50% (B)"
+                    displayType = 'percentage';
+                    const match = displayCalc.displayValue.match(/^([\d.]+)%/);
+                    if (match) {
+                        displayScore = parseFloat(match[1]);
+                    }
+                } else {
+                    // Just a number (points without letter grade): "2.74"
+                    displayType = 'points';
+                    displayScore = parseFloat(displayCalc.displayValue);
+                }
             }
 
             logger.trace(`[Snapshot] Display values: displayScore=${displayScore}, displayType=${displayType}, displayLetterGrade=${displayLetterGrade}`);
@@ -415,7 +425,9 @@ export async function populateCourseSnapshot(courseId, courseName, apiClient) {
         const key = `${SNAPSHOT_KEY_PREFIX}${courseId}`;
         sessionStorage.setItem(key, JSON.stringify(snapshot));
 
-        if (gradeData) {
+        if (gradeData && customGradeStatusId && displayScore === null) {
+            logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), IE status (customGradeStatusId=${customGradeStatusId}), source=${gradeSource}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
+        } else if (gradeData) {
             logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), display=${displayScore} (${displayType}), source=${gradeSource}, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
         } else {
             logger.debug(`[Snapshot] ✅ Populated snapshot for course ${courseId}: model=${classification.model} (${classification.reason}), no grade data, expiresAt=${new Date(snapshot.expiresAt).toISOString()}`);
