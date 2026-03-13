@@ -708,7 +708,7 @@ function createUIControls(courseId, assignmentId) {
         container.setAttribute('data-cg-enabled', settings.enabled ? 'true' : 'false');
         container.style.cssText = `
             display: flex;
-            align-items: stretch;
+            align-items: center;
             gap: 0.75rem;
             padding: 0.75rem;
             margin-bottom: 0.5rem;
@@ -736,11 +736,11 @@ function createUIControls(courseId, assignmentId) {
                 <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
                 <option value="sum" ${settings.method === 'sum' ? 'selected' : ''}>SUM</option>
             </select>
-            <div style="display: flex; height: 100%; flex-shrink: 0; margin: 0;">
-                <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; height: 100%; background-color: ${UI_COLORS.LABEL_BG};">
+            <div style="display: flex; height: 2.5rem; flex-shrink: 0; margin: 0;">
+                <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; background-color: ${UI_COLORS.LABEL_BG};">
                     <span style="font-weight: 600; white-space: nowrap;">Assignment Score</span>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; height: 100%; background-color: ${UI_COLORS.SCORE_BG};">
+                <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; background-color: ${UI_COLORS.SCORE_BG};">
                     <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
                 </div>
             </div>
