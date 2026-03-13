@@ -338,7 +338,7 @@ export async function renderMasteryDashboard() {
             (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
         );
 
-        const score = latest.score != null ? latest.score : "—";
+        const score = latest.score != null ? latest.score.toFixed(2) : "—";
 
         // Calculate percentage based on points_possible
         const possible = outcome.points_possible || 4;
@@ -532,7 +532,7 @@ export async function renderMasteryDashboard() {
                             });
 
                             const assignmentListHtml = sortedAssignments.map(assignment => {
-                                const assignmentScore = assignment.score;
+                                const assignmentScore = assignment.score.toFixed(2);
                                 const letterGrade = getLetterGrade(assignment.score);
 
                                 // Calculate mastery color for assignment
