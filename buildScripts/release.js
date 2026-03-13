@@ -2,16 +2,15 @@
 import esbuild from "esbuild";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
 
 // Get version bump type from command line argument
 const bumpType = process.argv[2];
 if (!bumpType || !['patch', 'minor', 'major'].includes(bumpType)) {
-    console.error("Usage: npm run release:mobile:patch/minor/major");
+    console.error("Usage: npm run release:patch/minor/major");
     process.exit(1);
 }
 
-console.log(`🚀 Starting Mobile Release: ${bumpType.toUpperCase()}`);
+console.log(`🚀 Starting Main Release: ${bumpType.toUpperCase()}`);
 console.log("━".repeat(80));
 
 // ============================================================================
@@ -20,7 +19,7 @@ console.log("━".repeat(80));
 
 console.log("\n✓ Pre-flight Checks:");
 
-// Refuse to release if there are uncommitted changes
+// Check for uncommitted changes
 try {
     execSync("git diff --quiet", { stdio: "ignore" });
     execSync("git diff --cached --quiet", { stdio: "ignore" });
@@ -31,48 +30,54 @@ try {
     process.exit(1);
 }
 
+// Check on main branch
+try {
+    const branch = execSync("git branch --show-current").toString().trim();
+    if (branch !== "main") {
+        console.warn(`   ⚠️  Warning: You're on branch '${branch}', not 'main'`);
+    } else {
+        console.log("   ✓ On branch: main");
+    }
+} catch {}
+
 // ============================================================================
 // VERSION BUMP
 // ============================================================================
 
 console.log("\n✓ Version Bump:");
 
-// Read current mobile package.json
-const mobilePkgPath = path.join(process.cwd(), 'mobile', 'package.json');
-const mobilePkg = JSON.parse(fs.readFileSync(mobilePkgPath, 'utf8'));
+// Read current version
+const pkg = JSON.parse(fs.readFileSync("package.json", 'utf8'));
+const oldVersion = pkg.version;
 
-// Parse current version
-const [major, minor, patch] = mobilePkg.version.split('.').map(Number);
+// Use npm version to bump (creates annotated tag automatically)
+execSync(`npm version ${bumpType} --no-git-tag-version`, { stdio: "ignore" });
 
-// Bump version based on type
-let newVersion;
-if (bumpType === 'major') {
-    newVersion = `${major + 1}.0.0`;
-} else if (bumpType === 'minor') {
-    newVersion = `${major}.${minor + 1}.0`;
-} else { // patch
-    newVersion = `${major}.${minor}.${patch + 1}`;
-}
+// Read new version
+const newPkg = JSON.parse(fs.readFileSync("package.json", 'utf8'));
+const newVersion = newPkg.version;
+const tag = `v${newVersion}`;
 
-console.log(`   • Updated mobile/package.json: ${mobilePkg.version} → ${newVersion}`);
-
-// Update package.json
-mobilePkg.version = newVersion;
-fs.writeFileSync(mobilePkgPath, JSON.stringify(mobilePkg, null, 2) + '\n');
+console.log(`   • Updated package.json: ${oldVersion} → ${newVersion}`);
 
 // Commit the version change
-execSync(`git add mobile/package.json`, { stdio: "ignore" });
-execSync(`git commit -m "Bump mobile version to ${newVersion}"`, { stdio: "ignore" });
-console.log(`   • Committed: "Bump mobile version to ${newVersion}"`);
+execSync(`git add package.json`, { stdio: "ignore" });
+execSync(`git commit -m "${newVersion}"`, { stdio: "ignore" });
+console.log(`   • Committed: "${newVersion}"`);
 
-// Create annotated git tag (FIXED: was lightweight tag)
-const tag = `mobile-v${newVersion}`;
-execSync(`git tag -a ${tag} -m "Mobile release ${newVersion}"`, { stdio: "ignore" });
+// Create annotated git tag
+execSync(`git tag -a ${tag} -m "Release ${newVersion}"`, { stdio: "ignore" });
 console.log(`   • Created annotated tag: ${tag}`);
 
-// Push with tags
+// ============================================================================
+// GIT PUSH
+// ============================================================================
+
+console.log("\n✓ Git Push:");
+
 execSync(`git push --follow-tags`, { stdio: "ignore" });
-console.log(`   • Pushed commits and tags to GitHub`);
+console.log(`   • Pushed commits to origin/main`);
+console.log(`   • Pushed tag ${tag}`);
 
 // ============================================================================
 // BUILD
@@ -111,15 +116,15 @@ function ensureDir(dir) {
 }
 
 const buildMeta = getBuildMetadata("prod");
-const outdir = "dist/mobile/prod";
+const outdir = "dist/prod";
 ensureDir(outdir);
 
-console.log(`   🔨 Building mobileInit.js (prod v${newVersion})...`);
+console.log(`   🔨 Building customGradebookInit.js (prod v${newVersion})...`);
 
 try {
     await esbuild.build({
-        entryPoints: ["src/masteryDashboard/mobileInit.js"],
-        outfile: `${outdir}/mobileInit.js`,
+        entryPoints: ["src/customGradebookInit.js"],
+        outfile: `${outdir}/customGradebookInit.js`,
         bundle: true,
         minify: true,
         sourcemap: false,
@@ -133,12 +138,15 @@ try {
         }
     });
 
-    const size = fs.statSync(`${outdir}/mobileInit.js`).size;
+    const size = fs.statSync(`${outdir}/customGradebookInit.js`).size;
     console.log(`   • Built and minified (${(size / 1024).toFixed(0)} KB)`);
 } catch (error) {
     console.error("❌ Build failed:", error.message);
     process.exit(1);
 }
+
+
+
 
 // ============================================================================
 // GITHUB RELEASE
@@ -148,23 +156,23 @@ console.log("\n✓ GitHub Release:");
 
 // Create release
 try {
-    execSync(`gh release create ${tag} --title "Mobile ${tag}" --notes "Parent Mastery mobile release ${tag}"`, { stdio: "ignore" });
+    execSync(`gh release create ${tag} --title "${tag}" --notes "Production release ${tag}"`, { stdio: "ignore" });
     console.log(`   • Created release ${tag}`);
 } catch {
     console.log(`   • Release ${tag} already exists`);
 }
 
 // Upload bundle
-execSync(`gh release upload ${tag} dist/mobile/prod/mobileInit.js --clobber`, { stdio: "ignore" });
-console.log(`   • Uploaded mobileInit.js`);
+execSync(`gh release upload ${tag} dist/prod/customGradebookInit.js --clobber`, { stdio: "ignore" });
+console.log(`   • Uploaded customGradebookInit.js`);
 
 // ============================================================================
 // SUMMARY
 // ============================================================================
 
 console.log("\n" + "━".repeat(80));
-console.log(`✅ Mobile Release ${tag} Complete!`);
+console.log(`✅ Release ${tag} Complete!`);
 console.log(`\n📦 Release: https://github.com/MOREnet-Canvas/CustomizedGradebook/releases/tag/${tag}`);
 console.log(`🕐 Built:   ${buildMeta.timestamp}`);
 console.log(`\n💡 Note: Version manifest will auto-update via GitHub Actions`);
-console.log(`   Workflow: update-mobile-version-manifest.yml`);
+console.log(`   Workflow: update-version-manifest.yml`);
