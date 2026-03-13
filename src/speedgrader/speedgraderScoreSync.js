@@ -587,7 +587,7 @@ async function extractRequestBody(input, init) {
 }
 
 /**
- * Hook window.fetch to detect rubric submissions (Suggestion #17 - extracted detection logic)
+ * Hook window.fetch to detect rubric submissions (Enhanced SpeedGrader - GraphQL)
  */
 function hookFetch() {
     logger.trace('[ScoreSync] Installing fetch hook...');
@@ -629,7 +629,7 @@ function hookFetch() {
             const detection = isRubricSubmission(url, method, bodyText);
 
             if (detection.isRubric) {
-                const apiType = detection.type === 'graphql' ? 'GraphQL (Enhanced)' : 'REST API (Classic)';
+                const apiType = detection.type === 'graphql' ? 'GraphQL (Enhanced)' : 'REST API (Fetch)';
                 logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED - ${apiType}`);
 
                 // Log GraphQL operation name if available
@@ -658,6 +658,75 @@ function hookFetch() {
     };
 
     logger.info('[ScoreSync] ✅ Fetch hook installed successfully');
+}
+
+/**
+ * Hook XMLHttpRequest to detect rubric submissions (Classic SpeedGrader - XHR/jQuery)
+ */
+function hookXMLHttpRequest() {
+    logger.trace('[ScoreSync] Installing XHR hook...');
+
+    if (window.__CG_SCORESYNC_XHR_HOOKED__) {
+        logger.warn('[ScoreSync] XHR hook already installed');
+        return;
+    }
+    window.__CG_SCORESYNC_XHR_HOOKED__ = true;
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+    let xhrCallCount = 0;
+
+    // Hook open() to capture method and URL
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+        this._cg_method = method;
+        this._cg_url = url;
+        return originalOpen.call(this, method, url, ...args);
+    };
+
+    // Hook send() to detect rubric submissions
+    XMLHttpRequest.prototype.send = function(body) {
+        const callId = ++xhrCallCount;
+        const method = this._cg_method;
+        const url = this._cg_url;
+        const xhr = this;
+
+        // Ignore our own submission API calls to prevent loops
+        if (url && url.includes('/api/v1/') && url.includes('/submissions/')) {
+            return originalSend.call(this, body);
+        }
+
+        // Detect rubric submissions
+        if (method === 'POST' && url) {
+            const detection = isRubricSubmission(url, method, body || '');
+
+            if (detection.isRubric) {
+                // Add load event listener to wait for successful response
+                const originalOnload = xhr.onload;
+                xhr.addEventListener('load', function() {
+                    // Check if response was successful
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED - XHR (Classic)`);
+                        logger.trace(`[ScoreSync] XHR Call #${callId}: ${method} ${url}`);
+
+                        // Re-parse URL to get current context (handles navigation)
+                        const parsed = parseSpeedGraderUrl();
+                        logger.trace(`[ScoreSync] XHR Call #${callId}: Parsed IDs - courseId: ${parsed.courseId}, assignmentId: ${parsed.assignmentId}, studentId: ${parsed.studentId}`);
+
+                        if (parsed.courseId && parsed.assignmentId && parsed.studentId) {
+                            logger.trace(`[ScoreSync] XHR Call #${callId}: Triggering handleRubricSubmit...`);
+                            void handleRubricSubmit(parsed.courseId, parsed.assignmentId, parsed.studentId, apiClient);
+                        } else {
+                            logger.warn(`[ScoreSync] XHR Call #${callId}: Missing IDs, cannot handle rubric submit`);
+                        }
+                    }
+                });
+            }
+        }
+
+        return originalSend.call(this, body);
+    };
+
+    logger.info('[ScoreSync] ✅ XHR hook installed successfully');
 }
 
 /**
@@ -758,6 +827,7 @@ function hookHistoryApi() {
 export function cleanup() {
     // Reset hooks
     window.__CG_SCORESYNC_FETCH_HOOKED__ = false;
+    window.__CG_SCORESYNC_XHR_HOOKED__ = false;
     window.__CG_SCORESYNC_HISTORY_HOOKED__ = false;
 
     // Reset state
@@ -832,8 +902,11 @@ export async function initSpeedGraderAutoGrade() {
 
     logger.info('[ScoreSync] ✅ Course is standards-based, proceeding with initialization');
 
-    logger.trace('[ScoreSync] Installing fetch hook...');
+    logger.trace('[ScoreSync] Installing fetch hook (Enhanced SpeedGrader)...');
     hookFetch();
+
+    logger.trace('[ScoreSync] Installing XHR hook (Classic SpeedGrader)...');
+    hookXMLHttpRequest();
 
     logger.trace('[ScoreSync] Installing history API hooks...');
     hookHistoryApi();
