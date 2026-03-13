@@ -282,7 +282,7 @@ function updateCurrentScorePill() {
         if (pill.dataset.cgIePill === 'true') continue;
 
         pillText.textContent = 'Insufficient Evidence';
-        pill.style.backgroundColor = '#fce8e8';
+        pill.style.backgroundColor = '#ffffff';
         pill.style.border = '1px solid #E62429';
         pillText.style.color = '#E62429';
         pillText.style.fontWeight = 'bold';
