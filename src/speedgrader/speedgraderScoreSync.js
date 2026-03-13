@@ -721,19 +721,12 @@ function createUIControls(courseId, assignmentId) {
 }
 
 // Removed: ensureScoreSyncUiPresent() - no longer needed with docked panel
-
-/**
- * Schedule UI recheck after navigation (Suggestion #4)
- */
-function scheduleUiRecheck() {
-    setTimeout(() => void ensureScoreSyncUiPresent(), 0);
-    setTimeout(() => void ensureScoreSyncUiPresent(), TIMING_CONSTANTS.NAVIGATION_RECHECK_DELAY);
-}
-
+// Removed: scheduleUiRecheck() - no longer needed with docked panel
 // Removed: startTemporaryUiKeepalive() - no longer needed with docked panel
 
 /**
  * Hook History API to detect SpeedGrader navigation
+ * Note: Docked panel persists across navigation, no UI re-injection needed
  */
 function hookHistoryApi() {
     if (window.__CG_SCORESYNC_HISTORY_HOOKED__) return;
@@ -744,16 +737,16 @@ function hookHistoryApi() {
 
     history.pushState = function(...args) {
         originalPushState.apply(this, args);
-        scheduleUiRecheck();
+        logger.trace('[ScoreSync] Navigation detected (pushState)');
     };
 
     history.replaceState = function(...args) {
         originalReplaceState.apply(this, args);
-        scheduleUiRecheck();
+        logger.trace('[ScoreSync] Navigation detected (replaceState)');
     };
 
     window.addEventListener('popstate', () => {
-        scheduleUiRecheck();
+        logger.trace('[ScoreSync] Navigation detected (popstate)');
     });
 
     logger.trace('[ScoreSync] History API hooks installed');
