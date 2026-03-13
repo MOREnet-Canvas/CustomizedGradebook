@@ -528,24 +528,40 @@ async function handleRubricSubmit(courseId, assignmentId, studentId, apiClient) 
 }
 
 /**
- * Check if request is a rubric submission mutation (only matches mutations, not queries)
+ * Detect if a fetch request is a rubric submission
+ * Supports both Enhanced SpeedGrader (GraphQL) and Classic SpeedGrader (REST API)
+ *
  * @param {string} url - Request URL
  * @param {string} method - HTTP method
  * @param {string} bodyText - Request body text
- * @returns {boolean} True if rubric submission mutation
+ * @returns {Object} { isRubric: boolean, type: 'graphql'|'rest'|null }
  */
 function isRubricSubmission(url, method, bodyText) {
-    if (!url.includes('/api/graphql')) return false;
-    if (method !== 'POST') return false;
+    if (method !== 'POST') return { isRubric: false, type: null };
 
-    // Match SaveRubricAssessment mutation patterns
-    // Canvas uses operation names like "SpeedGrader_SaveRubricAssessment"
-    // This matches mutations but excludes queries like "SpeedGrader_RubricAssessmentsQuery"
-    const isSaveMutation =
-        /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText) ||
-        /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
+    // Enhanced SpeedGrader: GraphQL API
+    if (url.includes('/api/graphql')) {
+        // Match SaveRubricAssessment mutation patterns
+        // Canvas uses operation names like "SpeedGrader_SaveRubricAssessment"
+        // This matches mutations but excludes queries like "SpeedGrader_RubricAssessmentsQuery"
+        const isSaveMutation =
+            /"operationName"\s*:\s*"[^"]*SaveRubricAssessment[^"]*"/i.test(bodyText) ||
+            /mutation\s+\w*SaveRubricAssessment/i.test(bodyText);
 
-    return isSaveMutation;
+        if (isSaveMutation) {
+            return { isRubric: true, type: 'graphql' };
+        }
+    }
+
+    // Classic SpeedGrader: REST API
+    // Pattern: /courses/{courseId}/rubric_associations/{rubricAssociationId}/assessments
+    const restApiPattern = /\/courses\/\d+\/rubric_associations\/\d+\/assessments/;
+    if (restApiPattern.test(url)) {
+        logger.trace('[ScoreSync] Matched Classic SpeedGrader REST API pattern');
+        return { isRubric: true, type: 'rest' };
+    }
+
+    return { isRubric: false, type: null };
 }
 
 /**
@@ -607,18 +623,23 @@ function hookFetch() {
             return res;
         }
 
-        // Detect GraphQL rubric submissions
-        if (res.ok && url.includes('/api/graphql') && method === 'POST') {
+        // Detect rubric submissions (both GraphQL and REST API)
+        if (res.ok && method === 'POST') {
             const bodyText = await extractRequestBody(input, init);
+            const detection = isRubricSubmission(url, method, bodyText);
 
-            // Log GraphQL operations at trace level
-            const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
-            const operationName = operationMatch ? operationMatch[1] : 'unknown';
-            logger.trace(`[ScoreSync] GraphQL operation: ${operationName}`);
+            if (detection.isRubric) {
+                const apiType = detection.type === 'graphql' ? 'GraphQL (Enhanced)' : 'REST API (Classic)';
+                logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED - ${apiType}`);
 
-            if (isRubricSubmission(url, method, bodyText)) {
-                logger.info(`[ScoreSync] ✅ RUBRIC SUBMISSION DETECTED`);
-                logger.trace(`[ScoreSync] Call #${callId}: Operation: ${operationName}`);
+                // Log GraphQL operation name if available
+                if (detection.type === 'graphql') {
+                    const operationMatch = bodyText.match(/"operationName"\s*:\s*"([^"]+)"/);
+                    const operationName = operationMatch ? operationMatch[1] : 'unknown';
+                    logger.trace(`[ScoreSync] Call #${callId}: GraphQL Operation: ${operationName}`);
+                } else {
+                    logger.trace(`[ScoreSync] Call #${callId}: REST API endpoint: ${url}`);
+                }
 
                 // Re-parse URL to get current context (handles navigation)
                 const parsed = parseSpeedGraderUrl();
