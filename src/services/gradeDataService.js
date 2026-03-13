@@ -61,32 +61,40 @@ async function fetchAvgAssignmentScore(courseId, studentId, apiClient) {
             'fetchAvgSubmission'
         );
 
+        // Extract score, grade, and custom grade status
+        const score = submission?.score;
+        const grade = submission?.grade;
+        const customGradeStatusId = submission?.custom_grade_status_id != null
+            ? String(submission.custom_grade_status_id)
+            : null;
+
         logger.trace(
             `[fetchAvgAssignmentScore] Submission fetched`,
             {
                 courseId,
                 studentId,
                 assignmentId: avgAssignment.id,
-                score: submission?.score,
-                grade: submission?.grade
+                score,
+                grade,
+                customGradeStatusId
             }
         );
 
-        // Extract score
-        const score = submission?.score;
-        const grade = submission?.grade;
-
         if (score === null || score === undefined) {
+            if (customGradeStatusId) {
+                logger.trace(`AVG assignment has IE status (customGradeStatusId=${customGradeStatusId}) for course ${courseId}`);
+                return { score: null, grade: null, customGradeStatusId };
+            }
             logger.trace(`No score found for AVG assignment in course ${courseId}`);
             return null;
         }
+
         if (grade === null || grade === undefined) {
             logger.trace(`No grade found for AVG assignment in course ${courseId}`);
-
         }
 
         logger.trace(`AVG assignment score for course ${courseId}: ${score}, grade: ${grade}`);
-        return { score, grade };
+        return { score, grade, customGradeStatusId };
 
     } catch (error) {
         logger.warn(`Failed to fetch AVG assignment score for course ${courseId}:`, error.message);
@@ -160,16 +168,17 @@ export async function getCourseGrade(courseId, apiClient) {
 
     const avgResult = await fetchAvgAssignmentScore(courseId, studentId, apiClient);
 
-    if (avgResult?.score != null) {
-        const { score, grade } = avgResult;
+    if (avgResult) {
+        const { score, grade, customGradeStatusId } = avgResult;
 
         logger.trace(
-            `[Grade Fetch] Course ${courseId}: AVG assignment found! score=${score}, letterGrade=${grade ?? '(none)'}`
+            `[Grade Fetch] Course ${courseId}: AVG assignment found! score=${score}, letterGrade=${grade ?? '(none)'}, customGradeStatusId=${customGradeStatusId ?? 'none'}`
         );
 
         return {
             score,
-            letterGrade: grade ?? null,   // ✅ normalize to the field snapshot expects
+            letterGrade: grade ?? null,
+            customGradeStatusId: customGradeStatusId ?? null,
             source: GRADE_SOURCE.ASSIGNMENT
         };
     }
