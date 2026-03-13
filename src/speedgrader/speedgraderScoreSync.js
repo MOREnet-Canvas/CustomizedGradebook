@@ -222,14 +222,26 @@ function createRubricFingerprint(rubricAssessment) {
 
 
 /**
- * Find best grade input element (Suggestion #6)
+ * Find best grade input element
+ * Supports both Enhanced SpeedGrader and Classic SpeedGrader
  * @returns {HTMLInputElement|null} Best input element or null
  */
 function findBestGradeInput() {
-    const allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
-    if (allInputs.length === 0) return null;
+    // Try Enhanced SpeedGrader first (React-based)
+    let allInputs = Array.from(document.querySelectorAll('input[data-testid="grade-input"]'));
 
-    // Filter to visible, enabled inputs
+    // Fallback to Classic SpeedGrader
+    if (allInputs.length === 0) {
+        const classicInput = document.querySelector('#grading-box-extended');
+        if (classicInput) {
+            logger.trace('[ScoreSync] Using Classic SpeedGrader input: #grading-box-extended');
+            return classicInput;
+        }
+        logger.trace('[ScoreSync] No grade input found (Enhanced or Classic)');
+        return null;
+    }
+
+    // Enhanced SpeedGrader: Filter to visible, enabled inputs
     const visibleInputs = allInputs.filter(el => el.offsetParent !== null && !el.disabled);
     if (visibleInputs.length === 0) return null;
 
