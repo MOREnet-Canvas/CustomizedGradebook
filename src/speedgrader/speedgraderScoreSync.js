@@ -19,13 +19,18 @@
 import { logger } from '../utils/logger.js';
 import { getCourseSnapshot, populateCourseSnapshot } from '../services/courseSnapshotService.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import {
+    initDockedPanel,
+    updatePanelScore,
+    addSyncControlsSection,
+    addScoreDisplaySection,
+    addPanelSettingsSection
+} from './scoreSyncDockedPanel.js';
 
 // Timing constants
 const TIMING_CONSTANTS = {
     GRADE_INPUT_UPDATE_DELAYS: [0, 700, 1500],
     RUBRIC_FETCH_DELAYS: [200, 250, 350],
-    UI_KEEPALIVE_INTERVAL: 600,
-    UI_KEEPALIVE_DURATION: 12000,
     NAVIGATION_RECHECK_DELAY: 250,
     URL_PARSE_RETRY_DELAY: 500,
     URL_PARSE_MAX_ATTEMPTS: 3,
@@ -33,25 +38,11 @@ const TIMING_CONSTANTS = {
     SUBMIT_GRADE_MAX_RETRIES: 2
 };
 
-// UI color constants
-const UI_COLORS = {
-    CONTAINER_BG: 'rgb(245, 245, 245)',
-    CONTAINER_BORDER: 'rgb(245, 245, 245)',
-    LABEL_BG: 'rgb(245, 245, 245)',
-    SCORE_BG: 'rgb(0, 142, 83)'
-};
-
-// Feature flags
-const FEATURE_FLAGS = {
-    UI_KEEPALIVE_ENABLED: true
-};
-
 // Module state
 let initialized = false;
 let inFlight = false;
 const lastFingerprintByContext = new Map();
 let apiClient = null;
-let uiKeepaliveInterval = null;
 
 // Metrics
 const metrics = {
@@ -649,128 +640,58 @@ function hookFetch() {
 }
 
 /**
- * Update assignment score display in UI
+ * Update assignment score display in docked panel
  */
 function updateAssignmentScoreDisplay(score) {
-    const display = document.querySelector('[data-cg-assignment-score]');
-    if (display) {
-        display.textContent = score;
-    }
+    updatePanelScore(score);
 }
 
 /**
- * Create UI controls (Suggestion #5, #13 - added error boundary, uses color constants)
+ * Create UI controls using docked panel
  */
 function createUIControls(courseId, assignmentId) {
     try {
         logger.trace('[ScoreSync] createUIControls called');
 
-        // Use stable selector: find rubric tab and navigate to tabs wrapper
-        logger.trace('[ScoreSync] Looking for rubric feedback tab');
-        const rubricTab = document.querySelector('#tab-rubric-feedback-tab');
-
-        if (!rubricTab) {
-            logger.trace('[ScoreSync] Rubric tab not found, trying fallback to tablist');
-            // Fallback: find any tablist in the rubric area
-            const tablist = document.querySelector('[role="tablist"]');
-            if (!tablist) {
-                logger.trace('[ScoreSync] No tablist found in DOM');
-                return false;
-            }
-            logger.trace('[ScoreSync] Found tablist via fallback');
+        // Check if already initialized
+        if (document.getElementById('cg-scoresync-root')) {
+            logger.trace('[ScoreSync] Docked panel already exists');
+            return true;
         }
 
-        // Navigate up to find the tabs wrapper
-        const tabElement = rubricTab || document.querySelector('[role="tablist"]');
-        const tabsWrapper = tabElement.closest('[class*="view-tabs"]') ||
-                           tabElement.closest('div[class*="tabs"]');
-
-        if (!tabsWrapper) {
-            logger.trace('[ScoreSync] Could not find tabs wrapper');
-            return false;
-        }
-
-        logger.trace('[ScoreSync] Found tabs wrapper, will insert Score Sync controls after it');
-
-        // Remove existing UI if present (handles navigation)
-        const existing = document.querySelector('[data-cg-scoresync-ui]');
-        if (existing) {
-            logger.trace('[ScoreSync] Removing existing UI controls before re-creation');
-            existing.remove();
-        }
-
-        logger.trace('[ScoreSync] Creating UI controls');
+        logger.trace('[ScoreSync] Creating docked panel UI');
         const settings = getSettings(courseId, assignmentId);
         logger.trace(`[ScoreSync] Settings loaded: enabled=${settings.enabled}, method=${settings.method}`);
 
-        const container = document.createElement('div');
-        container.setAttribute('data-cg-scoresync-ui', 'true');
-        container.setAttribute('data-cg-enabled', settings.enabled ? 'true' : 'false');
-        container.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
-            border-radius: 0.35rem;
-            background: ${UI_COLORS.CONTAINER_BG};
-            border: 1px solid ${UI_COLORS.CONTAINER_BORDER};
-            flex-shrink: 0;
-            font: inherit;
-            color: inherit;
-            transition: opacity 0.2s ease;
-            opacity: ${settings.enabled ? '1' : '0.6'};
-            overflow: hidden;
-        `;
+        // Initialize docked panel
+        const success = initDockedPanel();
+        if (!success) {
+            logger.error('[ScoreSync] Failed to initialize docked panel');
+            return false;
+        }
 
-        container.innerHTML = `
-            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0; white-space: nowrap;">
-                <input type="checkbox" data-cg-toggle ${settings.enabled ? 'checked' : ''}
-                       style="margin: 0; transform: scale(1.25); transform-origin: center; cursor: pointer;">
-                <span style="font-weight: 600;">Score Sync</span>
-            </label>
-            <select class="ic-Input" data-cg-method ${settings.enabled ? '' : 'disabled'}
-                    style="width: auto; min-width: 4rem; height: 2.375rem; min-height: 2.375rem; padding-top: 0.25rem; padding-bottom: 0.25rem; align-self: center;">
-                <option value="min" ${settings.method === 'min' ? 'selected' : ''}>MIN</option>
-                <option value="avg" ${settings.method === 'avg' ? 'selected' : ''}>AVG</option>
-                <option value="max" ${settings.method === 'max' ? 'selected' : ''}>MAX</option>
-                <option value="sum" ${settings.method === 'sum' ? 'selected' : ''}>SUM</option>
-            </select>
-            <div style="display: flex; height: 2.5rem; flex-shrink: 0; margin: 0;">
-                <div style="display: flex; align-items: center; padding-left: 0.75rem; padding-right: 0.75rem; background-color: ${UI_COLORS.LABEL_BG};">
-                    <span style="font-weight: 600; white-space: nowrap;">Assignment Score</span>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: center; padding: 0 0.75rem; background-color: ${UI_COLORS.SCORE_BG};">
-                    <span style="color: #fff; font-weight: 700; white-space: nowrap;"><span data-cg-assignment-score>--</span> pts</span>
-                </div>
-            </div>
-        `;
+        // Add sync controls section
+        addSyncControlsSection(
+            settings,
+            (enabled) => {
+                settings.enabled = enabled;
+                saveSettings(courseId, assignmentId, settings);
+                logger.info(`[ScoreSync] Score sync ${enabled ? 'enabled' : 'disabled'}`);
+            },
+            (method) => {
+                settings.method = method;
+                saveSettings(courseId, assignmentId, settings);
+                logger.info(`[ScoreSync] Method changed to: ${method}`);
+            }
+        );
 
-        const toggle = container.querySelector('[data-cg-toggle]');
-        const methodSelect = container.querySelector('[data-cg-method]');
+        // Add score display section
+        addScoreDisplaySection();
 
-        toggle.addEventListener('change', () => {
-            settings.enabled = toggle.checked;
-            saveSettings(courseId, assignmentId, settings);
+        // Add panel settings section
+        addPanelSettingsSection();
 
-            // Update disabled state
-            container.setAttribute('data-cg-enabled', settings.enabled ? 'true' : 'false');
-            container.style.opacity = settings.enabled ? '1' : '0.6';
-            methodSelect.disabled = !settings.enabled;
-            methodSelect.style.cursor = settings.enabled ? 'pointer' : 'not-allowed';
-
-            logger.info(`[ScoreSync] Score sync ${settings.enabled ? 'enabled' : 'disabled'}`);
-        });
-
-        methodSelect.addEventListener('change', () => {
-            settings.method = methodSelect.value;
-            saveSettings(courseId, assignmentId, settings);
-            logger.info(`[ScoreSync] Method changed to: ${settings.method}`);
-        });
-
-        logger.trace('[ScoreSync] Inserting UI container after tabs wrapper');
-        tabsWrapper.insertAdjacentElement('afterend', container);
-        logger.info('[ScoreSync] ✅ UI controls created and inserted into DOM');
+        logger.info('[ScoreSync] ✅ Docked panel UI created');
         return true;
     } catch (error) {
         logger.error('[ScoreSync] Failed to create UI controls:', error);
@@ -778,25 +699,7 @@ function createUIControls(courseId, assignmentId) {
     }
 }
 
-/**
- * Ensure ScoreSync UI is present (keepalive for React rerenders) (Suggestion #14 - better logging)
- */
-function ensureScoreSyncUiPresent() {
-    const { courseId, assignmentId } = parseSpeedGraderUrl();
-    if (!courseId || !assignmentId) {
-        logger.trace('[ScoreSync] Cannot ensure UI: missing IDs');
-        return;
-    }
-
-    if (document.querySelector('[data-cg-scoresync-ui]')) return;
-
-    const ok = createUIControls(courseId, assignmentId);
-    if (ok) {
-        logger.info(`[ScoreSync] UI re-injected for course=${courseId}, assignment=${assignmentId}`);
-    } else {
-        logger.warn('[ScoreSync] Failed to re-inject UI (container not found)');
-    }
-}
+// Removed: ensureScoreSyncUiPresent() - no longer needed with docked panel
 
 /**
  * Schedule UI recheck after navigation (Suggestion #4)
@@ -806,31 +709,10 @@ function scheduleUiRecheck() {
     setTimeout(() => void ensureScoreSyncUiPresent(), TIMING_CONSTANTS.NAVIGATION_RECHECK_DELAY);
 }
 
-/**
- * Start temporary UI keepalive (UI Keepalive fix)
- */
-function startTemporaryUiKeepalive() {
-    // Clear existing interval if any
-    if (uiKeepaliveInterval) {
-        clearInterval(uiKeepaliveInterval);
-    }
-
-    // Start new interval
-    uiKeepaliveInterval = setInterval(() => void ensureScoreSyncUiPresent(), TIMING_CONSTANTS.UI_KEEPALIVE_INTERVAL);
-    logger.trace(`[ScoreSync] Temporary UI keepalive started (${TIMING_CONSTANTS.UI_KEEPALIVE_INTERVAL}ms checks for ${TIMING_CONSTANTS.UI_KEEPALIVE_DURATION}ms)`);
-
-    // Auto-stop after duration
-    setTimeout(() => {
-        if (uiKeepaliveInterval) {
-            clearInterval(uiKeepaliveInterval);
-            uiKeepaliveInterval = null;
-            logger.trace('[ScoreSync] Temporary UI keepalive stopped (duration expired)');
-        }
-    }, TIMING_CONSTANTS.UI_KEEPALIVE_DURATION);
-}
+// Removed: startTemporaryUiKeepalive() - no longer needed with docked panel
 
 /**
- * Hook History API to detect SpeedGrader navigation (Suggestion #4, UI Keepalive fix)
+ * Hook History API to detect SpeedGrader navigation
  */
 function hookHistoryApi() {
     if (window.__CG_SCORESYNC_HISTORY_HOOKED__) return;
@@ -842,32 +724,24 @@ function hookHistoryApi() {
     history.pushState = function(...args) {
         originalPushState.apply(this, args);
         scheduleUiRecheck();
-        startTemporaryUiKeepalive();
     };
 
     history.replaceState = function(...args) {
         originalReplaceState.apply(this, args);
         scheduleUiRecheck();
-        startTemporaryUiKeepalive();
     };
 
     window.addEventListener('popstate', () => {
         scheduleUiRecheck();
-        startTemporaryUiKeepalive();
     });
 
     logger.trace('[ScoreSync] History API hooks installed');
 }
 
 /**
- * Cleanup function (Suggestion #3)
+ * Cleanup function
  */
 export function cleanup() {
-    if (uiKeepaliveInterval) {
-        clearInterval(uiKeepaliveInterval);
-        uiKeepaliveInterval = null;
-    }
-
     // Reset hooks
     window.__CG_SCORESYNC_FETCH_HOOKED__ = false;
     window.__CG_SCORESYNC_HISTORY_HOOKED__ = false;
@@ -950,14 +824,8 @@ export async function initSpeedGraderAutoGrade() {
     logger.trace('[ScoreSync] Installing history API hooks...');
     hookHistoryApi();
 
-    // Use feature flag for UI keepalive (Suggestion #18)
-    if (FEATURE_FLAGS.UI_KEEPALIVE_ENABLED) {
-        logger.trace('[ScoreSync] Starting temporary UI keepalive...');
-        startTemporaryUiKeepalive();
-    }
-
-    // Try immediate UI creation
-    logger.trace('[ScoreSync] Attempting immediate UI creation...');
+    // Create docked panel UI
+    logger.trace('[ScoreSync] Creating docked panel UI...');
     createUIControls(courseId, assignmentId);
 
     logger.info('[ScoreSync] ========== INITIALIZATION COMPLETE ==========');
