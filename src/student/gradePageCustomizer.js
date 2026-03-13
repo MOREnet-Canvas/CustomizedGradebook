@@ -10,9 +10,9 @@
  * This module only runs on student grades pages when ENABLE_STUDENT_GRADE_CUSTOMIZATION is true.
  */
 
-import { REMOVE_ASSIGNMENT_TAB } from '../config.js';
+import { REMOVE_ASSIGNMENT_TAB, AVG_OUTCOME_NAME } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { createConditionalObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
+import { createConditionalObserver, createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
@@ -261,6 +261,57 @@ function updateBottomGradeRow(gradeData) {
 }
 
 /**
+ * Update the Current Score outcome pill in the Learning Mastery tab to show
+ * "Insufficient Evidence" in red when IE status is detected.
+ *
+ * Canvas renders the outcomes tab lazily via React, so this must be called
+ * both immediately and via a persistent observer.
+ */
+function updateCurrentScorePill() {
+    const outcomeRows = document.querySelectorAll('[data-selenium="outcome"]');
+
+    for (const row of outcomeRows) {
+        const nameEl = row.querySelector('[class*="truncateText"]');
+        if (!nameEl?.textContent.trim().includes(AVG_OUTCOME_NAME)) continue;
+
+        const pill = row.querySelector('[class*="-pill"]');
+        const pillText = pill?.querySelector('[class*="pill__text"]');
+        if (!pillText) continue;
+
+        // Skip if already stamped to avoid redundant DOM writes
+        if (pill.dataset.cgIePill === 'true') continue;
+
+        pillText.textContent = 'Insufficient Evidence';
+        pill.style.backgroundColor = '#fce8e8';
+        pill.style.border = '1px solid #E62429';
+        pillText.style.color = '#E62429';
+        pillText.style.fontWeight = 'bold';
+        pill.dataset.cgIePill = 'true';
+
+        logger.debug('[IE Pill] Updated Current Score outcome pill to Insufficient Evidence');
+    }
+}
+
+/**
+ * Start a persistent observer to update the Current Score pill whenever
+ * the Learning Mastery tab content is rendered or re-rendered by Canvas.
+ */
+function startIEPillObserver() {
+    // Try immediately in case tab content is already in the DOM
+    updateCurrentScorePill();
+
+    createPersistentObserver(() => {
+        updateCurrentScorePill();
+    }, {
+        config: OBSERVER_CONFIGS.CHILD_LIST,
+        target: document.body,
+        name: 'IEPillObserver'
+    });
+
+    logger.debug('[IE Pill] Started persistent observer for Current Score pill');
+}
+
+/**
  * Apply all customizations to the grades page
  *
  * @param {Object} gradeData - Grade data object
@@ -282,6 +333,11 @@ function applyCustomizations(gradeData) {
 
     // 3) Update the final grade row in the grades table
     updateBottomGradeRow(gradeData);
+
+    // 4) If IE, watch the Learning Mastery tab and update the Current Score pill
+    if (gradeData.isInsufficient) {
+        startIEPillObserver();
+    }
 
     processed = true;
     return true;
