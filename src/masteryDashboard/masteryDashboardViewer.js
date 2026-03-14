@@ -199,14 +199,14 @@ export async function renderMasteryDashboard() {
         }
     }
 
-    // Fetch outcome results and submissions in parallel for the student
+    // Fetch outcome rollups and submissions in parallel for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
-    const [data, submissions] = await Promise.all([
+    const [rollupData, submissions] = await Promise.all([
         apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments`,
+            `/api/v1/courses/${courseId}/outcome_rollups?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments`,
             {},
-            'fetchOutcomeResults'
+            'fetchOutcomeRollups'
         ),
         apiClient.get(
             `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}&per_page=100`,
@@ -215,7 +215,7 @@ export async function renderMasteryDashboard() {
         )
     ]);
 
-    debugLog(`Outcome results and submissions fetched`);
+    debugLog(`Outcome rollups and submissions fetched`);
     debugStatus(statusEl, `Processing outcome data...`);
 
     // Build submission map: assignment_id → submission data
@@ -229,60 +229,46 @@ export async function renderMasteryDashboard() {
     });
     debugLog(`Submissions mapped: ${Object.keys(submissionMap).length}`);
 
-    if (!data.outcome_results || data.outcome_results.length === 0) {
+    // Extract rollup scores (one entry per outcome)
+    const rollupScores = rollupData.rollups?.[0]?.scores ?? [];
+
+    if (rollupScores.length === 0) {
         statusEl.textContent = "No mastery data available for this course.";
-        debugLog("No outcome results found");
+        debugLog("No rollup scores found");
         return;
     }
 
-    // Build outcome map
+    // Build outcome map from rollup linked data
     const outcomeMap = {};
-    if (data.linked?.outcomes) {
-        data.linked.outcomes.forEach(o => {
+    if (rollupData.linked?.outcomes) {
+        rollupData.linked.outcomes.forEach(o => {
             outcomeMap[o.id] = o;
         });
     }
     debugLog(`Outcomes mapped: ${Object.keys(outcomeMap).length}`);
 
-    // Build alignment map (assignment names)
+    // Build alignment map (assignment names/URLs) from rollup linked data
     const alignmentMap = {};
-    if (data.linked && data.linked["outcomes.alignments"]) {
-        data.linked["outcomes.alignments"].forEach(alignment => {
+    if (rollupData.linked?.["outcomes.alignments"]) {
+        rollupData.linked["outcomes.alignments"].forEach(alignment => {
             alignmentMap[alignment.id] = alignment;
         });
     }
     debugLog(`Alignments mapped: ${Object.keys(alignmentMap).length}`);
-
-    // Group outcome results by outcome ID
-    const grouped = {};
-    data.outcome_results.forEach(result => {
-        const outcomeId = result.links.learning_outcome;
-        if (!grouped[outcomeId]) {
-            grouped[outcomeId] = [];
-        }
-        grouped[outcomeId].push(result);
-    });
-    debugLog(`Outcomes with results: ${Object.keys(grouped).length}`);
+    debugLog(`Rollup scores: ${rollupScores.length}`);
 
     // Sort outcomes: AVG_OUTCOME first, then by most recent submission
-    const sortedOutcomeIds = Object.keys(grouped).sort((oidA, oidB) => {
-        const outcomeA = outcomeMap[oidA];
-        const outcomeB = outcomeMap[oidB];
+    const sortedScores = [...rollupScores].sort((a, b) => {
+        const outcomeA = outcomeMap[a.links.outcome];
+        const outcomeB = outcomeMap[b.links.outcome];
 
         // AVG_OUTCOME always first
         if (outcomeA?.title === AVG_OUTCOME_NAME) return -1;
         if (outcomeB?.title === AVG_OUTCOME_NAME) return 1;
 
-        // Sort by most recent submission
-        const latestA = grouped[oidA].reduce((a, b) =>
-            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
-        );
-        const latestB = grouped[oidB].reduce((a, b) =>
-            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
-        );
-
-        const dateA = new Date(latestA.submitted_or_assessed_at);
-        const dateB = new Date(latestB.submitted_or_assessed_at);
+        // Sort by most recent submission (submitted_at is already the latest for each outcome)
+        const dateA = new Date(a.submitted_at || 0);
+        const dateB = new Date(b.submitted_at || 0);
 
         return dateB - dateA; // Most recent first
     });
@@ -292,7 +278,8 @@ export async function renderMasteryDashboard() {
     let masteredCount = 0;
     let totalCount = 0;
 
-    for (const oid of sortedOutcomeIds) {
+    for (const rollupScore of sortedScores) {
+        const oid = String(rollupScore.links.outcome);
         const outcome = outcomeMap[oid];
         if (!outcome) continue;
 
@@ -308,13 +295,8 @@ export async function renderMasteryDashboard() {
         // Count this as a valid learning outcome
         totalCount++;
 
-        const outcomeResults = grouped[oid];
-        const latest = outcomeResults.reduce((a, b) =>
-            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
-        );
-
-        // Count as mastered if score >= 3 (matches Canvas gradebook)
-        if (latest.score != null && latest.score >= 3) {
+        // Rollup score IS the decaying average - use it directly
+        if (rollupScore.score != null && rollupScore.score >= 3) {
             masteredCount++;
         }
     }
@@ -327,28 +309,19 @@ export async function renderMasteryDashboard() {
     let avgOutcomeHtml = null;
     const regularCards = [];
 
-    for (const oid of sortedOutcomeIds) {
+    for (const rollupScore of sortedScores) {
+        const oid = String(rollupScore.links.outcome);
         const outcome = outcomeMap[oid];
         if (!outcome) continue;
 
-        const outcomeResults = grouped[oid];
-
-        // Get the latest result for the card display
-        const latest = outcomeResults.reduce((a, b) =>
-            (new Date(a.submitted_or_assessed_at) > new Date(b.submitted_or_assessed_at)) ? a : b
-        );
-
-        const score = latest.score != null ? latest.score.toFixed(2) : "—";
-
-        // Calculate percentage based on points_possible
-        const possible = outcome.points_possible || 4;
-        const percent = latest.score != null ? Math.round((latest.score / possible) * 100) : null;
+        // Use raw rollup score (server-calculated decaying average) - no rounding
+        const score = rollupScore.score != null ? rollupScore.score : "—";
 
         // Determine mastery color based on actual score value
         let masteryColor = "#E62429"; // Red - Insufficient Evidence (null/no score)
 
-        if (latest.score != null) {
-            const scoreValue = latest.score;
+        if (rollupScore.score != null) {
+            const scoreValue = rollupScore.score;
 
             // Map score directly to color ranges (inclusive of whole number)
             if (scoreValue >= 4) masteryColor = "#02672D";      // 4.0+ - Exceeds Mastery (dark green)
@@ -357,6 +330,9 @@ export async function renderMasteryDashboard() {
             else if (scoreValue >= 1) masteryColor = "#FD5D10"; // 1.0-1.99 - Below Mastery (orange)
             else masteryColor = "#E62429";                       // 0.0-0.99 - Well Below Mastery (red)
         }
+
+        // Use display_name if present, fall back to title
+        const outcomeName = outcome.display_name || outcome.title;
 
         // Check if this is the AVG_OUTCOME (Course Grade)
         if (outcome.title === AVG_OUTCOME_NAME) {
@@ -370,8 +346,8 @@ export async function renderMasteryDashboard() {
             }
 
             // Format the last updated date
-            const lastUpdated = latest.submitted_or_assessed_at
-                ? new Date(latest.submitted_or_assessed_at).toLocaleDateString('en-US', {
+            const lastUpdated = rollupScore.submitted_at
+                ? new Date(rollupScore.submitted_at).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric'
@@ -379,9 +355,9 @@ export async function renderMasteryDashboard() {
                 : null;
 
             // Build native-like course grade display (matches Canvas Parent app)
-            if (latest.score != null) {
+            if (rollupScore.score != null) {
                 // Has score - show score with letter grade and colored dot
-                const letterGrade = getLetterGrade(latest.score);
+                const letterGrade = getLetterGrade(rollupScore.score);
                 avgOutcomeHtml = `
                     <a href="${avgAssignmentUrl}" target="_blank"
                        style="display:flex; flex-direction:column; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
@@ -414,56 +390,18 @@ export async function renderMasteryDashboard() {
             continue;
         }
 
-        // Pre-build assignment list from outcome results and alignments
-        const assignmentListData = [];
-
-        // Get aligned assignments from outcome.alignments
-        if (outcome.alignments && outcome.alignments.length > 0) {
-            const assignmentAlignments = outcome.alignments.filter(id => id.startsWith("assignment_"));
-
-            assignmentAlignments.forEach(alignmentId => {
-                const alignment = alignmentMap[alignmentId];
-                if (!alignment) return;
-
-                // Extract assignment ID from alignment ID (format: "assignment_123")
-                const assignmentId = alignmentId.split("_")[1];
-
-                // Find the result for this alignment
-                const result = outcomeResults.find(r => {
-                    const resultAlignmentId = r.links?.alignment;
-                    return resultAlignmentId && String(resultAlignmentId) === alignmentId;
-                });
-
-                // Get submission status for this assignment
-                const submission = submissionMap[assignmentId];
-
-                assignmentListData.push({
-                    name: alignment.name || "Unnamed Assignment",
-                    score: result?.score,
-                    submitted_at: result?.submitted_or_assessed_at,
-                    html_url: alignment.html_url,
-                    assignment_id: assignmentId,
-                    late_policy_status: submission?.late_policy_status,
-                    excused: submission?.excused
-                });
-            });
-        }
-
-        // Store assignment data in dataset for lazy rendering
-        const assignmentDataJson = JSON.stringify(assignmentListData);
-
         // Get letter grade for display
-        const letterGrade = latest.score != null ? getLetterGrade(latest.score) : "";
+        const letterGrade = rollupScore.score != null ? getLetterGrade(rollupScore.score) : "";
 
-        // Format date for display
-        const latestDate = latest.submitted_or_assessed_at ? new Date(latest.submitted_or_assessed_at).toLocaleDateString('en-US', {
+        // Format date for display (rollup submitted_at = date of most recent assessment)
+        const latestDate = rollupScore.submitted_at ? new Date(rollupScore.submitted_at).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
         }) : "";
 
         regularCards.push(`
-            <div data-outcome-id="${oid}" data-assignment-data="${escapeHtml(assignmentDataJson)}"
+            <div data-outcome-id="${oid}"
                  tabindex="0"
                  role="button"
                  aria-expanded="false"
@@ -473,9 +411,7 @@ export async function renderMasteryDashboard() {
                 <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
                     <span class="expand-arrow" style="font-size:0.8rem; transition:transform 0.2s; margin-top:2px;">▶</span>
                     <div style="flex:1;">
-                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.title)}</div>
-                        <!-- Outcome description commented out - renders HTML as text -->
-                        <!-- <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcome.description || "")}</div> -->
+                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcomeName)}</div>
                     </div>
                     <div style="text-align:right;">
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
@@ -501,10 +437,10 @@ export async function renderMasteryDashboard() {
         ` : ""}
     `;
 
-    // Add click and keyboard handlers to toggle expansion and render pre-loaded assignment data
+    // Add click and keyboard handlers to toggle expansion and lazy-load outcome_results
     cardsEl.querySelectorAll('[data-outcome-id]').forEach(card => {
         const toggleCard = async (e) => {
-            // Don't toggle if clicking on a link (future-proofing)
+            // Don't toggle if clicking on a link
             if (e.target.tagName === 'A') return;
 
             const details = card.querySelector('.assignment-details');
@@ -512,61 +448,76 @@ export async function renderMasteryDashboard() {
             const outcomeId = card.dataset.outcomeId;
 
             if (details.style.display === 'none') {
-                // Expanding - render assignment list from pre-loaded data
+                // Expanding - fetch outcome_results for this outcome if not yet loaded
                 if (!card.dataset.loaded) {
                     try {
-                        const assignmentDataJson = card.dataset.assignmentData;
-                        const assignmentList = assignmentDataJson ? JSON.parse(assignmentDataJson) : [];
+                        debugLog(`Fetching outcome_results for outcome ${outcomeId}`);
 
-                        // Filter out unscored assignments
-                        const scoredAssignments = assignmentList.filter(a => a.score != null);
+                        const resultsData = await apiClient.get(
+                            `/api/v1/courses/${courseId}/outcome_results?user_ids[]=${studentId}&outcome_ids[]=${outcomeId}&include[]=outcomes.alignments&per_page=100`,
+                            {},
+                            'fetchOutcomeResultsLazy'
+                        );
 
-                        debugLog(`Rendering ${scoredAssignments.length} scored assignments for outcome ${outcomeId}`);
-
-                        if (scoredAssignments.length > 0) {
-                            // Sort by most recent first
-                            const sortedAssignments = scoredAssignments.sort((a, b) => {
-                                const dateA = new Date(a.submitted_at || 0);
-                                const dateB = new Date(b.submitted_at || 0);
-                                return dateB - dateA;
+                        // Build alignment lookup from this response (may include alignments not in rollup)
+                        const lazyAlignmentMap = { ...alignmentMap };
+                        if (resultsData.linked?.["outcomes.alignments"]) {
+                            resultsData.linked["outcomes.alignments"].forEach(a => {
+                                lazyAlignmentMap[a.id] = a;
                             });
+                        }
 
-                            const assignmentListHtml = sortedAssignments.map(assignment => {
-                                const assignmentScore = assignment.score.toFixed(2);
-                                const letterGrade = getLetterGrade(assignment.score);
+                        // Build assignment rows from individual results
+                        const scoredResults = (resultsData.outcome_results ?? []).filter(r => r.score != null);
+                        debugLog(`Received ${scoredResults.length} scored results for outcome ${outcomeId}`);
 
-                                // Calculate mastery color for assignment
-                                let assignmentMasteryColor = "#E62429"; // Red - default
-                                if (assignment.score >= 4) assignmentMasteryColor = "#02672D";      // Dark green
-                                else if (assignment.score >= 3) assignmentMasteryColor = "#03893D"; // Medium green
-                                else if (assignment.score >= 2) assignmentMasteryColor = "#FAB901"; // Yellow
-                                else if (assignment.score >= 1) assignmentMasteryColor = "#FD5D10"; // Orange
+                        if (scoredResults.length > 0) {
+                            // Sort by most recent first
+                            const sortedResults = scoredResults.sort((a, b) =>
+                                new Date(b.submitted_or_assessed_at || 0) - new Date(a.submitted_or_assessed_at || 0)
+                            );
+
+                            const assignmentListHtml = sortedResults.map(result => {
+                                const alignmentId = result.links?.alignment;
+                                const alignment = lazyAlignmentMap[alignmentId];
+                                const assignmentId = alignmentId?.split("_")[1];
+                                const submission = submissionMap[assignmentId];
+
+                                const assignmentScore = result.score;
+                                const letterGrade = getLetterGrade(result.score);
+
+                                // Calculate mastery color for this result
+                                let assignmentMasteryColor = "#E62429";
+                                if (result.score >= 4) assignmentMasteryColor = "#02672D";
+                                else if (result.score >= 3) assignmentMasteryColor = "#03893D";
+                                else if (result.score >= 2) assignmentMasteryColor = "#FAB901";
+                                else if (result.score >= 1) assignmentMasteryColor = "#FD5D10";
 
                                 // Format date
-                                const date = assignment.submitted_at ? new Date(assignment.submitted_at).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                }) : "";
+                                const date = result.submitted_or_assessed_at
+                                    ? new Date(result.submitted_or_assessed_at).toLocaleDateString('en-US', {
+                                        month: 'short', day: 'numeric', year: 'numeric'
+                                    })
+                                    : "";
 
-                                // Build status indicator (SVG icon + text)
+                                // Build status indicator from submission map (late/excused/missing)
                                 let statusIndicator = "";
-                                if (assignment.excused) {
-                                    // Excused: Red circle with white check
+                                if (submission?.excused) {
                                     statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="#EE0612" stroke="none"/><path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:600; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Excused</span></span>`;
-                                } else if (assignment.late_policy_status === 'late') {
-                                    // Late: Orange clock (thinner stroke)
+                                } else if (submission?.late_policy_status === 'late') {
                                     statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="8" y2="4.5" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="11" y2="8" stroke="#FC5E13" stroke-width="1.5"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:600; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Late</span></span>`;
-                                } else if (assignment.late_policy_status === 'missing') {
-                                    // Missing: Red circle with slash (bolder stroke)
+                                } else if (submission?.late_policy_status === 'missing') {
                                     statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#EE0612" stroke-width="2"/><line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="#EE0612" stroke-width="2"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:700; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Missing</span></span>`;
                                 }
+
+                                const assignmentName = alignment?.name ?? "Unnamed Assignment";
+                                const assignmentUrl = alignment?.html_url ?? "#";
 
                                 return `
                                     <div style="padding:8px 0; border-bottom:1px solid #c8c8c8;">
                                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:400; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                                            <a href="${assignment.html_url}" target="_blank" style="color:#0374B5; text-decoration:none;">
-                                                ${escapeHtml(assignment.name)}
+                                            <a href="${assignmentUrl}" target="_blank" style="color:#0374B5; text-decoration:none;">
+                                                ${escapeHtml(assignmentName)}
                                             </a>${statusIndicator}
                                         </div>
                                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.875rem; color:#333; margin-top:2px; line-height:1.5; -webkit-font-smoothing:antialiased;">
@@ -587,7 +538,7 @@ export async function renderMasteryDashboard() {
 
                         card.dataset.loaded = 'true';
                     } catch (err) {
-                        console.error('[MasteryDashboard] Failed to render assignments:', err);
+                        console.error('[MasteryDashboard] Failed to load assignments:', err);
                         details.innerHTML = '<div style="font-family:LatoWeb,\'Lato Extended\',Lato,\'Helvetica Neue\',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#c62828; line-height:1.5; -webkit-font-smoothing:antialiased;">Failed to load assignments.</div>';
                     }
                 }
