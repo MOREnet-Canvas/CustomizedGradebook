@@ -1,0 +1,3297 @@
+{
+  "rollups": [
+    {
+      "scores": [
+        {
+          "score": 5,
+          "title": "Gatsby Assessment (3.0)",
+          "submitted_at": "2025-12-03T16:18:34Z",
+          "count": 1,
+          "hide_points": false,
+          "links": {
+            "outcome": "14376"
+          }
+        },
+        {
+          "score": 3.75,
+          "title": "Outline for Essay - American ",
+          "submitted_at": "2025-10-10T17:31:24Z",
+          "count": 2,
+          "hide_points": false,
+          "links": {
+            "outcome": "14452"
+          }
+        },
+        {
+          "score": 4.13,
+          "title": "Gatsby Assessment (3.0)",
+          "submitted_at": "2025-12-03T16:18:34Z",
+          "count": 4,
+          "hide_points": false,
+          "links": {
+            "outcome": "14470"
+          }
+        },
+        {
+          "score": 3.31,
+          "title": "Ideas.3 Relate themes Assessment- Transcendentalism level 3.0",
+          "submitted_at": "2025-09-12T15:52:03Z",
+          "count": 4,
+          "hide_points": false,
+          "links": {
+            "outcome": "14471"
+          }
+        },
+        {
+          "score": 1.25,
+          "title": "American Dream across the texts ",
+          "submitted_at": "2026-02-17T16:33:10Z",
+          "count": 1,
+          "hide_points": false,
+          "links": {
+            "outcome": "14472"
+          }
+        },
+        {
+          "score": 3.31,
+          "title": "House Assessment 3.0",
+          "submitted_at": "2026-02-09T16:50:57Z",
+          "count": 4,
+          "hide_points": false,
+          "links": {
+            "outcome": "14473"
+          }
+        },
+        {
+          "score": 3.07,
+          "title": "Teacher Talk 1 POV.2 (level 2.0) I can make inferences about what is implied in the text based on contextual clues",
+          "submitted_at": "2026-03-13T16:31:49Z",
+          "count": 7,
+          "hide_points": false,
+          "links": {
+            "outcome": "14474"
+          }
+        },
+        {
+          "score": 0.88,
+          "title": "Assessment - ORG.4 /  ORG.5 - (3.0) Kernel Essay ",
+          "submitted_at": "2026-01-05T20:22:52Z",
+          "count": 4,
+          "hide_points": false,
+          "links": {
+            "outcome": "14477"
+          }
+        },
+        {
+          "score": 0.88,
+          "title": "Assessment - ORG.4 /  ORG.5 - (3.0) Kernel Essay ",
+          "submitted_at": "2026-01-05T20:22:52Z",
+          "count": 2,
+          "hide_points": false,
+          "links": {
+            "outcome": "14478"
+          }
+        },
+        {
+          "score": 3.75,
+          "title": "Outline for Essay - American ",
+          "submitted_at": "2025-10-10T17:31:24Z",
+          "count": 1,
+          "hide_points": false,
+          "links": {
+            "outcome": "14494"
+          }
+        },
+        {
+          "score": 3.04,
+          "title": "Current Score Assignment",
+          "submitted_at": "2026-03-13T13:43:14Z",
+          "count": 1,
+          "hide_points": false,
+          "links": {
+            "outcome": "14854"
+          }
+        }
+      ],
+      "links": {
+        "user": "4534",
+        "section": "38699",
+        "status": "active"
+      }
+    }
+  ],
+  "meta": {
+    "pagination": {
+      "per_page": 100,
+      "last": "https://sedalia200.test.instructure.com/api/v1/courses/38303/outcome_rollups?include%5B%5D=outcomes&include%5B%5D=outcomes.alignments&include%5B%5D=users&user_ids%5B%5D=4534&page=1&per_page=100",
+      "current": "https://sedalia200.test.instructure.com/api/v1/courses/38303/outcome_rollups?include%5B%5D=outcomes&include%5B%5D=outcomes.alignments&include%5B%5D=users&user_ids%5B%5D=4534&page=1&per_page=100",
+      "first": "https://sedalia200.test.instructure.com/api/v1/courses/38303/outcome_rollups?include%5B%5D=outcomes&include%5B%5D=outcomes.alignments&include%5B%5D=users&user_ids%5B%5D=4534&page=1&per_page=100",
+      "page": 1,
+      "template": "https://sedalia200.test.instructure.com/api/v1/courses/38303/outcome_rollups?include%5B%5D=outcomes&include%5B%5D=outcomes.alignments&include%5B%5D=users&user_ids%5B%5D=4534&page={page}&per_page=100",
+      "count": 1,
+      "page_count": 1
+    }
+  },
+  "linked": {
+    "outcomes": [
+      {
+        "id": 14314,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Complexity of an Issue",
+        "title": "Complexity of an Issue (11-12.RI3.B)",
+        "url": "/api/v1/outcomes/14314",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p>The student will:</p>\n<ul>\n<li><strong>Synthesize</strong><span> information from two or more texts about similar ideas/topics to </span><strong>articulate the complexity</strong><span> of the issue, using specific examples to support their analysis</span></li>\n</ul>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "assignment_538458",
+          "assignment_534834",
+          "rubric_36801",
+          "assignment_536584",
+          "rubric_36802",
+          "assignment_537492",
+          "rubric_36572",
+          "assignment_534801",
+          "assignment_534803",
+          "assignment_534821",
+          "assignment_534824",
+          "assignment_534827",
+          "assignment_534832",
+          "assignment_534833",
+          "rubric_36573",
+          "assignment_534935",
+          "assignment_534936",
+          "assignment_534937",
+          "assignment_534938",
+          "assignment_534939",
+          "assignment_534943",
+          "assignment_534940",
+          "assignment_534941",
+          "assignment_534942",
+          "assignment_534944",
+          "assignment_534945",
+          "assignment_534946",
+          "assignment_538235",
+          "assignment_539057",
+          "rubric_39953",
+          "rubric_40787",
+          "assignment_571813",
+          "assignment_566279",
+          "rubric_39502",
+          "assignment_563430",
+          "rubric_40876",
+          "assignment_572251",
+          "rubric_40100",
+          "assignment_567190",
+          "rubric_39737",
+          "assignment_564850",
+          "rubric_40554",
+          "assignment_570347",
+          "rubric_40645",
+          "assignment_570699",
+          "rubric_40646",
+          "assignment_570701",
+          "rubric_40617",
+          "assignment_570569"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14376,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Follow A Writing Process: Voice",
+        "title": "Follow a Writing Process: Voice (11-12.W.2.A)",
+        "url": "/api/v1/outcomes/14376",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><span>Follow a writing process to produce clear and coherent writing to ensure the </span><strong>voice </strong><span>of the writing is appropriate to the task, purpose, and audience.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_39312",
+          "assignment_562251",
+          "rubric_40704",
+          "assignment_568051",
+          "rubric_38889",
+          "rubric_39424",
+          "rubric_39022",
+          "rubric_42363",
+          "assignment_582434",
+          "assignment_559292",
+          "rubric_39338",
+          "assignment_562442",
+          "rubric_39167",
+          "assignment_561657",
+          "rubric_40471",
+          "assignment_569190",
+          "rubric_40247",
+          "assignment_568063",
+          "assignment_559311",
+          "rubric_42399",
+          "assignment_580502",
+          "rubric_42402",
+          "assignment_583000",
+          "rubric_40581",
+          "assignment_570280",
+          "rubric_41499",
+          "assignment_577454",
+          "rubric_41500",
+          "assignment_577451",
+          "rubric_40625",
+          "assignment_570568",
+          "assignment_557189"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14471,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Relate Themes/Central Ideas to Human Nature",
+        "title": "Relate Themes/Central Ideas to Human Nature (11-12.RL.1.D/11-12.RI.1.D)",
+        "url": "/api/v1/outcomes/14471",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p>Relate themes/central ideas within a text to human nature and the world, providing specific examples to support their analysis.</p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "assignment_562459",
+          "rubric_39389",
+          "assignment_562458",
+          "rubric_39390",
+          "assignment_562430",
+          "rubric_39401",
+          "rubric_39464",
+          "assignment_563231",
+          "rubric_39422",
+          "assignment_562984",
+          "rubric_39434",
+          "rubric_39438",
+          "assignment_563064",
+          "rubric_39440",
+          "assignment_563066",
+          "rubric_39492",
+          "rubric_39120",
+          "rubric_39496",
+          "assignment_563377",
+          "rubric_39343",
+          "rubric_39500",
+          "assignment_563428",
+          "rubric_39502",
+          "assignment_563430",
+          "rubric_39523",
+          "assignment_563548",
+          "rubric_39326",
+          "rubric_39337",
+          "rubric_39236",
+          "rubric_40073",
+          "assignment_566991",
+          "assignment_561876",
+          "rubric_40411",
+          "assignment_569276",
+          "rubric_39597",
+          "assignment_564016",
+          "rubric_40464",
+          "assignment_569385",
+          "rubric_39253",
+          "rubric_40955",
+          "assignment_572664",
+          "rubric_39657",
+          "assignment_564473",
+          "rubric_39648",
+          "assignment_564412",
+          "rubric_39243",
+          "assignment_561880",
+          "rubric_39737",
+          "assignment_564850",
+          "rubric_40554",
+          "assignment_570347",
+          "rubric_39814",
+          "assignment_565417",
+          "assignment_561486",
+          "assignment_561894",
+          "assignment_562342",
+          "assignment_562441"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14472,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Complexity of a Theme",
+        "title": "Complexity of a Theme (11-12.RL.3.B)",
+        "url": "/api/v1/outcomes/14472",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><strong>Synthesize</strong><span> ideas from two or more texts about similar themes or topics to </span><strong>articulate the complexity</strong><span> of the theme, using specific examples to support their analysis.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_42971",
+          "assignment_587084",
+          "rubric_42852",
+          "rubric_42853",
+          "rubric_42854",
+          "assignment_586288",
+          "assignment_586289",
+          "assignment_586287",
+          "rubric_40073",
+          "assignment_566991",
+          "assignment_586010",
+          "rubric_42769",
+          "assignment_585174",
+          "rubric_39597",
+          "assignment_564016",
+          "assignment_563430",
+          "rubric_40464",
+          "assignment_569385",
+          "rubric_39243",
+          "rubric_39502",
+          "rubric_40955",
+          "assignment_572664",
+          "rubric_42595",
+          "assignment_583876",
+          "rubric_42596",
+          "assignment_583879",
+          "rubric_42597",
+          "rubric_42798",
+          "assignment_586011",
+          "rubric_42799",
+          "rubric_42800",
+          "assignment_586012",
+          "assignment_561880",
+          "assignment_583881"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14473,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Author's Point of View",
+        "title": "Author's Point of View (11-12.RL.1.D/11-12.RI.1.D)",
+        "url": "/api/v1/outcomes/14473",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><strong>Analyze</strong><span> a text in which the author's </span><strong>point of view is not obvious</strong><span>, identifying clues or strategies the author uses to convey perspective indirectly.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_42702",
+          "assignment_581926",
+          "rubric_40735",
+          "assignment_570195",
+          "assignment_584736",
+          "assignment_584733",
+          "rubric_42705",
+          "assignment_578672",
+          "rubric_42707",
+          "rubric_42709",
+          "rubric_42710",
+          "assignment_581946",
+          "rubric_42745",
+          "assignment_580511",
+          "rubric_42772",
+          "assignment_584766",
+          "rubric_41502",
+          "rubric_41503",
+          "assignment_577472",
+          "assignment_577470",
+          "rubric_40515",
+          "assignment_569942",
+          "rubric_40521",
+          "rubric_42459",
+          "assignment_578670",
+          "rubric_42398",
+          "assignment_580090",
+          "rubric_42460",
+          "assignment_580509",
+          "rubric_42404",
+          "assignment_577662",
+          "rubric_42405",
+          "assignment_582725",
+          "rubric_42468",
+          "assignment_581845",
+          "rubric_42805",
+          "assignment_585551",
+          "rubric_42806",
+          "assignment_585534",
+          "rubric_42635",
+          "assignment_580510",
+          "rubric_42621",
+          "assignment_578671"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14474,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Point of View: Directly Stated vs. Implied",
+        "title": "Point of View: Directly Stated vs. Implied (11-12.RL.2.B/11-12.RI.2.B)",
+        "url": "/api/v1/outcomes/14474",
+        "can_edit": false,
+        "has_updateable_rubrics": false,
+        "description": "<p><strong>Distinguish</strong><span> what is </span><strong>directly stated</strong><span> and what is </span><strong>implied</strong><span> in the text, using specific examples to support their analysis.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_40704",
+          "assignment_568051",
+          "rubric_42864",
+          "assignment_586413",
+          "rubric_40441",
+          "assignment_564291",
+          "rubric_40442",
+          "assignment_568047",
+          "rubric_40445",
+          "assignment_569355",
+          "rubric_40471",
+          "assignment_569190",
+          "rubric_40224",
+          "assignment_567950",
+          "rubric_40524",
+          "assignment_569994",
+          "rubric_40270",
+          "assignment_564290",
+          "rubric_40532",
+          "assignment_564316",
+          "rubric_39280",
+          "rubric_40581",
+          "assignment_570280",
+          "rubric_40625",
+          "assignment_570568",
+          "assignment_562177"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14475,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Research to Solve a Problem ",
+        "title": "Research to Solve a Problem (11-12.W.1.A)",
+        "url": "/api/v1/outcomes/14475",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><strong>Conduct research to solve a problem</strong><span>; </span><strong>narrow or broaden</strong><span> the scope of research when appropriate to ensure the problem is thoroughly investigated; gather multiple relevant, credible sources, print and digital; integrate information using a standard citation system. </span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_37232",
+          "assignment_544193",
+          "rubric_37167",
+          "assignment_543332",
+          "rubric_39538",
+          "assignment_563639",
+          "assignment_563640",
+          "assignment_563641",
+          "rubric_39555",
+          "rubric_39565",
+          "assignment_563796",
+          "assignment_563808",
+          "rubric_39568",
+          "assignment_563783",
+          "rubric_39579",
+          "rubric_39582",
+          "assignment_563835",
+          "assignment_563859",
+          "rubric_39591",
+          "assignment_563875",
+          "rubric_39594",
+          "assignment_563864",
+          "assignment_563887",
+          "assignment_563898",
+          "assignment_563823",
+          "assignment_563848",
+          "assignment_563776",
+          "assignment_563819"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14476,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Claims & Counterclaim",
+        "title": "Claims & Counterclaims (11-12.W.2.A)",
+        "url": "/api/v1/outcomes/14476",
+        "can_edit": false,
+        "has_updateable_rubrics": false,
+        "description": "<p><strong>Develop argumentative writing by acknowledging counterclaims</strong><span>; </span><strong>establishing relationships among claims, counterclaims, and supporting evidence</strong><span>.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": false,
+        "alignments": null,
+        "group_id": "86351"
+      },
+      {
+        "id": 14477,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Writing; Organization & Content",
+        "title": "Writing; Organization & Content (11-12.W.3.A.a)",
+        "url": "/api/v1/outcomes/14477",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><span>Achieve the writer's purpose through choices in </span><strong>organization </strong><span>and </span><strong>content</strong><span>.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_40747",
+          "rubric_40733",
+          "assignment_571426",
+          "rubric_40786",
+          "assignment_571632",
+          "assignment_570872",
+          "rubric_40794",
+          "assignment_571834",
+          "rubric_40801",
+          "assignment_571811",
+          "rubric_40814",
+          "assignment_571799",
+          "rubric_40831",
+          "assignment_569424",
+          "rubric_40879",
+          "assignment_568399",
+          "rubric_40457",
+          "assignment_568042",
+          "rubric_40459",
+          "rubric_40978",
+          "assignment_569099",
+          "rubric_41500",
+          "rubric_41499",
+          "assignment_577454",
+          "rubric_42400",
+          "assignment_580522",
+          "rubric_42401",
+          "assignment_580877",
+          "rubric_42402",
+          "assignment_583000",
+          "rubric_40302",
+          "assignment_568510",
+          "rubric_40303",
+          "assignment_577451",
+          "assignment_568511",
+          "rubric_40680",
+          "rubric_40681",
+          "assignment_570875",
+          "assignment_570876",
+          "rubric_42363",
+          "assignment_582434"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14479,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Revise & Edit: Transitions",
+        "title": "Revise & Edit: Transitions (11-12.W.3.A.d)",
+        "url": "/api/v1/outcomes/14479",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><span>Review, revise, and edit writing with consideration for the task, purpose, and audience to use a variety of appropriate transitions to clarify relationships, connect ideas or claims, and signal time shifts.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_40270",
+          "assignment_564290",
+          "rubric_41501",
+          "assignment_577471",
+          "rubric_40303",
+          "assignment_568511",
+          "rubric_40640",
+          "assignment_569963"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14452,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Draw Conclusions and Infer",
+        "title": "Draw Conclusions and Infer (11-12.RI.1A / 11-12.RL.1A)",
+        "url": "/api/v1/outcomes/14452",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><strong>Draw conclusions and infer</strong><span> by </span><strong>citing</strong><span> relevant and thorough textual evidence to support analysis of what the text says explicitly.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_39905",
+          "assignment_565799",
+          "rubric_39903",
+          "assignment_564846",
+          "rubric_37323",
+          "assignment_547794",
+          "assignment_583904",
+          "rubric_37100",
+          "assignment_543082",
+          "rubric_36946",
+          "assignment_540393",
+          "rubric_37080",
+          "assignment_542840",
+          "rubric_36962",
+          "assignment_541030",
+          "rubric_36999",
+          "assignment_541634",
+          "rubric_36928",
+          "assignment_539876",
+          "rubric_42720",
+          "assignment_584264",
+          "rubric_39537",
+          "assignment_563636",
+          "assignment_563637",
+          "assignment_563638",
+          "assignment_557505",
+          "assignment_557506",
+          "rubric_39986",
+          "assignment_566287",
+          "rubric_40035",
+          "assignment_566730",
+          "rubric_39555",
+          "rubric_39563",
+          "rubric_39568",
+          "assignment_563799",
+          "assignment_563811",
+          "assignment_563787",
+          "rubric_39582",
+          "rubric_39577",
+          "rubric_40082",
+          "assignment_563838",
+          "assignment_566467",
+          "assignment_563859",
+          "rubric_39590",
+          "assignment_563867",
+          "rubric_39594",
+          "assignment_563890",
+          "assignment_563878",
+          "assignment_583905",
+          "rubric_37918",
+          "assignment_547791",
+          "assignment_563898",
+          "rubric_38175",
+          "rubric_39254",
+          "assignment_554202",
+          "rubric_38169",
+          "assignment_554197",
+          "rubric_39255",
+          "assignment_563826",
+          "assignment_563851",
+          "assignment_563776",
+          "assignment_563819",
+          "rubric_38704",
+          "rubric_38705",
+          "assignment_557504",
+          "assignment_557507",
+          "rubric_40240",
+          "assignment_567996",
+          "rubric_39736",
+          "assignment_564847",
+          "rubric_39810",
+          "assignment_554200",
+          "rubric_39735",
+          "assignment_564845",
+          "rubric_42601",
+          "rubric_42603",
+          "rubric_42604",
+          "assignment_583908",
+          "rubric_42471",
+          "assignment_583353"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14494,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Analyze Text",
+        "title": "Analyze Text (RL.1.A/RI.1.A)",
+        "url": "/api/v1/outcomes/14494",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p><span>Analyze text by citing relevant and thorough textual evidence to support inferences drawn from the text, including where the text leaves matters uncertain.</span></p>\n",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_37324",
+          "assignment_547796",
+          "rubric_40749",
+          "assignment_571561",
+          "rubric_38706",
+          "rubric_39953",
+          "assignment_566279",
+          "rubric_39986",
+          "assignment_566287",
+          "rubric_40035",
+          "assignment_566730",
+          "rubric_40082",
+          "assignment_566467",
+          "rubric_40876",
+          "assignment_572251",
+          "rubric_39609",
+          "assignment_564112",
+          "rubric_38176",
+          "assignment_554204",
+          "rubric_39627",
+          "assignment_564265",
+          "rubric_41507",
+          "assignment_577486",
+          "assignment_577484",
+          "assignment_577485",
+          "rubric_41506",
+          "rubric_41505",
+          "assignment_557509",
+          "rubric_39735",
+          "assignment_564845",
+          "rubric_39843",
+          "assignment_565623",
+          "rubric_39855",
+          "assignment_554203",
+          "rubric_40645",
+          "assignment_570699",
+          "rubric_40646",
+          "assignment_570701",
+          "rubric_40661",
+          "assignment_570779",
+          "rubric_40662",
+          "assignment_570781",
+          "rubric_39259",
+          "assignment_557508"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14854,
+        "context_type": "Course",
+        "context_id": 38303,
+        "vendor_guid": "MOREnet_nny9aj9n",
+        "display_name": null,
+        "title": "Current Score",
+        "url": "/api/v1/outcomes/14854",
+        "can_edit": false,
+        "has_updateable_rubrics": false,
+        "description": "Auto-generated outcome: Current Score",
+        "friendly_description": null,
+        "points_possible": 4,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Mastery",
+            "points": 4
+          },
+          {
+            "description": "Meets Mastery",
+            "points": 3
+          },
+          {
+            "description": "Approaching Mastery",
+            "points": 2
+          },
+          {
+            "description": "Below Mastery",
+            "points": 1
+          },
+          {
+            "description": "No Evidence",
+            "points": 0
+          }
+        ],
+        "calculation_method": "latest",
+        "assessed": true,
+        "alignments": [
+          "rubric_39348",
+          "assignment_562482"
+        ],
+        "group_id": "86338"
+      },
+      {
+        "id": 14470,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Analyze How Themes Develop",
+        "title": "Analyze How Themes Develop (11-12.RL1.D/11-12.RI.1.D)",
+        "url": "/api/v1/outcomes/14470",
+        "can_edit": false,
+        "has_updateable_rubrics": true,
+        "description": "<p>Analyze how themes/central ideas develop throughout the text, providing specific examples to support their analysis.</p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_40704",
+          "assignment_568051",
+          "rubric_40735",
+          "assignment_570195",
+          "rubric_39408",
+          "assignment_562942",
+          "rubric_42975",
+          "assignment_587116",
+          "rubric_39333",
+          "rubric_39168",
+          "assignment_561665",
+          "rubric_40412",
+          "assignment_569279",
+          "rubric_40441",
+          "assignment_564291",
+          "rubric_40445",
+          "assignment_569355",
+          "rubric_40471",
+          "assignment_569190",
+          "rubric_39275",
+          "assignment_562161",
+          "rubric_40153",
+          "assignment_567413",
+          "rubric_39276",
+          "assignment_562165",
+          "rubric_41502",
+          "rubric_41504",
+          "assignment_577473",
+          "assignment_577470",
+          "rubric_39712",
+          "assignment_564725",
+          "rubric_39713",
+          "rubric_39714",
+          "assignment_564729",
+          "rubric_40517",
+          "assignment_569957",
+          "rubric_40522",
+          "rubric_40524",
+          "assignment_569994",
+          "rubric_40532",
+          "assignment_564316",
+          "rubric_42600",
+          "assignment_583889",
+          "rubric_40581",
+          "assignment_570280",
+          "rubric_40625",
+          "assignment_570568",
+          "assignment_562436"
+        ],
+        "group_id": "86351"
+      },
+      {
+        "id": 14478,
+        "context_type": "Account",
+        "context_id": 1,
+        "vendor_guid": null,
+        "display_name": "Writing: Enhance Reader's Understanding",
+        "title": "Writing: Enhance Reader's Understanding (11-12.W.3.A.a)",
+        "url": "/api/v1/outcomes/14478",
+        "can_edit": false,
+        "has_updateable_rubrics": false,
+        "description": "<p><span>Enhance the reader's understanding and experience with the text through choices in organization and content.</span></p>",
+        "friendly_description": null,
+        "points_possible": 5,
+        "mastery_points": 3,
+        "ratings": [
+          {
+            "description": "Exceeds Expectations",
+            "points": 5
+          },
+          {
+            "description": "Meets Expectations",
+            "points": 3
+          },
+          {
+            "description": "Does Not Meet Expectations",
+            "points": 0
+          }
+        ],
+        "calculation_method": "standard_decaying_average",
+        "calculation_int": 65,
+        "assessed": true,
+        "alignments": [
+          "rubric_40747",
+          "rubric_40303",
+          "assignment_568511",
+          "rubric_40716",
+          "assignment_571288",
+          "rubric_40460",
+          "assignment_569427",
+          "assignment_569426",
+          "rubric_40733",
+          "assignment_571426",
+          "rubric_40786",
+          "assignment_571632",
+          "assignment_570872",
+          "rubric_40794",
+          "assignment_571834",
+          "rubric_40831",
+          "assignment_569424",
+          "rubric_40458",
+          "assignment_568052",
+          "rubric_40461",
+          "rubric_40978",
+          "assignment_569099",
+          "rubric_40682",
+          "assignment_570874"
+        ],
+        "group_id": "86351"
+      }
+    ],
+    "outcomes.alignments": [
+      {
+        "id": "assignment_538458",
+        "name": "Entry #9 - Where Should a Poor Family Live? - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/538458"
+      },
+      {
+        "id": "assignment_534834",
+        "name": "Assessment/Entry #12 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534834"
+      },
+      {
+        "id": "rubric_36801",
+        "name": "Entry #2",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/rubrics/36801"
+      },
+      {
+        "id": "assignment_536584",
+        "name": "Suburbs Text - Home Ownership Entry #2 Questions - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/536584"
+      },
+      {
+        "id": "rubric_36802",
+        "name": "Entry #3",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/rubrics/36802"
+      },
+      {
+        "id": "assignment_537492",
+        "name": "How Mortgages Work - Entry #3 Questions - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/537492"
+      },
+      {
+        "id": "rubric_36572",
+        "name": "Complexity of an Issue",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/36572"
+      },
+      {
+        "id": "assignment_534801",
+        "name": "Introduction/Entry #1 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534801"
+      },
+      {
+        "id": "assignment_534803",
+        "name": "Entry #2 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534803"
+      },
+      {
+        "id": "assignment_534821",
+        "name": "Entry #5 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534821"
+      },
+      {
+        "id": "assignment_534824",
+        "name": "Entry #8 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534824"
+      },
+      {
+        "id": "assignment_534827",
+        "name": "Entry #9 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534827"
+      },
+      {
+        "id": "assignment_534832",
+        "name": "Entry #10 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534832"
+      },
+      {
+        "id": "assignment_534833",
+        "name": "Entry #11 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/534833"
+      },
+      {
+        "id": "rubric_36573",
+        "name": "Complexity of an Issue",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/rubrics/36573"
+      },
+      {
+        "id": "assignment_534935",
+        "name": "Assessment/Entry #12 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534935"
+      },
+      {
+        "id": "assignment_534936",
+        "name": "Entry #10 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534936"
+      },
+      {
+        "id": "assignment_534937",
+        "name": "Entry #11 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534937"
+      },
+      {
+        "id": "assignment_534938",
+        "name": "Entry #2 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534938"
+      },
+      {
+        "id": "assignment_534939",
+        "name": "Entry #3 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534939"
+      },
+      {
+        "id": "assignment_534943",
+        "name": "Entry #7 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534943"
+      },
+      {
+        "id": "assignment_534940",
+        "name": "Entry #4 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534940"
+      },
+      {
+        "id": "assignment_534941",
+        "name": "Entry #5 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534941"
+      },
+      {
+        "id": "assignment_534942",
+        "name": "Entry #6 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534942"
+      },
+      {
+        "id": "assignment_534944",
+        "name": "Entry #8 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534944"
+      },
+      {
+        "id": "assignment_534945",
+        "name": "Entry #9 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534945"
+      },
+      {
+        "id": "assignment_534946",
+        "name": "Introduction/Entry #1 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/534946"
+      },
+      {
+        "id": "assignment_538235",
+        "name": "Entry #8 - The Affordable Housing Debate - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/538235"
+      },
+      {
+        "id": "assignment_539057",
+        "name": "Homeownership Assessment - 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/539057"
+      },
+      {
+        "id": "rubric_39953",
+        "name": "Some Rubric (10)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39953"
+      },
+      {
+        "id": "rubric_40787",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/rubrics/40787"
+      },
+      {
+        "id": "assignment_571813",
+        "name": "CREATE an Environmental Impact Report (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/assignments/571813"
+      },
+      {
+        "id": "assignment_566279",
+        "name": "AI Unit Assessment (Level 3.0) - Analyze Themes/ Central Ideas and Complexity of an Issue",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/566279"
+      },
+      {
+        "id": "rubric_39502",
+        "name": "Some Rubric (8)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39502"
+      },
+      {
+        "id": "assignment_563430",
+        "name": "🥳 Frankenstein Assessment (Level 3.0) - SUBMIT HERE 🥳",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/563430"
+      },
+      {
+        "id": "rubric_40876",
+        "name": "Some Rubric (12)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40876"
+      },
+      {
+        "id": "assignment_572251",
+        "name": "Additional Evidence - Theme.2 and Infer.2",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/572251"
+      },
+      {
+        "id": "rubric_40100",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40100"
+      },
+      {
+        "id": "assignment_567190",
+        "name": "📄CREATE an Environmental Impact Report (Level 2.0) - SUBMIT HERE",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/567190"
+      },
+      {
+        "id": "rubric_39737",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/39737"
+      },
+      {
+        "id": "assignment_564850",
+        "name": "Lessons 5-6: (Level 2.0) - I can recognize similarities and differences in how each text addresses the issue. I can make connections between the issue in the texts and broader concepts or real-world events. ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/564850"
+      },
+      {
+        "id": "rubric_40554",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/rubrics/40554"
+      },
+      {
+        "id": "assignment_570347",
+        "name": "Frankenstein Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/assignments/570347"
+      },
+      {
+        "id": "rubric_40645",
+        "name": "Some Rubric (10)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40645"
+      },
+      {
+        "id": "assignment_570699",
+        "name": "12/3-12/5 (Level 2.0) - Create Environmental Impact Report ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/570699"
+      },
+      {
+        "id": "rubric_40646",
+        "name": "Some Rubric (11)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40646"
+      },
+      {
+        "id": "assignment_570701",
+        "name": "12/9 - 12/11 (Level 3.0) - Assessment for INFER.2 and THEME.2",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/570701"
+      },
+      {
+        "id": "rubric_40617",
+        "name": "Some Rubric (9)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40617"
+      },
+      {
+        "id": "assignment_570569",
+        "name": "11/20 - (Level 2.0) - \"Artificial Intelligence 101\" - Listen to and/or read the transcript from this podcast episode and answer the questions in packet. ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/570569"
+      },
+      {
+        "id": "rubric_39312",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39312"
+      },
+      {
+        "id": "assignment_562251",
+        "name": "🏁 SUBMIT Final Draft - Conventions 3.0 & Claim.1",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/562251"
+      },
+      {
+        "id": "rubric_40704",
+        "name": "Some Rubric (18)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40704"
+      },
+      {
+        "id": "assignment_568051",
+        "name": "Gatsby Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/568051"
+      },
+      {
+        "id": "rubric_38889",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/38889"
+      },
+      {
+        "id": "rubric_39424",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/rubrics/39424"
+      },
+      {
+        "id": "rubric_39022",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39022"
+      },
+      {
+        "id": "rubric_42363",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/42363"
+      },
+      {
+        "id": "assignment_582434",
+        "name": "✏️ COMPLETE Worksheet in Packet (Part 1 &2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/582434"
+      },
+      {
+        "id": "assignment_559292",
+        "name": "Final Draft (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/assignments/559292"
+      },
+      {
+        "id": "rubric_39338",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/39338"
+      },
+      {
+        "id": "assignment_562442",
+        "name": "Final Draft Submission - 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/562442"
+      },
+      {
+        "id": "rubric_39167",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/39167"
+      },
+      {
+        "id": "assignment_561657",
+        "name": "Journal Prompt - 8/25 & 8/28 - Week 1",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/561657"
+      },
+      {
+        "id": "rubric_40471",
+        "name": "Some Rubric (10)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/40471"
+      },
+      {
+        "id": "assignment_569190",
+        "name": "Gatsby Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/569190"
+      },
+      {
+        "id": "rubric_40247",
+        "name": "Some Rubric (8)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40247"
+      },
+      {
+        "id": "assignment_568063",
+        "name": "Chapter 2 - Writing Activity (PROCESS.3) -  Level 2.0 - Draft clear and coherent writing with attention to structure (Introduction, body, conclusion)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/568063"
+      },
+      {
+        "id": "assignment_559311",
+        "name": "✏️Rough Draft Submission for Teacher Talk",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/559311"
+      },
+      {
+        "id": "rubric_42399",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42399"
+      },
+      {
+        "id": "assignment_580502",
+        "name": "COMPLETE Worksheet in Packet (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/580502"
+      },
+      {
+        "id": "rubric_42402",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42402"
+      },
+      {
+        "id": "assignment_583000",
+        "name": "SUBMIT Final Draft of Portfolio",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/583000"
+      },
+      {
+        "id": "rubric_40581",
+        "name": "Some Rubric (15)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40581"
+      },
+      {
+        "id": "assignment_570280",
+        "name": "Gatsby Assessment (3.0) 11/19 - 11/21 ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/570280"
+      },
+      {
+        "id": "rubric_41499",
+        "name": "Some Rubric (11)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41499"
+      },
+      {
+        "id": "assignment_577454",
+        "name": "✏️COMPLETE Reflection (Part 1) Due 1/13 - SUBMIT HERE",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577454"
+      },
+      {
+        "id": "rubric_41500",
+        "name": "Some Rubric (12)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41500"
+      },
+      {
+        "id": "assignment_577451",
+        "name": "🦉SUBMIT Final Draft of Portfolio HERE🎓 ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577451"
+      },
+      {
+        "id": "rubric_40625",
+        "name": "Gatsby Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/rubrics/40625"
+      },
+      {
+        "id": "assignment_570568",
+        "name": "The Great Gatsby Assessment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/assignments/570568"
+      },
+      {
+        "id": "assignment_557189",
+        "name": "🏁SUBMIT Final Draft - Claim 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/557189"
+      },
+      {
+        "id": "rubric_39905",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/rubrics/39905"
+      },
+      {
+        "id": "assignment_565799",
+        "name": "Teacher Talk 1 (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/assignments/565799"
+      },
+      {
+        "id": "rubric_39903",
+        "name": "Some Rubric (12)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39903"
+      },
+      {
+        "id": "assignment_564846",
+        "name": "Teacher Talk 1 - 3.0 Assessment - INFER.1 - 9/29",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/564846"
+      },
+      {
+        "id": "rubric_37323",
+        "name": "Draw Conclusions & Infer (INFER.1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/35141/rubrics/37323"
+      },
+      {
+        "id": "assignment_547794",
+        "name": "💡 Evidence Check 4 (assessment) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/35141/assignments/547794"
+      },
+      {
+        "id": "assignment_583904",
+        "name": "READ Beowulf Part 1 and COMPLETE Guided Notes (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/583904"
+      },
+      {
+        "id": "rubric_37100",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/37100"
+      },
+      {
+        "id": "assignment_543082",
+        "name": "Draw Conclusions Assessment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/543082"
+      },
+      {
+        "id": "rubric_36946",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/36946"
+      },
+      {
+        "id": "assignment_540393",
+        "name": "Act I, Scene I Assignment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/540393"
+      },
+      {
+        "id": "rubric_37080",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/37080"
+      },
+      {
+        "id": "assignment_542840",
+        "name": "Act II, Scene II & III Notes (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/542840"
+      },
+      {
+        "id": "rubric_36962",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/36962"
+      },
+      {
+        "id": "assignment_541030",
+        "name": "Act I, Scene II Notes (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/541030"
+      },
+      {
+        "id": "rubric_36999",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/36999"
+      },
+      {
+        "id": "assignment_541634",
+        "name": "Act II, Scene I Notes (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/541634"
+      },
+      {
+        "id": "rubric_36928",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/36928"
+      },
+      {
+        "id": "assignment_539876",
+        "name": "Act I, Scene I Notes (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/539876"
+      },
+      {
+        "id": "rubric_42720",
+        "name": "Some Rubric (7)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42720"
+      },
+      {
+        "id": "assignment_584264",
+        "name": "AMI Day Assignment (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/584264"
+      },
+      {
+        "id": "rubric_39537",
+        "name": "Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/rubrics/39537"
+      },
+      {
+        "id": "assignment_563636",
+        "name": "Evidence 1 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563636"
+      },
+      {
+        "id": "assignment_563637",
+        "name": "Evidence 2 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563637"
+      },
+      {
+        "id": "assignment_563638",
+        "name": "Evidence 3 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563638"
+      },
+      {
+        "id": "assignment_557505",
+        "name": "💡 Evidence Check 2 Infer.1 (level 2.0) - Preamble and 14th Amendment -   RESPOND to questions in Unit notes packet (be prepared to discuss with instructor)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/557505"
+      },
+      {
+        "id": "assignment_557506",
+        "name": "💡 Evidence Check 3 - Infer.1 (level 2.0) - Forming evidence based claims",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/557506"
+      },
+      {
+        "id": "rubric_39986",
+        "name": "Some Rubric (9)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39986"
+      },
+      {
+        "id": "assignment_566287",
+        "name": "Outline for Essay - American ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/566287"
+      },
+      {
+        "id": "rubric_40035",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40035"
+      },
+      {
+        "id": "assignment_566730",
+        "name": "Outline for Essay - American ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/566730"
+      },
+      {
+        "id": "rubric_39555",
+        "name": "All CAPS",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/rubrics/39555"
+      },
+      {
+        "id": "rubric_39563",
+        "name": "Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/rubrics/39563"
+      },
+      {
+        "id": "rubric_39568",
+        "name": "All CAPS",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/rubrics/39568"
+      },
+      {
+        "id": "assignment_563799",
+        "name": "Evidence 2 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563799"
+      },
+      {
+        "id": "assignment_563811",
+        "name": "Evidence 3 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563811"
+      },
+      {
+        "id": "assignment_563787",
+        "name": "Evidence 1 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563787"
+      },
+      {
+        "id": "rubric_39582",
+        "name": "All CAPS",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/rubrics/39582"
+      },
+      {
+        "id": "rubric_39577",
+        "name": "Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/rubrics/39577"
+      },
+      {
+        "id": "rubric_40082",
+        "name": "American Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/rubrics/40082"
+      },
+      {
+        "id": "assignment_563838",
+        "name": "Evidence 2 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563838"
+      },
+      {
+        "id": "assignment_566467",
+        "name": "American Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/assignments/566467"
+      },
+      {
+        "id": "assignment_563859",
+        "name": "Unobtrusive Evidence",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563859"
+      },
+      {
+        "id": "rubric_39590",
+        "name": "Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/rubrics/39590"
+      },
+      {
+        "id": "assignment_563867",
+        "name": "Evidence 1 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563867"
+      },
+      {
+        "id": "rubric_39594",
+        "name": "All CAPS",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/rubrics/39594"
+      },
+      {
+        "id": "assignment_563890",
+        "name": "Evidence 3 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563890"
+      },
+      {
+        "id": "assignment_563878",
+        "name": "Evidence 2 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563878"
+      },
+      {
+        "id": "assignment_583905",
+        "name": "READ Beowulf Part 2 and COMPLETE Guided Notes (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/583905"
+      },
+      {
+        "id": "rubric_37918",
+        "name": "Draw Conclusions & Infer",
+        "html_url": "https://sedalia200.test.instructure.com/courses/35141/rubrics/37918"
+      },
+      {
+        "id": "assignment_547791",
+        "name": "💡 Evidence Check 1",
+        "html_url": "https://sedalia200.test.instructure.com/courses/35141/assignments/547791"
+      },
+      {
+        "id": "assignment_563898",
+        "name": "Unobtrusive Evidence",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563898"
+      },
+      {
+        "id": "rubric_38175",
+        "name": "Draw Conclusions & Infer (INFER.1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/38175"
+      },
+      {
+        "id": "rubric_39254",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39254"
+      },
+      {
+        "id": "assignment_554202",
+        "name": "💡 Evidence Check 4 (assessment) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/554202"
+      },
+      {
+        "id": "rubric_38169",
+        "name": "Draw Conclusions & Infer",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/38169"
+      },
+      {
+        "id": "assignment_554197",
+        "name": "💡 Evidence Check 1",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/554197"
+      },
+      {
+        "id": "rubric_39255",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39255"
+      },
+      {
+        "id": "assignment_563826",
+        "name": "Evidence 1 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563826"
+      },
+      {
+        "id": "assignment_563851",
+        "name": "Evidence 3 Draw Conclusions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563851"
+      },
+      {
+        "id": "assignment_563776",
+        "name": "Unobtrusive Evidence",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563776"
+      },
+      {
+        "id": "assignment_563819",
+        "name": "Unobtrusive Evidence",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563819"
+      },
+      {
+        "id": "rubric_38704",
+        "name": "Draw Conclusions & Infer",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/38704"
+      },
+      {
+        "id": "rubric_38705",
+        "name": "Draw Conclusions & Infer (INFER.1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/38705"
+      },
+      {
+        "id": "assignment_557504",
+        "name": "💡 Evidence Check 1 Infer.1 (level 2) - Declaration -  RESPOND to questions in Unit notes packet (be prepared to discuss with instructor)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/557504"
+      },
+      {
+        "id": "assignment_557507",
+        "name": "💡 Evidence Check 4 Infer.1 - (level 3.0) (assessment)  - Teacher Talk",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/557507"
+      },
+      {
+        "id": "rubric_40240",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40240"
+      },
+      {
+        "id": "assignment_567996",
+        "name": "🎉SUBMIT Beowulf Assessment HERE🎉",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/567996"
+      },
+      {
+        "id": "rubric_39736",
+        "name": "Some Rubric (11)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39736"
+      },
+      {
+        "id": "assignment_564847",
+        "name": "Lesson 3: INFER.1 - (level 2.0) - I can understand the literal meaning of the text. This includes key details, context clues, main ideas and facts as they are stated.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/564847"
+      },
+      {
+        "id": "rubric_39810",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39810"
+      },
+      {
+        "id": "assignment_554200",
+        "name": "💡Forming Evidence Based Claims tool ( level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/554200"
+      },
+      {
+        "id": "rubric_39735",
+        "name": "Some Rubric (10)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39735"
+      },
+      {
+        "id": "assignment_564845",
+        "name": "3.0 Assessment  - Infer.1 and Infer.2",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/564845"
+      },
+      {
+        "id": "rubric_42601",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42601"
+      },
+      {
+        "id": "rubric_42603",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42603"
+      },
+      {
+        "id": "rubric_42604",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42604"
+      },
+      {
+        "id": "assignment_583908",
+        "name": "Beowulf Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/583908"
+      },
+      {
+        "id": "rubric_42471",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/42471"
+      },
+      {
+        "id": "assignment_583353",
+        "name": "🎉Beowulf 3.0 Assessment Located HERE🎉",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/583353"
+      },
+      {
+        "id": "rubric_40735",
+        "name": "Some Rubric (19)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40735"
+      },
+      {
+        "id": "assignment_570195",
+        "name": "Culminating Task (3.0 POV & IDEAS)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/570195"
+      },
+      {
+        "id": "rubric_39408",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39408"
+      },
+      {
+        "id": "assignment_562942",
+        "name": "Transcendentalism Assessment -  3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/562942"
+      },
+      {
+        "id": "rubric_42975",
+        "name": "Ideas.2",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/42975"
+      },
+      {
+        "id": "assignment_587116",
+        "name": "2/19 - Jenga - Peer Discussion Activity - Level 2.0 (Ideas.2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/587116"
+      },
+      {
+        "id": "rubric_39333",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39333"
+      },
+      {
+        "id": "rubric_39168",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39168"
+      },
+      {
+        "id": "assignment_561665",
+        "name": "Self-Reliance Annotations - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/561665"
+      },
+      {
+        "id": "rubric_40412",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40412"
+      },
+      {
+        "id": "assignment_569279",
+        "name": "Chapter 4 Exit Ticket - IDEAS. 2 (Level 2.0) - Identify examples of where a theme/ central idea is evident in different parts of the text.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/569279"
+      },
+      {
+        "id": "rubric_40441",
+        "name": "Some Rubric (11)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40441"
+      },
+      {
+        "id": "assignment_564291",
+        "name": "Gatsby TEACHER TALK 2- chapters 2-3 (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/564291"
+      },
+      {
+        "id": "rubric_40445",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40445"
+      },
+      {
+        "id": "assignment_569355",
+        "name": "Choose a character (level2.0) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/569355"
+      },
+      {
+        "id": "rubric_39275",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39275"
+      },
+      {
+        "id": "assignment_562161",
+        "name": "\"Nature\" Annotations - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/562161"
+      },
+      {
+        "id": "rubric_40153",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40153"
+      },
+      {
+        "id": "assignment_567413",
+        "name": "Character Review Packet - The Great Gatsby",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/567413"
+      },
+      {
+        "id": "rubric_39276",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39276"
+      },
+      {
+        "id": "assignment_562165",
+        "name": "Choose A Song Activity - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/562165"
+      },
+      {
+        "id": "rubric_41502",
+        "name": "Some Rubric (19)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41502"
+      },
+      {
+        "id": "rubric_41504",
+        "name": "Some Rubric (14)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41504"
+      },
+      {
+        "id": "assignment_577473",
+        "name": "WRITE Theme Analysis Paragraph (IDEAS/THEME 3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577473"
+      },
+      {
+        "id": "assignment_577470",
+        "name": "Culminating Task (3.0 POV & IDEAS)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577470"
+      },
+      {
+        "id": "rubric_39712",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36579/rubrics/39712"
+      },
+      {
+        "id": "assignment_564725",
+        "name": "Choose A Song Activity - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36579/assignments/564725"
+      },
+      {
+        "id": "rubric_39713",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36599/rubrics/39713"
+      },
+      {
+        "id": "rubric_39714",
+        "name": "Some Rubric (3) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36599/rubrics/39714"
+      },
+      {
+        "id": "assignment_564729",
+        "name": "Choose A Song Activity - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36599/assignments/564729"
+      },
+      {
+        "id": "rubric_40517",
+        "name": "Some Rubric (14)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40517"
+      },
+      {
+        "id": "assignment_569957",
+        "name": "WRITE Theme Analysis Paragraph (IDEAS/THEME 3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/569957"
+      },
+      {
+        "id": "rubric_40522",
+        "name": "Some Rubric (14)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/rubrics/40522"
+      },
+      {
+        "id": "rubric_40524",
+        "name": "Some Rubric (14)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40524"
+      },
+      {
+        "id": "assignment_569994",
+        "name": "11/13 - Chapter 8 - (Level 2.0) - POV.2 -Recognize when an author is suggesting or implying meaning beyond what is directly stated.  IDEAS.2 - Identify the central idea or theme of a text or section of text.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/569994"
+      },
+      {
+        "id": "rubric_40532",
+        "name": "Some Rubric (16)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40532"
+      },
+      {
+        "id": "assignment_564316",
+        "name": "Teacher  Talk  3 - chapter 4-6 (level 2.0) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/564316"
+      },
+      {
+        "id": "rubric_42600",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/42600"
+      },
+      {
+        "id": "assignment_583889",
+        "name": "Test",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/583889"
+      },
+      {
+        "id": "assignment_562436",
+        "name": "Watch \"Alike\" and Complete Activity - 2.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/562436"
+      },
+      {
+        "id": "assignment_562459",
+        "name": "Evidence 3 - (level 2.0) Choose a transcendental song",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/562459"
+      },
+      {
+        "id": "rubric_39389",
+        "name": "Some Rubric (8)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39389"
+      },
+      {
+        "id": "assignment_562458",
+        "name": "Evidence 3 - (level 2.0) Choose a transcendental song",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/562458"
+      },
+      {
+        "id": "rubric_39390",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39390"
+      },
+      {
+        "id": "assignment_562430",
+        "name": "Evidence 1 - Self Reliance Choosing quotes 6th hour ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/562430"
+      },
+      {
+        "id": "rubric_39401",
+        "name": "Some Rubric (2) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39401"
+      },
+      {
+        "id": "rubric_39464",
+        "name": "Some Rubric (8)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/39464"
+      },
+      {
+        "id": "assignment_563231",
+        "name": "Lesson 1: Letters 1-4 (Level 2.0) - I can identify the themes/ central ideas in the text that reflect aspects of human nature or societal issues.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/563231"
+      },
+      {
+        "id": "rubric_39422",
+        "name": "Some Rubric (7)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/39422"
+      },
+      {
+        "id": "assignment_562984",
+        "name": "Lesson 0: Mary Shelley Intro Questions - ( Level 2.0 ) - I can explain how the author uses characters, events, and/ or situations to highlight universal aspects of the human experience. ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/562984"
+      },
+      {
+        "id": "rubric_39434",
+        "name": "Some Rubric (3) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39434"
+      },
+      {
+        "id": "rubric_39438",
+        "name": "Some Rubric (9)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39438"
+      },
+      {
+        "id": "assignment_563064",
+        "name": "Submit Alike paragraph here",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/563064"
+      },
+      {
+        "id": "rubric_39440",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39440"
+      },
+      {
+        "id": "assignment_563066",
+        "name": "Evidence 4 - Alike Paragraph (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/563066"
+      },
+      {
+        "id": "rubric_39492",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36579/rubrics/39492"
+      },
+      {
+        "id": "rubric_39120",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39120"
+      },
+      {
+        "id": "rubric_39496",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36599/rubrics/39496"
+      },
+      {
+        "id": "assignment_563377",
+        "name": "Evidence 4 - Alike Paragraph (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36599/assignments/563377"
+      },
+      {
+        "id": "rubric_39343",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39343"
+      },
+      {
+        "id": "rubric_39500",
+        "name": "Some Rubric (7)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39500"
+      },
+      {
+        "id": "assignment_563428",
+        "name": "READ the Article and RESPOND with a Paragraph - Submit HERE",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/563428"
+      },
+      {
+        "id": "rubric_39523",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39523"
+      },
+      {
+        "id": "assignment_563548",
+        "name": "Submit Land assessment here  - 3.0 Relate Themes to the text and the world ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/563548"
+      },
+      {
+        "id": "rubric_39326",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39326"
+      },
+      {
+        "id": "rubric_39337",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39337"
+      },
+      {
+        "id": "rubric_39236",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39236"
+      },
+      {
+        "id": "rubric_40073",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/rubrics/40073"
+      },
+      {
+        "id": "assignment_566991",
+        "name": "Lesson 4 Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/assignments/566991"
+      },
+      {
+        "id": "assignment_561876",
+        "name": "✏️COMPLETE Theme Chart",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/561876"
+      },
+      {
+        "id": "rubric_40411",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40411"
+      },
+      {
+        "id": "assignment_569276",
+        "name": "Ch. 23 Exit Ticket - 11/4 (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/569276"
+      },
+      {
+        "id": "rubric_39597",
+        "name": "Some Rubric (5) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/39597"
+      },
+      {
+        "id": "assignment_564016",
+        "name": "✏️COMPLETE and SUBMIT Analysis Paragraph - Level 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/564016"
+      },
+      {
+        "id": "rubric_40464",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40464"
+      },
+      {
+        "id": "assignment_569385",
+        "name": "3.0 Frankenstein Assessment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/569385"
+      },
+      {
+        "id": "rubric_39253",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39253"
+      },
+      {
+        "id": "rubric_40955",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/rubrics/40955"
+      },
+      {
+        "id": "assignment_572664",
+        "name": "Additional Evidence - Complexity of a Theme and Relate Themes to Human Nature ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36538/assignments/572664"
+      },
+      {
+        "id": "rubric_39657",
+        "name": "Some Rubric (4) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36579/rubrics/39657"
+      },
+      {
+        "id": "assignment_564473",
+        "name": "Evidence 4 - Alike Paragraph (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36579/assignments/564473"
+      },
+      {
+        "id": "rubric_39648",
+        "name": "Transcendental Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/rubrics/39648"
+      },
+      {
+        "id": "assignment_564412",
+        "name": "Transcendental Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/assignments/564412"
+      },
+      {
+        "id": "rubric_39243",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39243"
+      },
+      {
+        "id": "assignment_561880",
+        "name": "✏️COMPLETE and SUBMIT Analysis Paragraph",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/561880"
+      },
+      {
+        "id": "rubric_39814",
+        "name": "Some Rubric (9)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/39814"
+      },
+      {
+        "id": "assignment_565417",
+        "name": "✏️ COMPLETE and SUBMIT Human Connection Paragraph HERE",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/565417"
+      },
+      {
+        "id": "assignment_561486",
+        "name": "Evidence 1 (2.0) - Identify themes in the text that reflect aspects of human nature or societal norms",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/561486"
+      },
+      {
+        "id": "assignment_561894",
+        "name": "Ideas.3 Relate themes Assessment- Transcendentalism level 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/561894"
+      },
+      {
+        "id": "assignment_562342",
+        "name": " Evidence 1 Score - Self-Reliance Choosing quotes and Commentary 4th and 5th hour ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/562342"
+      },
+      {
+        "id": "assignment_562441",
+        "name": "Evidence 1 - Self - Reliance Choosing quotes - 7th  hour",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/562441"
+      },
+      {
+        "id": "rubric_42971",
+        "name": "Theme",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42971"
+      },
+      {
+        "id": "assignment_587084",
+        "name": "2/11 - Quick-Write Reflection (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/587084"
+      },
+      {
+        "id": "rubric_42852",
+        "name": "Some Rubric (21)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42852"
+      },
+      {
+        "id": "rubric_42853",
+        "name": "Some Rubric (22)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42853"
+      },
+      {
+        "id": "rubric_42854",
+        "name": "Some Rubric (23)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42854"
+      },
+      {
+        "id": "assignment_586288",
+        "name": "ACT III - Making Connections ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/586288"
+      },
+      {
+        "id": "assignment_586289",
+        "name": "American Dream across the texts ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/586289"
+      },
+      {
+        "id": "assignment_586287",
+        "name": "ACT II peer discussion ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/586287"
+      },
+      {
+        "id": "assignment_586010",
+        "name": "2/20 and 2/23 - ACT II Peer Discussion (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/586010"
+      },
+      {
+        "id": "rubric_42769",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42769"
+      },
+      {
+        "id": "assignment_585174",
+        "name": "Tracking The American Dream (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/585174"
+      },
+      {
+        "id": "rubric_42595",
+        "name": "Some Rubric (21)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42595"
+      },
+      {
+        "id": "assignment_583876",
+        "name": "American Dream across the texts ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/583876"
+      },
+      {
+        "id": "rubric_42596",
+        "name": "Some Rubric (22)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42596"
+      },
+      {
+        "id": "assignment_583879",
+        "name": "ACT III - Making Connections ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/583879"
+      },
+      {
+        "id": "rubric_42597",
+        "name": "Some Rubric (23)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42597"
+      },
+      {
+        "id": "rubric_42798",
+        "name": "Some Rubric (21)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42798"
+      },
+      {
+        "id": "assignment_586011",
+        "name": "ACT III - Making Connections ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/586011"
+      },
+      {
+        "id": "rubric_42799",
+        "name": "Some Rubric (22)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42799"
+      },
+      {
+        "id": "rubric_42800",
+        "name": "Some Rubric (23)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42800"
+      },
+      {
+        "id": "assignment_586012",
+        "name": "2/4 - American Dream Across the Texts ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/586012"
+      },
+      {
+        "id": "assignment_583881",
+        "name": "ACT II peer discussion ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/583881"
+      },
+      {
+        "id": "rubric_42702",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42702"
+      },
+      {
+        "id": "assignment_581926",
+        "name": "Constructive Response 2 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/581926"
+      },
+      {
+        "id": "assignment_584736",
+        "name": "Pre-Writing Practice (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/584736"
+      },
+      {
+        "id": "assignment_584733",
+        "name": "Packet Check-In (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/584733"
+      },
+      {
+        "id": "rubric_42705",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42705"
+      },
+      {
+        "id": "assignment_578672",
+        "name": "Proficiency check 3",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/578672"
+      },
+      {
+        "id": "rubric_42707",
+        "name": "Some Rubric (4)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42707"
+      },
+      {
+        "id": "rubric_42709",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42709"
+      },
+      {
+        "id": "rubric_42710",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42710"
+      },
+      {
+        "id": "assignment_581946",
+        "name": "House on Mango Assessment (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/581946"
+      },
+      {
+        "id": "rubric_42745",
+        "name": "Some Rubric (25)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42745"
+      },
+      {
+        "id": "assignment_580511",
+        "name": "Proficiency check 3 - I can understand how point of view can influence the way information is presented or interpreted.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/580511"
+      },
+      {
+        "id": "rubric_42772",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42772"
+      },
+      {
+        "id": "assignment_584766",
+        "name": "1/29 - 2/3 - (POV.1) 3.0 Assessment - SUBMIT HERE",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/584766"
+      },
+      {
+        "id": "rubric_41503",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41503"
+      },
+      {
+        "id": "assignment_577472",
+        "name": "WRITE Letter from Shakespeare (POV 3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577472"
+      },
+      {
+        "id": "rubric_40515",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40515"
+      },
+      {
+        "id": "assignment_569942",
+        "name": "WRITE Letter from Shakespeare (POV 3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/569942"
+      },
+      {
+        "id": "rubric_40521",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36543/rubrics/40521"
+      },
+      {
+        "id": "rubric_42459",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42459"
+      },
+      {
+        "id": "assignment_578670",
+        "name": "Proficiency check 1 - POV.1 - (Level 2) - Recognize techniques authors use to communicate their point of view, such as tone, word choice, and perspective.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/578670"
+      },
+      {
+        "id": "rubric_42398",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42398"
+      },
+      {
+        "id": "assignment_580090",
+        "name": "READ and Annotate Author/Cultural Background (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/580090"
+      },
+      {
+        "id": "rubric_42460",
+        "name": "Some Rubric (20)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42460"
+      },
+      {
+        "id": "assignment_580509",
+        "name": "Proficiency check 1 - POV.1 - (Level 2) - Recognize techniques authors use to communicate their point of view, such as tone, word choice, and perspective.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/580509"
+      },
+      {
+        "id": "rubric_42404",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42404"
+      },
+      {
+        "id": "assignment_577662",
+        "name": "1/9 - READ and ANNOTATE Vignettes 9-16 & ANSWER questions in packet (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/577662"
+      },
+      {
+        "id": "rubric_42405",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/rubrics/42405"
+      },
+      {
+        "id": "assignment_582725",
+        "name": "1/12 - Constructive Response 1 - POV.1 - (Level 2.0) - Recognize techniques authors use to communicate their point of view, such as tone, word choice and perspective.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36563/assignments/582725"
+      },
+      {
+        "id": "rubric_42468",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/rubrics/42468"
+      },
+      {
+        "id": "assignment_581845",
+        "name": "Constructive Response 1 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36580/assignments/581845"
+      },
+      {
+        "id": "rubric_42805",
+        "name": "Some Rubric (26)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42805"
+      },
+      {
+        "id": "assignment_585551",
+        "name": "House Assessment 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/585551"
+      },
+      {
+        "id": "rubric_42806",
+        "name": "Some Rubric (3)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42806"
+      },
+      {
+        "id": "assignment_585534",
+        "name": "House on Mango St. - Assessment 3.0 ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/585534"
+      },
+      {
+        "id": "rubric_42635",
+        "name": "Some Rubric (24)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/42635"
+      },
+      {
+        "id": "assignment_580510",
+        "name": "Proficiency check 2 - Understand how point of view influences how information is presented or interpreted.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/580510"
+      },
+      {
+        "id": "rubric_42621",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/rubrics/42621"
+      },
+      {
+        "id": "assignment_578671",
+        "name": "Proficiency check 2",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36575/assignments/578671"
+      },
+      {
+        "id": "rubric_42864",
+        "name": "POV.1",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/42864"
+      },
+      {
+        "id": "assignment_586413",
+        "name": "2/9 - Death Prediction Prompt - SUBMIT Here (Level 2.0) POV.1",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/586413"
+      },
+      {
+        "id": "rubric_40442",
+        "name": "Some Rubric (12)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40442"
+      },
+      {
+        "id": "assignment_568047",
+        "name": "Perception tool - section 4 (level 2.0) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/568047"
+      },
+      {
+        "id": "rubric_40224",
+        "name": "Some Rubric (5)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40224"
+      },
+      {
+        "id": "assignment_567950",
+        "name": "Chapter 1 - Point of View (POV.2) - Level 2.0 - Understand the concept of implication and how authors use subtle hints or suggestions.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/567950"
+      },
+      {
+        "id": "rubric_40270",
+        "name": "Some Rubric (10)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40270"
+      },
+      {
+        "id": "assignment_564290",
+        "name": "RESPOND Narrative Structure prompt (see proctor) (level 2) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/564290"
+      },
+      {
+        "id": "rubric_39280",
+        "name": "Some Rubric (7)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39280"
+      },
+      {
+        "id": "assignment_562177",
+        "name": "Teacher Talk 1 - (first 4 pages) POV.2 (level 2.0) I can make inferences about what is implied in the text based on contextual clues",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/562177"
+      },
+      {
+        "id": "rubric_37232",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/rubrics/37232"
+      },
+      {
+        "id": "assignment_544193",
+        "name": "Creative Research Project",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33071/assignments/544193"
+      },
+      {
+        "id": "rubric_37167",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/rubrics/37167"
+      },
+      {
+        "id": "assignment_543332",
+        "name": "English Final Submission - Inquiry-Based Research (Solve a Problem) - 3.0",
+        "html_url": "https://sedalia200.test.instructure.com/courses/33048/assignments/543332"
+      },
+      {
+        "id": "rubric_39538",
+        "name": "Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/rubrics/39538"
+      },
+      {
+        "id": "assignment_563639",
+        "name": "Evidence 1 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563639"
+      },
+      {
+        "id": "assignment_563640",
+        "name": "Evidence 2 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563640"
+      },
+      {
+        "id": "assignment_563641",
+        "name": "Evidence 3 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/31955/assignments/563641"
+      },
+      {
+        "id": "rubric_39565",
+        "name": "Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/rubrics/39565"
+      },
+      {
+        "id": "assignment_563796",
+        "name": "Evidence 2 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563796"
+      },
+      {
+        "id": "assignment_563808",
+        "name": "Evidence 3 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563808"
+      },
+      {
+        "id": "assignment_563783",
+        "name": "Evidence 1 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38241/assignments/563783"
+      },
+      {
+        "id": "rubric_39579",
+        "name": "Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/rubrics/39579"
+      },
+      {
+        "id": "assignment_563835",
+        "name": "Evidence 2 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563835"
+      },
+      {
+        "id": "rubric_39591",
+        "name": "Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/rubrics/39591"
+      },
+      {
+        "id": "assignment_563875",
+        "name": "Evidence 2 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563875"
+      },
+      {
+        "id": "assignment_563864",
+        "name": "Evidence 1 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563864"
+      },
+      {
+        "id": "assignment_563887",
+        "name": "Evidence 3 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38248/assignments/563887"
+      },
+      {
+        "id": "assignment_563823",
+        "name": "Evidence 1 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563823"
+      },
+      {
+        "id": "assignment_563848",
+        "name": "Evidence 3 Conduct Research",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38246/assignments/563848"
+      },
+      {
+        "id": "rubric_40747",
+        "name": "Organization.4 and Organization.5",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40747"
+      },
+      {
+        "id": "rubric_40733",
+        "name": "Some Rubric (16)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40733"
+      },
+      {
+        "id": "assignment_571426",
+        "name": "Additional Evidence - ORG.4 & ORG.5",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/571426"
+      },
+      {
+        "id": "rubric_40786",
+        "name": "Some Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/rubrics/40786"
+      },
+      {
+        "id": "assignment_571632",
+        "name": "Assessment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36509/assignments/571632"
+      },
+      {
+        "id": "assignment_570872",
+        "name": "12/9 - 12/11 - Assessment - ORG.4 /  ORG.5 - (3.0) Kernel Essay ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/570872"
+      },
+      {
+        "id": "rubric_40794",
+        "name": "Some Rubric (17)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40794"
+      },
+      {
+        "id": "assignment_571834",
+        "name": "12/9 - Kernel Essay Brainstorm Organizer  - Complete First",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/571834"
+      },
+      {
+        "id": "rubric_40801",
+        "name": "Some Rubric (11)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/40801"
+      },
+      {
+        "id": "assignment_571811",
+        "name": "Children's book kernel essay ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/571811"
+      },
+      {
+        "id": "rubric_40814",
+        "name": "Some Rubric (17)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40814"
+      },
+      {
+        "id": "assignment_571799",
+        "name": "Children's Book Kernel Essay",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/571799"
+      },
+      {
+        "id": "rubric_40831",
+        "name": "Some Rubric (12)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/40831"
+      },
+      {
+        "id": "assignment_569424",
+        "name": "Assessment - ORG.4 /  ORG.5 - (3.0) Kernel Essay ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/569424"
+      },
+      {
+        "id": "rubric_40879",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40879"
+      },
+      {
+        "id": "assignment_568399",
+        "name": "Obama's address to the nation (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/568399"
+      },
+      {
+        "id": "rubric_40457",
+        "name": "Some Rubric (14)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40457"
+      },
+      {
+        "id": "assignment_568042",
+        "name": "Lou Gehrig speech (2.0) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/568042"
+      },
+      {
+        "id": "rubric_40459",
+        "name": "Some Rubric (13)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/40459"
+      },
+      {
+        "id": "rubric_40978",
+        "name": "Some Rubric (19)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40978"
+      },
+      {
+        "id": "assignment_569099",
+        "name": "Assessment - ORG.4 /  ORG.5 - (3.0) Kernel Essay ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/569099"
+      },
+      {
+        "id": "rubric_42400",
+        "name": "Some Rubric (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42400"
+      },
+      {
+        "id": "assignment_580522",
+        "name": "COMPLETE Reflection: Part 1 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/580522"
+      },
+      {
+        "id": "rubric_42401",
+        "name": "Some Rubric (2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/rubrics/42401"
+      },
+      {
+        "id": "assignment_580877",
+        "name": "COMPLETE Five-Year Plan: Part 2 (2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36609/assignments/580877"
+      },
+      {
+        "id": "rubric_40302",
+        "name": "Some Rubric (11)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40302"
+      },
+      {
+        "id": "assignment_568510",
+        "name": "✏️COMPLETE Reflection (Part 1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/568510"
+      },
+      {
+        "id": "rubric_40303",
+        "name": "Some Rubric (12)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40303"
+      },
+      {
+        "id": "assignment_568511",
+        "name": "🦉SUBMIT Final Draft of Portfolio HERE🎓 ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/568511"
+      },
+      {
+        "id": "rubric_40680",
+        "name": "Some Rubric (13) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40680"
+      },
+      {
+        "id": "rubric_40681",
+        "name": "Some Rubric (14) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40681"
+      },
+      {
+        "id": "assignment_570875",
+        "name": "12/3 & 12/4 - Lou Gehrig Speech (Level 2.0) - Canvas Assignment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/570875"
+      },
+      {
+        "id": "assignment_570876",
+        "name": "12/8 - Obama's Address to the Nation (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/570876"
+      },
+      {
+        "id": "rubric_40716",
+        "name": "Organization.5",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40716"
+      },
+      {
+        "id": "assignment_571288",
+        "name": "12/1 - Tupac Response - (Level 2.0) - ORGANIZATION.5",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/571288"
+      },
+      {
+        "id": "rubric_40460",
+        "name": "Some Rubric (14)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/40460"
+      },
+      {
+        "id": "assignment_569427",
+        "name": "Lou Gehrig speech (2.0) ",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/569427"
+      },
+      {
+        "id": "assignment_569426",
+        "name": "Choose your own speech (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/569426"
+      },
+      {
+        "id": "rubric_40458",
+        "name": "Some Rubric (15)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/40458"
+      },
+      {
+        "id": "assignment_568052",
+        "name": "Choose your own speech (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/568052"
+      },
+      {
+        "id": "rubric_40461",
+        "name": "Some Rubric (15)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/40461"
+      },
+      {
+        "id": "rubric_40682",
+        "name": "Some Rubric (15) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/40682"
+      },
+      {
+        "id": "assignment_570874",
+        "name": "12/5 - Choose Your Own Speech (Level 2.0) - Canvas Assignment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/570874"
+      },
+      {
+        "id": "rubric_41501",
+        "name": "Some Rubric (15)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41501"
+      },
+      {
+        "id": "assignment_577471",
+        "name": "REVISE and ANNOTATE Previous Paragraph Using Transitions (TRANSITIONS 3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577471"
+      },
+      {
+        "id": "rubric_40640",
+        "name": "Some Rubric (15)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40640"
+      },
+      {
+        "id": "assignment_569963",
+        "name": "REVISE and ANNOTATE Previous Paragraph Using Transitions (TRANSITIONS 3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/569963"
+      },
+      {
+        "id": "rubric_37324",
+        "name": "Analyze Text (INFER.2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/35141/rubrics/37324"
+      },
+      {
+        "id": "assignment_547796",
+        "name": "💡 Evidence Check 6",
+        "html_url": "https://sedalia200.test.instructure.com/courses/35141/assignments/547796"
+      },
+      {
+        "id": "rubric_40749",
+        "name": "Analyze Text",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40749"
+      },
+      {
+        "id": "assignment_571561",
+        "name": "✏️COMPLETE Analytical Paragraph - SUBMIT (3.0) - Chapters 16-20",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/571561"
+      },
+      {
+        "id": "rubric_38706",
+        "name": "Analyze Text (INFER.2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/38706"
+      },
+      {
+        "id": "rubric_39609",
+        "name": "Some Rubric (7)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39609"
+      },
+      {
+        "id": "assignment_564112",
+        "name": "Lesson 1: INFER.1 - (level 2.0) - I can annotate specific details, quotes, or passages from a text that are relevant.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/564112"
+      },
+      {
+        "id": "rubric_38176",
+        "name": "Analyze Text (INFER.2)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/38176"
+      },
+      {
+        "id": "assignment_554204",
+        "name": "💡 Evidence Check 6",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/554204"
+      },
+      {
+        "id": "rubric_39627",
+        "name": "Some Rubric (9)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/rubrics/39627"
+      },
+      {
+        "id": "assignment_564265",
+        "name": "Lesson 2: INFER.1 - (level 2.0) - I can recognize the purpose of inferring meaning from a text, including patterns and connected ideas that lead to conclusions.",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36489/assignments/564265"
+      },
+      {
+        "id": "rubric_41507",
+        "name": "Analyze Text",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41507"
+      },
+      {
+        "id": "assignment_577486",
+        "name": "✏️WRITE Analytical Paragraph and SUBMIT or COMPLETE Chart (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577486"
+      },
+      {
+        "id": "assignment_577484",
+        "name": "✏️COMPLETE Analytical Paragraph - SUBMIT (3.0) - Chapters 16-20",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577484"
+      },
+      {
+        "id": "assignment_577485",
+        "name": "✏️WRITE Analytical Paragraph and SUBMIT HERE (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/assignments/577485"
+      },
+      {
+        "id": "rubric_41506",
+        "name": "Some Rubric (17)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41506"
+      },
+      {
+        "id": "rubric_41505",
+        "name": "Some Rubric (16)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36622/rubrics/41505"
+      },
+      {
+        "id": "assignment_557509",
+        "name": "💡 Evidence Check 6",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/557509"
+      },
+      {
+        "id": "rubric_39843",
+        "name": "Some Rubric (8)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39843"
+      },
+      {
+        "id": "assignment_565623",
+        "name": "Seed Text summaries (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/565623"
+      },
+      {
+        "id": "rubric_39855",
+        "name": "Some Rubric (9) (1)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/rubrics/39855"
+      },
+      {
+        "id": "assignment_554203",
+        "name": "Answer Pathway Inquiry questions here (level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/36503/assignments/554203"
+      },
+      {
+        "id": "rubric_40661",
+        "name": "Some Rubric (16)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40661"
+      },
+      {
+        "id": "assignment_570779",
+        "name": "✏️WRITE Analytical Paragraph and SUBMIT or COMPLETE Chart (Level 2.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/570779"
+      },
+      {
+        "id": "rubric_40662",
+        "name": "Some Rubric (17)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/rubrics/40662"
+      },
+      {
+        "id": "assignment_570781",
+        "name": "✏️WRITE Analytical Paragraph and SUBMIT HERE (3.0)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38304/assignments/570781"
+      },
+      {
+        "id": "rubric_39259",
+        "name": "Some Rubric (6)",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39259"
+      },
+      {
+        "id": "assignment_557508",
+        "name": "💡 Evidence Check 5 - Infer.2 - (level 2.0)  Summaries and Inquiry questions",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/557508"
+      },
+      {
+        "id": "rubric_39348",
+        "name": "Current Score Rubric",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/rubrics/39348"
+      },
+      {
+        "id": "assignment_562482",
+        "name": "Current Score Assignment",
+        "html_url": "https://sedalia200.test.instructure.com/courses/38303/assignments/562482"
+      }
+    ],
+    "users": [
+      {
+        "id": "4534",
+        "name": "Olyvia Birdsong",
+        "sortable_name": "Birdsong, Olyvia",
+        "avatar_url": "https://sedalia200.instructure.com/images/thumbnails/1021880/qzxjwGpJxnvPC2bmQdr54PlrccJ5x91j5I0vjyys",
+        "display_name": "Olyvia Birdsong"
+      }
+    ]
+  }
+}
