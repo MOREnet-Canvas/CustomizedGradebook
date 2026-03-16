@@ -38,6 +38,7 @@ function getRosterFromCache(courseId) {
 }
 
 function saveRosterToCache(courseId, students, sections) {
+    if (!students.length) return; // Don't cache a failed or empty fetch
     try {
         sessionStorage.setItem(`${ROSTER_KEY_PREFIX}${courseId}`, JSON.stringify({
             timestamp: Date.now(),
