@@ -49,6 +49,8 @@ export async function renderTeacherMasteryView({ courseId, apiClient, statusEl, 
 
 /**
  * Build and inject the picker UI. Tracks state (selected section, search text) locally.
+ * The dropdown list is appended to document.body so it escapes any ancestor
+ * overflow:hidden or stacking-context created by border-radius on the dashboard container.
  */
 function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
     let selectedSectionId = null;
@@ -62,7 +64,25 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
 
     const sectionSelect = pickerEl.querySelector('#pm-section-select');
     const searchInput = pickerEl.querySelector('#pm-student-search');
-    const dropdown = pickerEl.querySelector('#pm-student-dropdown');
+
+    // Reuse an existing body-level dropdown if the picker was restored after "Change Student",
+    // otherwise create a new one and append it to document.body.
+    let dropdown = document.getElementById('pm-student-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = 'pm-student-dropdown';
+        dropdown.setAttribute('role', 'listbox');
+        dropdown.style.cssText = `display:none; position:absolute; background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 6px 6px; max-height:320px; overflow-y:auto; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.15); box-sizing:border-box;`;
+        document.body.appendChild(dropdown);
+    }
+
+    // Position the dropdown directly below the search input using viewport coordinates.
+    function positionDropdown() {
+        const rect = searchInput.getBoundingClientRect();
+        dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+        dropdown.style.left = (rect.left + window.scrollX) + 'px';
+        dropdown.style.width = rect.width + 'px';
+    }
 
     // Visible student list, recomputed on filter changes
     let filteredStudents = [...allStudents];
@@ -83,7 +103,6 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
         if (filteredStudents.length === 0) {
             dropdown.innerHTML = `<div style="padding:10px 12px; ${FONT} font-size:0.9rem; color:#888;">No students found.</div>`;
         } else {
-            // Items are fully inline — no extra whitespace/newlines inside the div
             dropdown.innerHTML = filteredStudents.map((s, i) => {
                 const sectionLabel = sections.length > 1 && !selectedSectionId
                     ? `<span style="color:#888; font-size:0.8rem; margin-left:6px;">${escapeHtml(getSectionName(sections, s.sectionId))}</span>`
@@ -91,6 +110,7 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
                 return `<div role="option" data-index="${i}" data-user-id="${s.userId}" style="padding:8px 12px; cursor:pointer; ${FONT} font-size:0.95rem; color:#333; border-bottom:1px solid #f0f0f0; line-height:1.4;" onmouseenter="this.style.background='#f5f5f5';" onmouseleave="this.style.background='';">${escapeHtml(s.name)}${sectionLabel}</div>`;
             }).join('');
         }
+        positionDropdown();
         dropdown.style.display = 'block';
     }
 
@@ -128,9 +148,15 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
     // Show dropdown on focus
     searchInput.addEventListener('focus', renderDropdown);
 
-    // Hide dropdown when clicking outside
+    // Reposition on scroll/resize so the body-level dropdown tracks the input
+    window.addEventListener('scroll', positionDropdown, { passive: true });
+    window.addEventListener('resize', positionDropdown, { passive: true });
+
+    // Hide dropdown when clicking outside both the picker and the dropdown itself
     document.addEventListener('click', (e) => {
-        if (!pickerEl.contains(e.target)) dropdown.style.display = 'none';
+        if (!pickerEl.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
     }, { capture: true });
 
     // Keyboard navigation
@@ -195,14 +221,13 @@ function buildPickerHtml(sections) {
         </div>` : '';
 
     return `
-        <div style="padding:4px 0 12px; overflow:visible;">
+        <div style="padding:4px 0 12px;">
             <div style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-bottom:12px;">Select a Student</div>
             ${sectionRow}
-            <div style="position:relative; overflow:visible;">
+            <div>
                 <label for="pm-student-search" style="${FONT} font-size:0.85rem; color:#555; display:block; margin-bottom:4px;">Student Name</label>
                 <input id="pm-student-search" type="text" placeholder="Type to search…" autocomplete="off"
                        style="${FONT} width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; color:#333; box-sizing:border-box;" />
-                <div id="pm-student-dropdown" role="listbox" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; z-index:9999; box-shadow:0 4px 8px rgba(0,0,0,0.12);"></div>
             </div>
         </div>`;
 }
