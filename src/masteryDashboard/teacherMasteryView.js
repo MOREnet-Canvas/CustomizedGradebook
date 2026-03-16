@@ -114,11 +114,13 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
         items.forEach((el, i) => { el.style.background = i === index ? '#e8f0fe' : ''; });
     }
 
-    // Section filter
-    sectionSelect.addEventListener('change', () => {
-        selectedSectionId = sectionSelect.value || null;
-        renderDropdown();
-    });
+    // Section filter — only wired up when the select element exists (courses with >1 section)
+    if (sectionSelect) {
+        sectionSelect.addEventListener('change', () => {
+            selectedSectionId = sectionSelect.value || null;
+            renderDropdown();
+        });
+    }
 
     // Search input — filter on each keystroke
     searchInput.addEventListener('input', renderDropdown);
