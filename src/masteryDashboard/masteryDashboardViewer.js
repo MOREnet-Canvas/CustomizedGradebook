@@ -69,7 +69,7 @@ function ensureHost(courseName = "Mastery Dashboard") {
 
     root.innerHTML = `
       <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
-        <div style="font-weight:700; margin-bottom:8px;">${escapeHtml(courseName)}</div>
+        <div id="pm-student-name" style="font-weight:700; margin-bottom:8px;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -249,7 +249,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
 
     const [rollupData, submissions] = await Promise.all([
         apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments`,
+            `/api/v1/courses/${courseId}/outcome_rollups?user_ids[]=${studentId}&include[]=outcomes&include[]=outcomes.alignments&include[]=users`,
             {},
             'fetchOutcomeRollups'
         ),
@@ -261,6 +261,13 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     ]);
 
     debugLog(`Outcome rollups and submissions fetched`);
+
+    // Populate student name from rollup linked users data
+    const studentName = rollupData.linked?.users?.[0]?.display_name
+        || rollupData.linked?.users?.[0]?.name
+        || '';
+    const nameEl = document.getElementById('pm-student-name');
+    if (nameEl) nameEl.textContent = studentName;
     debugStatus(statusEl, `Processing outcome data...`);
 
     // Build submission map: assignment_id → submission data
