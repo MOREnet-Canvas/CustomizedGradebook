@@ -205,6 +205,72 @@ export async function fetchSingleEnrollment(courseId, apiClient) {
 }
 
 /**
+ * Fetches all student enrollments for a course (teacher perspective).
+ * Uses getAllPages to handle courses with more than 100 students.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {Object} apiClient - Canvas API client instance
+ * @returns {Promise<Array<{userId: string, name: string, sortableName: string, sectionId: string}>>} Normalized student list
+ *
+ * @example
+ * const students = await fetchCourseStudents('12345', apiClient);
+ * // [{ userId: '101', name: 'Jane Smith', sortableName: 'Smith, Jane', sectionId: '55' }, ...]
+ */
+export async function fetchCourseStudents(courseId, apiClient) {
+    try {
+        const enrollments = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/enrollments?type[]=StudentEnrollment&state[]=active`,
+            {},
+            'fetchCourseStudents'
+        );
+
+        logger.trace(`[EnrollmentService] Fetched ${enrollments.length} student enrollments for course ${courseId}`);
+
+        return enrollments.map(e => ({
+            userId: String(e.user_id),
+            name: e.user?.name ?? e.user?.short_name ?? `Student ${e.user_id}`,
+            sortableName: e.user?.sortable_name ?? e.user?.name ?? `Student ${e.user_id}`,
+            sectionId: String(e.course_section_id)
+        }));
+
+    } catch (error) {
+        logger.warn(`[EnrollmentService] Failed to fetch course students for ${courseId}:`, error.message);
+        return [];
+    }
+}
+
+/**
+ * Fetches all sections for a course.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {Object} apiClient - Canvas API client instance
+ * @returns {Promise<Array<{id: string, name: string}>>} Normalized section list, sorted by name
+ *
+ * @example
+ * const sections = await fetchCourseSections('12345', apiClient);
+ * // [{ id: '55', name: 'Period 1' }, { id: '56', name: 'Period 2' }]
+ */
+export async function fetchCourseSections(courseId, apiClient) {
+    try {
+        const sections = await apiClient.get(
+            `/api/v1/courses/${courseId}/sections`,
+            {},
+            'fetchCourseSections'
+        );
+
+        logger.trace(`[EnrollmentService] Fetched ${sections.length} sections for course ${courseId}`);
+
+        return sections
+            .map(s => ({ id: String(s.id), name: s.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+    } catch (error) {
+        logger.warn(`[EnrollmentService] Failed to fetch sections for ${courseId}:`, error.message);
+        return [];
+    }
+}
+
+/**
  * Converts array of enrollments to a Map of course grades.
  *
  * @param {Array} enrollments - Array of enrollment objects from Canvas API
