@@ -52,6 +52,16 @@ function ensureHost(courseName = "Mastery Dashboard") {
     const root = document.getElementById("mastery-dashboard-root");
     if (!root) return null;
 
+    // Inject course name as a page-level heading before the root div (once only).
+    // This works for all existing pages regardless of whether they have the <h2> in their body.
+    let heading = document.getElementById('pm-course-heading');
+    if (!heading) {
+        heading = document.createElement('h2');
+        heading.id = 'pm-course-heading';
+        root.parentNode.insertBefore(heading, root);
+    }
+    heading.innerHTML = `<strong>${escapeHtml(courseName)}</strong>`;
+
     root.style.display = "block";
     root.style.width = "100%";
     root.style.maxWidth = "100%";
