@@ -83,15 +83,13 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
         if (filteredStudents.length === 0) {
             dropdown.innerHTML = `<div style="padding:10px 12px; ${FONT} font-size:0.9rem; color:#888;">No students found.</div>`;
         } else {
-            dropdown.innerHTML = filteredStudents.map((s, i) =>
-                `<div role="option" data-index="${i}" data-user-id="${s.userId}"
-                      style="padding:10px 12px; cursor:pointer; ${FONT} font-size:0.95rem; color:#333; border-bottom:1px solid #f0f0f0;"
-                      onmouseenter="this.style.background='#f5f5f5';"
-                      onmouseleave="this.style.background='';">
-                     ${escapeHtml(s.name)}
-                     ${sections.length > 1 && !selectedSectionId ? `<span style="color:#888; font-size:0.8rem; margin-left:6px;">${escapeHtml(getSectionName(sections, s.sectionId))}</span>` : ''}
-                 </div>`
-            ).join('');
+            // Items are fully inline — no extra whitespace/newlines inside the div
+            dropdown.innerHTML = filteredStudents.map((s, i) => {
+                const sectionLabel = sections.length > 1 && !selectedSectionId
+                    ? `<span style="color:#888; font-size:0.8rem; margin-left:6px;">${escapeHtml(getSectionName(sections, s.sectionId))}</span>`
+                    : '';
+                return `<div role="option" data-index="${i}" data-user-id="${s.userId}" style="padding:8px 12px; cursor:pointer; ${FONT} font-size:0.95rem; color:#333; border-bottom:1px solid #f0f0f0; line-height:1.4;" onmouseenter="this.style.background='#f5f5f5';" onmouseleave="this.style.background='';">${escapeHtml(s.name)}${sectionLabel}</div>`;
+            }).join('');
         }
         dropdown.style.display = 'block';
     }
@@ -99,8 +97,10 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
     function selectStudent(student) {
         dropdown.style.display = 'none';
         searchInput.value = '';
-        renderStudentHeader(cardsEl, student.name, () => {
-            // "Change Student" clicked — restore picker
+        const header = ensureTeacherHeader(cardsEl);
+        updateTeacherHeader(header, student.name, () => {
+            // "Change Student" clicked — hide header, restore picker
+            header.style.display = 'none';
             cardsEl.innerHTML = '';
             cardsEl.appendChild(pickerEl);
             dropdown.style.display = 'none';
@@ -160,19 +160,26 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
     });
 }
 
-/** Replace the picker with a "Viewing: [Name]" header bar above the cards area. */
-function renderStudentHeader(cardsEl, studentName, onChangeStudent) {
-    const header = document.createElement('div');
-    header.id = 'teacher-student-header';
-    header.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:8px 4px 12px; border-bottom:1px solid #e0e0e0; margin-bottom:8px;`;
-    header.innerHTML = `
-        <span style="${FONT} font-size:0.9rem; color:#555;">Viewing:</span>
-        <span style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-left:6px; flex:1;">${escapeHtml(studentName)}</span>
-        <button id="pm-change-student" style="${FONT} font-size:0.85rem; color:#0374B5; background:none; border:none; cursor:pointer; padding:4px 8px; text-decoration:underline;">← Change Student</button>
-    `;
-    const existing = cardsEl.querySelector('#teacher-student-header');
-    if (existing) existing.remove();
-    cardsEl.insertBefore(header, cardsEl.firstChild);
+/**
+ * Create or retrieve the persistent teacher header element.
+ * Lives as a sibling of cardsEl (inserted before it) so that
+ * cardsEl.innerHTML assignments in renderStudentData never wipe it.
+ */
+function ensureTeacherHeader(cardsEl) {
+    let header = cardsEl.parentNode.querySelector('#pm-teacher-header');
+    if (!header) {
+        header = document.createElement('div');
+        header.id = 'pm-teacher-header';
+        header.style.cssText = `display:none; justify-content:space-between; align-items:center; padding:8px 4px 12px; border-bottom:1px solid #e0e0e0; margin-bottom:8px;`;
+        cardsEl.parentNode.insertBefore(header, cardsEl);
+    }
+    return header;
+}
+
+/** Update the persistent header content and show it. */
+function updateTeacherHeader(header, studentName, onChangeStudent) {
+    header.innerHTML = `<span style="${FONT} font-size:0.9rem; color:#555;">Viewing:</span><span style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-left:6px; flex:1;">${escapeHtml(studentName)}</span><button id="pm-change-student" style="${FONT} font-size:0.85rem; color:#0374B5; background:none; border:none; cursor:pointer; padding:4px 8px; text-decoration:underline;">← Change Student</button>`;
+    header.style.display = 'flex';
     header.querySelector('#pm-change-student').addEventListener('click', onChangeStudent);
 }
 
@@ -188,14 +195,14 @@ function buildPickerHtml(sections) {
         </div>` : '';
 
     return `
-        <div style="padding:4px 0 12px;">
+        <div style="padding:4px 0 12px; overflow:visible;">
             <div style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-bottom:12px;">Select a Student</div>
             ${sectionRow}
-            <div style="position:relative;">
+            <div style="position:relative; overflow:visible;">
                 <label for="pm-student-search" style="${FONT} font-size:0.85rem; color:#555; display:block; margin-bottom:4px;">Student Name</label>
                 <input id="pm-student-search" type="text" placeholder="Type to search…" autocomplete="off"
                        style="${FONT} width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; color:#333; box-sizing:border-box;" />
-                <div id="pm-student-dropdown" role="listbox" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; z-index:100; box-shadow:0 4px 8px rgba(0,0,0,0.12);"></div>
+                <div id="pm-student-dropdown" role="listbox" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; z-index:9999; box-shadow:0 4px 8px rgba(0,0,0,0.12);"></div>
             </div>
         </div>`;
 }
