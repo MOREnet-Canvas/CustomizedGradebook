@@ -1,0 +1,209 @@
+// src/masteryDashboard/teacherMasteryView.js
+/**
+ * Teacher Mastery View
+ *
+ * Renders a student picker for teachers on the mastery dashboard.
+ * Features:
+ * - Section filter dropdown (optional — filters the student list)
+ * - Searchable student combobox (type-to-filter, keyboard navigable)
+ * - "Viewing: [Name]" header bar with "← Change Student" link after selection
+ *
+ * Uses fetchCourseStudents / fetchCourseSections from enrollmentService.
+ * Calls onStudentSelected(studentId, studentName) when teacher picks a student.
+ */
+
+import { fetchCourseStudents, fetchCourseSections } from '../services/enrollmentService.js';
+
+const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
+
+/**
+ * Render the teacher student picker into the dashboard container.
+ *
+ * @param {Object} options
+ * @param {string|number} options.courseId - Canvas course ID
+ * @param {Object} options.apiClient - CanvasApiClient instance
+ * @param {HTMLElement} options.statusEl - #pm-status element
+ * @param {HTMLElement} options.cardsEl - #pm-cards element
+ * @param {Function} options.onStudentSelected - Callback(studentId, studentName)
+ */
+export async function renderTeacherMasteryView({ courseId, apiClient, statusEl, cardsEl, onStudentSelected }) {
+    statusEl.textContent = "Loading student roster…";
+
+    // Fetch students and sections in parallel
+    const [students, sections] = await Promise.all([
+        fetchCourseStudents(courseId, apiClient),
+        fetchCourseSections(courseId, apiClient)
+    ]);
+
+    if (students.length === 0) {
+        statusEl.textContent = "No students found in this course.";
+        return;
+    }
+
+    // Sort students by sortable name (Last, First)
+    students.sort((a, b) => a.sortableName.localeCompare(b.sortableName));
+
+    statusEl.textContent = "";
+    renderPicker(cardsEl, students, sections, onStudentSelected);
+}
+
+/**
+ * Build and inject the picker UI. Tracks state (selected section, search text) locally.
+ */
+function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
+    let selectedSectionId = null;
+    let activeIndex = -1;
+
+    const pickerEl = document.createElement('div');
+    pickerEl.id = 'teacher-picker';
+    pickerEl.innerHTML = buildPickerHtml(sections);
+    cardsEl.innerHTML = '';
+    cardsEl.appendChild(pickerEl);
+
+    const sectionSelect = pickerEl.querySelector('#pm-section-select');
+    const searchInput = pickerEl.querySelector('#pm-student-search');
+    const dropdown = pickerEl.querySelector('#pm-student-dropdown');
+
+    // Visible student list, recomputed on filter changes
+    let filteredStudents = [...allStudents];
+
+    function getFilteredStudents() {
+        const query = searchInput.value.trim().toLowerCase();
+        return allStudents.filter(s => {
+            const inSection = !selectedSectionId || s.sectionId === selectedSectionId;
+            const matchesQuery = !query || s.name.toLowerCase().includes(query) || s.sortableName.toLowerCase().includes(query);
+            return inSection && matchesQuery;
+        });
+    }
+
+    function renderDropdown() {
+        filteredStudents = getFilteredStudents();
+        activeIndex = -1;
+
+        if (filteredStudents.length === 0) {
+            dropdown.innerHTML = `<div style="padding:10px 12px; ${FONT} font-size:0.9rem; color:#888;">No students found.</div>`;
+        } else {
+            dropdown.innerHTML = filteredStudents.map((s, i) =>
+                `<div role="option" data-index="${i}" data-user-id="${s.userId}"
+                      style="padding:10px 12px; cursor:pointer; ${FONT} font-size:0.95rem; color:#333; border-bottom:1px solid #f0f0f0;"
+                      onmouseenter="this.style.background='#f5f5f5';"
+                      onmouseleave="this.style.background='';">
+                     ${escapeHtml(s.name)}
+                     ${sections.length > 1 && !selectedSectionId ? `<span style="color:#888; font-size:0.8rem; margin-left:6px;">${escapeHtml(getSectionName(sections, s.sectionId))}</span>` : ''}
+                 </div>`
+            ).join('');
+        }
+        dropdown.style.display = 'block';
+    }
+
+    function selectStudent(student) {
+        dropdown.style.display = 'none';
+        searchInput.value = '';
+        renderStudentHeader(cardsEl, student.name, () => {
+            // "Change Student" clicked — restore picker
+            cardsEl.innerHTML = '';
+            cardsEl.appendChild(pickerEl);
+            dropdown.style.display = 'none';
+            searchInput.value = '';
+        });
+        onStudentSelected(student.userId, student.name);
+    }
+
+    function highlightItem(index) {
+        const items = dropdown.querySelectorAll('[role="option"]');
+        items.forEach((el, i) => { el.style.background = i === index ? '#e8f0fe' : ''; });
+    }
+
+    // Section filter
+    sectionSelect.addEventListener('change', () => {
+        selectedSectionId = sectionSelect.value || null;
+        renderDropdown();
+    });
+
+    // Search input — filter on each keystroke
+    searchInput.addEventListener('input', renderDropdown);
+
+    // Show dropdown on focus
+    searchInput.addEventListener('focus', renderDropdown);
+
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!pickerEl.contains(e.target)) dropdown.style.display = 'none';
+    }, { capture: true });
+
+    // Keyboard navigation
+    searchInput.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('[role="option"]');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, items.length - 1);
+            highlightItem(activeIndex);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIndex = Math.max(activeIndex - 1, 0);
+            highlightItem(activeIndex);
+        } else if (e.key === 'Enter' && activeIndex >= 0) {
+            e.preventDefault();
+            selectStudent(filteredStudents[activeIndex]);
+        } else if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Click on dropdown item
+    dropdown.addEventListener('click', (e) => {
+        const item = e.target.closest('[role="option"]');
+        if (!item) return;
+        selectStudent(filteredStudents[Number(item.dataset.index)]);
+    });
+}
+
+/** Replace the picker with a "Viewing: [Name]" header bar above the cards area. */
+function renderStudentHeader(cardsEl, studentName, onChangeStudent) {
+    const header = document.createElement('div');
+    header.id = 'teacher-student-header';
+    header.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:8px 4px 12px; border-bottom:1px solid #e0e0e0; margin-bottom:8px;`;
+    header.innerHTML = `
+        <span style="${FONT} font-size:0.9rem; color:#555;">Viewing:</span>
+        <span style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-left:6px; flex:1;">${escapeHtml(studentName)}</span>
+        <button id="pm-change-student" style="${FONT} font-size:0.85rem; color:#0374B5; background:none; border:none; cursor:pointer; padding:4px 8px; text-decoration:underline;">← Change Student</button>
+    `;
+    const existing = cardsEl.querySelector('#teacher-student-header');
+    if (existing) existing.remove();
+    cardsEl.insertBefore(header, cardsEl.firstChild);
+    header.querySelector('#pm-change-student').addEventListener('click', onChangeStudent);
+}
+
+/** Build the picker HTML shell */
+function buildPickerHtml(sections) {
+    const sectionRow = sections.length > 1 ? `
+        <div style="margin-bottom:10px;">
+            <label for="pm-section-select" style="${FONT} font-size:0.85rem; color:#555; display:block; margin-bottom:4px;">Section</label>
+            <select id="pm-section-select" style="${FONT} width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; color:#333; background:#fff;">
+                <option value="">All Sections</option>
+                ${sections.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}
+            </select>
+        </div>` : '';
+
+    return `
+        <div style="padding:4px 0 12px;">
+            <div style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-bottom:12px;">Select a Student</div>
+            ${sectionRow}
+            <div style="position:relative;">
+                <label for="pm-student-search" style="${FONT} font-size:0.85rem; color:#555; display:block; margin-bottom:4px;">Student Name</label>
+                <input id="pm-student-search" type="text" placeholder="Type to search…" autocomplete="off"
+                       style="${FONT} width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; color:#333; box-sizing:border-box;" />
+                <div id="pm-student-dropdown" role="listbox" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; z-index:100; box-shadow:0 4px 8px rgba(0,0,0,0.12);"></div>
+            </div>
+        </div>`;
+}
+
+function getSectionName(sections, sectionId) {
+    return sections.find(s => s.id === sectionId)?.name ?? '';
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c]
+    );
+}

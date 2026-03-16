@@ -11,11 +11,12 @@
  * Supports:
  * - Students viewing their own mastery data
  * - Observers (parents) viewing observed student's mastery data
- * - Teachers see an error message (future: dropdown to select student)
+ * - Teachers: student picker via teacherMasteryView.js
  */
 
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import { renderTeacherMasteryView } from './teacherMasteryView.js';
 
 /**
  * Rating scale for calculating letter grades
@@ -191,14 +192,48 @@ export async function renderMasteryDashboard() {
             debugLog(`Student ID: ${studentId}`);
             debugStatus(statusEl, `Role: ${userRole}. Loading your mastery data...`);
         } else {
-            // Teacher or other role - not supported yet
+            // Check for teacher enrollment
+            const isTeacher = courseEnrollments.some(e =>
+                e.type === "TeacherEnrollment" || e.type === "TaEnrollment" || e.type === "DesignerEnrollment"
+            );
+
+            if (isTeacher) {
+                debugLog(`User role: Teacher. Rendering student picker.`);
+                statusEl.textContent = "";
+                renderTeacherMasteryView({
+                    courseId,
+                    apiClient,
+                    statusEl,
+                    cardsEl,
+                    onStudentSelected: (selectedStudentId, selectedStudentName) => {
+                        renderStudentData(selectedStudentId, courseId, apiClient, statusEl, cardsEl);
+                    }
+                });
+                return;
+            }
+
+            // Unknown role
             const roleTypes = courseEnrollments.map(e => e.type).join(", ");
-            statusEl.textContent = `Mastery Dashboard is only available for students and observers. Your role(s): ${roleTypes || "none"}`;
-            debugLog(`ERROR: No student or observer enrollment found. Roles: ${roleTypes}`);
+            statusEl.textContent = `Mastery Dashboard is not available for your role. Role(s): ${roleTypes || "none"}`;
+            debugLog(`ERROR: No supported enrollment found. Roles: ${roleTypes}`);
             return;
         }
     }
 
+    await renderStudentData(studentId, courseId, apiClient, statusEl, cardsEl);
+}
+
+/**
+ * Render mastery data for a specific student.
+ * Called directly for students/observers, and by teacherMasteryView after student selection.
+ *
+ * @param {string|number} studentId - Canvas user ID of the student to display
+ * @param {string|number} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Authenticated API client
+ * @param {HTMLElement} statusEl - Status message element (#pm-status)
+ * @param {HTMLElement} cardsEl - Cards container element (#pm-cards)
+ */
+export async function renderStudentData(studentId, courseId, apiClient, statusEl, cardsEl) {
     // Fetch outcome rollups and submissions in parallel for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
