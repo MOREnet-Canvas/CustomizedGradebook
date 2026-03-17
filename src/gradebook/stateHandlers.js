@@ -294,6 +294,15 @@ export async function handleCalculating(stateMachine) {
     });
 
     if (numberOfUpdates === 0) {
+        // TEMPORARY — REMOVE AFTER 2026-04-07
+        // When status clearing is pending, bypass the zero-updates short-circuit so
+        // UPDATING_GRADES is always reached and existing IE statuses get cleared even
+        // when no score changes are needed. See documents/TODOs/grade-status-cleanup.md.
+        if (!ENABLE_GRADE_CUSTOM_STATUS) {
+            logger.debug('[StatusClear] No score updates needed but status clearing required — proceeding to UPDATING_GRADES');
+            return STATES.UPDATING_GRADES;
+        }
+
         // Mark as zero updates so COMPLETE handler can handle it appropriately
         stateMachine.updateContext({ zeroUpdates: true });
         return STATES.COMPLETE;
@@ -316,59 +325,52 @@ export async function handleUpdatingGrades(stateMachine) {
     const apiClient = new CanvasApiClient();
 
     // ---------------------------------------------------------------------------
-    // QUICK FIX: Clear existing custom grade statuses when the feature is disabled.
+    // TEMPORARY — REMOVE AFTER 2026-04-07
     //
-    // When ENABLE_GRADE_CUSTOM_STATUS=false, any statuses previously applied by
-    // this tool remain in Canvas until explicitly cleared. This block detects them
-    // and clears both the enrollment-level override status and the submission-level
-    // assignment status before the normal score update proceeds.
+    // Clears existing custom grade statuses (IE) for all students when
+    // ENABLE_GRADE_CUSTOM_STATUS=false. Runs before the GraphQL/bulk branch so it
+    // covers both update paths.
     //
-    // This runs BEFORE the GraphQL/bulk branch so it covers both update paths.
+    // Detection via the Canvas REST enrollment API was removed — the REST API does
+    // not reliably return customGradeStatusId in the grades object. Instead we send
+    // null for every student, which is idempotent for those who have no status set.
     //
-    // RESOLVED: REST bulk path previously had no status cleanup at all — this block
-    // fixes that by running independently of the downstream grading path.
+    // handleCalculating bypasses the numberOfUpdates===0 short-circuit when this
+    // flag is off, so this block is always reached even when no scores changed.
     //
-    // TODO: See documents/TODOs/grade-status-cleanup.md for the proper refactor.
-    //       Key items: dedicated CLEARING_STATUSES state, independent config flags,
-    //       and decoupling IE zero detection from custom status application.
+    // See documents/TODOs/grade-status-cleanup.md for the proper long-term refactor.
     // ---------------------------------------------------------------------------
     if (!ENABLE_GRADE_CUSTOM_STATUS) {
         try {
+            banner.setText('Clearing custom grade statuses...');
+
             const allEnrollments = await apiClient.getAllPages(
-                `/api/v1/courses/${courseId}/enrollments?type[]=StudentEnrollment&include[]=total_scores`
+                `/api/v1/courses/${courseId}/enrollments?type[]=StudentEnrollment`
             );
-            const anyWithStatus = allEnrollments.some(e => e.grades?.customGradeStatusId);
 
-            if (anyWithStatus) {
-                logger.debug(`[StatusClear] Found students with custom grade status — clearing before update`);
-                banner.setText('Clearing custom grade statuses...');
+            // Use preloaded submission map if available (GraphQL path already ran PRELOAD_SUBMISSIONS),
+            // otherwise fetch now (REST bulk path skips PRELOAD_SUBMISSIONS).
+            const subMap = submissionIdByUserId
+                || (await fetchAllSubmissions(courseId, assignmentId, apiClient)).submissionIdByUserId;
 
-                // Use preloaded submission map if available (GraphQL path already ran PRELOAD_SUBMISSIONS),
-                // otherwise fetch now (REST bulk path skips PRELOAD_SUBMISSIONS).
-                const subMap = submissionIdByUserId
-                    || (await fetchAllSubmissions(courseId, assignmentId, apiClient)).submissionIdByUserId;
-
-                let clearedCount = 0;
-                for (const enrollment of allEnrollments) {
-                    const subId = subMap?.get(String(enrollment.user_id));
-                    if (!subId) {
-                        logger.trace(`[StatusClear] No submission ID for user ${enrollment.user_id} — skipping`);
-                        continue;
-                    }
-                    await apiClient.graphql(
-                        `mutation {
-                            setOverrideStatus(input: { enrollmentId: "${enrollment.id}", customGradeStatusId: null }) { __typename }
-                            updateSubmissionGradeStatus(input: { submissionId: "${subId}", customGradeStatusId: null }) { __typename }
-                        }`,
-                        {},
-                        'clearCustomGradeStatus'
-                    );
-                    clearedCount++;
+            let clearedCount = 0;
+            for (const enrollment of allEnrollments) {
+                const subId = subMap?.get(String(enrollment.user_id));
+                if (!subId) {
+                    logger.trace(`[StatusClear] No submission ID for user ${enrollment.user_id} — skipping`);
+                    continue;
                 }
-                logger.debug(`[StatusClear] Cleared custom grade status for ${clearedCount} students`);
-            } else {
-                logger.trace(`[StatusClear] No students with custom grade status found — skipping clear`);
+                await apiClient.graphql(
+                    `mutation {
+                        setOverrideStatus(input: { enrollmentId: "${enrollment.id}", customGradeStatusId: null }) { __typename }
+                        updateSubmissionGradeStatus(input: { submissionId: "${subId}", customGradeStatusId: null }) { __typename }
+                    }`,
+                    {},
+                    'clearCustomGradeStatus'
+                );
+                clearedCount++;
             }
+            logger.debug(`[StatusClear] Cleared custom grade status for ${clearedCount} students`);
         } catch (err) {
             // Non-fatal — log and continue with the normal update so scores still apply
             logger.warn(`[StatusClear] Failed to clear custom grade statuses: ${err.message}`);
