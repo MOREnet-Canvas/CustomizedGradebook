@@ -5,6 +5,31 @@ Relates to: `src/gradebook/stateHandlers.js`, `src/services/unifiedGraphQLGradin
 
 ---
 
+## ⚠️ TEMPORARY CODE — Remove by 2026-04-07
+
+Two blocks of quick-fix code exist in `src/gradebook/stateHandlers.js`.
+Search for `TEMPORARY — REMOVE AFTER 2026-04-07` to find both.
+
+**Block 1 — `handleCalculating`**
+Bypasses the `numberOfUpdates === 0` short-circuit when `ENABLE_GRADE_CUSTOM_STATUS=false`
+so `UPDATING_GRADES` is always reached even when no score changes are needed.
+
+**Block 2 — `handleUpdatingGrades`**
+Clears both enrollment-level and submission-level custom grade statuses for all students
+before the normal score update proceeds.
+
+**To remove:**
+1. Delete both blocks (search `TEMPORARY — REMOVE AFTER 2026-04-07`)
+2. Re-enable `ENABLE_GRADE_CUSTOM_STATUS=true` in the loader if desired
+3. Complete the proper refactor described in the items below
+
+**When is it safe to remove?**
+Once all teachers have run at least one update with `ENABLE_GRADE_CUSTOM_STATUS=false`,
+all existing IE statuses will have been cleared from Canvas. After that point these blocks
+do nothing useful and can be deleted.
+
+---
+
 ## Background
 
 A quick fix was added to `handleUpdatingGrades` to clear custom grade statuses when
@@ -85,4 +110,3 @@ so both paths now clear statuses. Remaining work is moving this to a proper stat
 - `src/services/unifiedGraphQLGrading.js` — `submitUnifiedGrade`, status ID logic
 - `src/services/gradeCalculator.js` — `calculateStudentAveragesWithIE` vs `calculateStudentAverages`
 - `src/config.js` — all feature flags
-
