@@ -2,8 +2,18 @@
 For checking version in DevTools: CG.version
 
 
+## Things to look into
+- If the assignment screen in the student app can be linked to in the parent app, the links go to different places on the Mastery Dashboard depending on which app you are using.
+- If grades in the gradebook only show points even in "grading scheme" the score shows GPA in the student app instead of letter grade. 
+
+
 
 ## Next Steps
+TODO: Add missing assignments to Mastery Dashboard
+TODO: Add way to customize Mastery Dashboard colors
+TODO: Check on the zero grade penalty --> make sure a non scored outcome isn't being counted as a zero
+TODO: Add comments link to Mastery Dashboard
+TODO: Make zero outcomes show up first in Mastery Dashboard
 TODO: Fix Observer Grades page
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Add Checks for assignments

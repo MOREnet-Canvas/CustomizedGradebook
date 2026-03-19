@@ -69,7 +69,8 @@ function ensureHost(courseName = "Mastery Dashboard") {
 
     root.innerHTML = `
       <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
-        <div id="pm-student-name" style="font-weight:700; margin-bottom:8px;"></div>
+        <div id="pm-student-name" style="font-weight:700; margin-bottom:4px;"></div>
+        <div id="pm-missing" style="display:none; color:#C62828; font-size:0.85rem; font-weight:600; margin-bottom:8px;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -253,8 +254,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             {},
             'fetchOutcomeRollups'
         ),
-        apiClient.get(
-            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}&per_page=100`,
+        apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}`,
             {},
             'fetchStudentSubmissions'
         )
@@ -268,6 +269,21 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         || '';
     const nameEl = document.getElementById('pm-student-name');
     if (nameEl) nameEl.textContent = studentName;
+
+    // Count missing assignments and display in header
+    const missingCount = submissions.filter(s =>
+        s.missing === true || s.late_policy_status === 'missing'
+    ).length;
+    const missingEl = document.getElementById('pm-missing');
+    if (missingEl) {
+        if (missingCount > 0) {
+            missingEl.textContent = `${missingCount} Missing`;
+            missingEl.style.display = 'block';
+        } else {
+            missingEl.style.display = 'none';
+        }
+    }
+    debugLog(`Missing assignments: ${missingCount}`);
     debugStatus(statusEl, `Processing outcome data...`);
 
     // Build submission map: assignment_id → submission data
