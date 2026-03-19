@@ -43,8 +43,13 @@ export function buildAvgCommentToggleHtml(rawComments) {
             aria-label="View teacher comments"
             aria-expanded="false"
             title="View comments"
-            style="background:#E8F0FE; border:1.5px solid #0770A3; border-radius:12px; cursor:pointer; padding:3px 8px; font-size:1.1rem; line-height:1; flex-shrink:0;">
-            💬
+            style="background:none; border:none; cursor:pointer; padding:4px; flex-shrink:0; border-radius:4px; line-height:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="#0770A3" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"
+                 style="display:block;">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
         </button>
     `;
 }
@@ -107,7 +112,7 @@ export function initAvgCommentPanel() {
         const isOpen = panel.style.display !== 'none';
         panel.style.display = isOpen ? 'none' : 'block';
         toggle.setAttribute('aria-expanded', String(!isOpen));
-        toggle.style.background = isOpen ? '#E8F0FE' : '#C9DEFA';
-        toggle.style.borderColor = '#0770A3';
+        const svg = toggle.querySelector('svg');
+        if (svg) svg.style.opacity = isOpen ? '1' : '0.5';
     });
 }
