@@ -71,7 +71,8 @@ function ensureHost(courseName = "Mastery Dashboard") {
     root.innerHTML = `
       <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
         <div id="pm-student-name" style="font-weight:700; margin-bottom:4px;"></div>
-        <div id="pm-missing" style="display:none; font-size:0.85rem; font-weight:600; margin-bottom:8px;"></div>
+        <div id="pm-missing" style="display:none; font-size:0.85rem; font-weight:600; margin-bottom:4px; cursor:pointer;" role="button" tabindex="0"></div>
+        <div id="pm-missing-panel" style="display:none; margin-bottom:8px;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -256,7 +257,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             'fetchOutcomeRollups'
         ),
         apiClient.getAllPages(
-            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}&include[]=submission_comments`,
+            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}&include[]=submission_comments&include[]=assignment`,
             {},
             'fetchStudentSubmissions'
         )
@@ -271,19 +272,51 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     const nameEl = document.getElementById('pm-student-name');
     if (nameEl) nameEl.textContent = studentName;
 
-    // Count missing assignments and display in header
-    const missingCount = submissions.filter(s =>
+    // Build missing assignment list and display in header
+    const missingSubmissions = submissions.filter(s =>
         s.missing === true || s.late_policy_status === 'missing'
-    ).length;
+    );
+    const missingList = missingSubmissions
+        .map(s => ({ name: s.assignment?.name, url: s.assignment?.html_url }))
+        .filter(s => s.name);
+    const missingCount = missingList.length;
+
     const missingEl = document.getElementById('pm-missing');
+    const missingPanelEl = document.getElementById('pm-missing-panel');
+
     if (missingEl) {
         if (missingCount > 0) {
-            missingEl.textContent = `Missing Assignments: ${missingCount}`;
+            missingEl.textContent = `Missing Assignments: ${missingCount} ▶`;
             missingEl.style.color = '#C62828';
             missingEl.style.display = 'block';
+
+            if (missingPanelEl) {
+                missingPanelEl.innerHTML = missingList.map(a => `
+                    <div style="padding:3px 0;">
+                        <a href="${a.url}" target="_blank"
+                           style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;
+                                  font-size:0.82rem; color:#C62828; text-decoration:underline; line-height:1.5;">
+                            ${escapeHtml(a.name)}
+                        </a>
+                    </div>
+                `).join('');
+
+                missingEl.addEventListener('click', () => {
+                    const isOpen = missingPanelEl.style.display !== 'none';
+                    missingPanelEl.style.display = isOpen ? 'none' : 'block';
+                    missingEl.textContent = `Missing Assignments: ${missingCount} ${isOpen ? '▶' : '▼'}`;
+                });
+                missingEl.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        missingEl.click();
+                    }
+                });
+            }
         } else {
             missingEl.textContent = '🎉 No Missing Assignments';
             missingEl.style.color = '#2E7D32';
+            missingEl.style.cursor = 'default';
             missingEl.style.display = 'block';
         }
     }
