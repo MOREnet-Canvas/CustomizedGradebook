@@ -17,6 +17,7 @@
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { renderTeacherMasteryView } from './teacherMasteryView.js';
+import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
 
 /**
  * Rating scale for calculating letter grades
@@ -255,7 +256,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             'fetchOutcomeRollups'
         ),
         apiClient.getAllPages(
-            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}`,
+            `/api/v1/courses/${courseId}/students/submissions?student_ids[]=${studentId}&include[]=submission_comments`,
             {},
             'fetchStudentSubmissions'
         )
@@ -295,7 +296,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         submissionMap[sub.assignment_id] = {
             late_policy_status: sub.late_policy_status,
             excused: sub.excused,
-            workflow_state: sub.workflow_state
+            workflow_state: sub.workflow_state,
+            submission_comments: sub.submission_comments ?? []
         };
     });
     debugLog(`Submissions mapped: ${Object.keys(submissionMap).length}`);
@@ -407,14 +409,21 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
 
         // Check if this is the AVG_OUTCOME (Course Grade)
         if (outcome.title === AVG_OUTCOME_NAME) {
-            // Get AVG assignment URL from alignments
+            // Get AVG assignment URL and ID from alignments
             let avgAssignmentUrl = "#";
+            let avgAssignmentId = null;
             if (outcome.alignments && outcome.alignments.length > 0) {
                 const avgAssignmentAlignment = outcome.alignments.find(id => id.startsWith("assignment_"));
                 if (avgAssignmentAlignment && alignmentMap[avgAssignmentAlignment]) {
                     avgAssignmentUrl = alignmentMap[avgAssignmentAlignment].html_url || "#";
+                    avgAssignmentId = avgAssignmentAlignment.replace("assignment_", "");
                 }
             }
+
+            // Get comments for this submission from the submission map
+            const avgComments = avgAssignmentId
+                ? (submissionMap[avgAssignmentId]?.submission_comments ?? [])
+                : [];
 
             // Format the last updated date
             const lastUpdated = rollupScore.submitted_at
@@ -425,37 +434,27 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                   })
                 : null;
 
-            // Build native-like course grade display (matches Canvas Parent app)
-            if (rollupScore.score != null) {
-                // Has score - show score with letter grade and colored dot
-                const letterGrade = getLetterGrade(rollupScore.score);
-                avgOutcomeHtml = `
-                    <a href="${avgAssignmentUrl}" target="_blank"
-                       style="display:flex; flex-direction:column; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+            // Shared row template: <a> covers label+score only, comment button sits alongside
+            const scoreLabel = rollupScore.score != null
+                ? `<span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(getLetterGrade(rollupScore.score))})`
+                : `<span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence`;
+
+            avgOutcomeHtml = `
+                <div style="display:flex; flex-direction:column; padding:12px 0; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <a href="${avgAssignmentUrl}" target="_blank"
+                           style="flex:1; display:flex; justify-content:space-between; align-items:center; text-decoration:none;">
                             <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
                             <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                                <span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(letterGrade)})
+                                ${scoreLabel}
                             </span>
-                        </div>
-                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
-                    </a>
-                `;
-            } else {
-                // No score - show "Insufficient Evidence" with red dot
-                avgOutcomeHtml = `
-                    <a href="${avgAssignmentUrl}" target="_blank"
-                       style="display:flex; flex-direction:column; padding:12px 0; text-decoration:none; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
-                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                                <span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence
-                            </span>
-                        </div>
-                        ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
-                    </a>
-                `;
-            }
+                        </a>
+                        ${buildAvgCommentToggleHtml(avgComments)}
+                    </div>
+                    ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
+                    ${buildAvgCommentPanelHtml(avgComments)}
+                </div>
+            `;
 
             // Skip adding to regular cards
             continue;
@@ -507,6 +506,9 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             ${regularCards.join("")}
         ` : ""}
     `;
+
+    // Wire up the AVG assignment comment panel toggle
+    initAvgCommentPanel();
 
     // Add click and keyboard handlers to toggle expansion and lazy-load outcome_results
     cardsEl.querySelectorAll('[data-outcome-id]').forEach(card => {
