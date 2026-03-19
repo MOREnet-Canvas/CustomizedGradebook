@@ -45,6 +45,20 @@ function getLetterGrade(score) {
 }
 
 /**
+ * Return a motivational sub-label for the Mastered stat box
+ * @param {number} mastered - Number of mastered outcomes
+ * @param {number} total - Total number of outcomes
+ * @returns {string}
+ */
+function getMasteryEncouragement(mastered, total) {
+    if (total === 0) return '';
+    if (mastered === total) return '🌟 All mastered!';
+    if (mastered >= total / 2) return 'Almost there!';
+    if (mastered > 0) return 'Good start!';
+    return 'Keep going!';
+}
+
+/**
  * Ensure the host container exists and is properly configured
  * @param {string} courseName - The name of the course to display
  * @returns {HTMLElement|null} The root element, or null if not found
@@ -68,11 +82,31 @@ function ensureHost(courseName = "Mastery Dashboard") {
     root.style.maxWidth = "100%";
     root.style.boxSizing = "border-box";
 
+    const F = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
     root.innerHTML = `
-      <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
-        <div id="pm-student-name" style="font-weight:700; margin-bottom:4px;"></div>
-        <div id="pm-missing" style="display:none; font-size:0.85rem; font-weight:600; margin-bottom:4px; cursor:pointer;" role="button" tabindex="0"></div>
-        <div id="pm-missing-panel" style="display:none; margin-bottom:8px;"></div>
+      <div style="border:1px solid #ddd; border-radius:10px; padding:16px; margin:12px 0;">
+        <div style="margin-bottom:12px;">
+          <div id="pm-student-name" style="${F} font-size:1.1rem; font-weight:700; color:#333; margin-bottom:2px; line-height:1.4; -webkit-font-smoothing:antialiased;"></div>
+          <div id="pm-subtitle" style="${F} font-size:0.8rem; color:#666; line-height:1.4; -webkit-font-smoothing:antialiased;"></div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <div style="flex:1; min-width:110px; background:#f8f9fa; border-radius:8px; padding:10px 12px;">
+            <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Score</div>
+            <div id="pm-stat-score" style="${F} font-size:1.6rem; font-weight:700; line-height:1; margin-bottom:4px; -webkit-font-smoothing:antialiased;">—</div>
+            <div id="pm-stat-score-label" style="${F} font-size:0.78rem; color:#555; -webkit-font-smoothing:antialiased;"></div>
+          </div>
+          <div style="flex:1; min-width:110px; background:#f8f9fa; border-radius:8px; padding:10px 12px;">
+            <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Mastered</div>
+            <div id="pm-stat-mastered" style="${F} font-size:1.6rem; font-weight:700; line-height:1; margin-bottom:4px; color:#333; -webkit-font-smoothing:antialiased;">—</div>
+            <div id="pm-stat-mastered-label" style="${F} font-size:0.78rem; color:#555; -webkit-font-smoothing:antialiased;"></div>
+          </div>
+          <div style="flex:1; min-width:110px; background:#f8f9fa; border-radius:8px; padding:10px 12px;">
+            <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Attention</div>
+            <div id="pm-stat-attention" style="${F} font-size:1.6rem; font-weight:700; line-height:1; margin-bottom:4px; color:#333; -webkit-font-smoothing:antialiased;">—</div>
+            <div id="pm-stat-attention-label" style="${F} font-size:0.78rem; -webkit-font-smoothing:antialiased;"></div>
+          </div>
+        </div>
+        <div id="pm-missing-banner" style="display:none; background:#FFF8E1; border:1px solid #FAB901; border-left:4px solid #FAB901; border-radius:6px; padding:10px 14px; margin-bottom:12px;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -265,61 +299,21 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
 
     debugLog(`Outcome rollups and submissions fetched`);
 
-    // Populate student name from rollup linked users data
+    // Populate student name with "— Mastery progress" suffix
     const studentName = rollupData.linked?.users?.[0]?.display_name
         || rollupData.linked?.users?.[0]?.name
         || '';
     const nameEl = document.getElementById('pm-student-name');
-    if (nameEl) nameEl.textContent = studentName;
+    if (nameEl) nameEl.textContent = studentName ? `${studentName} — Mastery progress` : 'Mastery progress';
 
-    // Build missing assignment list and display in header
+    // Build missing assignment list (banner populated after stat boxes are built)
     const missingSubmissions = submissions.filter(s =>
         s.missing === true || s.late_policy_status === 'missing'
     );
     const missingList = missingSubmissions
-        .map(s => ({ name: s.assignment?.name, url: s.assignment?.html_url }))
+        .map(s => ({ name: s.assignment?.name, url: s.assignment?.html_url, assignmentId: String(s.assignment_id) }))
         .filter(s => s.name);
     const missingCount = missingList.length;
-
-    const missingEl = document.getElementById('pm-missing');
-    const missingPanelEl = document.getElementById('pm-missing-panel');
-
-    if (missingEl) {
-        if (missingCount > 0) {
-            missingEl.textContent = `Missing Assignments: ${missingCount} ▶`;
-            missingEl.style.color = '#C62828';
-            missingEl.style.display = 'block';
-
-            if (missingPanelEl) {
-                missingPanelEl.innerHTML = missingList.map(a => `
-                    <div style="padding:3px 0;">
-                        <a href="${a.url}" target="_blank"
-                           style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;
-                                  font-size:0.82rem; color:#C62828; text-decoration:underline; line-height:1.5;">
-                            ${escapeHtml(a.name)}
-                        </a>
-                    </div>
-                `).join('');
-
-                missingEl.addEventListener('click', () => {
-                    const isOpen = missingPanelEl.style.display !== 'none';
-                    missingPanelEl.style.display = isOpen ? 'none' : 'block';
-                    missingEl.textContent = `Missing Assignments: ${missingCount} ${isOpen ? '▶' : '▼'}`;
-                });
-                missingEl.addEventListener('keydown', e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        missingEl.click();
-                    }
-                });
-            }
-        } else {
-            missingEl.textContent = '🎉 No Missing Assignments';
-            missingEl.style.color = '#2E7D32';
-            missingEl.style.cursor = 'default';
-            missingEl.style.display = 'block';
-        }
-    }
     debugLog(`Missing assignments: ${missingCount}`);
     debugStatus(statusEl, `Processing outcome data...`);
 
@@ -363,6 +357,21 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     debugLog(`Alignments mapped: ${Object.keys(alignmentMap).length}`);
     debugLog(`Rollup scores: ${rollupScores.length}`);
 
+    // Build reverse map: assignment_id → outcome names aligned to it (for missing banner)
+    const assignmentOutcomeMap = {};
+    for (const outcome of rollupData.linked?.outcomes ?? []) {
+        if (outcome.title === AVG_OUTCOME_NAME) continue;
+        const isExcluded = EXCLUDED_OUTCOME_KEYWORDS.some(kw => outcome.title.includes(kw));
+        if (isExcluded) continue;
+        for (const alignmentId of outcome.alignments ?? []) {
+            if (!alignmentId.startsWith('assignment_')) continue;
+            const aId = alignmentId.replace('assignment_', '');
+            if (!assignmentOutcomeMap[aId]) assignmentOutcomeMap[aId] = [];
+            assignmentOutcomeMap[aId].push(outcome.display_name || outcome.title);
+        }
+    }
+    debugLog(`Assignment→outcome map: ${Object.keys(assignmentOutcomeMap).length} entries`);
+
     // Sort outcomes: AVG_OUTCOME first, then null/IE and scores ≤ 1 by score ascending, then by most recent submission
     const sortedScores = [...rollupScores].sort((a, b) => {
         const outcomeA = outcomeMap[a.links.outcome];
@@ -389,6 +398,28 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // Both normal (score > 1): sort by most recent submission
         return new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0);
     });
+
+    // Extract AVG outcome score and date for header stat box (before card loop)
+    let avgScore = null;
+    let avgScoreColor = '#E62429';
+    let avgLetterGrade = '';
+    let avgUpdatedDate = null;
+    const avgRollupScore = sortedScores.find(s => outcomeMap[String(s.links.outcome)]?.title === AVG_OUTCOME_NAME);
+    if (avgRollupScore) {
+        avgScore = avgRollupScore.score;
+        if (avgScore != null) {
+            avgLetterGrade = getLetterGrade(avgScore);
+            if (avgScore >= 4) avgScoreColor = "#02672D";
+            else if (avgScore >= 3) avgScoreColor = "#03893D";
+            else if (avgScore >= 2) avgScoreColor = "#FAB901";
+            else if (avgScore >= 1) avgScoreColor = "#FD5D10";
+            else avgScoreColor = "#E62429";
+        }
+        avgUpdatedDate = avgRollupScore.submitted_at
+            ? new Date(avgRollupScore.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : null;
+    }
+    debugLog(`AVG score for header: ${avgScore}, date: ${avgUpdatedDate}`);
 
     // Calculate mastery count (score >= 3 is considered mastered)
     // Exclude AVG_OUTCOME and any outcomes matching EXCLUDED_OUTCOME_KEYWORDS
@@ -418,9 +449,74 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         }
     }
 
-    // Update status with mastery count
-    statusEl.textContent = `${masteredCount} of ${totalCount} Mastered`;
     debugLog(`Mastery count: ${masteredCount} of ${totalCount}`);
+
+    const HFONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
+
+    // Subtitle — updated date
+    const subtitleEl = document.getElementById('pm-subtitle');
+    if (subtitleEl) subtitleEl.textContent = avgUpdatedDate ? `Updated ${avgUpdatedDate}` : '';
+
+    // Score stat box
+    const scoreEl = document.getElementById('pm-stat-score');
+    const scoreLabelEl = document.getElementById('pm-stat-score-label');
+    if (scoreEl) { scoreEl.textContent = avgScore != null ? avgScore : '—'; scoreEl.style.color = avgScoreColor; }
+    if (scoreLabelEl) scoreLabelEl.textContent = avgLetterGrade || 'No score yet';
+
+    // Mastered stat box
+    const masteredStatEl = document.getElementById('pm-stat-mastered');
+    const masteredLabelEl = document.getElementById('pm-stat-mastered-label');
+    if (masteredStatEl) masteredStatEl.textContent = `${masteredCount} of ${totalCount}`;
+    if (masteredLabelEl) masteredLabelEl.textContent = getMasteryEncouragement(masteredCount, totalCount);
+
+    // Needs attention stat box
+    const attentionEl = document.getElementById('pm-stat-attention');
+    const attentionLabelEl = document.getElementById('pm-stat-attention-label');
+    if (attentionEl) {
+        if (missingCount > 0) {
+            attentionEl.textContent = missingCount;
+            attentionEl.style.color = '#C62828';
+            if (attentionLabelEl) {
+                attentionLabelEl.textContent = missingCount === 1 ? 'Missing assignment' : 'Missing assignments';
+                attentionLabelEl.style.color = '#C62828';
+            }
+        } else {
+            attentionEl.textContent = '✓';
+            attentionEl.style.color = '#2E7D32';
+            if (attentionLabelEl) {
+                attentionLabelEl.textContent = 'All caught up!';
+                attentionLabelEl.style.color = '#2E7D32';
+            }
+        }
+    }
+
+    // Missing assignments banner
+    const bannerEl = document.getElementById('pm-missing-banner');
+    if (bannerEl && missingList.length > 0) {
+        const bannerRows = missingList.map(a => {
+            const affectedOutcomes = assignmentOutcomeMap[a.assignmentId] ?? [];
+            return `
+                <div style="padding:5px 0; border-bottom:1px solid rgba(250,185,1,0.3);">
+                    <a href="${a.url}" target="_blank"
+                       style="${HFONT} font-size:0.85rem; color:#C62828; text-decoration:underline; font-weight:600; line-height:1.5;">
+                        ${escapeHtml(a.name)}
+                    </a>
+                    ${affectedOutcomes.length > 0
+                        ? `<div style="${HFONT} font-size:0.75rem; color:#555; margin-top:2px; line-height:1.4;">Affects: ${affectedOutcomes.map(escapeHtml).join(', ')}</div>`
+                        : ''}
+                </div>
+            `;
+        }).join('');
+        bannerEl.innerHTML = `
+            <div style="${HFONT} font-size:0.75rem; font-weight:600; color:#795500; margin-bottom:6px; -webkit-font-smoothing:antialiased;">⚠ Missing Assignments</div>
+            ${bannerRows}
+        `;
+        bannerEl.style.display = 'block';
+    }
+
+    // Hide loading status now that header is populated
+    statusEl.style.display = 'none';
+    statusEl.textContent = '';
 
     // Separate AVG_OUTCOME from regular outcomes
     let avgOutcomeHtml = null;
