@@ -70,7 +70,7 @@ function ensureHost(courseName = "Mastery Dashboard") {
     root.innerHTML = `
       <div style="border:1px solid #ddd; border-radius:10px; padding:12px; margin:12px 0;">
         <div id="pm-student-name" style="font-weight:700; margin-bottom:4px;"></div>
-        <div id="pm-missing" style="display:none; color:#C62828; font-size:0.85rem; font-weight:600; margin-bottom:8px;"></div>
+        <div id="pm-missing" style="display:none; font-size:0.85rem; font-weight:600; margin-bottom:8px;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -277,10 +277,13 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     const missingEl = document.getElementById('pm-missing');
     if (missingEl) {
         if (missingCount > 0) {
-            missingEl.textContent = `${missingCount} Missing`;
+            missingEl.textContent = `Missing Assignments: ${missingCount}`;
+            missingEl.style.color = '#C62828';
             missingEl.style.display = 'block';
         } else {
-            missingEl.style.display = 'none';
+            missingEl.textContent = '🎉 No Missing Assignments';
+            missingEl.style.color = '#2E7D32';
+            missingEl.style.display = 'block';
         }
     }
     debugLog(`Missing assignments: ${missingCount}`);
