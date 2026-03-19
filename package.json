@@ -1,6 +1,6 @@
 {
   "name": "customized-gradebook",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "type": "module",
   "scripts": {
     "deploy:dev": "node buildScripts/deploy-dev.js",
