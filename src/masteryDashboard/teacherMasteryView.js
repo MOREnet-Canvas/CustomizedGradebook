@@ -167,6 +167,20 @@ function renderPicker(cardsEl, allStudents, sections, onStudentSelected) {
             cardsEl.appendChild(pickerEl);
             dropdown.style.display = 'none';
             searchInput.value = '';
+
+            // Reset header stat boxes to blank state
+            const clearText = (id, val = '') => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            const clearHtml = (id) => { const el = document.getElementById(id); if (el) el.innerHTML = ''; };
+            clearText('pm-student-name');
+            clearText('pm-subtitle');
+            clearText('pm-stat-score', '—');
+            clearText('pm-stat-score-label');
+            clearHtml('pm-stat-mastered');
+            clearText('pm-stat-mastered-label');
+            const banner = document.getElementById('pm-missing-banner');
+            if (banner) { banner.style.display = 'none'; banner.innerHTML = ''; }
+            clearHtml('pm-comment-toggle-slot');
+            clearHtml('pm-comment-panel-container');
         });
         onStudentSelected(student.userId, student.name);
     }
