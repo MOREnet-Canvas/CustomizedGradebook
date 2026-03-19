@@ -363,7 +363,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     debugLog(`Alignments mapped: ${Object.keys(alignmentMap).length}`);
     debugLog(`Rollup scores: ${rollupScores.length}`);
 
-    // Sort outcomes: AVG_OUTCOME first, then by most recent submission
+    // Sort outcomes: AVG_OUTCOME first, then null/IE and scores ≤ 1 by score ascending, then by most recent submission
     const sortedScores = [...rollupScores].sort((a, b) => {
         const outcomeA = outcomeMap[a.links.outcome];
         const outcomeB = outcomeMap[b.links.outcome];
@@ -372,11 +372,22 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         if (outcomeA?.title === AVG_OUTCOME_NAME) return -1;
         if (outcomeB?.title === AVG_OUTCOME_NAME) return 1;
 
-        // Sort by most recent submission (submitted_at is already the latest for each outcome)
-        const dateA = new Date(a.submitted_at || 0);
-        const dateB = new Date(b.submitted_at || 0);
+        // Null/IE and scores ≤ 1 bubble to the top
+        const aLow = a.score == null || a.score <= 1;
+        const bLow = b.score == null || b.score <= 1;
 
-        return dateB - dateA; // Most recent first
+        if (aLow && !bLow) return -1;
+        if (!aLow && bLow) return 1;
+
+        if (aLow && bLow) {
+            // Null/IE sorts above any scored-but-low outcome
+            if (a.score == null && b.score != null) return -1;
+            if (a.score != null && b.score == null) return 1;
+            return a.score - b.score; // ascending: lowest score first
+        }
+
+        // Both normal (score > 1): sort by most recent submission
+        return new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0);
     });
 
     // Calculate mastery count (score >= 3 is considered mastered)
