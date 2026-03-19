@@ -411,8 +411,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             avgLetterGrade = getLetterGrade(avgScore);
             if (avgScore >= 4) avgScoreColor = "#02672D";
             else if (avgScore >= 3) avgScoreColor = "#03893D";
-            else if (avgScore >= 2) avgScoreColor = "#FAB901";
-            else if (avgScore >= 1) avgScoreColor = "#FD5D10";
+            else if (avgScore >= 2) avgScoreColor = "#a86700";
+            else if (avgScore >= 1) avgScoreColor = "#db3b00";
             else avgScoreColor = "#E62429";
         }
         avgUpdatedDate = avgRollupScore.submitted_at
@@ -533,6 +533,11 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             else masteryColor = "#E62429";                       // 0.0-0.99 - Well Below Mastery (red)
         }
 
+        // Accessible font-only variants for yellow/orange (better contrast on white)
+        const masteryFontColor = masteryColor === '#FAB901' ? '#a86700'
+            : masteryColor === '#FD5D10' ? '#db3b00'
+            : masteryColor;
+
         // Use display_name if present, fall back to title
         const outcomeName = outcome.display_name || outcome.title;
 
@@ -563,7 +568,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcomeName)}</div>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
+                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryFontColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
                             ${score}
                         </div>
                         ${letterGrade ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; font-weight:600; color:#333; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
