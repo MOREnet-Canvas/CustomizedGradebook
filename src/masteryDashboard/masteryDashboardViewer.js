@@ -90,22 +90,21 @@ function ensureHost(courseName = "Mastery Dashboard") {
           <div id="pm-subtitle" style="${F} font-size:0.8rem; color:#666; line-height:1.4; -webkit-font-smoothing:antialiased;"></div>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
-          <div style="flex:1; min-width:110px; background:#f8f9fa; border-radius:8px; padding:10px 12px;">
-            <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Score</div>
-            <div id="pm-stat-score" style="${F} font-size:1.6rem; font-weight:700; line-height:1; margin-bottom:4px; -webkit-font-smoothing:antialiased;">—</div>
+          <div style="flex:1; min-width:130px; background:#f5f6f7; border-radius:8px; padding:10px 12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; -webkit-font-smoothing:antialiased;">Score</div>
+              <div id="pm-comment-toggle-slot"></div>
+            </div>
+            <div id="pm-stat-score" style="${F} font-size:2.2rem; font-weight:700; line-height:1; margin-bottom:4px; -webkit-font-smoothing:antialiased;">—</div>
             <div id="pm-stat-score-label" style="${F} font-size:0.78rem; color:#555; -webkit-font-smoothing:antialiased;"></div>
           </div>
-          <div style="flex:1; min-width:110px; background:#f8f9fa; border-radius:8px; padding:10px 12px;">
+          <div style="flex:1; min-width:130px; background:#f5f6f7; border-radius:8px; padding:10px 12px;">
             <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Mastered</div>
-            <div id="pm-stat-mastered" style="${F} font-size:1.6rem; font-weight:700; line-height:1; margin-bottom:4px; color:#333; -webkit-font-smoothing:antialiased;">—</div>
+            <div id="pm-stat-mastered" style="${F} font-size:2.2rem; font-weight:700; line-height:1; margin-bottom:4px; color:#333; -webkit-font-smoothing:antialiased;">—</div>
             <div id="pm-stat-mastered-label" style="${F} font-size:0.78rem; color:#555; -webkit-font-smoothing:antialiased;"></div>
           </div>
-          <div style="flex:1; min-width:110px; background:#f8f9fa; border-radius:8px; padding:10px 12px;">
-            <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Attention</div>
-            <div id="pm-stat-attention" style="${F} font-size:1.6rem; font-weight:700; line-height:1; margin-bottom:4px; color:#333; -webkit-font-smoothing:antialiased;">—</div>
-            <div id="pm-stat-attention-label" style="${F} font-size:0.78rem; -webkit-font-smoothing:antialiased;"></div>
-          </div>
         </div>
+        <div id="pm-comment-panel-container"></div>
         <div id="pm-missing-banner" style="display:none; background:#FFF8E1; border:1px solid #FAB901; border-left:4px solid #FAB901; border-radius:6px; padding:10px 14px; margin-bottom:12px;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
@@ -399,11 +398,12 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         return new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0);
     });
 
-    // Extract AVG outcome score and date for header stat box (before card loop)
+    // Extract AVG outcome score, date, and comments for header stat box (before card loop)
     let avgScore = null;
     let avgScoreColor = '#E62429';
     let avgLetterGrade = '';
     let avgUpdatedDate = null;
+    let avgComments = [];
     const avgRollupScore = sortedScores.find(s => outcomeMap[String(s.links.outcome)]?.title === AVG_OUTCOME_NAME);
     if (avgRollupScore) {
         avgScore = avgRollupScore.score;
@@ -418,8 +418,12 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         avgUpdatedDate = avgRollupScore.submitted_at
             ? new Date(avgRollupScore.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : null;
+        const avgOutcome = outcomeMap[String(avgRollupScore.links.outcome)];
+        const avgAlignmentId = avgOutcome?.alignments?.find(id => id.startsWith('assignment_'));
+        const avgAssignmentId = avgAlignmentId ? avgAlignmentId.replace('assignment_', '') : null;
+        avgComments = avgAssignmentId ? (submissionMap[avgAssignmentId]?.submission_comments ?? []) : [];
     }
-    debugLog(`AVG score for header: ${avgScore}, date: ${avgUpdatedDate}`);
+    debugLog(`AVG score for header: ${avgScore}, date: ${avgUpdatedDate}, comments: ${avgComments.length}`);
 
     // Calculate mastery count (score >= 3 is considered mastered)
     // Exclude AVG_OUTCOME and any outcomes matching EXCLUDED_OUTCOME_KEYWORDS
@@ -463,32 +467,19 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     if (scoreEl) { scoreEl.textContent = avgScore != null ? avgScore : '—'; scoreEl.style.color = avgScoreColor; }
     if (scoreLabelEl) scoreLabelEl.textContent = avgLetterGrade || 'No score yet';
 
-    // Mastered stat box
+    // Mastered stat box — big count, smaller "of N"
     const masteredStatEl = document.getElementById('pm-stat-mastered');
     const masteredLabelEl = document.getElementById('pm-stat-mastered-label');
-    if (masteredStatEl) masteredStatEl.textContent = `${masteredCount} of ${totalCount}`;
+    if (masteredStatEl) {
+        masteredStatEl.innerHTML = `<span style="font-size:2.2rem; font-weight:700;">${masteredCount}</span><span style="font-size:1rem; font-weight:400; color:#555;"> of ${totalCount}</span>`;
+    }
     if (masteredLabelEl) masteredLabelEl.textContent = getMasteryEncouragement(masteredCount, totalCount);
 
-    // Needs attention stat box
-    const attentionEl = document.getElementById('pm-stat-attention');
-    const attentionLabelEl = document.getElementById('pm-stat-attention-label');
-    if (attentionEl) {
-        if (missingCount > 0) {
-            attentionEl.textContent = missingCount;
-            attentionEl.style.color = '#C62828';
-            if (attentionLabelEl) {
-                attentionLabelEl.textContent = missingCount === 1 ? 'Missing assignment' : 'Missing assignments';
-                attentionLabelEl.style.color = '#C62828';
-            }
-        } else {
-            attentionEl.textContent = '✓';
-            attentionEl.style.color = '#2E7D32';
-            if (attentionLabelEl) {
-                attentionLabelEl.textContent = 'All caught up!';
-                attentionLabelEl.style.color = '#2E7D32';
-            }
-        }
-    }
+    // Inject comment toggle into Score box and panel into its container
+    const commentToggleSlot = document.getElementById('pm-comment-toggle-slot');
+    const commentPanelContainer = document.getElementById('pm-comment-panel-container');
+    if (commentToggleSlot) commentToggleSlot.innerHTML = buildAvgCommentToggleHtml(avgComments);
+    if (commentPanelContainer) commentPanelContainer.innerHTML = buildAvgCommentPanelHtml(avgComments);
 
     // Missing assignments banner
     const bannerEl = document.getElementById('pm-missing-banner');
@@ -518,8 +509,6 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     statusEl.style.display = 'none';
     statusEl.textContent = '';
 
-    // Separate AVG_OUTCOME from regular outcomes
-    let avgOutcomeHtml = null;
     const regularCards = [];
 
     for (const rollupScore of sortedScores) {
@@ -547,58 +536,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // Use display_name if present, fall back to title
         const outcomeName = outcome.display_name || outcome.title;
 
-        // Check if this is the AVG_OUTCOME (Course Grade)
-        if (outcome.title === AVG_OUTCOME_NAME) {
-            // Get AVG assignment URL and ID from alignments
-            let avgAssignmentUrl = "#";
-            let avgAssignmentId = null;
-            if (outcome.alignments && outcome.alignments.length > 0) {
-                const avgAssignmentAlignment = outcome.alignments.find(id => id.startsWith("assignment_"));
-                if (avgAssignmentAlignment && alignmentMap[avgAssignmentAlignment]) {
-                    avgAssignmentUrl = alignmentMap[avgAssignmentAlignment].html_url || "#";
-                    avgAssignmentId = avgAssignmentAlignment.replace("assignment_", "");
-                }
-            }
-
-            // Get comments for this submission from the submission map
-            const avgComments = avgAssignmentId
-                ? (submissionMap[avgAssignmentId]?.submission_comments ?? [])
-                : [];
-
-            // Format the last updated date
-            const lastUpdated = rollupScore.submitted_at
-                ? new Date(rollupScore.submitted_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })
-                : null;
-
-            // Shared row template: <a> covers label+score only, comment button sits alongside
-            const scoreLabel = rollupScore.score != null
-                ? `<span style="color:${masteryColor}; font-size:1.3em; line-height:1;">●</span> ${score} (${escapeHtml(getLetterGrade(rollupScore.score))})`
-                : `<span style="color:#E62429; font-size:1.3em; line-height:1;">●</span> Insufficient Evidence`;
-
-            avgOutcomeHtml = `
-                <div style="display:flex; flex-direction:column; padding:12px 0; margin-bottom:12px; border-bottom:1px solid #e0e0e0;">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <a href="${avgAssignmentUrl}" target="_blank"
-                           style="flex:1; display:flex; justify-content:space-between; align-items:center; text-decoration:none;">
-                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#666; font-weight:400; line-height:1.5; -webkit-font-smoothing:antialiased;">Total</span>
-                            <span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.2rem; font-weight:600; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                                ${scoreLabel}
-                            </span>
-                        </a>
-                        ${buildAvgCommentToggleHtml(avgComments)}
-                    </div>
-                    ${lastUpdated ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.8rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">Last Updated: ${lastUpdated}</div>` : ''}
-                    ${buildAvgCommentPanelHtml(avgComments)}
-                </div>
-            `;
-
-            // Skip adding to regular cards
-            continue;
-        }
+        // AVG_OUTCOME is shown in the header stat box — skip it here
+        if (outcome.title === AVG_OUTCOME_NAME) continue;
 
         // Get letter grade for display
         const letterGrade = rollupScore.score != null ? getLetterGrade(rollupScore.score) : "";
@@ -638,14 +577,11 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         `);
     }
 
-    // Render: Course grade section first, then regular outcomes
-    cardsEl.innerHTML = `
-        ${avgOutcomeHtml || ""}
-        ${regularCards.length > 0 ? `
-            <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; font-weight:600; color:#666; margin-bottom:8px; margin-top:8px; line-height:1.5; -webkit-font-smoothing:antialiased;">Learning Outcomes</div>
-            ${regularCards.join("")}
-        ` : ""}
-    `;
+    // Render outcome cards
+    cardsEl.innerHTML = regularCards.length > 0 ? `
+        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; font-weight:600; color:#666; margin-bottom:8px; margin-top:8px; line-height:1.5; -webkit-font-smoothing:antialiased;">Learning Outcomes</div>
+        ${regularCards.join("")}
+    ` : "";
 
     // Wire up the AVG assignment comment panel toggle
     initAvgCommentPanel();
