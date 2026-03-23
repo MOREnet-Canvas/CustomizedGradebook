@@ -126,3 +126,72 @@ export async function createOutcome(courseId, apiClient) {
     logger.debug("Outcome fully created");
 }
 
+/**
+ * Set outcome order in Learning Mastery Gradebook
+ * Places the AVG_OUTCOME first while preserving the order of other outcomes
+ * @param {string} courseId - Canvas course ID
+ * @param {string} avgOutcomeId - ID of the AVG_OUTCOME to place first
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @param {object} rollupData - Optional: Pre-fetched rollup data (to avoid re-fetching)
+ * @returns {Promise<void>}
+ */
+export async function setOutcomeOrderWithAvgFirst(courseId, avgOutcomeId, apiClient, rollupData = null) {
+    try {
+        logger.debug(`Setting outcome order for course ${courseId}, placing outcome ${avgOutcomeId} first...`);
+
+        // Use provided rollupData or fetch it
+        let data = rollupData;
+        if (!data) {
+            data = await apiClient.get(
+                `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes`,
+                {},
+                'setOutcomeOrder:getRollup'
+            );
+        }
+
+        const outcomes = data?.linked?.outcomes ?? [];
+
+        if (outcomes.length === 0) {
+            logger.warn('No outcomes found, skipping outcome ordering');
+            return;
+        }
+
+        // Check if AVG_OUTCOME is already first (optimization)
+        const firstOutcome = outcomes[0];
+        if (String(firstOutcome?.id) === String(avgOutcomeId)) {
+            logger.debug('AVG_OUTCOME already first, skipping reorder');
+            return;
+        }
+
+        // Build ordered array: AVG_OUTCOME first, then all others in their current order
+        const outcomeIds = [];
+        const otherOutcomeIds = [];
+
+        for (const outcome of outcomes) {
+            if (String(outcome.id) === String(avgOutcomeId)) {
+                continue; // Skip AVG_OUTCOME, we'll add it first
+            }
+            otherOutcomeIds.push(Number(outcome.id));
+        }
+
+        // Place AVG_OUTCOME first, followed by all others
+        outcomeIds.push(Number(avgOutcomeId));
+        outcomeIds.push(...otherOutcomeIds);
+
+        logger.debug(`Outcome order: [${outcomeIds.join(', ')}] (${outcomeIds.length} total)`);
+
+        // Submit the ordering
+        await apiClient.post(
+            `/api/v1/courses/${courseId}/assign_outcome_order`,
+            { outcome_ids: outcomeIds },
+            {},
+            'setOutcomeOrder'
+        );
+
+        logger.debug('Outcome order saved successfully');
+
+    } catch (error) {
+        // Don't fail the entire update flow if ordering fails
+        logger.warn('Failed to set outcome order (non-critical):', error?.message || error);
+    }
+}
