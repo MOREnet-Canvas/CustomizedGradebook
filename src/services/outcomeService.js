@@ -156,6 +156,12 @@ export async function setOutcomeOrderWithAvgFirst(courseId, avgOutcomeId, apiCli
             return;
         }
 
+        // Check if there's only one outcome (no ordering needed)
+        if (outcomes.length === 1) {
+            logger.debug('Only one outcome exists, no ordering needed');
+            return;
+        }
+
         // Check if AVG_OUTCOME is already first (optimization)
         const firstOutcome = outcomes[0];
         if (String(firstOutcome?.id) === String(avgOutcomeId)) {
@@ -163,28 +169,40 @@ export async function setOutcomeOrderWithAvgFirst(courseId, avgOutcomeId, apiCli
             return;
         }
 
-        // Build ordered array: AVG_OUTCOME first, then all others in their current order
-        const outcomeIds = [];
-        const otherOutcomeIds = [];
+        // Build ordered array in Canvas format: array of {outcome_id, position} objects
+        // Canvas expects positions to be 1-based (starting at 1, not 0)
+        const orderedOutcomes = [];
 
+        // Add AVG_OUTCOME first (position 1)
+        orderedOutcomes.push({
+            outcome_id: Number(avgOutcomeId),
+            position: 1
+        });
+
+        // Add all other outcomes with sequential positions
+        let position = 2;
         for (const outcome of outcomes) {
             if (String(outcome.id) === String(avgOutcomeId)) {
-                continue; // Skip AVG_OUTCOME, we'll add it first
+                continue; // Skip AVG_OUTCOME, already added at position 1
             }
-            otherOutcomeIds.push(Number(outcome.id));
+            orderedOutcomes.push({
+                outcome_id: Number(outcome.id),
+                position: position++
+            });
         }
 
-        // Place AVG_OUTCOME first, followed by all others
-        outcomeIds.push(Number(avgOutcomeId));
-        outcomeIds.push(...otherOutcomeIds);
+        logger.debug(`Outcome order: ${orderedOutcomes.length} outcomes, AVG_OUTCOME at position 1`);
+        logger.trace('Ordered outcomes:', orderedOutcomes);
 
-        logger.debug(`Outcome order: [${outcomeIds.join(', ')}] (${outcomeIds.length} total)`);
-
-        // Submit the ordering
+        // Submit the ordering - Canvas expects array of objects directly (not wrapped)
         await apiClient.post(
             `/api/v1/courses/${courseId}/assign_outcome_order`,
-            { outcome_ids: outcomeIds },
-            {},
+            orderedOutcomes,
+            {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            },
             'setOutcomeOrder'
         );
 
