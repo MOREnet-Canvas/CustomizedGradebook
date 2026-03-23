@@ -34,7 +34,7 @@ import { verifyUIScores } from "../services/avgOutcomeVerification.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer } from "../utils/uiHelpers.js";
 
 // Import Canvas API service functions
-import { getRollup, getOutcomeObjectByName, createOutcome } from "../services/outcomeService.js";
+import { getRollup, getOutcomeObjectByName, createOutcome, setOutcomeOrderWithAvgFirst } from "../services/outcomeService.js";
 import { getAssignmentObjectFromOutcomeObj, createAssignment } from "../services/assignmentService.js";
 import { getRubricForAssignment, createRubric } from "../services/rubricService.js";
 import { enableCourseOverride, verifyOverrideScores } from "../services/gradeOverrideVerification.js";
@@ -152,6 +152,25 @@ export async function handleCheckingSetup(stateMachine) {
         } catch (error) {
             logger.warn('Failed to enable course grading scheme, continuing anyway:', error);
             // Don't fail the entire flow if grading scheme setup fails
+        }
+    }
+
+    // Set outcome order: AVG_OUTCOME first, preserve order of others
+    // This runs before calculations to ensure the Learning Mastery Gradebook displays outcomes in the correct order
+    if (ENABLE_OUTCOME_UPDATES && stateMachine.getContext().outcomeId) {
+        try {
+            const { outcomeId, rollupData } = stateMachine.getContext();
+
+            logger.debug('Setting outcome order in LMGB before calculations...');
+            banner.soft('Setting outcome order...');
+
+            // Pass rollupData to avoid re-fetching
+            await setOutcomeOrderWithAvgFirst(courseId, outcomeId, apiClient, rollupData);
+
+            logger.debug('Outcome order set successfully');
+        } catch (error) {
+            // Non-critical error - log but don't fail the update
+            logger.warn('Failed to set outcome order (non-critical):', error?.message || error);
         }
     }
 
