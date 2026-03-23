@@ -177,12 +177,56 @@ export function getStudentIdFromUrl() {
     return match ? match[1] : null;
 }
 
-export function resolveTargetStudentId() {
-    // Teacher viewing a specific student
+/**
+ * Resolve the target student ID for grade fetching
+ *
+ * Handles three scenarios:
+ * 1. Teacher viewing a specific student's grades → return student ID from URL
+ * 2. Observer viewing observed student's grades → return associated_user_id from enrollment
+ * 3. Student viewing their own grades → return current user ID
+ *
+ * @param {string} [courseId] - Course ID (required for observer detection)
+ * @param {Object} [apiClient] - Canvas API client (required for observer detection)
+ * @returns {Promise<string|null>} Student ID or null if not found
+ */
+export async function resolveTargetStudentId(courseId = null, apiClient = null) {
+    // Scenario 1: Teacher viewing a specific student
     if (isTeacherViewingStudentGrades()) {
-        return getStudentIdFromUrl();
+        const studentId = getStudentIdFromUrl();
+        logger.trace(`[resolveTargetStudentId] Teacher viewing student ${studentId}`);
+        return studentId;
     }
 
-    // Student (or anyone) viewing "self"
-    return ENV?.current_user_id ? String(ENV.current_user_id) : null;
+    // Scenario 2: Observer viewing observed student's grades
+    // Check if user is an observer and get the associated student ID
+    if (courseId && apiClient) {
+        try {
+            // Fetch enrollments for the current course
+            const enrollments = await apiClient.get(
+                `/api/v1/courses/${courseId}/enrollments?user_id=self`,
+                {},
+                'resolveTargetStudentId'
+            );
+
+            // Find observer enrollment with associated_user_id
+            const observerEnrollment = enrollments.find(e =>
+                (e.type === 'observer' || e.type === 'ObserverEnrollment') &&
+                e.associated_user_id
+            );
+
+            if (observerEnrollment) {
+                const studentId = String(observerEnrollment.associated_user_id);
+                logger.trace(`[resolveTargetStudentId] Observer viewing student ${studentId} (observer ID: ${ENV?.current_user_id})`);
+                return studentId;
+            }
+        } catch (error) {
+            logger.warn(`[resolveTargetStudentId] Failed to fetch enrollments for observer check:`, error.message);
+            // Fall through to default behavior
+        }
+    }
+
+    // Scenario 3: Student (or anyone else) viewing "self"
+    const userId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
+    logger.trace(`[resolveTargetStudentId] Student/user viewing self: ${userId}`);
+    return userId;
 }
