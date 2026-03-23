@@ -20,12 +20,37 @@
 
 import { AVG_ASSIGNMENT_NAME } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { getCourseSnapshot } from '../services/courseSnapshotService.js';
 
 /**
  * Remove fraction denominators and "out of X" text from all grade displays
  * This function is idempotent and can be called multiple times safely
+ *
+ * Course-aware: Only modifies grades for standards-based courses
+ *
+ * @param {string|null} courseId - Course ID to check (null for dashboard/multi-course pages)
+ * @returns {Promise<void>}
  */
-export async function removeFractionScores() {
+export async function removeFractionScores(courseId = null) {
+    // If courseId provided, verify it's standards-based before making ANY modifications
+    if (courseId) {
+        const snapshot = getCourseSnapshot(courseId);
+        if (!snapshot) {
+            logger.trace(`[Grade Normalizer] No snapshot for course ${courseId}, skipping fraction removal`);
+            return;
+        }
+
+        if (snapshot.model !== 'standards') {
+            logger.trace(`[Grade Normalizer] Course ${courseId} is ${snapshot.model}, skipping fraction removal`);
+            return;
+        }
+
+        logger.trace(`[Grade Normalizer] Course ${courseId} is standards-based, proceeding with fraction removal`);
+    } else {
+        // Dashboard mode: no courseId provided
+        // We'll be selective about which elements to modify (only those matching AVG_ASSIGNMENT_NAME)
+        logger.trace(`[Grade Normalizer] Running in dashboard mode (no courseId), will be selective`);
+    }
     // --- 1. Course homepage / assignments list style ---
     // <span class="score-display"><b>2.74</b>/4 pts</span>
     document.querySelectorAll(".score-display").forEach(scoreEl => {
@@ -116,6 +141,8 @@ export async function removeFractionScores() {
 
     // --- 7. Recent feedback / dashboard card style ---
     // Only affect dashboard cards for the Current Score Assignment
+    // NOTE: This section is already course-aware by checking AVG_ASSIGNMENT_NAME
+    // which only exists in standards-based courses
     document.querySelectorAll('a[data-track-category="dashboard"][data-track-label="recent feedback"]').forEach(cardEl => {
         const titleEl = cardEl.querySelector(".recent_feedback_title");
         const strongEl = cardEl.querySelector(".event-details strong");
