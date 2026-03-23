@@ -329,7 +329,8 @@
 /***** END ADMIN DASHBOARD STYLES ************************************/
 /*********************************************************************/
 
-/* Only hide the Canvas student grade table while our script says "processing" */
-body.responsive_student_grades_page.cg_processing_grades table.course_details.student_grades {
+/* Only hide the Canvas grade table while our script says "processing" (supports both student and observer views) */
+body.responsive_student_grades_page.cg_processing_grades table.course_details.student_grades,
+body.responsive_student_grades_page.cg_processing_grades table.course_details.observer_grades {
     display: none !important;
 }

@@ -315,8 +315,8 @@ function createGradesTable(courses) {
  * @param {Array} courses - Array of course grade objects
  */
 function replaceGradesTable(courses) {
-    // Find the original table
-    const originalTable = document.querySelector('table.course_details.student_grades');
+    // Find the original table (supports both student and observer views)
+    const originalTable = document.querySelector('table.course_details.student_grades, table.course_details.observer_grades');
     if (!originalTable) {
         logger.warn('Original grades table not found');
         return;
@@ -397,9 +397,9 @@ export function initAllGradesPageCustomizer() {
     // Try immediately
     applyCustomizations();
 
-    // Also observe for lazy-loaded content
+    // Also observe for lazy-loaded content (supports both student and observer views)
     createPersistentObserver(() => {
-        const table = document.querySelector('table.course_details.student_grades');
+        const table = document.querySelector('table.course_details.student_grades, table.course_details.observer_grades');
         if (table && !table.dataset.customized && !processed) {
             logger.debug('Grades table detected, applying customizations...');
             applyCustomizations();
