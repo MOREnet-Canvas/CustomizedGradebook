@@ -160,7 +160,7 @@ export async function getCourseGrade(courseId, apiClient) {
 
 
     logger.trace(`[Grade Fetch] Course ${courseId}: Checking priority 1 - AVG assignment...`);
-    const studentId = resolveTargetStudentId();
+    const studentId = await resolveTargetStudentId(courseId, apiClient);
     if (!studentId) {
         logger.trace(`[Grade Fetch] Course ${courseId}: No target studentId available for submission lookup`);
         return null; // or fall back to enrollment
