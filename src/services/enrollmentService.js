@@ -112,14 +112,17 @@ export function parseEnrollmentGrade(enrollmentData) {
 }
 
 /**
- * Fetches all student enrollments from Canvas API.
- * 
+ * Fetches all student and observer enrollments from Canvas API.
+ *
+ * For observers, the enrollment will include associated_user_id pointing to the observed student.
+ * The grade data in observer enrollments reflects the observed student's grades.
+ *
  * @param {Object} apiClient - Canvas API client instance
  * @param {Object} [options] - Fetch options
  * @param {string} [options.state='active'] - Enrollment state filter (active, completed, etc.)
  * @param {boolean} [options.includeTotalScores=true] - Whether to include total_scores in response
  * @returns {Promise<Array>} Array of enrollment objects
- * 
+ *
  * @example
  * const enrollments = await fetchAllEnrollments(apiClient, {
  *   state: 'active',
@@ -135,6 +138,7 @@ export async function fetchAllEnrollments(apiClient, options = {}) {
     try {
         const params = new URLSearchParams();
         params.append('type[]', 'StudentEnrollment');
+        params.append('type[]', 'ObserverEnrollment');
         params.append('state[]', state);
 
         if (includeTotalScores) {
@@ -159,6 +163,9 @@ export async function fetchAllEnrollments(apiClient, options = {}) {
 /**
  * Fetches enrollment for a specific course.
  *
+ * Supports both student and observer enrollments. For observers, returns the
+ * ObserverEnrollment which contains the observed student's grade data.
+ *
  * @param {string|number} courseId - Canvas course ID
  * @param {Object} apiClient - Canvas API client instance
  * @returns {Promise<Object|null>} Enrollment object or null if not found
@@ -171,31 +178,34 @@ export async function fetchAllEnrollments(apiClient, options = {}) {
  */
 export async function fetchSingleEnrollment(courseId, apiClient) {
     try {
-        // Fetch enrollments for specific course
+        // Fetch enrollments for specific course (both student and observer types)
         const enrollments = await apiClient.get(
-            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment`,
+            `/api/v1/courses/${courseId}/enrollments?user_id=self&type[]=StudentEnrollment&type[]=ObserverEnrollment`,
             {},
             'fetchSingleEnrollment'
         );
 
         logger.trace(`[EnrollmentService] Fetched ${enrollments.length} enrollment(s) for course ${courseId}`);
 
-        // Find student enrollment - try both "StudentEnrollment" and "student"
+        // Find student or observer enrollment
+        // For observers, check that associated_user_id exists (indicates they're observing a student)
         const studentEnrollment = enrollments.find(e =>
             e.type === 'StudentEnrollment' ||
             e.type === 'student' ||
-            e.role === 'StudentEnrollment'
+            e.role === 'StudentEnrollment' ||
+            (e.type === 'ObserverEnrollment' && e.associated_user_id)
         );
 
         if (!studentEnrollment) {
-            logger.trace(`[EnrollmentService] No student enrollment found for course ${courseId}`);
+            logger.trace(`[EnrollmentService] No student or observer enrollment found for course ${courseId}`);
             if (logger.isTraceEnabled() && enrollments.length > 0) {
                 logger.trace(`[EnrollmentService] Available enrollment types:`, enrollments.map(e => e.type || e.role));
             }
             return null;
         }
 
-        logger.trace(`[EnrollmentService] Found student enrollment for course ${courseId}`);
+        const enrollmentType = studentEnrollment.type === 'ObserverEnrollment' ? 'observer' : 'student';
+        logger.trace(`[EnrollmentService] Found ${enrollmentType} enrollment for course ${courseId}`);
         return studentEnrollment;
 
     } catch (error) {
