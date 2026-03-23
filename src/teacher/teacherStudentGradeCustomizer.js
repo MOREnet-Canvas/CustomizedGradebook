@@ -282,19 +282,20 @@ function applyCustomizations(gradeData, retryCount = 0) {
 
 /**
  * Start cleanup observers for continuous fraction removal and grade updates
+ * @param {string} courseId - Course ID for course-aware cleanup
  * @param {Object|null} gradeData - Grade data for re-applying customizations
  */
-function startCleanupObservers(gradeData = null) {
-    logger.debug('Starting cleanup observers for teacher student grade page');
+function startCleanupObservers(courseId, gradeData = null) {
+    logger.debug(`Starting cleanup observers for teacher student grade page (course ${courseId})`);
 
     // Run initial cleanup immediately
-    removeFractionScores().catch(err => {
+    removeFractionScores(courseId).catch(err => {
         logger.warn('Error in initial removeFractionScores:', err);
     });
 
     // Create debounced version for fraction removal
     const debouncedClean = debounce(() => {
-        removeFractionScores().catch(err => {
+        removeFractionScores(courseId).catch(err => {
             logger.warn('Error in removeFractionScores:', err);
         });
     }, 100);
@@ -337,7 +338,7 @@ export async function initTeacherStudentGradeCustomizer() {
 
     if (!courseId || !studentId) {
         logger.trace('[Teacher] Cannot get course ID or student ID from URL');
-        startCleanupObservers(); // Still run fraction cleanup
+        // Don't run cleanup without course context
         return;
     }
 
@@ -366,7 +367,7 @@ export async function initTeacherStudentGradeCustomizer() {
 
     if (!snapshot) {
         logger.warn(`[Teacher] Failed to create snapshot for course ${courseId}`);
-        startCleanupObservers(); // Still run fraction cleanup for any course
+        // Don't run cleanup without snapshot - can't verify course type
         return;
     }
 
@@ -374,7 +375,7 @@ export async function initTeacherStudentGradeCustomizer() {
 
     if (snapshot.model !== 'standards') {
         logger.debug(`[Teacher] Skipping teacher student grade customization - course is ${snapshot.model}`);
-        startCleanupObservers(); // Still run fraction cleanup for any course
+        // Don't run cleanup for non-standards-based courses
         return;
     }
 
@@ -386,7 +387,8 @@ export async function initTeacherStudentGradeCustomizer() {
 
     if (!gradeData) {
         logger.warn(`[Teacher] ❌ No AVG assignment score found for student ${studentId} - skipping grade customizations`);
-        startCleanupObservers(); // Still run fraction cleanup
+        // Still run cleanup for standards-based course (we know it's SBG from snapshot check above)
+        startCleanupObservers(courseId, null);
         return;
     }
 
@@ -396,7 +398,7 @@ export async function initTeacherStudentGradeCustomizer() {
     applyCustomizations(gradeData);
 
     // Start cleanup observers with grade data for continuous updates
-    startCleanupObservers(gradeData);
+    startCleanupObservers(courseId, gradeData);
 
     // Set up URL change detection to handle navigation between students
     setupUrlChangeDetection();

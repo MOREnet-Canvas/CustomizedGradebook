@@ -28,13 +28,15 @@ function shouldClean() {
 /**
  * Start cleanup observers for grade normalization
  * Sets up MutationObserver and URL change detection
+ *
+ * @param {string|null} courseId - Course ID for single-course pages, null for dashboard
  */
-export function startCleanupObservers() {
-    logger.debug('Starting cleanup observers for grade normalization');
+export function startCleanupObservers(courseId = null) {
+    logger.debug(`Starting cleanup observers for grade normalization${courseId ? ` (course ${courseId})` : ' (dashboard)'}`);
 
     // Run initial cleanup immediately to eliminate display lag
     if (shouldClean()) {
-        removeFractionScores().catch(err => {
+        removeFractionScores(courseId).catch(err => {
             logger.warn('Error in initial removeFractionScores:', err);
         });
     }
@@ -43,7 +45,7 @@ export function startCleanupObservers() {
     // Wrap async function to handle promises properly
     const debouncedClean = debounce(() => {
         if (shouldClean()) {
-            removeFractionScores().catch(err => {
+            removeFractionScores(courseId).catch(err => {
                 logger.warn('Error in removeFractionScores:', err);
             });
         }
@@ -91,11 +93,11 @@ export async function initCleanupObservers(retryCount = 0, maxRetries = 5) {
     }
 
     if (isDashboardPage()) {
-        // Dashboard: always allow cleanup
+        // Dashboard: always allow cleanup (no courseId - will be selective)
         // The removeFractionScores() function will only rewrite scores
         // for cards matching AVG_ASSIGNMENT_NAME
         logger.debug('Initializing cleanup observers for dashboard');
-        startCleanupObservers();
+        startCleanupObservers(null); // null = dashboard mode
     } else {
         // Course pages: only run if this course is standards-based
         // Check snapshot for course model classification
@@ -126,6 +128,6 @@ export async function initCleanupObservers(retryCount = 0, maxRetries = 5) {
         }
 
         logger.debug('Initializing cleanup observers for standards-based course page');
-        startCleanupObservers();
+        startCleanupObservers(courseId); // Pass courseId for course-specific cleanup
     }
 }
