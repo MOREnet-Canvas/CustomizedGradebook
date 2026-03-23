@@ -189,11 +189,12 @@ export async function fetchSingleEnrollment(courseId, apiClient) {
 
         // Find student or observer enrollment
         // For observers, check that associated_user_id exists (indicates they're observing a student)
+        // Canvas returns lowercase 'observer' for type, but 'ObserverEnrollment' for role
         const studentEnrollment = enrollments.find(e =>
             e.type === 'StudentEnrollment' ||
             e.type === 'student' ||
             e.role === 'StudentEnrollment' ||
-            (e.type === 'ObserverEnrollment' && e.associated_user_id)
+            ((e.type === 'observer' || e.type === 'ObserverEnrollment') && e.associated_user_id)
         );
 
         if (!studentEnrollment) {
@@ -204,7 +205,7 @@ export async function fetchSingleEnrollment(courseId, apiClient) {
             return null;
         }
 
-        const enrollmentType = studentEnrollment.type === 'ObserverEnrollment' ? 'observer' : 'student';
+        const enrollmentType = (studentEnrollment.type === 'observer' || studentEnrollment.type === 'ObserverEnrollment') ? 'observer' : 'student';
         logger.trace(`[EnrollmentService] Found ${enrollmentType} enrollment for course ${courseId}`);
         return studentEnrollment;
 

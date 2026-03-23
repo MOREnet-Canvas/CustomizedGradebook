@@ -73,7 +73,7 @@ async function fetchActiveCourses(apiClient) {
         }
 
         // Filter to student and observer enrollments and extract enrollment data
-        // Canvas enrollment type can be "student" (lowercase), "StudentEnrollment", or "ObserverEnrollment"
+        // Canvas enrollment type can be "student" (lowercase), "StudentEnrollment", "observer" (lowercase), or "ObserverEnrollment"
         // For observers, only include if they have an associated_user_id (observing a student)
         const studentCourses = courses.filter(course => {
             const enrollments = course.enrollments || [];
@@ -81,7 +81,7 @@ async function fetchActiveCourses(apiClient) {
                 e.type === 'student' ||
                 e.type === 'StudentEnrollment' ||
                 e.role === 'StudentEnrollment' ||
-                (e.type === 'ObserverEnrollment' && e.associated_user_id)
+                ((e.type === 'observer' || e.type === 'ObserverEnrollment') && e.associated_user_id)
             );
 
             if (logger.isTraceEnabled() && enrollments.length > 0) {
@@ -98,7 +98,7 @@ async function fetchActiveCourses(apiClient) {
                 e.type === 'student' ||
                 e.type === 'StudentEnrollment' ||
                 e.role === 'StudentEnrollment' ||
-                (e.type === 'ObserverEnrollment' && e.associated_user_id)
+                ((e.type === 'observer' || e.type === 'ObserverEnrollment') && e.associated_user_id)
             );
 
             return {
