@@ -129,22 +129,23 @@ export function extractCourseDataFromRow(row) {
 
 /**
  * Find all course table rows in the all-grades page
- * 
+ *
  * Locates the Canvas grades table and returns all course rows.
- * 
+ * Supports both student and observer views.
+ *
  * @returns {HTMLTableRowElement[]} Array of table row elements
  */
 export function findTableRows() {
-    const table = document.querySelector('table.course_details.student_grades');
-    
+    const table = document.querySelector('table.course_details.student_grades, table.course_details.observer_grades');
+
     if (!table) {
         logger.trace('[DOM Extractor] Grades table not found');
         return [];
     }
-    
+
     const rows = table.querySelectorAll('tbody tr');
     logger.trace(`[DOM Extractor] Found ${rows.length} table rows`);
-    
+
     return Array.from(rows);
 }
 
@@ -170,4 +171,3 @@ export function extractAllCoursesFromTable() {
     logger.trace(`[DOM Extractor] Extracted ${courses.length} courses from table`);
     return courses;
 }
-
