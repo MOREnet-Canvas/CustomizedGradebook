@@ -24,17 +24,18 @@ const SELECTED_STUDENT_KEY_PREFIX = 'cg_observer_selected_';
  *
  * @param {Object} options
  * @param {string|number} options.courseId - Canvas course ID
+ * @param {Array} options.observerEnrollments - Array of ObserverEnrollment objects for this course
  * @param {Object} options.apiClient - CanvasApiClient instance
  * @param {HTMLElement} options.statusEl - #pm-status element
  * @param {HTMLElement} options.cardsEl - #pm-cards element
  * @param {Function} options.onStudentSelected - Callback(studentId, studentName)
  */
-export async function renderObserverMasteryView({ courseId, apiClient, statusEl, cardsEl, onStudentSelected }) {
+export async function renderObserverMasteryView({ courseId, observerEnrollments, apiClient, statusEl, cardsEl, onStudentSelected }) {
     statusEl.textContent = "Loading observed students…";
 
-    // Fetch observed students from Canvas API (includes names from observed_users)
+    // Fetch observed students from Canvas API (uses /users/self/observees for names)
     const [observedStudents, sections] = await Promise.all([
-        fetchObservedStudents(courseId, apiClient),
+        fetchObservedStudents(courseId, observerEnrollments, apiClient),
         fetchCourseSections(courseId, apiClient)
     ]);
 
