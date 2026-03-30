@@ -226,6 +226,7 @@ export async function renderMasteryDashboard() {
 
         renderObserverMasteryView({
             courseId,
+            observerEnrollments,
             apiClient,
             statusEl,
             cardsEl,
