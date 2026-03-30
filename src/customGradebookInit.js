@@ -49,6 +49,21 @@ import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardI
     if (ENV_PROD) {logger.info("Running in PROD mode");}
     logger.info(`Build environment: ${ENV_NAME}`);
 
+    // Proactively store observed users list for observers (parents)
+    // This helps the mastery dashboard work correctly when observers have multiple students
+    // ENV.OBSERVER_OPTIONS.OBSERVED_USERS_LIST is available on course pages
+    if (ENV?.OBSERVER_OPTIONS?.OBSERVED_USERS_LIST) {
+        try {
+            sessionStorage.setItem(
+                'cg_observed_users',
+                JSON.stringify(ENV.OBSERVER_OPTIONS.OBSERVED_USERS_LIST)
+            );
+            logger.debug(`Stored ${ENV.OBSERVER_OPTIONS.OBSERVED_USERS_LIST.length} observed users in sessionStorage`);
+        } catch (e) {
+            logger.warn('Failed to store observed users list in sessionStorage:', e);
+        }
+    }
+
     // Validate all existing snapshots on initialization (security)
     validateAllSnapshots();
 

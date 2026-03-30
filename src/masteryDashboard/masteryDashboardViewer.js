@@ -17,6 +17,7 @@
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { renderTeacherMasteryView } from './teacherMasteryView.js';
+import { renderObserverMasteryView } from './observerMasteryView.js';
 import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
 
 /**
@@ -211,16 +212,32 @@ export async function renderMasteryDashboard() {
     debugLog(`Enrollment types for this course: ${enrollmentTypes}`);
     debugStatus(statusEl, `Course enrollments: ${enrollmentTypes || "none"}. Determining role...`);
 
-    // Try to find observer enrollment first (parent viewing child)
-    const obs = courseEnrollments.find(e => 
+    // Find all observer enrollments (parent viewing child/children)
+    const observerEnrollments = courseEnrollments.filter(e =>
         e.type === "ObserverEnrollment" && e.associated_user_id
     );
 
     let studentId;
     let userRole;
 
-    if (obs) {
-        // Observer (parent) viewing observed student's data
+    if (observerEnrollments.length > 1) {
+        // Multiple observed students in this course - show student picker
+        debugLog(`User role: Observer with ${observerEnrollments.length} observed students. Rendering student picker.`);
+
+        renderObserverMasteryView({
+            courseId,
+            observerEnrollments,
+            apiClient,
+            statusEl,
+            cardsEl,
+            onStudentSelected: (selectedStudentId, selectedStudentName) => {
+                renderStudentData(selectedStudentId, courseId, apiClient, statusEl, cardsEl);
+            }
+        });
+        return;
+    } else if (observerEnrollments.length === 1) {
+        // Single observed student - show their data directly
+        const obs = observerEnrollments[0];
         studentId = obs.associated_user_id;
         userRole = "Observer (Parent)";
         debugLog(`User role: ${userRole}`);
