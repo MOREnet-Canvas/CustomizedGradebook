@@ -251,6 +251,47 @@ export async function fetchCourseStudents(courseId, apiClient) {
 }
 
 /**
+ * Fetch all observed students for an observer (parent) in a course.
+ * Uses the Canvas API to get ObserverEnrollments with observed user details.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {Object} apiClient - Canvas API client instance
+ * @returns {Promise<Array<{userId: string, name: string, sortableName: string, sectionId: string}>>} Normalized observed student list
+ *
+ * @example
+ * const students = await fetchObservedStudents('12345', apiClient);
+ * // [{ userId: '642', name: 'Test Student001', sortableName: 'Student001, Test', sectionId: '55' }, ...]
+ */
+export async function fetchObservedStudents(courseId, apiClient) {
+    try {
+        const enrollments = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/enrollments?type[]=ObserverEnrollment&state[]=active&include[]=observed_users`,
+            {},
+            'fetchObservedStudents'
+        );
+
+        logger.trace(`[EnrollmentService] Fetched ${enrollments.length} observer enrollments for course ${courseId}`);
+
+        // Map to observed students (not the observers themselves)
+        return enrollments
+            .filter(e => e.associated_user_id && e.observed_users?.length > 0)
+            .map(e => {
+                const observedUser = e.observed_users[0]; // First observed user in the enrollment
+                return {
+                    userId: String(e.associated_user_id),
+                    name: observedUser?.name ?? observedUser?.short_name ?? `Student ${e.associated_user_id}`,
+                    sortableName: observedUser?.sortable_name ?? observedUser?.name ?? `Student ${e.associated_user_id}`,
+                    sectionId: String(e.course_section_id)
+                };
+            });
+
+    } catch (error) {
+        logger.warn(`[EnrollmentService] Failed to fetch observed students for ${courseId}:`, error.message);
+        return [];
+    }
+}
+
+/**
  * Fetches all sections for a course.
  *
  * @param {string|number} courseId - Canvas course ID

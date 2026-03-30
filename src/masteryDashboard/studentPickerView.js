@@ -20,8 +20,9 @@ const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetic
  * @param {Array} options.sections - Array of section objects {id, name}
  * @param {HTMLElement} options.cardsEl - Container element to render picker into
  * @param {Function} options.onStudentSelected - Callback(studentId, studentName) when student is selected
+ * @param {Object} [options.autoSelectStudent] - Optional student object to auto-select on render
  */
-export function renderStudentPicker({ students, sections, cardsEl, onStudentSelected }) {
+export function renderStudentPicker({ students, sections, cardsEl, onStudentSelected, autoSelectStudent }) {
     // Sort students by sortable name (Last, First)
     const sortedStudents = [...students].sort((a, b) => a.sortableName.localeCompare(b.sortableName));
 
@@ -31,8 +32,23 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
     const pickerEl = document.createElement('div');
     pickerEl.id = 'student-picker';
     pickerEl.innerHTML = buildPickerHtml(sections);
+
+    // Insert picker at the TOP of the page (before stat boxes)
+    // Find the parent container and insert before the first child (student name div)
+    const container = cardsEl.parentNode;
+    const firstChild = container.firstChild;
+
+    // If picker already exists from previous render, remove it
+    const existingPicker = document.getElementById('student-picker');
+    if (existingPicker) {
+        existingPicker.remove();
+    }
+
+    // Insert picker at the very top (before student name)
+    container.insertBefore(pickerEl, firstChild);
+
+    // Clear the cards area (will be populated when student is selected)
     cardsEl.innerHTML = '';
-    cardsEl.appendChild(pickerEl);
 
     const sectionSelect = pickerEl.querySelector('#pm-section-select');
     const searchInput = pickerEl.querySelector('#pm-student-search');
@@ -89,14 +105,18 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
     function selectStudent(student) {
         dropdown.style.display = 'none';
         searchInput.value = '';
+
+        // Hide the picker
+        pickerEl.style.display = 'none';
+
         const header = ensureStudentHeader(cardsEl);
         updateStudentHeader(header, student.name, () => {
             // "Change Student" clicked — hide header, restore picker
             header.style.display = 'none';
-            cardsEl.innerHTML = '';
-            cardsEl.appendChild(pickerEl);
+            pickerEl.style.display = 'block';
             dropdown.style.display = 'none';
             searchInput.value = '';
+            cardsEl.innerHTML = '';
 
             // Reset header stat boxes to blank state
             const clearText = (id, val = '') => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -170,6 +190,14 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
         if (!item) return;
         selectStudent(filteredStudents[Number(item.dataset.index)]);
     });
+
+    // Auto-select student if provided (for observers)
+    if (autoSelectStudent) {
+        // Use setTimeout to allow DOM to fully render first
+        setTimeout(() => {
+            selectStudent(autoSelectStudent);
+        }, 0);
+    }
 }
 
 /**
@@ -190,7 +218,7 @@ function ensureStudentHeader(cardsEl) {
 
 /** Update the persistent header content and show it. */
 function updateStudentHeader(header, studentName, onChangeStudent) {
-    header.innerHTML = `<span style="${FONT} font-size:0.9rem; color:#555;">Viewing:</span><span style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-left:6px; flex:1;">${escapeHtml(studentName)}</span><button id="pm-change-student" style="${FONT} font-size:0.85rem; color:#0374B5; background:none; border:none; cursor:pointer; padding:4px 8px; text-decoration:underline;">← Change Student</button>`;
+    header.innerHTML = `<span style="${FONT} font-size:0.9rem; color:#555;">Viewing:</span><span style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-left:6px;">${escapeHtml(studentName)}</span><button id="pm-change-student" style="${FONT} font-size:0.85rem; color:#0374B5; background:none; border:none; cursor:pointer; padding:4px 12px; margin-left:12px; text-decoration:underline;">← Change Student</button>`;
     header.style.display = 'flex';
     header.querySelector('#pm-change-student').addEventListener('click', onChangeStudent);
 }

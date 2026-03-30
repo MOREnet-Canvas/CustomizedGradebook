@@ -3,87 +3,88 @@
  * Observer Mastery View
  *
  * Renders a student picker for observers (parents) who have multiple observed students
- * in the same course. Uses ENV.OBSERVER_OPTIONS.OBSERVED_USERS_LIST to get student names
- * without requiring API calls that observers may not have permission for.
+ * in the same course. Uses Canvas API to get student names reliably.
  *
  * Features:
- * - Gets observed student list from ENV or sessionStorage
+ * - Fetches observed student list from Canvas API
+ * - Auto-selects first student (or last selected from localStorage)
+ * - Remembers selection across page loads
  * - Shows only observed students (privacy - no access to other students)
  * - Reuses shared student picker UI from studentPickerView.js
  */
 
 import { renderStudentPicker } from './studentPickerView.js';
-import { fetchCourseSections } from '../services/enrollmentService.js';
+import { fetchObservedStudents, fetchCourseSections } from '../services/enrollmentService.js';
 import { logger } from '../utils/logger.js';
+
+const SELECTED_STUDENT_KEY_PREFIX = 'cg_observer_selected_';
 
 /**
  * Render the observer student picker into the dashboard container.
  *
  * @param {Object} options
  * @param {string|number} options.courseId - Canvas course ID
- * @param {Array} options.observerEnrollments - Array of ObserverEnrollment objects for this course
  * @param {Object} options.apiClient - CanvasApiClient instance
  * @param {HTMLElement} options.statusEl - #pm-status element
  * @param {HTMLElement} options.cardsEl - #pm-cards element
  * @param {Function} options.onStudentSelected - Callback(studentId, studentName)
  */
-export async function renderObserverMasteryView({ courseId, observerEnrollments, apiClient, statusEl, cardsEl, onStudentSelected }) {
+export async function renderObserverMasteryView({ courseId, apiClient, statusEl, cardsEl, onStudentSelected }) {
     statusEl.textContent = "Loading observed students…";
 
-    // Try to get observed users list from ENV (most reliable source)
-    let observedUsersList = ENV?.OBSERVER_OPTIONS?.OBSERVED_USERS_LIST;
-    
-    if (observedUsersList) {
-        logger.debug(`[ObserverMasteryView] Found ${observedUsersList.length} observed users in ENV.OBSERVER_OPTIONS`);
-        
-        // Store in sessionStorage for future use (SPA navigation)
-        try {
-            sessionStorage.setItem('cg_observed_users', JSON.stringify(observedUsersList));
-        } catch (e) {
-            logger.warn('[ObserverMasteryView] Failed to store observed users in sessionStorage:', e);
-        }
-    } else {
-        // Fallback to sessionStorage if ENV not available
-        const cached = sessionStorage.getItem('cg_observed_users');
-        if (cached) {
-            try {
-                observedUsersList = JSON.parse(cached);
-                logger.debug(`[ObserverMasteryView] Found ${observedUsersList.length} observed users in sessionStorage`);
-            } catch (e) {
-                logger.warn('[ObserverMasteryView] Failed to parse cached observed users:', e);
-                observedUsersList = null;
-            }
+    // Fetch observed students from Canvas API (includes names from observed_users)
+    const [observedStudents, sections] = await Promise.all([
+        fetchObservedStudents(courseId, apiClient),
+        fetchCourseSections(courseId, apiClient)
+    ]);
+
+    if (observedStudents.length === 0) {
+        statusEl.textContent = "No observed students found in this course.";
+        logger.warn('[ObserverMasteryView] No observed students found');
+        return;
+    }
+
+    logger.info(`[ObserverMasteryView] Found ${observedStudents.length} observed students`);
+
+    // Check localStorage for last selected student
+    const storageKey = `${SELECTED_STUDENT_KEY_PREFIX}${courseId}`;
+    const lastSelectedId = localStorage.getItem(storageKey);
+
+    // Find the student to auto-select
+    let studentToSelect = null;
+    if (lastSelectedId) {
+        studentToSelect = observedStudents.find(s => s.userId === lastSelectedId);
+        if (studentToSelect) {
+            logger.debug(`[ObserverMasteryView] Auto-selecting last selected student: ${studentToSelect.name}`);
         }
     }
 
-    // Build student list from observer enrollments
-    const observedStudents = observerEnrollments.map(enrollment => {
-        const userId = String(enrollment.associated_user_id);
-        
-        // Try to get name from observedUsersList first (no API call needed!)
-        const userInfo = observedUsersList?.find(u => String(u.id) === userId);
-        
-        return {
-            userId: userId,
-            name: userInfo?.name || `Student ${userId}`,
-            sortableName: userInfo?.sortable_name || userInfo?.name || `Student ${userId}`,
-            sectionId: String(enrollment.course_section_id)
-        };
-    });
-
-    logger.info(`[ObserverMasteryView] Rendering picker for ${observedStudents.length} observed students`);
-
-    // Fetch sections for the course
-    const sections = await fetchCourseSections(courseId, apiClient);
+    // If no last selection or student not found, select first student (alphabetically)
+    if (!studentToSelect) {
+        const sortedStudents = [...observedStudents].sort((a, b) => a.sortableName.localeCompare(b.sortableName));
+        studentToSelect = sortedStudents[0];
+        logger.debug(`[ObserverMasteryView] Auto-selecting first student: ${studentToSelect.name}`);
+    }
 
     statusEl.textContent = "";
-    
+
+    // Wrap the onStudentSelected callback to save selection to localStorage
+    const wrappedCallback = (selectedStudentId, selectedStudentName) => {
+        try {
+            localStorage.setItem(storageKey, selectedStudentId);
+            logger.trace(`[ObserverMasteryView] Saved student selection: ${selectedStudentId}`);
+        } catch (e) {
+            logger.warn('[ObserverMasteryView] Failed to save student selection to localStorage:', e);
+        }
+        onStudentSelected(selectedStudentId, selectedStudentName);
+    };
+
     // Use shared student picker UI
     renderStudentPicker({
         students: observedStudents,
         sections: sections,
         cardsEl: cardsEl,
-        onStudentSelected: onStudentSelected
+        onStudentSelected: wrappedCallback,
+        autoSelectStudent: studentToSelect  // Pass student to auto-select
     });
 }
-
