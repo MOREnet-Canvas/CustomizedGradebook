@@ -749,5 +749,5 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         });
     });
 
-    debugLog(`Rendered ${avgOutcomeHtml ? '1 course grade + ' : ''}${regularCards.length} outcome cards`);
+    debugLog(`Rendered ${regularCards.length} outcome cards`);
 }
