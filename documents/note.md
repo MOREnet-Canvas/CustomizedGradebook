@@ -9,12 +9,9 @@ For checking version in DevTools: CG.version
 
 
 ## Next Steps
-TODO: Add missing assignments to Mastery Dashboard
 TODO: Add way to customize Mastery Dashboard colors
 TODO: Check on the zero grade penalty --> make sure a non scored outcome isn't being counted as a zero
-TODO: Add comments link to Mastery Dashboard
 TODO: Make zero outcomes show up first in Mastery Dashboard
-TODO: Fix Observer Grades page
 TODO: Have the button appear for CBE courses on both gradebook pages
 TODO: Add Checks for assignments
    - have they had mastery refresh done?
