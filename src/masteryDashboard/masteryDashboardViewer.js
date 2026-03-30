@@ -226,7 +226,6 @@ export async function renderMasteryDashboard() {
 
         renderObserverMasteryView({
             courseId,
-            observerEnrollments,
             apiClient,
             statusEl,
             cardsEl,
@@ -321,6 +320,17 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         || '';
     const nameEl = document.getElementById('pm-student-name');
     if (nameEl) nameEl.textContent = studentName ? `${studentName} — Mastery progress` : 'Mastery progress';
+
+    // Also update the picker header if it exists (for teachers/observers with student picker)
+    const pickerHeader = document.getElementById('pm-teacher-header');
+    if (pickerHeader && pickerHeader.style.display !== 'none') {
+        // Find the student name span (second span in header)
+        const headerNameSpan = pickerHeader.querySelector('span:nth-child(2)');
+        if (headerNameSpan && studentName) {
+            headerNameSpan.textContent = studentName;
+            debugLog(`Updated picker header with student name: ${studentName}`);
+        }
+    }
 
     // Build missing assignment list (banner populated after stat boxes are built)
     const missingSubmissions = submissions.filter(s =>
