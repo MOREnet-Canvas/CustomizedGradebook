@@ -131,6 +131,31 @@ export function isGradebookPage() {
 }
 
 /**
+ * Check if current page is Learning Mastery Gradebook (LMGB)
+ *
+ * LMGB and traditional gradebook share the same URL (/courses/:id/gradebook),
+ * so URL-based detection alone cannot distinguish them. This function uses
+ * Canvas's ENV.GRADEBOOK_OPTIONS to reliably detect LMGB.
+ *
+ * Detection method:
+ * - Primary: Check if ENV.GRADEBOOK_OPTIONS.settings.gradebook_view === 'learning_mastery'
+ * - Fallback: Check if ENV.GRADEBOOK_OPTIONS.outcome_proficiency exists (LMGB-only property)
+ *
+ * @returns {boolean} True if on Learning Mastery Gradebook
+ */
+export function isLMGBPage() {
+    const opts = window.ENV?.GRADEBOOK_OPTIONS;
+
+    // Primary: Check gradebook_view setting
+    if (opts?.settings?.gradebook_view === 'learning_mastery') {
+        return true;
+    }
+
+    // Fallback: outcome_proficiency only exists on LMGB
+    return !!opts?.outcome_proficiency;
+}
+
+/**
  * Check if current page is SpeedGrader
  *
  * Matches:

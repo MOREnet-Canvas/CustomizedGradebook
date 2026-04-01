@@ -13,12 +13,19 @@ import { handleError } from "../../utils/errorHandler.js";
 import { logger } from "../../utils/logger.js";
 import { startUpdateFlow } from "../updateFlowOrchestrator.js";
 import { renderLastUpdateNotice } from "../../utils/uiHelpers.js";
-import { isGradebookPage } from "../../utils/pageDetection.js";
+import { isGradebookPage, isLMGBPage } from "../../utils/pageDetection.js";
 
 /**
  * Inject the "Update Average" button into Canvas gradebook toolbar
+ * Only injects on Learning Mastery Gradebook (LMGB), not traditional gradebook
  */
 export function injectButtons() {
+    // Only inject on LMGB - exit early if not
+    if (!isLMGBPage()) {
+        logger.debug('Not on LMGB, skipping Update Average button injection');
+        return;
+    }
+
     waitForGradebookAndToolbar((toolbar) => {
         const courseId = getCourseId();
 
