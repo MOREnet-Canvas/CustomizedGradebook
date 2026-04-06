@@ -203,6 +203,8 @@ async function uploadFile(apiClient, courseId, folderId, payload, label = 'write
     }
 
     // 2c. Confirm with Canvas (or wait for file to be available)
+    let fileId = null;
+
     // Canvas auto-confirms on 201, but file may not be immediately available
     // Wait a moment for Canvas to process the upload
     if (s3Response.status === 201) {
@@ -219,34 +221,58 @@ async function uploadFile(apiClient, courseId, folderId, payload, label = 'write
             const file = files.find(f => f.display_name === FILE_NAME);
             if (file) {
                 pass(`File uploaded successfully (${label}) — file id: ${file.id}`);
-                return file.id;
+                fileId = file.id;
             }
         } catch (searchErr) {
             info('Could not search for file, trying confirmation URL...');
         }
     }
 
-    // Try explicit confirmation via Location header
-    const confirmUrl = s3Response.headers.get('Location') || uploadInstructions.location;
+    // Try explicit confirmation via Location header if file not found yet
+    if (!fileId) {
+        const confirmUrl = s3Response.headers.get('Location') || uploadInstructions.location;
 
-    if (!confirmUrl) {
-        fail('No confirmation URL and could not find file', { uploadInstructions, s3Response });
-        throw new Error('Upload confirmation failed - file may not be available');
+        if (!confirmUrl) {
+            fail('No confirmation URL and could not find file', { uploadInstructions, s3Response });
+            throw new Error('Upload confirmation failed - file may not be available');
+        }
+
+        try {
+            const confirmed = await apiClient.post(
+                confirmUrl,
+                {},
+                {},
+                'filesApiStep3'
+            );
+            pass(`File uploaded and confirmed (${label}) — file id: ${confirmed.id}`);
+            fileId = confirmed.id;
+        } catch (e) {
+            fail(`File confirmation failed (${label})`, e);
+            throw e;
+        }
     }
 
+    // 2d. Lock the file (UNPUBLISH it)
+    info('2d. Setting file to UNPUBLISHED...');
     try {
-        const confirmed = await apiClient.post(
-            confirmUrl,
+        await apiClient.put(
+            `/api/v1/files/${fileId}`,
+            {
+                locked: true,            // UNPUBLISHED - students blocked
+                hidden: false,           // Teachers can see it
+                unlock_at: '',
+                lock_at: '',
+                visibility_level: 'inherit'
+            },
             {},
-            {},
-            'filesApiStep3'
+            'lockUploadedFile'
         );
-        pass(`File uploaded and confirmed (${label}) — file id: ${confirmed.id}`);
-        return confirmed.id;
-    } catch (e) {
-        fail(`File confirmation failed (${label})`, e);
-        throw e;
+        pass(`File set to UNPUBLISHED (students cannot access)`);
+    } catch (lockErr) {
+        fail(`Could not lock file (${label})`, lockErr);
     }
+
+    return fileId;
 }
 
 // ─── Step 3: Read file back ──────────────────────────────────────────────────

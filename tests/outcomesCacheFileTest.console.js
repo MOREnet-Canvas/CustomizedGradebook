@@ -26,8 +26,9 @@
     // ═══════════════════════════════════════════════════════════════════════
     // CONFIGURATION
     // ═══════════════════════════════════════════════════════════════════════
-    
-    const FOLDER_NAME = '_mastery_cache';
+
+    const PARENT_FOLDER_NAME = 'MOREnet_CustomizedGradebook';
+    const FOLDER_NAME = 'outcomes_cache';
     const FILE_NAME = 'outcomes_cache.json';
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -150,64 +151,128 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // TEST STEP 1: ENSURE FOLDER EXISTS
+    // TEST STEP 1: ENSURE FOLDER EXISTS (with parent folder)
     // ═══════════════════════════════════════════════════════════════════════
 
-    async function ensureFolder(apiClient) {
-        section('Step 1: Creating/verifying _mastery_cache folder...');
+    async function ensureParentFolder(apiClient) {
+        section('Step 1a: Creating/verifying parent folder...');
+
+        // First, try to find parent folder by listing all course folders
+        try {
+            const allFolders = await apiClient.get(
+                `/api/v1/courses/${courseId}/folders?per_page=100`
+            );
+            const existing = allFolders.find(f => f.name === PARENT_FOLDER_NAME && !f.deleted);
+            if (existing) {
+                pass(`Parent folder already exists (id: ${existing.id})`);
+                // Ensure it's locked
+                await lockFolder(apiClient, existing.id, 'parent folder');
+                return existing.id;
+            }
+        } catch (e) {
+            info('Could not list folders, will try to create parent...');
+        }
+
+        // Parent folder doesn't exist — create it
+        try {
+            const folder = await apiClient.post(
+                `/api/v1/courses/${courseId}/folders`,
+                {
+                    name: PARENT_FOLDER_NAME,
+                    hidden: false,  // Visible to teachers
+                    locked: true    // UNPUBLISHED - prevents student access
+                }
+            );
+            pass(`Parent folder created (id: ${folder.id})`);
+            await lockFolder(apiClient, folder.id, 'parent folder');
+            return folder.id;
+        } catch (e) {
+            // If name conflict, try to find the existing folder by name
+            if (e.message.includes('already exists') || e.message.includes('taken')) {
+                info('Parent folder name exists (possibly deleted), searching...');
+                try {
+                    const allFolders = await apiClient.get(
+                        `/api/v1/courses/${courseId}/folders?per_page=100`
+                    );
+                    const existing = allFolders.find(f => f.name === PARENT_FOLDER_NAME);
+                    if (existing) {
+                        pass(`Found existing parent folder (id: ${existing.id})`);
+                        await lockFolder(apiClient, existing.id, 'parent folder');
+                        return existing.id;
+                    }
+                } catch (searchError) {
+                    fail('Could not find existing parent folder', searchError);
+                }
+            }
+            fail('Could not create parent folder', e);
+            throw e;
+        }
+    }
+
+    async function ensureFolder(apiClient, parentFolderId) {
+        section('Step 1b: Creating/verifying outcomes_cache subfolder...');
 
         // First, try to find folder by listing all course folders
         try {
             const allFolders = await apiClient.get(
                 `/api/v1/courses/${courseId}/folders?per_page=100`
             );
-            const existing = allFolders.find(f => f.name === FOLDER_NAME && !f.deleted);
+            const existing = allFolders.find(f =>
+                f.name === FOLDER_NAME &&
+                f.parent_folder_id === parentFolderId &&
+                !f.deleted
+            );
             if (existing) {
-                pass(`Folder already exists (id: ${existing.id})`);
+                pass(`Subfolder already exists (id: ${existing.id})`);
                 // Ensure it's locked
-                await lockFolder(apiClient, existing.id);
+                await lockFolder(apiClient, existing.id, 'subfolder');
                 return existing.id;
             }
         } catch (e) {
-            info('Could not list folders, will try to create...');
+            info('Could not list folders, will try to create subfolder...');
         }
 
-        // Folder doesn't exist — create it
+        // Folder doesn't exist — create it as a subfolder
         try {
             const folder = await apiClient.post(
                 `/api/v1/courses/${courseId}/folders`,
                 {
                     name: FOLDER_NAME,
+                    parent_folder_id: parentFolderId,  // Create inside parent folder
                     hidden: false,  // Visible to teachers
                     locked: true    // UNPUBLISHED - prevents student access
                 }
             );
-            pass(`Folder created (id: ${folder.id})`);
+            pass(`Subfolder created (id: ${folder.id})`);
+            await lockFolder(apiClient, folder.id, 'subfolder');
             return folder.id;
         } catch (e) {
             // If name conflict, try to find the existing folder by name
             if (e.message.includes('already exists') || e.message.includes('taken')) {
-                info('Folder name exists (possibly deleted), searching...');
+                info('Subfolder name exists (possibly deleted), searching...');
                 try {
                     const allFolders = await apiClient.get(
                         `/api/v1/courses/${courseId}/folders?per_page=100`
                     );
-                    const existing = allFolders.find(f => f.name === FOLDER_NAME);
+                    const existing = allFolders.find(f =>
+                        f.name === FOLDER_NAME &&
+                        f.parent_folder_id === parentFolderId
+                    );
                     if (existing) {
-                        pass(`Found existing folder (id: ${existing.id})`);
-                        await lockFolder(apiClient, existing.id);
+                        pass(`Found existing subfolder (id: ${existing.id})`);
+                        await lockFolder(apiClient, existing.id, 'subfolder');
                         return existing.id;
                     }
                 } catch (searchError) {
-                    fail('Could not find existing folder', searchError);
+                    fail('Could not find existing subfolder', searchError);
                 }
             }
-            fail('Could not create folder', e);
+            fail('Could not create subfolder', e);
             throw e;
         }
     }
 
-    async function lockFolder(apiClient, folderId) {
+    async function lockFolder(apiClient, folderId, label = 'folder') {
         try {
             await fetch(`/api/v1/folders/${folderId}`, {
                 method: 'PUT',
@@ -224,9 +289,9 @@
                     visibility_level: 'inherit'
                 })
             });
-            info('Folder set to UNPUBLISHED (students cannot access)');
+            info(`${label.charAt(0).toUpperCase() + label.slice(1)} set to UNPUBLISHED (students cannot access)`);
         } catch (e) {
-            info('Could not update folder permissions (may not affect functionality)');
+            info(`Could not update ${label} permissions (may not affect functionality)`);
         }
     }
 
@@ -287,6 +352,8 @@
         // 2c. Confirm with Canvas (or wait for file to be available)
         info('2c. Confirming upload with Canvas...');
 
+        let fileId = null;
+
         // Canvas auto-confirms on 201, but file may not be immediately available
         // Wait a moment for Canvas to process the upload
         if (s3Response.status === 201) {
@@ -301,29 +368,56 @@
                 const file = files.find(f => f.display_name === FILE_NAME);
                 if (file) {
                     pass(`File uploaded successfully (${label}) — file id: ${file.id}`);
-                    return file.id;
+                    fileId = file.id;
                 }
             } catch (searchErr) {
                 info('Could not search for file, trying confirmation URL...');
             }
         }
 
-        // Try explicit confirmation via Location header
-        const confirmUrl = s3Response.headers.get('Location') || uploadInstructions.location;
+        // Try explicit confirmation via Location header if file not found yet
+        if (!fileId) {
+            const confirmUrl = s3Response.headers.get('Location') || uploadInstructions.location;
 
-        if (!confirmUrl) {
-            fail('No confirmation URL and could not find file', { uploadInstructions, s3Response });
-            throw new Error('Upload confirmation failed - file may not be available');
+            if (!confirmUrl) {
+                fail('No confirmation URL and could not find file', { uploadInstructions, s3Response });
+                throw new Error('Upload confirmation failed - file may not be available');
+            }
+
+            try {
+                const confirmed = await apiClient.post(confirmUrl, {});
+                pass(`File uploaded and confirmed (${label}) — file id: ${confirmed.id}`);
+                fileId = confirmed.id;
+            } catch (e) {
+                fail(`File confirmation failed (${label})`, e);
+                throw e;
+            }
         }
 
+        // 2d. Lock the file (UNPUBLISH it)
+        info('2d. Setting file to UNPUBLISHED...');
         try {
-            const confirmed = await apiClient.post(confirmUrl, {});
-            pass(`File uploaded and confirmed (${label}) — file id: ${confirmed.id}`);
-            return confirmed.id;
-        } catch (e) {
-            fail(`File confirmation failed (${label})`, e);
-            throw e;
+            await fetch(`/api/v1/files/${fileId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': apiClient.csrfToken
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    locked: true,            // UNPUBLISHED - students blocked
+                    hidden: false,           // Teachers can see it
+                    unlock_at: '',
+                    lock_at: '',
+                    visibility_level: 'inherit'
+                })
+            });
+            pass(`File set to UNPUBLISHED (students cannot access)`);
+        } catch (lockErr) {
+            fail(`Could not lock file (${label})`, lockErr);
         }
+
+        return fileId;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -372,7 +466,7 @@
 
     console.group('%c📦 Canvas Files API Test', 'font-size: 14px; font-weight: bold; color: #0066cc;');
     console.log('%cAuto-detected course ID:', 'font-weight: bold;', courseId);
-    console.log('%cTarget file:', 'font-weight: bold;', `${FOLDER_NAME}/${FILE_NAME}`);
+    console.log('%cTarget file:', 'font-weight: bold;', `${PARENT_FOLDER_NAME}/${FOLDER_NAME}/${FILE_NAME}`);
     console.log('─'.repeat(60));
 
     try {
@@ -381,8 +475,12 @@
         info('API client initialized with CSRF token');
         console.log('');
 
-        // 1. Folder
-        const folderId = await ensureFolder(apiClient);
+        // 1a. Parent folder
+        const parentFolderId = await ensureParentFolder(apiClient);
+        console.log('');
+
+        // 1b. Subfolder
+        const folderId = await ensureFolder(apiClient, parentFolderId);
         console.log('');
 
         // 2. Initial write
@@ -427,9 +525,10 @@
         console.log('');
         console.log('%cYou can verify the file in Canvas:', 'font-weight: bold;');
         console.log(`  1. Go to Files in your course`);
-        console.log(`  2. Look for folder: ${FOLDER_NAME}`);
-        console.log(`  3. Find file: ${FILE_NAME}`);
-        console.log(`  4. Folder should show as UNPUBLISHED (locked)`);
+        console.log(`  2. Look for folder: ${PARENT_FOLDER_NAME}`);
+        console.log(`  3. Inside that, find subfolder: ${FOLDER_NAME}`);
+        console.log(`  4. Find file: ${FILE_NAME}`);
+        console.log(`  5. Both folders should show as UNPUBLISHED (locked)`);
         console.log('');
         console.log('%c📋 Next: Test as STUDENT', 'font-weight: bold; color: #ff9800;');
         console.log('  1. Use Student View or log in as student');
