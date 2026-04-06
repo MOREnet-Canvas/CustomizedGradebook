@@ -72,17 +72,23 @@ function info(msg) { console.log(`%c  ${msg}`, 'color: #888;'); }
 
 async function ensureFolder(apiClient, courseId) {
     info('Step 1: Creating/verifying _mastery_cache folder...');
+
+    // First, try to find folder by listing all course folders
     try {
-        // Check if folder already exists
-        const existing = await apiClient.get(
-            `/api/v1/courses/${courseId}/folders/by_path/${FOLDER_NAME}`,
+        const allFolders = await apiClient.get(
+            `/api/v1/courses/${courseId}/folders`,
             {},
-            'getCacheFolder'
+            'listCourseFolders'
         );
-        pass(`Folder already exists (id: ${existing.id})`);
-        return existing.id;
+        const existing = allFolders.find(f => f.name === FOLDER_NAME && !f.deleted);
+        if (existing) {
+            pass(`Folder already exists (id: ${existing.id})`);
+            // Ensure it's locked
+            await lockFolder(apiClient, existing.id);
+            return existing.id;
+        }
     } catch (e) {
-        if (e.status !== 404) { fail('Unexpected error checking folder', e); throw e; }
+        info('Could not list folders, will try to create...');
     }
 
     // Folder doesn't exist — create it
@@ -91,7 +97,8 @@ async function ensureFolder(apiClient, courseId) {
             `/api/v1/courses/${courseId}/folders`,
             {
                 name: FOLDER_NAME,
-                hidden: true  // not visible to students in Files UI
+                hidden: true,  // Hidden from students in Files UI
+                locked: true   // Locked to prevent student access
             },
             {},
             'createCacheFolder'
@@ -99,8 +106,45 @@ async function ensureFolder(apiClient, courseId) {
         pass(`Folder created (id: ${folder.id})`);
         return folder.id;
     } catch (e) {
+        // If name conflict, try to find the existing folder by name
+        if (e.message && (e.message.includes('already exists') || e.message.includes('taken'))) {
+            info('Folder name exists (possibly deleted), searching...');
+            try {
+                const allFolders = await apiClient.get(
+                    `/api/v1/courses/${courseId}/folders`,
+                    {},
+                    'searchExistingFolder'
+                );
+                const existing = allFolders.find(f => f.name === FOLDER_NAME);
+                if (existing) {
+                    pass(`Found existing folder (id: ${existing.id})`);
+                    await lockFolder(apiClient, existing.id);
+                    return existing.id;
+                }
+            } catch (searchError) {
+                fail('Could not find existing folder', searchError);
+            }
+        }
         fail('Could not create folder', e);
         throw e;
+    }
+}
+
+async function lockFolder(apiClient, folderId) {
+    try {
+        await apiClient.put(
+            `/api/v1/folders/${folderId}`,
+            {
+                hidden: true,
+                locked: true,
+                visibility_level: 'inherit'
+            },
+            {},
+            'lockCacheFolder'
+        );
+        info('Folder locked (students cannot access)');
+    } catch (e) {
+        info('Could not lock folder (may not affect functionality)');
     }
 }
 
@@ -156,8 +200,38 @@ async function uploadFile(apiClient, courseId, folderId, payload, label = 'write
         throw e;
     }
 
-    // 2c. Confirm with Canvas — follow redirect location
+    // 2c. Confirm with Canvas (or wait for file to be available)
+    // Canvas auto-confirms on 201, but file may not be immediately available
+    // Wait a moment for Canvas to process the upload
+    if (s3Response.status === 201) {
+        info('Upload successful, waiting for Canvas to process...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // File should now be available - search for it
+        try {
+            const files = await apiClient.get(
+                `/api/v1/courses/${courseId}/files?search_term=${FILE_NAME}`,
+                {},
+                'searchUploadedFile'
+            );
+            const file = files.find(f => f.display_name === FILE_NAME);
+            if (file) {
+                pass(`File uploaded successfully (${label}) — file id: ${file.id}`);
+                return file.id;
+            }
+        } catch (searchErr) {
+            info('Could not search for file, trying confirmation URL...');
+        }
+    }
+
+    // Try explicit confirmation via Location header
     const confirmUrl = s3Response.headers.get('Location') || uploadInstructions.location;
+
+    if (!confirmUrl) {
+        fail('No confirmation URL and could not find file', { uploadInstructions, s3Response });
+        throw new Error('Upload confirmation failed - file may not be available');
+    }
+
     try {
         const confirmed = await apiClient.post(
             confirmUrl,
@@ -194,7 +268,9 @@ async function readFile(apiClient, courseId) {
         info(`File found (id: ${file.id}) — fetching contents...`);
 
         // Fetch the actual file contents from the download URL
-        const response = await fetch(file.url);
+        // Add cache-busting query parameter to prevent browser cache
+        const fileUrl = file.url + (file.url.includes('?') ? '&' : '?') + '_=' + Date.now();
+        const response = await fetch(fileUrl);
         if (!response.ok) {
             fail(`Could not fetch file contents — status: ${response.status}`);
             return null;
