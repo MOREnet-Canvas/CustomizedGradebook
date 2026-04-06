@@ -97,8 +97,8 @@ async function ensureFolder(apiClient, courseId) {
             `/api/v1/courses/${courseId}/folders`,
             {
                 name: FOLDER_NAME,
-                hidden: true,  // Hidden from students in Files UI
-                locked: true   // Locked to prevent student access
+                hidden: false,  // Visible to teachers
+                locked: true    // UNPUBLISHED - prevents student access
             },
             {},
             'createCacheFolder'
@@ -135,16 +135,18 @@ async function lockFolder(apiClient, folderId) {
         await apiClient.put(
             `/api/v1/folders/${folderId}`,
             {
-                hidden: true,
-                locked: true,
+                hidden: false,           // Teachers can see it
+                locked: true,            // UNPUBLISHED - students blocked
+                unlock_at: '',
+                lock_at: '',
                 visibility_level: 'inherit'
             },
             {},
             'lockCacheFolder'
         );
-        info('Folder locked (students cannot access)');
+        info('Folder set to UNPUBLISHED (students cannot access)');
     } catch (e) {
-        info('Could not lock folder (may not affect functionality)');
+        info('Could not update folder permissions (may not affect functionality)');
     }
 }
 
