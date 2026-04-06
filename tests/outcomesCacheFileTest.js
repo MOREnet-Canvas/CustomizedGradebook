@@ -1,50 +1,66 @@
 // tests/outcomesCacheFileTest.js
 /**
- * Standalone test for Canvas course file save/read operations.
- * Run this in the browser console on a Canvas beta course page,
- * or inject it via your existing script loader.
+ * ES Module Canvas Files API Test
+ *
+ * This is the ES module version for integration testing and module-based workflows.
+ * For quick console testing, use outcomesCacheFileTest.console.js instead.
  *
  * Prerequisites:
- *   - You are logged in as a teacher or admin
- *   - The course ID below matches a course in your beta environment
- *   - Your apiClient instance is available (adjust import as needed)
+ *   - Loaded as part of the bundled application
+ *   - Run on a Canvas course page
+ *   - User is logged in as teacher or admin
+ *
+ * Usage:
+ *   import { runFileSaveTest } from './tests/outcomesCacheFileTest.js';
+ *   const apiClient = new CanvasApiClient();
+ *   await runFileSaveTest(apiClient);
+ *
+ * Or attach to window for console access:
+ *   window.CG_testOutcomesCacheFiles = () => runFileSaveTest(new CanvasApiClient());
  *
  * Tests:
- *   1. Create _mastery_cache folder (hidden from students)
- *   2. Write a small JSON file to that folder
- *   3. Read the file back and verify contents match
- *   4. Overwrite the file and verify new contents
- *   5. Report results clearly
+ *   1. Auto-detect course ID from URL (or use provided override)
+ *   2. Create _mastery_cache folder (hidden from students)
+ *   3. Write a small JSON file to that folder
+ *   4. Read the file back and verify contents match
+ *   5. Overwrite the file and verify new contents
+ *   6. Report results with color-coded console output
  */
 
-import { CanvasApiClient } from '../src/services/canvasApiClient.js'; // adjust path
+import { CanvasApiClient } from '../src/utils/canvasApiClient.js';
+import { getCourseId } from '../src/utils/canvas.js';
 
-const TEST_COURSE_ID = 'YOUR_BETA_COURSE_ID'; // replace before running
-const FOLDER_NAME    = '_mastery_cache';
-const FILE_NAME      = 'outcomes_cache.json';
+const FOLDER_NAME = '_mastery_cache';
+const FILE_NAME = 'outcomes_cache.json';
 
-const testPayload = {
-    meta: {
-        courseId:            TEST_COURSE_ID,
-        courseName:          'Test Course',
-        computedAt:          new Date().toISOString(),
-        computedBy:          'test_script',
-        studentCount:        0,
-        outcomeCount:        0,
-        canvasScoringMethod: 'decaying_average',
-        schemaVersion:       '1.0'
-    },
-    outcomes: []
-};
+// Test payloads - courseId will be injected at runtime
+function createTestPayload(courseId) {
+    return {
+        meta: {
+            courseId: courseId,
+            courseName: 'Test Course',
+            computedAt: new Date().toISOString(),
+            computedBy: 'module_test_v1',
+            studentCount: 0,
+            outcomeCount: 0,
+            canvasScoringMethod: 'decaying_average',
+            schemaVersion: '1.0'
+        },
+        outcomes: []
+    };
+}
 
-const testPayloadV2 = {
-    ...testPayload,
-    meta: {
-        ...testPayload.meta,
-        computedAt: new Date().toISOString(),
-        computedBy: 'test_script_overwrite'
-    }
-};
+function createTestPayloadV2(courseId) {
+    const base = createTestPayload(courseId);
+    return {
+        ...base,
+        meta: {
+            ...base.meta,
+            computedAt: new Date().toISOString(),
+            computedBy: 'module_test_v2_overwrite'
+        }
+    };
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -54,12 +70,14 @@ function info(msg) { console.log(`%c  ${msg}`, 'color: #888;'); }
 
 // ─── Step 1: Ensure folder exists ───────────────────────────────────────────
 
-async function ensureFolder(apiClient) {
+async function ensureFolder(apiClient, courseId) {
     info('Step 1: Creating/verifying _mastery_cache folder...');
     try {
         // Check if folder already exists
         const existing = await apiClient.get(
-            `/api/v1/courses/${TEST_COURSE_ID}/folders/by_path/${FOLDER_NAME}`
+            `/api/v1/courses/${courseId}/folders/by_path/${FOLDER_NAME}`,
+            {},
+            'getCacheFolder'
         );
         pass(`Folder already exists (id: ${existing.id})`);
         return existing.id;
@@ -70,11 +88,13 @@ async function ensureFolder(apiClient) {
     // Folder doesn't exist — create it
     try {
         const folder = await apiClient.post(
-            `/api/v1/courses/${TEST_COURSE_ID}/folders`,
+            `/api/v1/courses/${courseId}/folders`,
             {
-                name:   FOLDER_NAME,
+                name: FOLDER_NAME,
                 hidden: true  // not visible to students in Files UI
-            }
+            },
+            {},
+            'createCacheFolder'
         );
         pass(`Folder created (id: ${folder.id})`);
         return folder.id;
@@ -86,10 +106,10 @@ async function ensureFolder(apiClient) {
 
 // ─── Step 2: Upload file (Canvas 3-step process) ─────────────────────────────
 
-async function uploadFile(apiClient, folderId, payload, label = 'write') {
+async function uploadFile(apiClient, courseId, folderId, payload, label = 'write') {
     info(`Step 2 (${label}): Uploading ${FILE_NAME}...`);
 
-    const blob    = new Blob(
+    const blob = new Blob(
         [JSON.stringify(payload, null, 2)],
         { type: 'application/json' }
     );
@@ -99,14 +119,16 @@ async function uploadFile(apiClient, folderId, payload, label = 'write') {
     let uploadInstructions;
     try {
         uploadInstructions = await apiClient.post(
-            `/api/v1/courses/${TEST_COURSE_ID}/files`,
+            `/api/v1/courses/${courseId}/files`,
             {
-                name:                FILE_NAME,
+                name: FILE_NAME,
                 size,
-                content_type:        'application/json',
-                parent_folder_id:    folderId,
-                on_duplicate:        'overwrite'
-            }
+                content_type: 'application/json',
+                parent_folder_id: folderId,
+                on_duplicate: 'overwrite'
+            },
+            {},
+            'filesApiStep1'
         );
         info(`Upload URL received from Canvas`);
     } catch (e) {
@@ -125,7 +147,8 @@ async function uploadFile(apiClient, folderId, payload, label = 'write') {
     try {
         s3Response = await fetch(uploadInstructions.upload_url, {
             method: 'POST',
-            body:   formData
+            body: formData,
+            credentials: 'omit'  // No Canvas cookies for S3
         });
         info(`S3 upload status: ${s3Response.status}`);
     } catch (e) {
@@ -134,10 +157,14 @@ async function uploadFile(apiClient, folderId, payload, label = 'write') {
     }
 
     // 2c. Confirm with Canvas — follow redirect location
-    // Canvas returns 3xx — get the confirmation URL from Location header
-    const confirmUrl = s3Response.headers.get('Location') || s3Response.url;
+    const confirmUrl = s3Response.headers.get('Location') || uploadInstructions.location;
     try {
-        const confirmed = await apiClient.post(confirmUrl, {});
+        const confirmed = await apiClient.post(
+            confirmUrl,
+            {},
+            {},
+            'filesApiStep3'
+        );
         pass(`File uploaded and confirmed (${label}) — file id: ${confirmed.id}`);
         return confirmed.id;
     } catch (e) {
@@ -148,13 +175,14 @@ async function uploadFile(apiClient, folderId, payload, label = 'write') {
 
 // ─── Step 3: Read file back ──────────────────────────────────────────────────
 
-async function readFile(apiClient) {
+async function readFile(apiClient, courseId) {
     info('Step 3: Reading file back from Canvas...');
     try {
         // Find the file in the folder
         const files = await apiClient.get(
-            `/api/v1/courses/${TEST_COURSE_ID}/files`,
-            { search_term: FILE_NAME, per_page: 5 }
+            `/api/v1/courses/${courseId}/files?search_term=${FILE_NAME}&per_page=5`,
+            {},
+            'searchCacheFile'
         );
 
         const file = files.find(f => f.display_name === FILE_NAME);
@@ -183,47 +211,84 @@ async function readFile(apiClient) {
 
 // ─── Run all tests ───────────────────────────────────────────────────────────
 
-export async function runFileSaveTest(apiClient) {
-    console.group('%cCanvas File Save/Read Test', 'font-size:14px; font-weight:bold;');
-    console.log('Course ID:', TEST_COURSE_ID);
+/**
+ * Run Canvas Files API test suite
+ * @param {CanvasApiClient} apiClient - Initialized Canvas API client
+ * @param {string} courseIdOverride - Optional course ID override (auto-detects from URL if not provided)
+ */
+export async function runFileSaveTest(apiClient, courseIdOverride = null) {
+    // Auto-detect course ID from URL if not provided
+    const courseId = courseIdOverride || getCourseId();
+
+    if (!courseId) {
+        console.error('%c❌ Cannot run test - no course ID found', 'color: red; font-weight: bold;');
+        console.log('%cEither navigate to a course page or provide courseId parameter', 'color: #888;');
+        return;
+    }
+
+    console.group('%cCanvas File Save/Read Test (ES Module)', 'font-size:14px; font-weight:bold; color: #0066cc;');
+    console.log('Course ID:', courseId);
     console.log('Target file:', `${FOLDER_NAME}/${FILE_NAME}`);
-    console.log('─'.repeat(40));
+    console.log('─'.repeat(60));
 
     try {
+        // Create test payloads with actual course ID
+        const testPayload = createTestPayload(courseId);
+        const testPayloadV2 = createTestPayloadV2(courseId);
+
         // 1. Folder
-        const folderId = await ensureFolder(apiClient);
+        const folderId = await ensureFolder(apiClient, courseId);
 
         // 2. Initial write
-        await uploadFile(apiClient, folderId, testPayload, 'initial write');
+        await uploadFile(apiClient, courseId, folderId, testPayload, 'initial write');
 
         // 3. Read back and verify
-        const readBack = await readFile(apiClient);
+        const readBack = await readFile(apiClient, courseId);
         if (readBack) {
             const match = readBack.meta.computedBy === testPayload.meta.computedBy;
             match
-                ? pass('Contents verified — computedBy matches')
-                : fail('Contents mismatch — computedBy does not match', readBack);
+                ? pass('Contents verified — computedBy matches (module_test_v1)')
+                : fail('Contents mismatch — computedBy does not match', {
+                    expected: testPayload.meta.computedBy,
+                    actual: readBack.meta.computedBy
+                });
         }
 
         // 4. Overwrite
-        await uploadFile(apiClient, folderId, testPayloadV2, 'overwrite');
+        await uploadFile(apiClient, courseId, folderId, testPayloadV2, 'overwrite');
 
         // 5. Read back and verify overwrite
-        const readBack2 = await readFile(apiClient);
+        const readBack2 = await readFile(apiClient, courseId);
         if (readBack2) {
             const match = readBack2.meta.computedBy === testPayloadV2.meta.computedBy;
             match
-                ? pass('Overwrite verified — computedBy reflects new value')
-                : fail('Overwrite mismatch — still showing old value', readBack2);
+                ? pass('Overwrite verified — computedBy reflects new value (module_test_v2_overwrite)')
+                : fail('Overwrite mismatch — still showing old value', {
+                    expected: testPayloadV2.meta.computedBy,
+                    actual: readBack2.meta.computedBy
+                });
         }
 
-        console.log('─'.repeat(40));
+        console.log('─'.repeat(60));
         pass('All file tests complete');
+        console.log('');
+        console.log('%cVerify in Canvas Files:', 'font-weight: bold;');
+        console.log(`  Folder: ${FOLDER_NAME} (hidden from students)`);
+        console.log(`  File: ${FILE_NAME}`);
 
     } catch (e) {
-        console.log('─'.repeat(40));
+        console.log('─'.repeat(60));
         fail('Test suite aborted due to error above', e);
     }
 
     console.groupEnd();
+}
+
+// Attach to window for easy console access
+// Usage: window.CG_testOutcomesCacheFiles()
+if (typeof window !== 'undefined') {
+    window.CG_testOutcomesCacheFiles = async (courseIdOverride = null) => {
+        const apiClient = new CanvasApiClient();
+        await runFileSaveTest(apiClient, courseIdOverride);
+    };
 }
