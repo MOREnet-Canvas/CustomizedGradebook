@@ -151,10 +151,29 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // TEST STEP 0: GET ROOT FOLDER
+    // ═══════════════════════════════════════════════════════════════════════
+
+    async function getRootFolderId(apiClient) {
+        section('Step 0: Finding course root folder...');
+
+        try {
+            const rootFolder = await apiClient.get(
+                `/api/v1/courses/${courseId}/folders/root`
+            );
+            pass(`Root folder found: "${rootFolder.name}" (id: ${rootFolder.id})`);
+            return rootFolder.id;
+        } catch (e) {
+            fail('Could not find root folder', e);
+            throw e;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // TEST STEP 1: ENSURE FOLDER EXISTS (with parent folder)
     // ═══════════════════════════════════════════════════════════════════════
 
-    async function ensureParentFolder(apiClient) {
+    async function ensureParentFolder(apiClient, rootFolderId) {
         section('Step 1a: Creating/verifying parent folder...');
 
         // First, try to find parent folder by listing all course folders
@@ -179,6 +198,7 @@
                 `/api/v1/courses/${courseId}/folders`,
                 {
                     name: PARENT_FOLDER_NAME,
+                    parent_folder_id: rootFolderId,  // Create inside course root folder
                     hidden: false,  // Visible to teachers
                     locked: true    // UNPUBLISHED - prevents student access
                 }
@@ -475,8 +495,12 @@
         info('API client initialized with CSRF token');
         console.log('');
 
+        // 0. Get root folder ID
+        const rootFolderId = await getRootFolderId(apiClient);
+        console.log('');
+
         // 1a. Parent folder
-        const parentFolderId = await ensureParentFolder(apiClient);
+        const parentFolderId = await ensureParentFolder(apiClient, rootFolderId);
         console.log('');
 
         // 1b. Subfolder
