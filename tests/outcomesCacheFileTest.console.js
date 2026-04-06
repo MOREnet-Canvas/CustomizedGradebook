@@ -178,8 +178,8 @@
                 `/api/v1/courses/${courseId}/folders`,
                 {
                     name: FOLDER_NAME,
-                    hidden: true,  // Hidden from students in Files UI
-                    locked: true   // Locked to prevent student access
+                    hidden: false,  // Visible to teachers
+                    locked: true    // UNPUBLISHED - prevents student access
                 }
             );
             pass(`Folder created (id: ${folder.id})`);
@@ -217,14 +217,16 @@
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    hidden: true,
-                    locked: true,
+                    hidden: false,           // Teachers can see it
+                    locked: true,            // UNPUBLISHED - students blocked
+                    unlock_at: '',
+                    lock_at: '',
                     visibility_level: 'inherit'
                 })
             });
-            info('Folder locked (students cannot access)');
+            info('Folder set to UNPUBLISHED (students cannot access)');
         } catch (e) {
-            info('Could not lock folder (may not affect functionality)');
+            info('Could not update folder permissions (may not affect functionality)');
         }
     }
 
@@ -427,7 +429,13 @@
         console.log(`  1. Go to Files in your course`);
         console.log(`  2. Look for folder: ${FOLDER_NAME}`);
         console.log(`  3. Find file: ${FILE_NAME}`);
-        console.log(`  4. The folder is hidden from students`);
+        console.log(`  4. Folder should show as UNPUBLISHED (locked)`);
+        console.log('');
+        console.log('%c📋 Next: Test as STUDENT', 'font-weight: bold; color: #ff9800;');
+        console.log('  1. Use Student View or log in as student');
+        console.log('  2. Navigate to this course');
+        console.log('  3. Run: tests/outcomesCacheFileTest.student.js');
+        console.log('  4. Verify students CANNOT access cache files');
 
     } catch (e) {
         console.log('─'.repeat(60));
