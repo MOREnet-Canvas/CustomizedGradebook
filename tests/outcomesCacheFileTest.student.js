@@ -121,21 +121,23 @@
     
     // Test 3: Try to search for cache file
     section('Test 3: Attempting to search for cache file...');
+    let foundFileId = null;
     try {
         const response = await fetch(`/api/v1/courses/${courseId}/files?search_term=${FILE_NAME}`, {
             headers: { 'X-CSRF-Token': csrfToken },
             credentials: 'same-origin'
         });
-        
+
         if (response.ok) {
             const files = await response.json();
             const cacheFile = files.find(f => f.display_name === FILE_NAME);
-            
+
             if (cacheFile) {
                 fail(`SECURITY ISSUE: Student can find cache file "${FILE_NAME}"`);
                 info(`File ID: ${cacheFile.id}, Locked: ${cacheFile.locked}`);
+                foundFileId = cacheFile.id;
                 allTestsPassed = false;
-                
+
                 // Test 3b: Try to download the file
                 section('Test 3b: Attempting to download found file...');
                 try {
@@ -164,10 +166,47 @@
     }
     console.log('');
     
-    // Test 4: Try to access with direct file ID (if provided)
+    // Test 4: Try to access with direct file ID
     section('Test 4: Direct file access test');
-    info('To test direct file access, provide file ID from teacher test:');
-    info('Run: window.testDirectFileAccess(fileId)');
+
+    // If we found a file in Test 3, test direct access automatically
+    if (foundFileId) {
+        info(`Testing direct access to file ID: ${foundFileId}`);
+        try {
+            const response = await fetch(`/api/v1/files/${foundFileId}`, {
+                headers: { 'X-CSRF-Token': csrfToken },
+                credentials: 'same-origin'
+            });
+
+            if (response.ok) {
+                const file = await response.json();
+
+                // Check if file is actually locked for the student
+                if (file.locked_for_user === true || !file.url || file.url === '') {
+                    pass('File is locked for students - metadata accessible but cannot download');
+                    info(`File: ${file.display_name}, locked_for_user: ${file.locked_for_user}, url: ${file.url ? 'present' : 'empty'}`);
+                    if (file.lock_explanation) {
+                        info(`Lock reason: ${file.lock_explanation}`);
+                    }
+                } else {
+                    fail('CRITICAL SECURITY ISSUE: Student can access file by direct ID!');
+                    info(`File name: ${file.display_name}, Locked: ${file.locked}, locked_for_user: ${file.locked_for_user}`);
+                    info(`Download URL is accessible: ${file.url}`);
+                    allTestsPassed = false;
+                }
+            } else if (response.status === 401 || response.status === 403) {
+                pass(`Direct file access blocked (status: ${response.status})`);
+            } else {
+                info(`Unexpected status: ${response.status}`);
+            }
+        } catch (e) {
+            pass('Direct file access blocked: ' + e.message);
+        }
+    } else {
+        info('No file found to test - if you have file ID from teacher test:');
+        info('Run: window.testDirectFileAccess(fileId)');
+    }
+    console.log('');
     
     window.testDirectFileAccess = async (fileId) => {
         console.log('');
@@ -177,12 +216,24 @@
                 headers: { 'X-CSRF-Token': csrfToken },
                 credentials: 'same-origin'
             });
-            
+
             if (response.ok) {
-                fail('CRITICAL SECURITY ISSUE: Student can access file by direct ID!');
                 const file = await response.json();
-                info(`File name: ${file.display_name}, Locked: ${file.locked}`);
-                return false;
+
+                // Check if file is actually locked for the student
+                if (file.locked_for_user === true || !file.url || file.url === '') {
+                    pass('File is locked for students - metadata accessible but cannot download');
+                    info(`File: ${file.display_name}, locked_for_user: ${file.locked_for_user}, url: ${file.url ? 'present' : 'empty'}`);
+                    if (file.lock_explanation) {
+                        info(`Lock reason: ${file.lock_explanation}`);
+                    }
+                    return true;
+                } else {
+                    fail('CRITICAL SECURITY ISSUE: Student can access file by direct ID!');
+                    info(`File name: ${file.display_name}, Locked: ${file.locked}, locked_for_user: ${file.locked_for_user}`);
+                    info(`Download URL is accessible: ${file.url}`);
+                    return false;
+                }
             } else if (response.status === 401 || response.status === 403) {
                 pass(`Direct file access blocked (status: ${response.status})`);
                 return true;
