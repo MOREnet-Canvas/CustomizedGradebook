@@ -1,0 +1,62 @@
+[ ] NAME:Outcomes Dashboard Implementation DESCRIPTION:Complete implementation of the Outcomes Dashboard with Power Law analytics for Canvas LMS
+-[ ] NAME:Phase 0 - Validation & Setup DESCRIPTION:Validate Canvas APIs and verify prerequisites before building modules
+--[x] NAME:Test Canvas Files API (COMPLETE) DESCRIPTION:Verify the updated outcomesCacheFileTest.console.js works in Canvas beta with proper folder structure
+--[x] NAME:Test Unpublished Page Access DESCRIPTION:Manual test in Canvas UI - create unpublished test page and verify teacher access. Instructions in tests/phase0_api_validation/01_testUnpublishedPageAccess.md
+--[x] NAME:Test Canvas Outcomes API DESCRIPTION:Console test to verify outcome names fetch and outcome rollups API format. Run tests/phase0_api_validation/02_testOutcomesAPI.console.js
+--[x] NAME:Test Canvas Outcome Results API DESCRIPTION:Console test to verify outcome results format and data structure for attempts extraction. Run tests/phase0_api_validation/03_testOutcomeResultsAPI.console.js
+-[ ] NAME:Phase 1 - Core Services DESCRIPTION:Build foundational services for caching, permissions, and storage
+--[ ] NAME:Build outcomesCacheService.js DESCRIPTION:Canvas Files API integration for reading/writing outcomes cache
+---[ ] NAME:Implement ensureFolder() DESCRIPTION:Find or create MOREnet_CustomizedGradebook/outcomes_cache folder structure
+---[ ] NAME:Implement writeOutcomesCache() DESCRIPTION:3-step upload process with locked/hidden file permissions
+---[ ] NAME:Implement readOutcomesCache() DESCRIPTION:Read and parse outcomes_cache.json from Canvas Files
+---[ ] NAME:Console test outcomesCacheService DESCRIPTION:Test folder creation, file write, and file read in browser console
+--[ ] NAME:Build thresholdStorage.js DESCRIPTION:localStorage wrapper for per-user, per-course threshold values
+---[ ] NAME:Implement getThreshold() DESCRIPTION:Read threshold from localStorage with default 2.2
+---[ ] NAME:Implement saveThreshold() DESCRIPTION:Write threshold to localStorage with key pattern cg_threshold_{courseId}_{userId}
+--[ ] NAME:Build outcomesPermissions.js DESCRIPTION:Role-based access control for dashboard
+---[ ] NAME:Implement canAccessOutcomesDashboard() DESCRIPTION:Check ENV.current_user_roles for teacher/ta/admin/designer roles
+-[ ] NAME:Phase 2 - Data Pipeline DESCRIPTION:Build data fetching and processing services
+--[ ] NAME:Build outcomesDataService.js DESCRIPTION:Fetch and process outcome data from Canvas APIs
+---[ ] NAME:Implement fetchOutcomeNames() DESCRIPTION:Fetch outcome metadata (names, IDs, alignments) using /outcome_rollups API with include[]=outcomes&include[]=outcomes.alignments. Returns array of {id, title, displayOrder, alignments[]}. See API_REFERENCE.md Step 1.
+---[ ] NAME:Implement fetchOutcomeRollups() DESCRIPTION:Fetch ALL individual outcome attempts using /outcome_results API (no user_ids or outcome_ids filters). Use apiClient.getAllPages() for pagination. Returns array of {score, submitted_or_assessed_at, links: {user, learning_outcome, alignment}}. See API_REFERENCE.md Step 2.
+---[ ] NAME:Implement extractAttempts() DESCRIPTION:Group outcome_results by studentId_outcomeId composite key. Sort each group by submitted_or_assessed_at chronologically (oldest first). Extract score arrays. Deduplicate by submissionId if needed. Reuse pattern from masteryDashboardViewer.js lines 638-660. See API_REFERENCE.md.
+---[ ] NAME:Implement fetchAllOutcomeData() DESCRIPTION:Orchestrate all data fetches: 1) fetchOutcomeNames() for metadata, 2) fetchOutcomeRollups() for ALL attempts (not rollup summary), 3) extractAttempts() to build chronological score sequences per student+outcome. Return combined data structure ready for Power Law.
+---[ ] NAME:Implement computeOutcomeStats() DESCRIPTION:For each student+outcome score sequence: Check if scores.length >= MIN_SCORES (from powerLaw.js, currently 3). If yes, call powerLawPredict(scores). If no, set status='NE'. Use computeStudentOutcome() from powerLaw.js. Calculate class stats (mean, median, threshold percentiles). Return cache-ready structure.
+---[ ] NAME:Console test outcomesDataService DESCRIPTION:Console test outcomesDataService: Fetch data for real course, log grouped sequences per student+outcome, verify MIN_SCORES threshold applied correctly (NE for <3 attempts), check Power Law predictions calculated. Test with course that has students with 3+ attempts per outcome. Verify chronological sorting (oldest first).
+-[ ] NAME:Phase 3 - Page Creation & Initialization DESCRIPTION:Build page creation tools and dashboard initialization
+--[ ] NAME:Build outcomesDashboardCreation.js DESCRIPTION:Button injection and page creation for Outcomes Dashboard
+---[ ] NAME:Implement injectOutcomesDashboardButton() DESCRIPTION:Inject creation button in Course Settings sidebar
+---[ ] NAME:Implement createOutcomesDashboard() DESCRIPTION:Create outcomes-dashboard page with root div and front page button
+---[ ] NAME:Implement deleteOutcomesDashboard() DESCRIPTION:Delete page and remove button from front page
+--[ ] NAME:Build outcomesDashboardInit.js DESCRIPTION:Entry point and initialization logic
+---[ ] NAME:Implement page detection DESCRIPTION:Detect /courses/{id}/pages/outcomes-dashboard URL
+---[ ] NAME:Implement permission check DESCRIPTION:Call canAccessOutcomesDashboard() before rendering
+---[ ] NAME:Implement render orchestration DESCRIPTION:Initialize view with containerEl, courseId, apiClient, onRefresh
+---[ ] NAME:Implement refresh handler DESCRIPTION:Trigger data fetch, compute, and cache write with progress callbacks
+--[ ] NAME:Update pageDetection.js DESCRIPTION:Add isOutcomesDashboardPage() and isOutcomesDashboardCreationPage() functions
+-[ ] NAME:Phase 4 - UI Components & Rendering DESCRIPTION:Build renderer components and complete the view layer
+--[ ] NAME:Build outcomesRenderer.js DESCRIPTION:Render individual UI components for dashboard
+---[ ] NAME:Implement renderOutcomeRow() DESCRIPTION:Expandable outcome rows with class stats and expand/collapse
+---[ ] NAME:Implement renderStudentTable() DESCRIPTION:Student table with PL predictions, score history, trend arrows
+---[ ] NAME:Implement renderInterventionSidebar() DESCRIPTION:Low-performing students list and re-teach priorities
+---[ ] NAME:Implement renderThresholdSlider() DESCRIPTION:Interactive threshold slider with live updates
+--[ ] NAME:Complete outcomesDashboardView.js DESCRIPTION:Wire up placeholders and integrate all components
+---[ ] NAME:Wire tryLoadCache() DESCRIPTION:Connect to outcomesCacheService.readOutcomesCache()
+---[ ] NAME:Wire fetchOutcomeNames() DESCRIPTION:Connect to outcomesDataService for default state
+---[ ] NAME:Build threshold slider UI DESCRIPTION:Create slider component using renderThresholdSlider()
+---[ ] NAME:Build intervention sidebar DESCRIPTION:Create sidebar using renderInterventionSidebar()
+---[ ] NAME:Build expandable outcome rows DESCRIPTION:Create outcome rows using renderOutcomeRow()
+-[ ] NAME:Phase 5 - Integration & Testing DESCRIPTION:Wire everything together and perform end-to-end testing
+--[ ] NAME:Manual Test - Page Creation DESCRIPTION:Test creating Outcomes Dashboard page via Settings button
+--[ ] NAME:Manual Test - Default State DESCRIPTION:Test dashboard loads with no cache showing outcome names and NE placeholders
+--[ ] NAME:Manual Test - Refresh Data DESCRIPTION:Test clicking Refresh Data button fetches, computes, and caches data
+--[ ] NAME:Manual Test - Loaded State DESCRIPTION:Test dashboard shows full Power Law data after refresh
+--[ ] NAME:Manual Test - Threshold Slider DESCRIPTION:Test threshold slider updates intervention list in real-time
+--[ ] NAME:Manual Test - Expand Rows DESCRIPTION:Test expanding outcome rows shows student table with score history
+--[ ] NAME:Manual Test - Cache Persistence DESCRIPTION:Test cache persists across page reloads and different users
+--[ ] NAME:Manual Test - Student Access DESCRIPTION:Verify students cannot access dashboard page or cache files
+--[ ] NAME:Debug and Fix Issues DESCRIPTION:Address any bugs found during manual testing
+-[ ] NAME:Phase 6 - Documentation & Cleanup DESCRIPTION:Final documentation updates and code cleanup
+--[ ] NAME:Update Implementation Summary DESCRIPTION:Mark completed tasks and update status in IMPLEMENTATION_SUMMARY.md
+--[ ] NAME:Code Review & Cleanup DESCRIPTION:Review all modules for consistency, remove debug logs, add JSDoc comments
+--[ ] NAME:Final End-to-End Test DESCRIPTION:Complete walkthrough of all features in beta environment

@@ -36,9 +36,17 @@ This includes:
 ### 3. Use Existing Services — Do Not Recreate
 Before writing any new utility, helper, or service function:
 
+- **Check `docs/AI_SERVICES_REFERENCE.md`** for existing services and utilities
 - Search the codebase for an existing implementation that covers the need
 - Prefer calling or extending an existing service over creating a parallel one
 - If an existing service is close but not quite right, prefer modifying it (safely) over duplicating it
+
+Common services already exist for:
+- Canvas API calls → `CanvasApiClient`
+- Role detection → `getUserRoleGroup()` from `src/utils/canvas.js`
+- Course ID → `getCourseId()` from `src/utils/canvas.js`
+- Student roster → `fetchCourseStudents()` from `src/services/enrollmentService.js`
+- Logging → `logger` from `src/utils/logger.js`
 
 If no existing service exists, create a new one — but:
 - Place it where similar utilities live
