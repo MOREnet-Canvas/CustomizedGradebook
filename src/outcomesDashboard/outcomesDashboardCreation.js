@@ -19,10 +19,10 @@ import { isCourseSettingsPage } from '../utils/pageDetection.js';
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
 
-const INJECTION_MARKER = 'cg-outcomes-dashboard-creator';
-const OUTCOMES_PAGE_TITLE = 'Outcomes Dashboard';
-const OUTCOMES_PAGE_URL = 'outcomes-dashboard';
-const OUTCOMES_PAGE_BODY = '<div id="outcomes-dashboard-root"></div>';
+const INJECTION_MARKER = 'cg-teacher-mastery-dashboard-creator';
+const OUTCOMES_PAGE_TITLE = 'Teacher Mastery Dashboard';
+const OUTCOMES_PAGE_URL = 'teacher-mastery-dashboard';
+const OUTCOMES_PAGE_BODY = '<div id="teacher-mastery-dashboard-root"></div>';
 
 // ═══════════════════════════════════════════════════════════════════════
 // CREATE OUTCOMES DASHBOARD PAGE

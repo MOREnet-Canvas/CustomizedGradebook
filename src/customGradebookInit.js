@@ -35,6 +35,7 @@ import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
 import { initMasteryDashboardCreation } from "./masteryDashboardCreation/masteryDashboardCreationInit.js";
 import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
+import { initOutcomesDashboard } from "./outcomesDashboard/outcomesDashboardInit.js";
 
 /**
  * Main initialization function
@@ -82,6 +83,10 @@ import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardI
         logger.debug('[Init] On course settings page, initializing mastery dashboard creation');
         initMasteryDashboardCreation();
     }
+
+    // Teacher Mastery Dashboard (outcomes dashboard)
+    // Has internal page detection - runs on both settings page and dashboard page
+    initOutcomesDashboard();
 
     // Mastery Dashboard Viewer (web version)
     // Only runs if ?cg_web=1 is present in the URL
