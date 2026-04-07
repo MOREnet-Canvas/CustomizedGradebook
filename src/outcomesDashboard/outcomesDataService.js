@@ -25,41 +25,52 @@ import { computeStudentOutcome, computeClassStats, MIN_SCORES } from './powerLaw
 /**
  * Fetch outcome names and metadata for the course
  *
- * Uses /outcome_rollups to get outcome metadata including alignments.
- * This provides the outcome list for the dashboard's default state.
+ * Uses /outcome_groups API to get outcome names and IDs.
+ * This works even when there are no students or results yet.
  *
  * @param {string} courseId - Canvas course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @returns {Promise<Array>} Array of {id, title, displayOrder, alignments[]}
+ * @returns {Promise<Array>} Array of {id, title, displayOrder}
  */
 export async function fetchOutcomeNames(courseId, apiClient) {
     try {
         logger.info('[outcomesDataService] Fetching outcome metadata...');
 
-        // Fetch outcome rollup with alignment metadata
-        const rollupData = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups`,
-            {
-                include: ['outcomes', 'outcomes.alignments'],
-                per_page: 100
-            },
-            'fetchOutcomeNames:rollup'
+        // Fetch outcome groups for the course
+        const groups = await apiClient.get(
+            `/api/v1/courses/${courseId}/outcome_groups`,
+            {},
+            'fetchOutcomeNames:groups'
         );
 
-        // Extract outcomes from linked data
-        const outcomes = rollupData.linked?.outcomes || [];
+        if (!groups || groups.length === 0) {
+            logger.warn('[outcomesDataService] No outcome groups found in course');
+            return [];
+        }
 
-        if (outcomes.length === 0) {
+        // Fetch outcomes from each group
+        const outcomePromises = groups.map(group =>
+            apiClient.get(
+                `/api/v1/courses/${courseId}/outcome_groups/${group.id}/outcomes`,
+                {},
+                `fetchOutcomeNames:group_${group.id}`
+            )
+        );
+
+        const results = await Promise.all(outcomePromises);
+
+        // Flatten and map to simple structure
+        const allOutcomes = results.flat();
+
+        if (allOutcomes.length === 0) {
             logger.warn('[outcomesDataService] No outcomes found in course');
             return [];
         }
 
-        // Map to simple structure
-        const outcomeList = outcomes.map((outcome, index) => ({
-            id: outcome.id,
-            title: outcome.title || outcome.display_name || `Outcome ${outcome.id}`,
-            displayOrder: index + 1,
-            alignments: outcome.alignments || []
+        const outcomeList = allOutcomes.map((outcomeWrapper, index) => ({
+            id: outcomeWrapper.outcome.id,
+            title: outcomeWrapper.outcome.title || outcomeWrapper.outcome.display_name || `Outcome ${outcomeWrapper.outcome.id}`,
+            displayOrder: index + 1
         }));
 
         logger.info(`[outcomesDataService] Fetched ${outcomeList.length} outcomes`);
