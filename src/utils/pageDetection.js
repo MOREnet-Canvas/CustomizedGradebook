@@ -1,27 +1,28 @@
 // src/utils/pageDetection.js
 /**
  * Page Detection Utilities
- * 
+ *
  * Shared utilities for detecting different Canvas page types across the application.
  * Used by dashboard, student grade customization, cleanup observer, and other modules.
- * 
+ *
  * Functions:
  * - isDashboardPage: Check if on Canvas dashboard
  * - isAllGradesPage: Check if on all-grades page (/grades)
  * - isSingleCourseGradesPage: Check if on single course grades page
  * - isCoursePageNeedingCleanup: Check if on course page that needs grade cleanup
+ * - isOutcomesDashboardPage: Check if on Outcomes Dashboard page
  */
 
 import {logger} from "./logger.js";
 
 /**
  * Check if current page is the Canvas dashboard
- * 
+ *
  * Matches:
  * - / (root)
  * - /dashboard
  * - /dashboard/*
- * 
+ *
  * @returns {boolean} True if on dashboard page
  */
 export function isDashboardPage() {
@@ -31,14 +32,14 @@ export function isDashboardPage() {
 
 /**
  * Check if current page is the all-grades page
- * 
+ *
  * Matches:
  * - /grades (exact)
  * - Any path with /grades but NOT /courses/ (e.g., /users/123/grades)
- * 
+ *
  * Does NOT match:
  * - /courses/123/grades (single course grades page)
- * 
+ *
  * @returns {boolean} True if on all-grades page
  */
 export function isAllGradesPage() {
@@ -49,16 +50,16 @@ export function isAllGradesPage() {
 
 /**
  * Check if current page is a single-course grades page
- * 
+ *
  * Matches:
  * - /courses/123/grades
  * - /courses/123/grades#tab-outcomes
  * - /courses/123/grades?any=params
- * 
+ *
  * Does NOT match:
  * - /grades (all-grades page)
  * - /courses/123 (course homepage)
- * 
+ *
  * @returns {boolean} True if on single-course grades page
  */
 export function isSingleCourseGradesPage() {
@@ -254,4 +255,19 @@ export async function resolveTargetStudentId(courseId = null, apiClient = null) 
     const userId = ENV?.current_user_id ? String(ENV.current_user_id) : null;
     logger.trace(`[resolveTargetStudentId] Student/user viewing self: ${userId}`);
     return userId;
+}
+
+
+/**
+ * Check if current page is the Outcomes Dashboard page
+ *
+ * Matches:
+ * - /courses/123/pages/outcomes-dashboard
+ * - /courses/123/pages/outcomes-dashboard-* (auto-numbered variants)
+ *
+ * @returns {boolean} True if on outcomes dashboard page
+ */
+export function isOutcomesDashboardPage() {
+    const path = window.location.pathname;
+    return path.includes('/pages/outcomes-dashboard');
 }
