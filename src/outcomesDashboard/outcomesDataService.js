@@ -1,0 +1,369 @@
+// src/outcomesDashboard/outcomesDataService.js
+/**
+ * Outcomes Data Service
+ *
+ * Fetches and processes outcome data from Canvas APIs for Power Law analysis.
+ *
+ * Data Flow:
+ * 1. fetchOutcomeNames() - Get outcome metadata (names, IDs, alignments)
+ * 2. fetchOutcomeResults() - Get ALL individual attempts across all students
+ * 3. extractAttempts() - Group by student+outcome, sort chronologically
+ * 4. fetchAllOutcomeData() - Orchestrate all fetches
+ * 5. computeOutcomeStats() - Apply Power Law calculations
+ *
+ * See: docs/AI_SERVICES_REFERENCE.md and src/outcomesDashboard/API_REFERENCE.md
+ */
+
+import { logger } from '../utils/logger.js';
+import { fetchCourseStudents } from '../services/enrollmentService.js';
+import { computeStudentOutcome, computeClassStats, MIN_SCORES } from './powerLaw.js';
+
+// ═══════════════════════════════════════════════════════════════════════
+// FETCH OUTCOME METADATA
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetch outcome names and metadata for the course
+ *
+ * Uses /outcome_rollups to get outcome metadata including alignments.
+ * This provides the outcome list for the dashboard's default state.
+ *
+ * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Array>} Array of {id, title, displayOrder, alignments[]}
+ */
+export async function fetchOutcomeNames(courseId, apiClient) {
+    try {
+        logger.info('[outcomesDataService] Fetching outcome metadata...');
+
+        // Fetch outcome rollup with alignment metadata
+        const rollupData = await apiClient.get(
+            `/api/v1/courses/${courseId}/outcome_rollups`,
+            {
+                include: ['outcomes', 'outcomes.alignments'],
+                per_page: 100
+            },
+            'fetchOutcomeNames:rollup'
+        );
+
+        // Extract outcomes from linked data
+        const outcomes = rollupData.linked?.outcomes || [];
+
+        if (outcomes.length === 0) {
+            logger.warn('[outcomesDataService] No outcomes found in course');
+            return [];
+        }
+
+        // Map to simple structure
+        const outcomeList = outcomes.map((outcome, index) => ({
+            id: outcome.id,
+            title: outcome.title || outcome.display_name || `Outcome ${outcome.id}`,
+            displayOrder: index + 1,
+            alignments: outcome.alignments || []
+        }));
+
+        logger.info(`[outcomesDataService] Fetched ${outcomeList.length} outcomes`);
+        return outcomeList;
+
+    } catch (error) {
+        logger.error('[outcomesDataService] Failed to fetch outcome names', error);
+        throw new Error(`Could not fetch outcome metadata: ${error.message}`);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FETCH OUTCOME RESULTS (ALL ATTEMPTS)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetch ALL individual outcome attempts across all students
+ *
+ * Uses /outcome_results to get chronological score history.
+ * This is the foundation for Power Law regression.
+ *
+ * IMPORTANT: May require many API calls on large courses.
+ * Use onProgress callback to update UI during fetch.
+ *
+ * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @param {Function} onProgress - Callback for progress updates: (message) => void
+ * @returns {Promise<Array>} Array of outcome result objects
+ */
+export async function fetchOutcomeResults(courseId, apiClient, onProgress = () => {}) {
+    try {
+        logger.info('[outcomesDataService] Fetching ALL outcome results...');
+        onProgress('Fetching outcome results...');
+
+        // Fetch ALL outcome results (no user_ids or outcome_ids filter)
+        // Use getAllPages for automatic pagination
+        const allResults = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/outcome_results`,
+            {
+                include: ['outcomes.alignments'],
+                per_page: 100
+            },
+            'fetchOutcomeResults',
+            (page) => {
+                onProgress(`Fetching outcome results... page ${page}`);
+            }
+        );
+
+        logger.info(`[outcomesDataService] Fetched ${allResults.length} outcome results`);
+        onProgress(`Loaded ${allResults.length} outcome results`);
+
+        return allResults;
+
+    } catch (error) {
+        logger.error('[outcomesDataService] Failed to fetch outcome results', error);
+        throw new Error(`Could not fetch outcome results: ${error.message}`);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// EXTRACT AND GROUP ATTEMPTS
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Group outcome results by student+outcome and sort chronologically
+ *
+ * Pattern from masteryDashboardViewer.js lines 638-660.
+ *
+ * Groups by composite key: studentId_outcomeId
+ * Sorts each group by submitted_or_assessed_at (oldest first)
+ * Deduplicates by submission ID if needed
+ *
+ * @param {Array} outcomeResults - Raw outcome_results from Canvas API
+ * @returns {Object} Grouped attempts: { "studentId_outcomeId": [{score, timestamp, assignmentId}] }
+ */
+export function extractAttempts(outcomeResults) {
+    logger.debug(`[outcomesDataService] Extracting attempts from ${outcomeResults.length} results...`);
+
+    const grouped = {};
+
+    outcomeResults.forEach(result => {
+        const studentId = result.links?.user;
+        const outcomeId = result.links?.learning_outcome;
+        const score = result.score;
+        const timestamp = result.submitted_or_assessed_at || result.submitted_at;
+
+
+        const assignmentId = result.links?.assignment || result.links?.alignment;
+
+        // Skip invalid results
+        if (!studentId || !outcomeId || score === null || score === undefined) {
+            logger.warn('[outcomesDataService] Skipping invalid result', result);
+            return;
+        }
+
+        // Create composite key
+        const key = `${studentId}_${outcomeId}`;
+
+        // Initialize array for this student+outcome
+        if (!grouped[key]) {
+            grouped[key] = [];
+        }
+
+        // Add attempt
+        grouped[key].push({
+            score: parseFloat(score),
+            timestamp: timestamp,
+            assignmentId: assignmentId,
+            resultId: result.id
+        });
+    });
+
+    // Sort each group chronologically (oldest first) and deduplicate
+    Object.keys(grouped).forEach(key => {
+        // Sort by timestamp
+        grouped[key].sort((a, b) => {
+            const dateA = new Date(a.timestamp || 0);
+            const dateB = new Date(b.timestamp || 0);
+            return dateA - dateB;  // Oldest first
+        });
+
+        // Deduplicate by submission ID (keep first occurrence)
+        const seen = new Set();
+        grouped[key] = grouped[key].filter(attempt => {
+            if (!attempt.assignmentId) return true;  // Keep if no assignment ID
+
+            if (seen.has(attempt.assignmentId)) {
+                return false;  // Duplicate - skip
+            }
+
+            seen.add(attempt.assignmentId);
+            return true;
+        });
+    });
+
+    const totalGroups = Object.keys(grouped).length;
+    const totalAttempts = Object.values(grouped).reduce((sum, arr) => sum + arr.length, 0);
+
+    logger.info(`[outcomesDataService] Grouped into ${totalGroups} student+outcome pairs (${totalAttempts} attempts total)`);
+
+    return grouped;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ORCHESTRATE DATA FETCH
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Orchestrate all data fetches for the Outcomes Dashboard
+ *
+ * Steps:
+ * 1. Fetch outcome names (metadata)
+ * 2. Fetch student roster
+ * 3. Fetch ALL outcome results
+ * 4. Extract and group attempts
+ *
+ * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @param {Function} onProgress - Progress callback: (message) => void
+ * @returns {Promise<Object>} Combined data: {outcomes, students, groupedAttempts}
+ */
+export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () => {}) {
+    try {
+        logger.info('[outcomesDataService] Starting complete data fetch...');
+        onProgress('Starting data fetch...');
+
+        // Step 1: Fetch outcome metadata
+        onProgress('Fetching outcome names...');
+        const outcomes = await fetchOutcomeNames(courseId, apiClient);
+
+        if (outcomes.length === 0) {
+            throw new Error('No outcomes found in course');
+        }
+
+        // Step 2: Fetch student roster
+        onProgress('Fetching student roster...');
+        const students = await fetchCourseStudents(courseId, apiClient);
+
+        if (students.length === 0) {
+            logger.warn('[outcomesDataService] No students found in course');
+        }
+
+        // Step 3: Fetch ALL outcome results
+        const outcomeResults = await fetchOutcomeResults(courseId, apiClient, onProgress);
+
+        if (outcomeResults.length === 0) {
+            logger.warn('[outcomesDataService] No outcome results found');
+        }
+
+        // Step 4: Extract and group attempts
+        onProgress('Processing attempts...');
+        const groupedAttempts = extractAttempts(outcomeResults);
+
+        onProgress('Data fetch complete');
+        logger.info('[outcomesDataService] Complete data fetch finished');
+
+        return {
+            outcomes,
+            students,
+            groupedAttempts
+        };
+
+    } catch (error) {
+        logger.error('[outcomesDataService] Failed to fetch outcome data', error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// COMPUTE POWER LAW STATS
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Compute Power Law statistics for all student+outcome combinations
+ *
+ * For each student+outcome:
+ * - Check if scores.length >= MIN_SCORES
+ * - If yes: call computeStudentOutcome() from powerLaw.js
+ * - If no: set status='NE'
+ *
+ * Then compute class stats per outcome using computeClassStats()
+ *
+ * @param {Object} data - Combined data from fetchAllOutcomeData()
+ * @param {number} threshold - Re-teach threshold (e.g. 2.2)
+ * @returns {Object} Cache-ready structure matching DATA_STRUCTURES.md schema
+ */
+export function computeOutcomeStats(data, threshold = 2.2) {
+    const { outcomes, students, groupedAttempts } = data;
+
+    logger.info('[outcomesDataService] Computing Power Law statistics...');
+    logger.debug(`[outcomesDataService] Using threshold: ${threshold}, MIN_SCORES: ${MIN_SCORES}`);
+
+    // Build student outcome data
+    const studentData = students.map(student => {
+        const studentOutcomes = outcomes.map(outcome => {
+            const key = `${student.user_id}_${outcome.id}`;
+            const attempts = groupedAttempts[key] || [];
+            const scores = attempts.map(a => a.score);
+
+            // Compute stats using powerLaw.js
+            const computed = computeStudentOutcome(scores);
+
+            return {
+                outcomeId: outcome.id,
+                ...computed,
+                attempts: attempts  // Include full history for UI
+            };
+        });
+
+        return {
+            id: student.user_id.toString(),
+            name: student.name || student.sortable_name || `Student ${student.user_id}`,
+            sortableName: student.sortable_name || student.name,
+            outcomes: studentOutcomes
+        };
+    });
+
+
+    // Compute class stats per outcome
+    const outcomeStats = outcomes.map(outcome => {
+        // Get all student results for this outcome
+        const studentResults = studentData.map(student => {
+            const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
+            return {
+                computed: {
+                    status: outcomeData.status,
+                    plPrediction: outcomeData.plPrediction,
+                    slope: outcomeData.slope
+                }
+            };
+        });
+
+        // Compute class stats using powerLaw.js
+        const classStats = computeClassStats(studentResults, threshold);
+
+        return {
+            id: outcome.id,
+            title: outcome.title,
+            displayOrder: outcome.displayOrder,
+            classStats: {
+                classMean: classStats.plAvg,
+                classMedian: null,  // Not computed by computeClassStats
+                threshold_2_2: classStats.computedThreshold,
+                studentsAtRisk: classStats.belowThresholdCount,
+                studentsNE: classStats.neCount,
+                totalStudents: students.length,
+                distribution: classStats.distribution,
+                avgSlope: classStats.avgSlope
+            }
+        };
+    });
+
+    logger.info('[outcomesDataService] Power Law computation complete');
+
+    // Return cache-ready structure
+    return {
+        metadata: {
+            courseId: data.courseId || 'unknown',
+            generatedAt: new Date().toISOString(),
+            minScoresThreshold: MIN_SCORES,
+            studentCount: students.length,
+            outcomeCount: outcomes.length
+        },
+        outcomes: outcomeStats,
+        students: studentData
+    };
+}
