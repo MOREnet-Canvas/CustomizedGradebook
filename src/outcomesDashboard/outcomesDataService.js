@@ -83,6 +83,70 @@ export async function fetchOutcomeNames(courseId, apiClient) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// FETCH CANVAS OUTCOME ROLLUPS (OFFICIAL SCORES)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetch Canvas's official outcome rollup scores for all students
+ *
+ * These are the scores Canvas calculates and displays in the gradebook,
+ * based on the outcome's calculation_method (decaying_average, n_mastery, etc.)
+ *
+ * @param {string} courseId - Canvas course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object>} Map of studentId_outcomeId -> canvasScore
+ */
+export async function fetchOutcomeRollups(courseId, apiClient) {
+    try {
+        logger.info('[outcomesDataService] Fetching Canvas outcome rollups...');
+
+        // Fetch outcome rollups with pagination
+        const rollupData = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
+            {},
+            'fetchOutcomeRollups'
+        );
+
+        if (!rollupData || rollupData.length === 0) {
+            logger.warn('[outcomesDataService] No rollup data found');
+            return {};
+        }
+
+        // Parse rollup data structure
+        // Response is an array of pages, each containing { rollups: [...], linked: {...} }
+        const scoreMap = {};
+
+        rollupData.forEach(page => {
+            const rollups = page.rollups || [];
+
+            rollups.forEach(rollup => {
+                const studentId = rollup.links?.user;
+                if (!studentId) return;
+
+                const scores = rollup.scores || [];
+                scores.forEach(scoreObj => {
+                    const outcomeId = scoreObj.links?.outcome;
+                    const score = scoreObj.score;
+
+                    if (outcomeId && score !== null && score !== undefined) {
+                        const key = `${studentId}_${outcomeId}`;
+                        scoreMap[key] = score;
+                    }
+                });
+            });
+        });
+
+        logger.info(`[outcomesDataService] Fetched ${Object.keys(scoreMap).length} Canvas rollup scores`);
+        return scoreMap;
+
+    } catch (error) {
+        logger.error('[outcomesDataService] Failed to fetch outcome rollups', error);
+        // Don't throw - rollups are supplementary data
+        return {};
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // FETCH OUTCOME RESULTS (ALL ATTEMPTS)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -285,7 +349,11 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
             logger.warn('[outcomesDataService] No outcome results found');
         }
 
-        // Step 4: Extract and group attempts
+        // Step 4: Fetch Canvas official rollup scores
+        onProgress('Fetching Canvas rollup scores...');
+        const canvasRollups = await fetchOutcomeRollups(courseId, apiClient);
+
+        // Step 5: Extract and group attempts
         onProgress('Processing attempts...');
         const groupedAttempts = extractAttempts(outcomeResults);
 
@@ -295,7 +363,8 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
         return {
             outcomes,
             students,
-            groupedAttempts
+            groupedAttempts,
+            canvasRollups
         };
 
     } catch (error) {
@@ -323,7 +392,7 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
  * @returns {Object} Cache-ready structure matching DATA_STRUCTURES.md schema
  */
 export function computeOutcomeStats(data, threshold = 2.2) {
-    const { outcomes, students, groupedAttempts } = data;
+    const { outcomes, students, groupedAttempts, canvasRollups = {} } = data;
 
     logger.info('[outcomesDataService] Computing Power Law statistics...');
     logger.debug(`[outcomesDataService] Using threshold: ${threshold}, MIN_SCORES: ${MIN_SCORES}`);
@@ -338,9 +407,13 @@ export function computeOutcomeStats(data, threshold = 2.2) {
             // Compute stats using powerLaw.js
             const computed = computeStudentOutcome(scores);
 
+            // Get Canvas official score from rollups
+            const canvasScore = canvasRollups[key] !== undefined ? canvasRollups[key] : null;
+
             return {
                 outcomeId: outcome.id,
                 ...computed,
+                canvasScore: canvasScore,  // Canvas's calculated score
                 attempts: attempts  // Include full history for UI
             };
         });

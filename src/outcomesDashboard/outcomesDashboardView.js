@@ -416,6 +416,10 @@ function buildStudentTable(outcome, cache, filter) {
     const rowsHTML = students.map(s => {
         const c = s.plPrediction !== null ? profColor(s.plPrediction) : { bg: '#f5f5f3', tx: '#999' };
         const plDisplay = s.plPrediction !== null ? s.plPrediction.toFixed(2) : 'NE';
+        const canvasScoreDisplay = s.canvasScore !== null && s.canvasScore !== undefined
+            ? s.canvasScore.toFixed(1)
+            : '—';
+        const decayingAvgDisplay = s.decayingAvg !== null ? s.decayingAvg.toFixed(1) : '—';
         const meanDisplay = s.mean !== null ? s.mean.toFixed(1) : '—';
         const recentDisplay = s.mostRecent !== null ? s.mostRecent : '—';
 
@@ -447,6 +451,8 @@ function buildStudentTable(outcome, cache, filter) {
                            padding:2px 8px; border-radius:6px;
                            font-size:12px; font-weight:500;">${plDisplay}</span>
                 </td>
+                <td style="text-align:center; font-size:13px; padding:6px 8px;">${canvasScoreDisplay}</td>
+                <td style="text-align:center; font-size:13px; padding:6px 8px;">${decayingAvgDisplay}</td>
                 <td style="text-align:center; font-size:13px; padding:6px 8px;">${meanDisplay}</td>
                 <td style="text-align:center; font-size:13px; padding:6px 8px;">${recentDisplay}</td>
                 <td style="text-align:center; padding:6px 8px;">
@@ -464,6 +470,10 @@ function buildStudentTable(outcome, cache, filter) {
                                padding:6px 8px; font-size:12px;">Student</th>
                     <th style="font-weight:500; color:#666; text-align:center;
                                padding:6px 8px; font-size:12px;">PL Pred.</th>
+                    <th style="font-weight:500; color:#666; text-align:center;
+                               padding:6px 8px; font-size:12px;">Canvas Score</th>
+                    <th style="font-weight:500; color:#666; text-align:center;
+                               padding:6px 8px; font-size:12px;">Decaying Avg</th>
                     <th style="font-weight:500; color:#666; text-align:center;
                                padding:6px 8px; font-size:12px;">Mean</th>
                     <th style="font-weight:500; color:#666; text-align:center;
