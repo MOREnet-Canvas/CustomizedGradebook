@@ -89,7 +89,7 @@ function initOutcomesDashboardView() {
 
         // Write to cache
         onProgress('Saving cache...');
-        await writeOutcomesCache(courseId, cache, apiClient);
+        await writeOutcomesCache(courseId, apiClient, cache);
 
         logger.info('[OutcomesDashboardInit] Data refresh complete');
 
