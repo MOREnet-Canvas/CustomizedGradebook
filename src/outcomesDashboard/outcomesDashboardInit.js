@@ -13,9 +13,13 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { getUserRoleGroup } from '../utils/canvas.js';
+import { getUserRoleGroup, getCourseId } from '../utils/canvas.js';
 import { isOutcomesDashboardPage } from '../utils/pageDetection.js';
 import { injectOutcomesDashboardButton } from './outcomesDashboardCreation.js';
+import { renderOutcomesDashboard } from './outcomesDashboardView.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
+import { fetchAllOutcomeData, computeOutcomeStats } from './outcomesDataService.js';
+import { writeOutcomesCache, readOutcomesCache } from './outcomesCacheService.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -40,6 +44,71 @@ function canAccessOutcomesDashboard() {
     
     logger.debug(`[OutcomesDashboardInit] Access denied (role group: ${roleGroup})`);
     return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DASHBOARD VIEW INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Initialize Teacher Mastery Dashboard view
+ *
+ * Finds the root container, sets up refresh handler, and renders the dashboard.
+ * Uses outcomesDashboardView.js for UI rendering.
+ */
+function initOutcomesDashboardView() {
+    const containerEl = document.getElementById('teacher-mastery-dashboard-root');
+
+    if (!containerEl) {
+        logger.warn('[OutcomesDashboardInit] Root container not found');
+        return;
+    }
+
+    const courseId = getCourseId();
+    if (!courseId) {
+        containerEl.innerHTML = '<div style="padding:2rem; text-align:center; color:#888;">Could not determine course ID</div>';
+        return;
+    }
+
+    const apiClient = new CanvasApiClient();
+
+    // Define refresh handler
+    const onRefresh = async (onProgress) => {
+        logger.info('[OutcomesDashboardInit] Starting data refresh...');
+
+        // Fetch all data
+        const data = await fetchAllOutcomeData(courseId, apiClient, onProgress);
+
+        // Compute Power Law stats
+        onProgress('Computing Power Law predictions...');
+        const cache = computeOutcomeStats(data, 2.2);
+
+        // Add courseId to cache metadata
+        cache.metadata.courseId = courseId;
+        cache.metadata.computedAt = new Date().toISOString();
+
+        // Write to cache
+        onProgress('Saving cache...');
+        await writeOutcomesCache(courseId, cache, apiClient);
+
+        logger.info('[OutcomesDashboardInit] Data refresh complete');
+
+        return {
+            meta: cache.metadata,
+            outcomes: cache.outcomes,
+            students: cache.students
+        };
+    };
+
+    // Render dashboard
+    renderOutcomesDashboard({
+        containerEl,
+        courseId,
+        apiClient,
+        onRefresh
+    });
+
+    logger.info('[OutcomesDashboardInit] Dashboard view initialized');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -72,17 +141,12 @@ export function initOutcomesDashboard() {
         logger.error('[OutcomesDashboardInit] Error injecting creation button', error);
     }
     
-    // Route 2: Outcomes Dashboard page - initialize view
+    // Route 2: Teacher Mastery Dashboard page - initialize view
     if (isOutcomesDashboardPage()) {
-        logger.info('[OutcomesDashboardInit] On Outcomes Dashboard page, initializing view...');
-        
+        logger.info('[OutcomesDashboardInit] On Teacher Mastery Dashboard page, initializing view...');
+
         try {
-            // TODO: Phase 4 - Initialize dashboard view
-            // import { initOutcomesDashboardView } from './outcomesDashboardView.js';
-            // initOutcomesDashboardView();
-            
-            logger.debug('[OutcomesDashboardInit] Dashboard view initialization not yet implemented (Phase 4)');
-            
+            initOutcomesDashboardView();
         } catch (error) {
             logger.error('[OutcomesDashboardInit] Error initializing dashboard view', error);
         }

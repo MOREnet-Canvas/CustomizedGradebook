@@ -340,11 +340,15 @@ export function computeOutcomeStats(data, threshold = 2.2) {
             title: outcome.title,
             displayOrder: outcome.displayOrder,
             classStats: {
-                classMean: classStats.plAvg,
+                plAvg: classStats.plAvg,
+                classMean: classStats.plAvg,  // Alias for compatibility
                 classMedian: null,  // Not computed by computeClassStats
-                threshold_2_2: classStats.computedThreshold,
-                studentsAtRisk: classStats.belowThresholdCount,
+                computedThreshold: classStats.computedThreshold,
+                threshold_2_2: classStats.computedThreshold,  // Alias for compatibility
+                belowThresholdCount: classStats.belowThresholdCount,
+                studentsAtRisk: classStats.belowThresholdCount,  // Alias
                 studentsNE: classStats.neCount,
+                neCount: classStats.neCount,  // Alias
                 totalStudents: students.length,
                 distribution: classStats.distribution,
                 avgSlope: classStats.avgSlope

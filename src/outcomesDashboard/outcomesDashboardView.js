@@ -12,6 +12,8 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { readOutcomesCache } from './outcomesCacheService.js';
+import { fetchOutcomeNames } from './outcomesDataService.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
 
@@ -144,7 +146,7 @@ async function renderDefaultState(shell, courseId, apiClient, onRefresh) {
     setStatus(shell.statusEl, '');
     setLastUpdated(shell.lastUpdatedEl, null);
 
-    wireRefreshButton(shell, onRefresh, courseId, apiClient);
+    wireRefreshButton(shell, onRefresh);
 }
 
 function renderDefaultOutcomeRows(outcomesEl, outcomes) {
@@ -441,46 +443,46 @@ function overallPlAvg(cache) {
 }
 
 function countInterventionStudents(cache) {
-    // Count unique userIds appearing below threshold on 3+ outcomes
+    // Count students appearing below threshold on 3+ outcomes
     const lowCounts = {};
-    cache.outcomes.forEach(outcome => {
-        outcome.students
-            .filter(s => s.computed.status === 'ok' &&
-                s.computed.plPrediction < outcome.classStats.computedThreshold)
-            .forEach(s => {
-                lowCounts[s.userId] = (lowCounts[s.userId] ?? 0) + 1;
-            });
+
+    cache.students.forEach(student => {
+        let lowCount = 0;
+        student.outcomes.forEach(outcome => {
+            // Find the threshold for this outcome
+            const outcomeData = cache.outcomes.find(o => o.id === outcome.outcomeId);
+            if (!outcomeData) return;
+
+            const threshold = outcomeData.classStats.threshold_2_2;
+
+            if (outcome.status === 'ok' && outcome.plPrediction < threshold) {
+                lowCount++;
+            }
+        });
+
+        if (lowCount >= 3) {
+            lowCounts[student.id] = lowCount;
+        }
     });
-    return Object.values(lowCounts).filter(count => count >= 3).length;
+
+    return Object.keys(lowCounts).length;
 }
 
 async function tryLoadCache(courseId, apiClient) {
-    // Placeholder — outcomesCacheService.readOutcomesCache goes here
-    return null;
-}
-
-async function fetchOutcomeNames(courseId, apiClient) {
-    // Placeholder — returns [{ id, title, displayOrder }]
-    // Full implementation in outcomesDataService
     try {
-        const groups = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_groups`
-        );
-        const results = await Promise.all(
-            groups.map(g =>
-                apiClient.get(
-                    `/api/v1/courses/${courseId}/outcome_groups/${g.id}/outcomes`
-                )
-            )
-        );
-        return results.flat().map((o, i) => ({
-            id:           o.outcome.id,
-            title:        o.outcome.title,
-            displayOrder: i + 1
-        }));
-    } catch (e) {
-        logger.warn('[OutcomesDashboard] fetchOutcomeNames failed', e);
-        return [];
+        const cache = await readOutcomesCache(courseId, apiClient);
+        if (cache) {
+            logger.info('[OutcomesDashboard] Cache loaded successfully');
+            return {
+                meta: cache.metadata,
+                outcomes: cache.outcomes,
+                students: cache.students
+            };
+        }
+        return null;
+    } catch (error) {
+        logger.warn('[OutcomesDashboard] Could not load cache', error);
+        return null;
     }
 }
 
