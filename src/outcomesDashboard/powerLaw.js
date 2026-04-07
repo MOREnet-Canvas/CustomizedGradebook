@@ -11,10 +11,10 @@
  * Predicts what a student would score if assessed at the next time point.
  */
 
-const MIN_SCORES = 3;
-const MAX_SCORE = 4;
-const MIN_SCORE = 1;
-const DECAYING_AVG_WEIGHT = 0.65;
+export const MIN_SCORES = 3;
+export const MAX_SCORE = 4;
+export const MIN_SCORE = 1;
+export const DECAYING_AVG_WEIGHT = 0.65;
 
 /**
  * Clamp a value between min and max
