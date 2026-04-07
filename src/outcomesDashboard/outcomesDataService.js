@@ -100,39 +100,43 @@ export async function fetchOutcomeRollups(courseId, apiClient) {
     try {
         logger.info('[outcomesDataService] Fetching Canvas outcome rollups...');
 
-        // Fetch outcome rollups with pagination
-        const rollupData = await apiClient.getAllPages(
+        // Fetch outcome rollups
+        // Note: Canvas returns object { rollups: [...], linked: {...} }, not an array
+        const rollupResponse = await apiClient.get(
             `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
             {},
             'fetchOutcomeRollups'
         );
 
-        if (!rollupData || rollupData.length === 0) {
-            logger.warn('[outcomesDataService] No rollup data found');
+        if (!rollupResponse) {
+            logger.warn('[outcomesDataService] No rollup data returned');
+            return {};
+        }
+
+        // Extract rollups array from response object
+        const rollups = rollupResponse.rollups || [];
+
+        if (rollups.length === 0) {
+            logger.warn('[outcomesDataService] No rollups found in response');
             return {};
         }
 
         // Parse rollup data structure
-        // Response is an array of pages, each containing { rollups: [...], linked: {...} }
         const scoreMap = {};
 
-        rollupData.forEach(page => {
-            const rollups = page.rollups || [];
+        rollups.forEach(rollup => {
+            const studentId = rollup.links?.user;
+            if (!studentId) return;
 
-            rollups.forEach(rollup => {
-                const studentId = rollup.links?.user;
-                if (!studentId) return;
+            const scores = rollup.scores || [];
+            scores.forEach(scoreObj => {
+                const outcomeId = scoreObj.links?.outcome;
+                const score = scoreObj.score;
 
-                const scores = rollup.scores || [];
-                scores.forEach(scoreObj => {
-                    const outcomeId = scoreObj.links?.outcome;
-                    const score = scoreObj.score;
-
-                    if (outcomeId && score !== null && score !== undefined) {
-                        const key = `${studentId}_${outcomeId}`;
-                        scoreMap[key] = score;
-                    }
-                });
+                if (outcomeId && score !== null && score !== undefined) {
+                    const key = `${studentId}_${outcomeId}`;
+                    scoreMap[key] = score;
+                }
             });
         });
 

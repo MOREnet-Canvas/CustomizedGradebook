@@ -417,11 +417,11 @@ function buildStudentTable(outcome, cache, filter) {
         const c = s.plPrediction !== null ? profColor(s.plPrediction) : { bg: '#f5f5f3', tx: '#999' };
         const plDisplay = s.plPrediction !== null ? s.plPrediction.toFixed(2) : 'NE';
         const canvasScoreDisplay = s.canvasScore !== null && s.canvasScore !== undefined
-            ? s.canvasScore.toFixed(1)
+            ? s.canvasScore.toFixed(2)
             : '—';
-        const decayingAvgDisplay = s.decayingAvg !== null ? s.decayingAvg.toFixed(1) : '—';
-        const meanDisplay = s.mean !== null ? s.mean.toFixed(1) : '—';
-        const recentDisplay = s.mostRecent !== null ? s.mostRecent : '—';
+        const decayingAvgDisplay = s.decayingAvg !== null ? s.decayingAvg.toFixed(2) : '—';
+        const meanDisplay = s.mean !== null ? s.mean.toFixed(2) : '—';
+        const recentDisplay = s.mostRecent !== null ? s.mostRecent.toFixed(2) : '—';
 
         // Trend indicator
         let trendIcon = '→';
