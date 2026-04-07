@@ -331,7 +331,7 @@ export function computeOutcomeStats(data, threshold = 2.2) {
     // Build student outcome data
     const studentData = students.map(student => {
         const studentOutcomes = outcomes.map(outcome => {
-            const key = `${student.user_id}_${outcome.id}`;
+            const key = `${student.userId}_${outcome.id}`;
             const attempts = groupedAttempts[key] || [];
             const scores = attempts.map(a => a.score);
 
@@ -346,9 +346,9 @@ export function computeOutcomeStats(data, threshold = 2.2) {
         });
 
         return {
-            id: student.user_id.toString(),
-            name: student.name || student.sortable_name || `Student ${student.user_id}`,
-            sortableName: student.sortable_name || student.name,
+            id: student.userId.toString(),
+            name: student.name || student.sortableName || `Student ${student.userId}`,
+            sortableName: student.sortableName || student.name,
             outcomes: studentOutcomes
         };
     });
