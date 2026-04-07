@@ -358,7 +358,21 @@ export function computeOutcomeStats(data, threshold = 2.2) {
     const outcomeStats = outcomes.map(outcome => {
         // Get all student results for this outcome
         const studentResults = studentData.map(student => {
-            const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
+            // Use loose equality to handle string/number mismatch
+            const outcomeData = student.outcomes.find(o => String(o.outcomeId) === String(outcome.id));
+
+            // Handle case where outcome data is not found
+            if (!outcomeData) {
+                logger.warn(`[outcomesDataService] No outcome data found for student ${student.id}, outcome ${outcome.id}`);
+                return {
+                    computed: {
+                        status: 'NE',
+                        plPrediction: null,
+                        slope: null
+                    }
+                };
+            }
+
             return {
                 computed: {
                     status: outcomeData.status,
