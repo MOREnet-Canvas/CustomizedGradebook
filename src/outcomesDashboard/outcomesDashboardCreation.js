@@ -158,17 +158,23 @@ export function injectOutcomesDashboardButton() {
  */
 function waitForSettingsSidebar(callback) {
     let attempts = 0;
-    const intervalId = setInterval(() => {
-        const sidebar = document.querySelector('aside[role="region"]');
-        const documentReady = document.readyState === 'complete';
+    const maxAttempts = 33; // ~10 seconds
+    const intervalMs = 300;
 
-        if (sidebar && documentReady) {
+    const intervalId = setInterval(() => {
+        const onSettingsPage = isCourseSettingsPage();
+        const documentReady = document.readyState === 'complete';
+        const sidebar = document.querySelector('#right-side') ||
+                        document.querySelector('#right-side-wrapper') ||
+                        document.querySelector('aside[id="right-side"]');
+
+        if (onSettingsPage && documentReady && sidebar) {
             clearInterval(intervalId);
             logger.debug('[OutcomesDashboard] Settings sidebar found');
             callback(sidebar);
-        } else if (attempts++ > 33) {
+        } else if (attempts++ >= maxAttempts) {
             clearInterval(intervalId);
             logger.warn('[OutcomesDashboard] Settings sidebar not found after 10 seconds');
         }
-    }, 300);
+    }, intervalMs);
 }
