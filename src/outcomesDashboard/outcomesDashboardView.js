@@ -402,12 +402,22 @@ function buildStudentTable(outcome, cache, filter) {
         students = students.filter(s => s.slope !== null && s.slope > 0.05);
     }
 
-    // Sort by PL prediction (lowest first)
-    students.sort((a, b) => {
-        if (a.plPrediction === null) return 1;
-        if (b.plPrediction === null) return -1;
-        return a.plPrediction - b.plPrediction;
-    });
+    // Sort based on active tab
+    if (filter === 'students') {
+        // All Students: Alphabetical order by name
+        students.sort((a, b) => {
+            const nameA = (a.sortableName || a.name || '').toLowerCase();
+            const nameB = (b.sortableName || b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    } else {
+        // Struggling/Growing: Sort by PL prediction (lowest first)
+        students.sort((a, b) => {
+            if (a.plPrediction === null) return 1;
+            if (b.plPrediction === null) return -1;
+            return a.plPrediction - b.plPrediction;
+        });
+    }
 
     if (students.length === 0) {
         return `<p style="${FONT} font-size:13px; color:#666; padding:12px 0;">No students in this category.</p>`;
