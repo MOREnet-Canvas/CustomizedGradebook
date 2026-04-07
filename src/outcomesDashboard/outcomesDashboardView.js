@@ -111,7 +111,7 @@ function buildShell(containerEl) {
 }
 
 function colHeader(label, center = false) {
-    return `<div style="font-size:10px; font-weight:600; color:#999; 
+    return `<div style="font-size:12px; font-weight:600; color:#999;
             text-transform:uppercase; letter-spacing:.04em;
             ${center ? 'text-align:center;' : ''}">${label}</div>`;
 }
@@ -165,13 +165,13 @@ function renderDefaultOutcomeRows(outcomesEl, outcomes) {
             border:0.5px solid #e0e0e0; border-radius:8px; 
             margin-bottom:6px; background:#fff;`;
         row.innerHTML = `
-            <div style="font-size:11px; color:#999; font-weight:500;">${i + 1}</div>
-            <div style="font-size:13px; color:#333; font-weight:500; 
-                 white-space:nowrap; overflow:hidden; 
+            <div style="font-size:13px; color:#999; font-weight:500;">${i + 1}</div>
+            <div style="font-size:15px; color:#333; font-weight:500;
+                 white-space:nowrap; overflow:hidden;
                  text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
             <div style="text-align:center;">${neChip()}</div>
             <div>${emptySpread()}</div>
-            <div style="text-align:center; font-size:11px; color:#bbb;">—</div>
+            <div style="text-align:center; font-size:13px; color:#bbb;">—</div>
             <div style="text-align:center;">${pendingBadge()}</div>
             <div></div>
         `;
@@ -212,14 +212,14 @@ function buildRefreshPrompt() {
 }
 
 function neChip() {
-    return `<span style="${FONT} font-size:10px; font-weight:600; 
-            padding:2px 7px; border-radius:8px; 
+    return `<span style="${FONT} font-size:12px; font-weight:600;
+            padding:3px 8px; border-radius:8px;
             background:#f0f0f0; color:#999;">NE</span>`;
 }
 
 function pendingBadge() {
-    return `<span style="${FONT} font-size:10px; font-weight:600; 
-            padding:2px 7px; border-radius:8px; 
+    return `<span style="${FONT} font-size:12px; font-weight:600;
+            padding:3px 8px; border-radius:8px;
             background:#f0f0f0; color:#999;">Pending</span>`;
 }
 
@@ -255,18 +255,18 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
             border:0.5px solid #e0e0e0; border-radius:8px; 
             margin-bottom:6px; background:#fff; cursor:pointer;`;
         row.innerHTML = `
-            <div style="font-size:11px; color:#999;">${i + 1}</div>
-            <div style="font-size:13px; font-weight:500; color:#333; 
-                 white-space:nowrap; overflow:hidden; 
+            <div style="font-size:13px; color:#999;">${i + 1}</div>
+            <div style="font-size:15px; font-weight:500; color:#333;
+                 white-space:nowrap; overflow:hidden;
                  text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
             <div style="text-align:center;">${plAvgChip(outcome.classStats)}</div>
             <div>${spreadBar(outcome.classStats)}</div>
-            <div style="text-align:center; font-size:12px; 
+            <div style="text-align:center; font-size:14px;
                  color:${outcome.classStats.belowThresholdCount > 3 ? '#A32D2D' : '#666'};">
                 ${outcome.classStats.belowThresholdCount}
             </div>
             <div style="text-align:center;">${statusBadge(outcome.classStats)}</div>
-            <div style="font-size:12px; color:#999; text-align:center;">›</div>
+            <div style="font-size:14px; color:#999; text-align:center;">›</div>
         `;
         outcomesEl.appendChild(row);
     });
@@ -315,13 +315,13 @@ function renderMetricCards(metricsEl, cache) {
 
     metricsEl.innerHTML = cards.map(c => `
         <div style="background:#f5f5f3; border-radius:8px; padding:10px 12px;">
-            <div style="font-size:11px; color:#666; margin-bottom:3px;">
+            <div style="font-size:13px; color:#666; margin-bottom:3px;">
                 ${c.label}
             </div>
-            <div style="font-size:20px; font-weight:700; color:${c.color};">
+            <div style="font-size:24px; font-weight:700; color:${c.color};">
                 ${c.value}
             </div>
-            <div style="font-size:10px; color:#999; margin-top:1px;">
+            <div style="font-size:12px; color:#999; margin-top:1px;">
                 ${c.sub}
             </div>
         </div>`
@@ -334,17 +334,17 @@ function renderDefaultSidebar(sidebarEl) {
     sidebarEl.innerHTML = `
         <div style="background:#fff; border:0.5px solid #e0e0e0; 
              border-radius:12px; padding:12px; margin-bottom:10px;">
-            <div style="font-size:13px; font-weight:700; color:#333; 
+            <div style="font-size:15px; font-weight:700; color:#333;
                  margin-bottom:8px;">Intervention list</div>
-            <div style="font-size:11px; color:#aaa; padding:8px 0;">
+            <div style="font-size:13px; color:#aaa; padding:8px 0;">
                 Refresh to identify students low on 3+ outcomes.
             </div>
         </div>
-        <div style="background:#fff; border:0.5px solid #e0e0e0; 
+        <div style="background:#fff; border:0.5px solid #e0e0e0;
              border-radius:12px; padding:12px;">
-            <div style="font-size:13px; font-weight:700; color:#333; 
+            <div style="font-size:15px; font-weight:700; color:#333;
                  margin-bottom:8px;">Re-teach now</div>
-            <div style="font-size:11px; color:#aaa; padding:8px 0;">
+            <div style="font-size:13px; color:#aaa; padding:8px 0;">
                 Refresh to flag outcomes below threshold.
             </div>
         </div>`;
@@ -372,6 +372,9 @@ function wireRefreshButton(shell, onRefresh) {
                 setStatus(shell.statusEl, progressMsg);
             });
 
+            // Reset button state after successful refresh
+            shell.refreshBtn.textContent = 'Refresh Data';
+            shell.refreshBtn.disabled = false;
             setStatus(shell.statusEl, '');
             setLastUpdated(shell.lastUpdatedEl, freshCache.meta.computedAt);
             renderLoadedState(shell, freshCache, onRefresh);
@@ -390,8 +393,8 @@ function wireRefreshButton(shell, onRefresh) {
 function plAvgChip(classStats) {
     if (classStats.plAvg === null) return neChip();
     const c = profColor(classStats.plAvg);
-    return `<span style="${FONT} font-size:11px; font-weight:600; 
-            padding:2px 8px; border-radius:8px; 
+    return `<span style="${FONT} font-size:13px; font-weight:600;
+            padding:3px 10px; border-radius:8px;
             background:${c.bg}; color:${c.tx};">
             ${classStats.plAvg.toFixed(2)}
             </span>`;
@@ -414,14 +417,14 @@ function statusBadge(classStats) {
     if (classStats.plAvg === null) return pendingBadge();
     const isReteach = classStats.plAvg < classStats.computedThreshold;
     const isSolid   = classStats.plAvg >= 3.0;
-    if (isReteach) return `<span style="${FONT} font-size:10px; font-weight:600; 
-        padding:2px 7px; border-radius:8px; 
+    if (isReteach) return `<span style="${FONT} font-size:12px; font-weight:600;
+        padding:3px 8px; border-radius:8px;
         background:#FCEBEB; color:#791F1F;">Re-teach</span>`;
-    if (isSolid)   return `<span style="${FONT} font-size:10px; font-weight:600; 
-        padding:2px 7px; border-radius:8px; 
+    if (isSolid)   return `<span style="${FONT} font-size:12px; font-weight:600;
+        padding:3px 8px; border-radius:8px;
         background:#E1F5EE; color:#085041;">Solid</span>`;
-    return `<span style="${FONT} font-size:10px; font-weight:600; 
-        padding:2px 7px; border-radius:8px; 
+    return `<span style="${FONT} font-size:12px; font-weight:600;
+        padding:3px 8px; border-radius:8px;
         background:#FAEEDA; color:#633806;">Monitor</span>`;
 }
 
