@@ -105,19 +105,38 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
         logger.info('[outcomesDataService] Fetching ALL outcome results...');
         onProgress('Fetching outcome results...');
 
-        // Fetch ALL outcome results (no user_ids or outcome_ids filter)
-        // Use getAllPages for automatic pagination
-        const allResults = await apiClient.getAllPages(
-            `/api/v1/courses/${courseId}/outcome_results`,
-            {
-                include: ['outcomes.alignments'],
-                per_page: 100
-            },
-            'fetchOutcomeResults',
-            (page) => {
-                onProgress(`Fetching outcome results... page ${page}`);
+        // Manual pagination because Canvas API returns { outcome_results: [...] }
+        // not a direct array like other endpoints
+        let allResults = [];
+        let page = 1;
+        let hasMore = true;
+        let nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=outcomes.alignments&per_page=100`;
+
+        while (hasMore) {
+            const response = await apiClient.get(
+                nextUrl,
+                {},
+                `fetchOutcomeResults:page${page}`
+            );
+
+            // Extract outcome_results array from response
+            const pageResults = response.outcome_results || [];
+            allResults = allResults.concat(pageResults);
+
+            logger.debug(`[outcomesDataService] Page ${page}: ${pageResults.length} results`);
+            onProgress(`Fetching outcome results... page ${page} (${allResults.length} total)`);
+
+            // Check for next page using Link header
+            // apiClient should expose pagination info, but we'll check response
+            if (pageResults.length < 100) {
+                // Last page (fewer results than per_page)
+                hasMore = false;
+            } else {
+                // Continue to next page
+                page++;
+                nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=outcomes.alignments&per_page=100&page=${page}`;
             }
-        );
+        }
 
         logger.info(`[outcomesDataService] Fetched ${allResults.length} outcome results`);
         onProgress(`Loaded ${allResults.length} outcome results`);
@@ -147,6 +166,12 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
  * @returns {Object} Grouped attempts: { "studentId_outcomeId": [{score, timestamp, assignmentId}] }
  */
 export function extractAttempts(outcomeResults) {
+    // Defensive check
+    if (!Array.isArray(outcomeResults)) {
+        logger.error(`[outcomesDataService] extractAttempts received non-array: ${typeof outcomeResults}`);
+        return {};
+    }
+
     logger.debug(`[outcomesDataService] Extracting attempts from ${outcomeResults.length} results...`);
 
     const grouped = {};
