@@ -606,6 +606,7 @@ function buildStudentTable(outcome, cache, filter) {
     let students = cache.students.map(student => {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
         const studentRow = {
+            id: student.id,  // Add student ID for linking
             name: student.name || student.sortableName,
             sortableName: student.sortableName,
             ...outcomeData
@@ -690,7 +691,15 @@ function buildStudentTable(outcome, cache, filter) {
 
         return `
             <tr style="${isFlagged ? 'background:rgba(252,235,235,0.3);' : ''}">
-                <td style="font-size:13px; padding:6px 8px;">${escapeHtml(s.name)}</td>
+                <td style="font-size:13px; padding:6px 8px;">
+                    <a href="/courses/${cache.meta.courseId}/pages/mastery-dashboard?cg_web=1&student_id=${s.id}"
+                       style="color:#333; text-decoration:none;"
+                       onmouseenter="this.style.textDecoration='underline'; this.style.color='#0374B5';"
+                       onmouseleave="this.style.textDecoration='none'; this.style.color='#333';"
+                       title="View ${escapeHtml(s.name)}'s individual mastery dashboard">
+                        ${escapeHtml(s.name)}
+                    </a>
+                </td>
                 <td style="text-align:center; padding:6px 8px;">
                     <span style="background:${c.bg}; color:${c.tx};
                            padding:2px 8px; border-radius:6px;

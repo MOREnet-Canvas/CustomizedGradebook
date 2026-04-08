@@ -302,15 +302,30 @@ export function buildHeatmapGrid(cache, options = {}) {
             const row = document.createElement('tr');
             row.style.borderBottom = '1px solid #f0f0f0';
 
-            // Name cell
+            // Name cell with link to individual mastery dashboard
             const nameCell = document.createElement('td');
             nameCell.style.cssText = `
                 width:80px; padding:6px 8px; font-size:12px; font-weight:500;
                 background:#fff; border-right:1px solid #e0e0e0;
                 position:sticky; left:0; z-index:1;
             `;
-            nameCell.textContent = formatStudentName(student);
-            nameCell.title = student.name || student.sortableName;
+
+            // Create link to mastery dashboard
+            const link = document.createElement('a');
+            link.href = `/courses/${cache.meta.courseId}/pages/mastery-dashboard?cg_web=1&student_id=${student.id}`;
+            link.textContent = formatStudentName(student);
+            link.title = `View ${student.name || student.sortableName}'s individual mastery dashboard`;
+            link.style.cssText = 'color:#333; text-decoration:none; font-weight:500;';
+            link.addEventListener('mouseenter', () => {
+                link.style.textDecoration = 'underline';
+                link.style.color = '#0374B5';
+            });
+            link.addEventListener('mouseleave', () => {
+                link.style.textDecoration = 'none';
+                link.style.color = '#333';
+            });
+
+            nameCell.appendChild(link);
             row.appendChild(nameCell);
 
             // Outcome cells

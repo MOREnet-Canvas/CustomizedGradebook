@@ -460,11 +460,27 @@ export function openFullScreenHeatmap(cache, options = {}) {
             sortedStudents.forEach(function(student) {
                 const row = document.createElement('tr');
 
-                // Name cell
+                // Name cell with link to individual mastery dashboard
                 const nameCell = document.createElement('td');
                 nameCell.className = 'name-cell';
-                nameCell.textContent = formatStudentName(student);
-                nameCell.title = student.name || student.sortableName;
+
+                // Create link (opens in parent window)
+                const link = document.createElement('a');
+                link.href = '/courses/' + cache.meta.courseId + '/pages/mastery-dashboard?cg_web=1&student_id=' + student.id;
+                link.textContent = formatStudentName(student);
+                link.title = "View " + (student.name || student.sortableName) + "'s individual mastery dashboard";
+                link.style.cssText = 'color:#333; text-decoration:none; font-weight:500;';
+                link.target = '_blank';  // Open in new tab from full-screen window
+                link.onmouseenter = function() {
+                    this.style.textDecoration = 'underline';
+                    this.style.color = '#0374B5';
+                };
+                link.onmouseleave = function() {
+                    this.style.textDecoration = 'none';
+                    this.style.color = '#333';
+                };
+
+                nameCell.appendChild(link);
                 row.appendChild(nameCell);
 
                 // Outcome cells
