@@ -14,6 +14,8 @@
 import { logger } from '../utils/logger.js';
 import { readOutcomesCache } from './outcomesCacheService.js';
 import { fetchOutcomeNames } from './outcomesDataService.js';
+import { getThreshold, saveThreshold } from './thresholdStorage.js';
+import { getCourseId } from '../utils/canvas.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
 
@@ -74,6 +76,16 @@ function buildShell(containerEl) {
              gap:8px; margin-bottom:1rem;">
         </div>
 
+        <div id="od-threshold-control" style="display:flex; align-items:center;
+             gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px;
+             margin-bottom:1rem;">
+            <span style="font-size:0.9rem; color:#666; font-weight:500;">Re-teach threshold:</span>
+            <input type="range" id="od-threshold-slider" min="1.5" max="3.5"
+                   step="0.1" value="2.2" style="width:150px; cursor:pointer;">
+            <span id="od-threshold-value" style="font-size:0.95rem; font-weight:600;
+                  color:#333; min-width:32px; text-align:center;">2.2</span>
+        </div>
+
         <div id="od-body" style="display:grid;
              grid-template-columns:1fr 260px; gap:12px;">
             <div id="od-outcomes-col">
@@ -99,14 +111,16 @@ function buildShell(containerEl) {
     `;
 
     return {
-        titleEl:       containerEl.querySelector('#od-title'),
-        subtitleEl:    containerEl.querySelector('#od-subtitle'),
-        lastUpdatedEl: containerEl.querySelector('#od-last-updated'),
-        refreshBtn:    containerEl.querySelector('#od-refresh-btn'),
-        metricsEl:     containerEl.querySelector('#od-metrics'),
-        outcomesEl:    containerEl.querySelector('#od-outcomes-list'),
-        sidebarEl:     containerEl.querySelector('#od-sidebar'),
-        statusEl:      containerEl.querySelector('#od-status-bar'),
+        titleEl:         containerEl.querySelector('#od-title'),
+        subtitleEl:      containerEl.querySelector('#od-subtitle'),
+        lastUpdatedEl:   containerEl.querySelector('#od-last-updated'),
+        refreshBtn:      containerEl.querySelector('#od-refresh-btn'),
+        thresholdSlider: containerEl.querySelector('#od-threshold-slider'),
+        thresholdValue:  containerEl.querySelector('#od-threshold-value'),
+        metricsEl:       containerEl.querySelector('#od-metrics'),
+        outcomesEl:      containerEl.querySelector('#od-outcomes-list'),
+        sidebarEl:       containerEl.querySelector('#od-sidebar'),
+        statusEl:        containerEl.querySelector('#od-status-bar'),
     };
 }
 
@@ -237,6 +251,7 @@ function renderLoadedState(shell, cache, onRefresh) {
          ${cache.meta.outcomeCount} outcomes ·
          Power Law predictions`;
 
+    wireThresholdSlider(shell, cache);
     renderMetricCards(shell.metricsEl, cache);
     renderLoadedOutcomeRows(shell.outcomesEl, cache);
     renderSidebar(shell.sidebarEl, cache);
@@ -248,6 +263,11 @@ function renderLoadedState(shell, cache, onRefresh) {
 
 let expandedOutcomeId = null;
 let activeTab = 'students';
+
+function getCurrentThreshold() {
+    const slider = document.querySelector('#od-threshold-slider');
+    return slider ? parseFloat(slider.value) : 2.2;
+}
 
 function renderLoadedOutcomeRows(outcomesEl, cache) {
     outcomesEl.innerHTML = '';
@@ -327,11 +347,13 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl) {
         background:#fafafa;`;
 
     const strugglingCount = countStrugglingStudents(outcome, cache);
+    const decliningCount = countDecliningStudents(outcome, cache);
     const growingCount = countGrowingStudents(outcome, cache);
 
     const tabs = [
         { id: 'students', label: `All Students (${cache.students.length})` },
         { id: 'struggling', label: `Struggling (${strugglingCount})` },
+        { id: 'declining', label: `Declining (${decliningCount})` },
         { id: 'growing', label: `Growing (${growingCount})` }
     ];
 
@@ -369,10 +391,18 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl) {
 }
 
 function countStrugglingStudents(outcome, cache) {
+    const threshold = getCurrentThreshold();
     return cache.students.filter(student => {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
         return outcomeData && outcomeData.plPrediction !== null &&
-               outcomeData.plPrediction < (cache.meta.threshold || 2.2);
+               outcomeData.plPrediction < threshold;
+    }).length;
+}
+
+function countDecliningStudents(outcome, cache) {
+    return cache.students.filter(student => {
+        const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
+        return outcomeData && outcomeData.slope !== null && outcomeData.slope < -0.05;
     }).length;
 }
 
@@ -393,11 +423,13 @@ function buildStudentTable(outcome, cache, filter) {
         };
     });
 
-    const threshold = cache.meta.threshold || 2.2;
+    const threshold = getCurrentThreshold();
 
     // Filter students based on active tab
     if (filter === 'struggling') {
         students = students.filter(s => s.plPrediction !== null && s.plPrediction < threshold);
+    } else if (filter === 'declining') {
+        students = students.filter(s => s.slope !== null && s.slope < -0.05);
     } else if (filter === 'growing') {
         students = students.filter(s => s.slope !== null && s.slope > 0.05);
     }
@@ -409,6 +441,13 @@ function buildStudentTable(outcome, cache, filter) {
             const nameA = (a.sortableName || a.name || '').toLowerCase();
             const nameB = (b.sortableName || b.name || '').toLowerCase();
             return nameA.localeCompare(nameB);
+        });
+    } else if (filter === 'declining') {
+        // Declining: Sort by slope (most negative first)
+        students.sort((a, b) => {
+            if (a.slope === null) return 1;
+            if (b.slope === null) return -1;
+            return a.slope - b.slope;  // Most negative first
         });
     } else {
         // Struggling/Growing: Sort by PL prediction (lowest first)
@@ -503,6 +542,7 @@ function buildStudentTable(outcome, cache, filter) {
 // ─── Metric cards ─────────────────────────────────────────────────────────────
 
 function renderMetricCards(metricsEl, cache) {
+    const threshold = getCurrentThreshold();
     const cards = cache ? [
         {
             label: 'Class PL avg',
@@ -514,7 +554,7 @@ function renderMetricCards(metricsEl, cache) {
             label: 'Re-teach flagged',
             value: cache.outcomes.filter(
                 o => o.classStats.plAvg !== null &&
-                    o.classStats.plAvg < o.classStats.computedThreshold
+                    o.classStats.plAvg < threshold
             ).length,
             sub:   `of ${cache.meta.outcomeCount} outcomes`,
             color: '#A32D2D'
@@ -582,6 +622,35 @@ function renderSidebar(sidebarEl, cache) {
     // Full sidebar implementation in next pass
     // Intervention list and re-teach panel
     renderDefaultSidebar(sidebarEl);
+}
+
+// ─── Threshold slider ─────────────────────────────────────────────────────────
+
+function wireThresholdSlider(shell, cache) {
+    const courseId = getCourseId();
+    const userId = window.ENV?.current_user_id;
+
+    if (!userId) {
+        logger.warn('[OutcomesDashboard] Cannot wire threshold slider - no user ID');
+        return;
+    }
+
+    // Load stored threshold or use default
+    const storedThreshold = getThreshold(courseId, userId);
+    shell.thresholdSlider.value = storedThreshold;
+    shell.thresholdValue.textContent = storedThreshold.toFixed(1);
+
+    // Update display and save on change
+    shell.thresholdSlider.addEventListener('input', (e) => {
+        const newThreshold = parseFloat(e.target.value);
+        shell.thresholdValue.textContent = newThreshold.toFixed(1);
+        saveThreshold(courseId, userId, newThreshold);
+
+        // Re-render to apply new threshold
+        // Note: This just updates the UI, doesn't recompute cache
+        renderLoadedOutcomeRows(shell.outcomesEl, cache);
+        renderSidebar(shell.sidebarEl, cache);
+    });
 }
 
 // ─── Refresh button ───────────────────────────────────────────────────────────
@@ -675,18 +744,13 @@ function overallPlAvg(cache) {
 
 function countInterventionStudents(cache) {
     // Count students appearing below threshold on 3+ outcomes
+    const threshold = getCurrentThreshold();
     const lowCounts = {};
 
     cache.students.forEach(student => {
         let lowCount = 0;
         student.outcomes.forEach(outcome => {
-            // Find the threshold for this outcome
-            const outcomeData = cache.outcomes.find(o => o.id === outcome.outcomeId);
-            if (!outcomeData) return;
-
-            const threshold = outcomeData.classStats.threshold_2_2;
-
-            if (outcome.status === 'ok' && outcome.plPrediction < threshold) {
+            if (outcome.plPrediction !== null && outcome.plPrediction < threshold) {
                 lowCount++;
             }
         });
