@@ -648,6 +648,7 @@ function wireThresholdSlider(shell, cache) {
 
         // Re-render to apply new threshold
         // Note: This just updates the UI, doesn't recompute cache
+        renderMetricCards(shell.metricsEl, cache);
         renderLoadedOutcomeRows(shell.outcomesEl, cache);
         renderSidebar(shell.sidebarEl, cache);
     });
