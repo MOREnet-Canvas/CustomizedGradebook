@@ -529,14 +529,28 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl) {
 
 function countStrugglingStudents(outcome, cache) {
     const threshold = getCurrentThreshold();
+    const isCurrentScore = isCurrentScoreOutcome(outcome.title);
+
     return cache.students.filter(student => {
-        const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return outcomeData && outcomeData.plPrediction !== null &&
-               outcomeData.plPrediction < threshold;
+        let plValue;
+
+        if (isCurrentScore) {
+            // For Current Score, use calculated PL Avg (average of regular outcome PL Predictions)
+            plValue = calculateStudentPLAvg(student, cache);
+        } else {
+            // For regular outcomes, use stored plPrediction
+            const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
+            plValue = outcomeData ? outcomeData.plPrediction : null;
+        }
+
+        return plValue !== null && plValue < threshold;
     }).length;
 }
 
 function countDecliningStudents(outcome, cache) {
+    // NOTE: For Current Score, this uses the outcome's own slope data (from Current Score attempts)
+    // If we want to calculate a "meta-slope" based on how student PL Avgs are trending over time,
+    // we would need to add special handling here similar to countStrugglingStudents()
     return cache.students.filter(student => {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
         return outcomeData && outcomeData.slope !== null && outcomeData.slope < -0.05;
@@ -544,6 +558,9 @@ function countDecliningStudents(outcome, cache) {
 }
 
 function countGrowingStudents(outcome, cache) {
+    // NOTE: For Current Score, this uses the outcome's own slope data (from Current Score attempts)
+    // If we want to calculate a "meta-slope" based on how student PL Avgs are trending over time,
+    // we would need to add special handling here similar to countStrugglingStudents()
     return cache.students.filter(student => {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
         return outcomeData && outcomeData.slope !== null && outcomeData.slope > 0.05;
