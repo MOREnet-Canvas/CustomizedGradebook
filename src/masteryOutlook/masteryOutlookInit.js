@@ -22,6 +22,7 @@ import { fetchAllOutcomeData, computeOutcomeStats } from './masteryOutlookDataSe
 import { writeMasteryOutlookCache, readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
+import { findMasteryDashboardPageUrl } from '../services/pageService.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -90,10 +91,20 @@ function initMasteryOutlookView() {
         onProgress('Computing Power Law predictions...');
         const cache = computeOutcomeStats(data, threshold);
 
+        // Find Mastery Dashboard page URL (handles auto-numbered URLs like mastery-dashboard-2)
+        onProgress('Finding Mastery Dashboard page...');
+        const masteryDashboardUrl = await findMasteryDashboardPageUrl(courseId, apiClient);
+        if (masteryDashboardUrl) {
+            logger.info(`[MasteryOutlookInit] Found Mastery Dashboard at: ${masteryDashboardUrl}`);
+        } else {
+            logger.warn('[MasteryOutlookInit] Mastery Dashboard page not found - student links may not work');
+        }
+
         // Add courseId to cache metadata
         cache.metadata.courseId = courseId;
         cache.metadata.computedAt = new Date().toISOString();
         cache.metadata.threshold = threshold;
+        cache.metadata.masteryDashboardUrl = masteryDashboardUrl;
 
         // Write to cache
         onProgress('Saving cache...');

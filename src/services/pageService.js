@@ -95,6 +95,46 @@ export async function getPage(courseId, pageUrl, apiClient) {
 }
 
 /**
+ * Find the actual URL of the Mastery Dashboard page by searching by title
+ * Handles auto-numbered URLs (mastery-dashboard-2, mastery-dashboard-3, etc.)
+ *
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - API client instance
+ * @returns {Promise<string|null>} Actual page URL or null if not found
+ */
+export async function findMasteryDashboardPageUrl(courseId, apiClient) {
+    try {
+        // Search for pages with "Mastery Dashboard" in the title
+        const pages = await apiClient.get(
+            `/api/v1/courses/${courseId}/pages`,
+            { search_term: 'Mastery Dashboard', per_page: 10 },
+            'findMasteryDashboardPageUrl'
+        );
+
+        // Find the non-deleted page with exact title match
+        const masteryPage = pages.find(p =>
+            p.title === 'Mastery Dashboard' &&
+            p.workflow_state !== 'deleted' &&
+            p.url &&
+            p.url.startsWith('mastery-dashboard')  // Ensure it's the right page
+        );
+
+        if (masteryPage) {
+            logger.debug(`[PageService] Found Mastery Dashboard at: ${masteryPage.url}`);
+            return masteryPage.url;  // Could be 'mastery-dashboard-2'
+        }
+
+        // Return null if not found (don't use fallback)
+        logger.debug('[PageService] Mastery Dashboard page not found');
+        return null;
+
+    } catch (error) {
+        logger.warn('[PageService] Error finding Mastery Dashboard URL:', error);
+        return null;
+    }
+}
+
+/**
  * Set course default view to wiki (front page)
  * @param {string} courseId - Course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance

@@ -464,9 +464,12 @@ export function openFullScreenHeatmap(cache, options = {}) {
                 const nameCell = document.createElement('td');
                 nameCell.className = 'name-cell';
 
+                // Use cached masteryDashboardUrl or fallback to default
+                const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
+
                 // Create link (opens in parent window)
                 const link = document.createElement('a');
-                link.href = '/courses/' + cache.meta.courseId + '/pages/mastery-dashboard?cg_web=1&student_id=' + student.id;
+                link.href = '/courses/' + cache.meta.courseId + '/pages/' + masteryDashboardUrl + '?cg_web=1&student_id=' + student.id;
                 link.textContent = formatStudentName(student);
                 link.title = "View " + (student.name || student.sortableName) + "'s individual mastery dashboard";
                 link.style.cssText = 'color:#333; text-decoration:none; font-weight:500;';

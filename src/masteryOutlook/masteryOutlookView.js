@@ -689,10 +689,13 @@ function buildStudentTable(outcome, cache, filter) {
 
         const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
 
+        // Use cached masteryDashboardUrl or fallback to default
+        const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
+
         return `
             <tr style="${isFlagged ? 'background:rgba(252,235,235,0.3);' : ''}">
                 <td style="font-size:13px; padding:6px 8px;">
-                    <a href="/courses/${cache.meta.courseId}/pages/mastery-dashboard?cg_web=1&student_id=${s.id}"
+                    <a href="/courses/${cache.meta.courseId}/pages/${masteryDashboardUrl}?cg_web=1&student_id=${s.id}"
                        style="color:#333; text-decoration:none;"
                        onmouseenter="this.style.textDecoration='underline'; this.style.color='#0374B5';"
                        onmouseleave="this.style.textDecoration='none'; this.style.color='#333';"
