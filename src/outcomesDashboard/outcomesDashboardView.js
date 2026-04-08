@@ -16,8 +16,95 @@ import { readOutcomesCache } from './outcomesCacheService.js';
 import { fetchOutcomeNames } from './outcomesDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getCourseId } from '../utils/canvas.js';
+import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
+
+// ─── Outcome Type Helpers ────────────────────────────────────────────────────
+
+function isCurrentScoreOutcome(title) {
+    return title === AVG_OUTCOME_NAME;
+}
+
+function isExcludedOutcome(title) {
+    return EXCLUDED_OUTCOME_KEYWORDS.some(kw => title.includes(kw));
+}
+
+function isSpecialOutcome(title) {
+    return isCurrentScoreOutcome(title) || isExcludedOutcome(title);
+}
+
+function isRegularOutcome(outcome) {
+    return !isSpecialOutcome(outcome.title);
+}
+
+/**
+ * Calculate a student's PL Avg from their regular outcome PL Predictions
+ * Used for Current Score outcome
+ */
+function calculateStudentPLAvg(student, cache) {
+    const regularOutcomes = cache.outcomes.filter(o => isRegularOutcome(o));
+
+    const plPredictions = student.outcomes
+        .filter(so => {
+            // Check if this outcome is a regular outcome
+            const outcome = regularOutcomes.find(ro => String(ro.id) === String(so.outcomeId));
+            return outcome && so.plPrediction !== null;
+        })
+        .map(so => so.plPrediction);
+
+    if (plPredictions.length === 0) return null;
+
+    return plPredictions.reduce((sum, p) => sum + p, 0) / plPredictions.length;
+}
+
+/**
+ * Compute class stats for Current Score outcome
+ * Based on student PL Avgs (average of their regular outcome PL Predictions)
+ */
+function computeCurrentScoreClassStats(cache) {
+    const threshold = getCurrentThreshold();
+
+    // Calculate PL Avg for each student
+    const studentPLAvgs = cache.students
+        .map(student => calculateStudentPLAvg(student, cache))
+        .filter(v => v !== null);
+
+    if (studentPLAvgs.length === 0) {
+        return {
+            plAvg: null,
+            distribution: { '1': 0, '2': 0, '3': 0, '4': 0 },
+            belowThresholdCount: 0,
+            computedThreshold: threshold,
+            avgSlope: null,
+            neCount: cache.students.length
+        };
+    }
+
+    // Compute distribution
+    const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
+    studentPLAvgs.forEach(plAvg => {
+        if (plAvg < 1.5)      distribution['1']++;
+        else if (plAvg < 2.5) distribution['2']++;
+        else if (plAvg < 3.5) distribution['3']++;
+        else                  distribution['4']++;
+    });
+
+    // Compute class PL avg
+    const classPLAvg = studentPLAvgs.reduce((sum, v) => sum + v, 0) / studentPLAvgs.length;
+
+    // Count below threshold
+    const belowThresholdCount = studentPLAvgs.filter(plAvg => plAvg < threshold).length;
+
+    return {
+        plAvg: parseFloat(classPLAvg.toFixed(4)),
+        distribution,
+        belowThresholdCount,
+        computedThreshold: threshold,
+        avgSlope: null,  // Not meaningful for Current Score
+        neCount: cache.students.length - studentPLAvgs.length
+    };
+}
 
 // ─── Main entry point ────────────────────────────────────────────────────────
 
@@ -271,7 +358,43 @@ function getCurrentThreshold() {
 
 function renderLoadedOutcomeRows(outcomesEl, cache) {
     outcomesEl.innerHTML = '';
-    cache.outcomes.forEach((outcome, i) => {
+
+    // Sort outcomes: Current Score → Excluded → Regular
+    const currentScore = cache.outcomes.find(o => isCurrentScoreOutcome(o.title));
+    const excluded = cache.outcomes.filter(o => isExcludedOutcome(o.title) && !isCurrentScoreOutcome(o.title));
+    const regular = cache.outcomes.filter(o => isRegularOutcome(o));
+
+    // Add "No Current Score found" message if missing
+    if (!currentScore) {
+        const noCurrentScore = document.createElement('div');
+        noCurrentScore.style.cssText = `
+            padding: 12px;
+            font-size: 13px;
+            color: #888;
+            font-style: italic;
+            margin-bottom: 6px;
+        `;
+        noCurrentScore.textContent = 'No Current Score found';
+        outcomesEl.appendChild(noCurrentScore);
+    }
+
+    const sortedOutcomes = [
+        ...(currentScore ? [currentScore] : []),
+        ...excluded,
+        ...regular
+    ];
+
+    // Track regular outcome numbering
+    let regularIndex = 0;
+
+    sortedOutcomes.forEach((outcome, i) => {
+        const isSpecial = isSpecialOutcome(outcome.title);
+        const displayNumber = isSpecial ? '' : ++regularIndex;
+        const isCurrentScoreRow = isCurrentScoreOutcome(outcome.title);
+
+        // For Current Score, use computed stats instead of cached stats
+        const displayStats = isCurrentScoreRow ? computeCurrentScoreClassStats(cache) : outcome.classStats;
+
         const outcomeContainer = document.createElement('div');
         outcomeContainer.style.cssText = `margin-bottom:6px;`;
 
@@ -287,17 +410,17 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
 
         const chevron = isExpanded ? '▼' : '›';
         row.innerHTML = `
-            <div style="font-size:13px; color:#999;">${i + 1}</div>
+            <div style="font-size:13px; color:#999;">${displayNumber}</div>
             <div style="font-size:15px; font-weight:500; color:#333;
                  white-space:nowrap; overflow:hidden;
                  text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
-            <div style="text-align:center;">${plAvgChip(outcome.classStats)}</div>
-            <div>${spreadBar(outcome.classStats)}</div>
+            <div style="text-align:center;">${plAvgChip(displayStats)}</div>
+            <div>${spreadBar(displayStats)}</div>
             <div style="text-align:center; font-size:14px;
-                 color:${outcome.classStats.belowThresholdCount > 3 ? '#A32D2D' : '#666'};">
-                ${outcome.classStats.belowThresholdCount}
+                 color:${displayStats.belowThresholdCount > 3 ? '#A32D2D' : '#666'};">
+                ${displayStats.belowThresholdCount}
             </div>
-            <div style="text-align:center;">${statusBadge(outcome.classStats)}</div>
+            <div style="text-align:center;">${statusBadge(displayStats)}</div>
             <div style="font-size:14px; color:#999; text-align:center;">${chevron}</div>
         `;
 
@@ -324,6 +447,20 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
         }
 
         outcomesEl.appendChild(outcomeContainer);
+
+        // Add divider after last special outcome, before first regular
+        const isLastSpecial = isSpecial &&
+                              (i === sortedOutcomes.length - 1 || !isSpecialOutcome(sortedOutcomes[i + 1].title));
+
+        if (isLastSpecial && regular.length > 0) {
+            const divider = document.createElement('div');
+            divider.style.cssText = `
+                height: 1px;
+                background: #e0e0e0;
+                margin: 12px 0;
+            `;
+            outcomesEl.appendChild(divider);
+        }
     });
 }
 
@@ -414,13 +551,22 @@ function countGrowingStudents(outcome, cache) {
 }
 
 function buildStudentTable(outcome, cache, filter) {
+    const isCurrentScore = isCurrentScoreOutcome(outcome.title);
+
     let students = cache.students.map(student => {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return {
+        const studentRow = {
             name: student.name || student.sortableName,
             sortableName: student.sortableName,
             ...outcomeData
         };
+
+        // For Current Score, override plPrediction with calculated PL Avg
+        if (isCurrentScore) {
+            studentRow.plPrediction = calculateStudentPLAvg(student, cache);
+        }
+
+        return studentRow;
     });
 
     const threshold = getCurrentThreshold();
@@ -511,6 +657,9 @@ function buildStudentTable(outcome, cache, filter) {
             </tr>`;
     }).join('');
 
+    // Use "PL Avg" header for Current Score, "PL Pred." for all others
+    const plColumnHeader = isCurrentScore ? 'PL Avg' : 'PL Pred.';
+
     return `
         <table style="${FONT} width:100%; border-collapse:collapse; font-size:13px;">
             <thead>
@@ -518,7 +667,7 @@ function buildStudentTable(outcome, cache, filter) {
                     <th style="font-weight:500; color:#666; text-align:left;
                                padding:6px 8px; font-size:12px;">Student</th>
                     <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">PL Pred.</th>
+                               padding:6px 8px; font-size:12px;">${plColumnHeader}</th>
                     <th style="font-weight:500; color:#666; text-align:center;
                                padding:6px 8px; font-size:12px;">Canvas Score</th>
                     <th style="font-weight:500; color:#666; text-align:center;
@@ -543,20 +692,24 @@ function buildStudentTable(outcome, cache, filter) {
 
 function renderMetricCards(metricsEl, cache) {
     const threshold = getCurrentThreshold();
+
+    // Only include regular outcomes in metrics (exclude Current Score and excluded outcomes)
+    const regularOutcomes = cache ? cache.outcomes.filter(o => isRegularOutcome(o)) : [];
+
     const cards = cache ? [
         {
             label: 'Class PL avg',
-            value: overallPlAvg(cache),
+            value: overallPlAvg(cache, regularOutcomes),
             sub:   'across all outcomes',
             color: '#0F6E56'
         },
         {
             label: 'Re-teach flagged',
-            value: cache.outcomes.filter(
+            value: regularOutcomes.filter(
                 o => o.classStats.plAvg !== null &&
                     o.classStats.plAvg < threshold
             ).length,
-            sub:   `of ${cache.meta.outcomeCount} outcomes`,
+            sub:   `of ${regularOutcomes.length} outcomes`,
             color: '#A32D2D'
         },
         {
@@ -567,7 +720,7 @@ function renderMetricCards(metricsEl, cache) {
         },
         {
             label: 'Growing outcomes',
-            value: cache.outcomes.filter(
+            value: regularOutcomes.filter(
                 o => o.classStats.avgSlope !== null &&
                     o.classStats.avgSlope > 0.05
             ).length,
@@ -736,8 +889,9 @@ function profColor(v) {
     return             { bg: '#F7C1C1', tx: '#791F1F' };
 }
 
-function overallPlAvg(cache) {
-    const avgs = cache.outcomes
+function overallPlAvg(cache, regularOutcomes) {
+    const outcomes = regularOutcomes || cache.outcomes;
+    const avgs = outcomes
         .map(o => o.classStats.plAvg)
         .filter(v => v !== null);
     if (avgs.length === 0) return '—';
