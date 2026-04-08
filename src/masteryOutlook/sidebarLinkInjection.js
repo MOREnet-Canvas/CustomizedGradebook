@@ -62,24 +62,16 @@ export function injectMasteryOutlookLink(courseId) {
 
         li.appendChild(a);
 
-        // Insert after "Files" link if it exists
-        const filesLink = Array.from(sectionTabs.querySelectorAll('li.section')).find(li =>
-            li.querySelector('a.files')
-        );
+        // Insert as second item (after Home, which is always first in Canvas)
+        const firstItem = sectionTabs.querySelector('li.section:first-child');
 
-        if (filesLink) {
-            filesLink.insertAdjacentElement('afterend', li);
-            logger.debug('[SidebarLink] Link inserted after Files');
+        if (firstItem) {
+            firstItem.insertAdjacentElement('afterend', li);
+            logger.debug('[SidebarLink] Link inserted as second item (after Home)');
         } else {
-            // Fallback: append to end of visible sections (before hidden ones)
-            const hiddenSections = sectionTabs.querySelectorAll('li.section.section-hidden');
-            if (hiddenSections.length > 0) {
-                hiddenSections[0].insertAdjacentElement('beforebegin', li);
-                logger.debug('[SidebarLink] Link inserted before hidden sections');
-            } else {
-                sectionTabs.appendChild(li);
-                logger.debug('[SidebarLink] Link appended to end');
-            }
+            // Fallback: prepend to list if no items found (unlikely)
+            sectionTabs.insertBefore(li, sectionTabs.firstChild);
+            logger.debug('[SidebarLink] Link inserted as first item (fallback)');
         }
 
         logger.info('[SidebarLink] Mastery Outlook link injected successfully');
