@@ -17,6 +17,8 @@ import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getCourseId } from '../utils/canvas.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
+import { buildHeatmapGrid } from './masteryOutlookHeatmap.js';
+import { openFullScreenHeatmap } from './masteryOutlookHeatmapFullScreen.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
 
@@ -176,19 +178,43 @@ function buildShell(containerEl) {
         <div id="od-body" style="display:grid;
              grid-template-columns:1fr 260px; gap:12px;">
             <div id="od-outcomes-col">
-                <div id="od-col-headers" style="display:grid;
-                     grid-template-columns:20px 1fr 80px 100px 80px 80px 24px;
-                     gap:8px; padding:4px 12px 6px;
-                     border-bottom:1px solid #e0e0e0; margin-bottom:4px;">
-                    ${colHeader('#')}
-                    ${colHeader('Outcome')}
-                    ${colHeader('PL avg', true)}
-                    ${colHeader('Spread', true)}
-                    ${colHeader('Below threshold', true)}
-                    ${colHeader('Status', true)}
-                    <div></div>
+                <!-- Tab bar -->
+                <div id="od-tab-bar" style="display:flex; gap:4px;
+                     border-bottom:2px solid #e0e0e0; margin-bottom:8px;">
+                    <button class="od-tab" data-tab="outcomes" style="${FONT}
+                        font-size:13px; padding:8px 16px; cursor:pointer;
+                        border:none; background:transparent; color:#666;
+                        border-bottom:2px solid transparent; font-weight:400;">
+                        Outcomes
+                    </button>
+                    <button class="od-tab" data-tab="heatmap" style="${FONT}
+                        font-size:13px; padding:8px 16px; cursor:pointer;
+                        border:none; background:transparent; color:#666;
+                        border-bottom:2px solid transparent; font-weight:400;">
+                        🔥 Heatmap
+                    </button>
                 </div>
-                <div id="od-outcomes-list"></div>
+
+                <!-- Outcomes view -->
+                <div id="od-outcomes-view">
+                    <div id="od-col-headers" style="display:grid;
+                         grid-template-columns:20px 1fr 80px 100px 80px 80px 24px;
+                         gap:8px; padding:4px 12px 6px;
+                         border-bottom:1px solid #e0e0e0; margin-bottom:4px;">
+                        ${colHeader('#')}
+                        ${colHeader('Outcome')}
+                        ${colHeader('PL avg', true)}
+                        ${colHeader('Spread', true)}
+                        ${colHeader('Below threshold', true)}
+                        ${colHeader('Status', true)}
+                        <div></div>
+                    </div>
+                    <div id="od-outcomes-list"></div>
+                </div>
+
+                <!-- Heatmap view -->
+                <div id="od-heatmap-view" style="display:none;">
+                </div>
             </div>
             <div id="od-sidebar"></div>
         </div>
@@ -208,6 +234,10 @@ function buildShell(containerEl) {
         outcomesEl:      containerEl.querySelector('#od-outcomes-list'),
         sidebarEl:       containerEl.querySelector('#od-sidebar'),
         statusEl:        containerEl.querySelector('#od-status-bar'),
+        tabBar:          containerEl.querySelector('#od-tab-bar'),
+        outcomesView:    containerEl.querySelector('#od-outcomes-view'),
+        heatmapView:     containerEl.querySelector('#od-heatmap-view'),
+        bodyEl:          containerEl.querySelector('#od-body'),
     };
 }
 
@@ -331,6 +361,8 @@ function emptySpread() {
 
 // ─── Loaded state (cache exists) ─────────────────────────────────────────────
 
+let currentViewMode = 'outcomes';  // 'outcomes' or 'heatmap'
+
 function renderLoadedState(shell, cache, onRefresh) {
     setLastUpdated(shell.lastUpdatedEl, cache.meta.computedAt);
     shell.subtitleEl.textContent =
@@ -344,6 +376,7 @@ function renderLoadedState(shell, cache, onRefresh) {
     renderSidebar(shell.sidebarEl, cache);
 
     wireRefreshButton(shell, onRefresh);
+    wireTabBar(shell, cache);
 }
 
 // ─── Outcome row expansion ───────────────────────────────────────────────────
@@ -972,4 +1005,97 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, c =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c]
     );
+}
+
+// ─── Tab Bar (Outcomes / Heatmap) ────────────────────────────────────────────
+
+/**
+ * Wire tab bar to switch between outcomes view and heatmap view
+ */
+function wireTabBar(shell, cache) {
+    const tabs = shell.tabBar.querySelectorAll('.od-tab');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            switchToView(tabName, shell, cache);
+        });
+    });
+
+    // Set initial active tab
+    switchToView('outcomes', shell, cache);
+}
+
+/**
+ * Switch between outcomes and heatmap views
+ */
+function switchToView(viewMode, shell, cache) {
+    currentViewMode = viewMode;
+
+    const tabs = shell.tabBar.querySelectorAll('.od-tab');
+    tabs.forEach(tab => {
+        const isActive = tab.dataset.tab === viewMode;
+        tab.style.color = isActive ? '#185FA5' : '#666';
+        tab.style.borderBottom = isActive ? '2px solid #185FA5' : '2px solid transparent';
+        tab.style.fontWeight = isActive ? '500' : '400';
+        tab.style.background = isActive ? '#fff' : 'transparent';
+    });
+
+    if (viewMode === 'outcomes') {
+        // Show outcomes view, show sidebar
+        shell.outcomesView.style.display = 'block';
+        shell.heatmapView.style.display = 'none';
+        shell.sidebarEl.style.display = 'block';
+        shell.bodyEl.style.gridTemplateColumns = '1fr 260px';
+
+        logger.debug('[MasteryOutlook] Switched to outcomes view');
+    } else if (viewMode === 'heatmap') {
+        // Show heatmap view, hide sidebar
+        shell.outcomesView.style.display = 'none';
+        shell.heatmapView.style.display = 'block';
+        shell.sidebarEl.style.display = 'none';
+        shell.bodyEl.style.gridTemplateColumns = '1fr';
+
+        renderHeatmapView(shell, cache);
+
+        logger.debug('[MasteryOutlook] Switched to heatmap view');
+    }
+}
+
+/**
+ * Render heatmap view
+ */
+function renderHeatmapView(shell, cache) {
+    shell.heatmapView.innerHTML = '';
+
+    if (!cache || !cache.students || cache.students.length === 0) {
+        // No data state
+        shell.heatmapView.innerHTML = `
+            <div style="text-align:center; padding:2rem 1rem; color:#888;">
+                <div style="font-size:2rem; margin-bottom:0.5rem;">🔥</div>
+                <div style="font-size:0.95rem; font-weight:600;
+                     color:#555; margin-bottom:0.4rem;">
+                    No heatmap data yet
+                </div>
+                <div style="font-size:0.85rem; line-height:1.6; max-width:340px;
+                     margin:0 auto;">
+                    Hit <strong>Refresh Data</strong> to calculate Power Law
+                    predictions and generate the class heatmap.
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const heatmapGrid = buildHeatmapGrid(cache, {
+        cellWidth: 80,
+        cellHeight: 28,
+        onFullScreen: () => {
+            const courseName = window.ENV?.COURSE?.name || 'Course';
+            openFullScreenHeatmap(cache, { courseName });
+        }
+    });
+
+    shell.heatmapView.appendChild(heatmapGrid);
+    logger.info('[MasteryOutlook] Heatmap rendered');
 }
