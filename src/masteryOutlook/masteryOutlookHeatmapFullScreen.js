@@ -332,8 +332,8 @@ export function openFullScreenHeatmap(cache, options = {}) {
                 // Canvas mastery colors (5-level, bold)
                 if (plPrediction >= 4.0) return { bg: '#02672D', text: '#FFFFFF' };
                 if (plPrediction >= 3.0) return { bg: '#03893D', text: '#FFFFFF' };
-                if (plPrediction >= 2.0) return { bg: '#FAB901', text: '#a86700' };
-                if (plPrediction >= 1.0) return { bg: '#FD5D10', text: '#db3b00' };
+                if (plPrediction >= 2.0) return { bg: '#FAB901', text: '#FFFFFF' }; // White text on yellow
+                if (plPrediction >= 1.0) return { bg: '#FD5D10', text: '#FFFFFF' }; // White text on orange
                 return { bg: '#E62429', text: '#FFFFFF' };
             } else {
                 // Soft colors (4-level, pastel) - default
