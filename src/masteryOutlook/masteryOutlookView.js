@@ -1015,12 +1015,19 @@ function spreadBar(classStats) {
     const total = Object.values(classStats.distribution).reduce((a, b) => a + b, 0);
     if (total === 0) return emptySpread();
     const d = classStats.distribution;
+
+    // Get colors based on current color scheme
+    const level4Color = profColor(4.0).bg;   // Advanced/Exceeds Mastery
+    const level3Color = profColor(3.0).bg;   // Proficient/Mastery
+    const level2Color = profColor(2.0).bg;   // Developing/Near Mastery
+    const level1Color = profColor(1.0).bg;   // Beginning/Below Mastery
+
     return `<div style="display:flex; height:16px; border-radius:4px;
             overflow:hidden; gap:1px;">
-        <div style="width:${d['4']/total*100}%; background:#C0DD97;"></div>
-        <div style="width:${d['3']/total*100}%; background:#9FE1CB;"></div>
-        <div style="width:${d['2']/total*100}%; background:#FAC775;"></div>
-        <div style="width:${d['1']/total*100}%; background:#F7C1C1;"></div>
+        <div style="width:${d['4']/total*100}%; background:${level4Color};"></div>
+        <div style="width:${d['3']/total*100}%; background:${level3Color};"></div>
+        <div style="width:${d['2']/total*100}%; background:${level2Color};"></div>
+        <div style="width:${d['1']/total*100}%; background:${level1Color};"></div>
     </div>`;
 }
 
@@ -1047,22 +1054,58 @@ function statusBadge(classStats) {
  * Supports two color schemes: 'soft' (default pastel) or 'canvas' (Canvas mastery colors)
  *
  * @param {number} v - PL prediction value
- * @returns {Object} { bg: background color, tx: text color }
+ * @returns {Object} { bg: background color, tx: text color on bg, txOnDefault: text color on white }
  */
 function profColor(v) {
     if (currentColorScheme === 'canvas') {
         // Canvas mastery colors (5-level, bold)
-        if (v >= 4.0) return { bg: '#02672D', tx: '#FFFFFF' }; // Exceeds Mastery (dark green)
-        if (v >= 3.0) return { bg: '#03893D', tx: '#FFFFFF' }; // Mastery (medium green)
-        if (v >= 2.0) return { bg: '#FAB901', tx: '#a86700' }; // Near Mastery (yellow/gold)
-        if (v >= 1.0) return { bg: '#FD5D10', tx: '#db3b00' }; // Below Mastery (orange)
-        return { bg: '#E62429', tx: '#FFFFFF' };               // Well Below Mastery (red)
+        if (v >= 4.0) return {
+            bg: '#02672D',        // Dark green background
+            tx: '#FFFFFF',        // White text on background
+            txOnDefault: '#02672D' // Dark green text on white
+        };
+        if (v >= 3.0) return {
+            bg: '#03893D',        // Medium green background
+            tx: '#FFFFFF',        // White text on background
+            txOnDefault: '#03893D' // Medium green text on white
+        };
+        if (v >= 2.0) return {
+            bg: '#FAB901',        // Yellow background
+            tx: '#FFFFFF',        // White text on background (readable!)
+            txOnDefault: '#a86700' // Dark brown text on white
+        };
+        if (v >= 1.0) return {
+            bg: '#FD5D10',        // Orange background
+            tx: '#FFFFFF',        // White text on background (readable!)
+            txOnDefault: '#db3b00' // Dark orange text on white
+        };
+        return {
+            bg: '#E62429',        // Red background
+            tx: '#FFFFFF',        // White text on background
+            txOnDefault: '#E62429' // Red text on white
+        };
     } else {
         // Soft colors (4-level, pastel) - default
-        if (v >= 3.5) return { bg: '#C0DD97', tx: '#27500A' }; // Advanced (light green)
-        if (v >= 3.0) return { bg: '#9FE1CB', tx: '#085041' }; // Proficient (teal)
-        if (v >= 2.0) return { bg: '#FAC775', tx: '#633806' }; // Developing (light orange)
-        return { bg: '#F7C1C1', tx: '#791F1F' };               // Beginning (light red)
+        if (v >= 3.5) return {
+            bg: '#C0DD97',
+            tx: '#27500A',
+            txOnDefault: '#27500A'
+        };
+        if (v >= 3.0) return {
+            bg: '#9FE1CB',
+            tx: '#085041',
+            txOnDefault: '#085041'
+        };
+        if (v >= 2.0) return {
+            bg: '#FAC775',
+            tx: '#633806',
+            txOnDefault: '#633806'
+        };
+        return {
+            bg: '#F7C1C1',
+            tx: '#791F1F',
+            txOnDefault: '#791F1F'
+        };
     }
 }
 
