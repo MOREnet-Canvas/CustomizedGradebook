@@ -938,7 +938,7 @@ function countInterventionStudents(cache) {
 
 async function tryLoadCache(courseId, apiClient) {
     try {
-        const cache = await readOutcomesCache(courseId, apiClient);
+        const cache = await readMasteryOutlookCache(courseId, apiClient);
         if (cache) {
             logger.info('[MasteryOutlook] Cache loaded successfully');
             return {

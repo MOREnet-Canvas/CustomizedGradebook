@@ -266,7 +266,7 @@ export async function writeMasteryOutlookCache(courseId, apiClient, cacheData) {
                 on_duplicate: 'overwrite'  // Replace existing file
             },
             {},
-            'writeOutcomesCache:requestUpload'
+            'writeMasteryOutlookCache:requestUpload'
         );
 
         // Step 2: Upload file to Canvas storage
@@ -298,7 +298,7 @@ export async function writeMasteryOutlookCache(courseId, apiClient, cacheData) {
                 visibility_level: 'inherit'
             },
             {},
-            'writeOutcomesCache:lockFile'
+            'writeMasteryOutlookCache:lockFile'
         );
 
         logger.info(`[masteryOutlookCacheService] Cache written successfully (file id: ${fileId})`);
@@ -339,7 +339,7 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
                 content_types: ['application/json'],
                 per_page: 10
             },
-            'readOutcomesCache:searchFile'
+            'readMasteryOutlookCache:searchFile'
         );
 
         // Find exact match in mastery_outlook_cache folder
