@@ -21,6 +21,7 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { fetchAllOutcomeData, computeOutcomeStats } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache, readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { getThreshold } from './thresholdStorage.js';
+import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -124,33 +125,34 @@ function initMasteryOutlookView() {
 
 /**
  * Initialize Mastery Outlook module
- * 
+ *
  * Called from main init (customGradebookInit.js)
- * 
+ *
  * Execution flow:
  * 1. Check permissions (teacher_like only)
  * 2. If on Course Settings page → Inject creation button
  * 3. If on Mastery Outlook page → Initialize OUTLOOK VIEW
+ * 4. On any course page → Check if page exists and inject sidebar link
  */
 export function initMasteryOutlook() {
     logger.debug('[MasteryOutlookInit] Starting initialization...');
-    
+
     // Check permissions
     if (!canAccessMasteryOutlook()) {
         logger.debug('[MasteryOutlookInit] User does not have access, exiting');
         return;
     }
-    
+
     // Route 1: Course Settings page - inject creation button
     try {
         injectMasteryOutlookButton();
     } catch (error) {
         logger.error('[MasteryOutlookInit] Error injecting creation button', error);
     }
-    
-    // Route 2: Teacher Mastery Dashboard page - initialize view
+
+    // Route 2: Mastery Outlook page - initialize view
     if (isMasteryOutlookPage()) {
-        logger.info('[MasteryOutlookInit] On Teacher Mastery Dashboard page, initializing view...');
+        logger.info('[MasteryOutlookInit] On Mastery Outlook page, initializing view...');
 
         try {
             initMasteryOutlookView();
@@ -158,6 +160,13 @@ export function initMasteryOutlook() {
             logger.error('[MasteryOutlookInit] Error initializing OUTLOOK VIEW', error);
         }
     }
-    
+
+    // Route 3: Any course page - check if page exists and inject sidebar link
+    try {
+        checkAndInjectMasteryOutlookLink();
+    } catch (error) {
+        logger.error('[MasteryOutlookInit] Error checking/injecting sidebar link', error);
+    }
+
     logger.debug('[MasteryOutlookInit] Initialization complete');
 }

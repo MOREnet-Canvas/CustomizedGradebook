@@ -271,3 +271,24 @@ export function isMasteryOutlookPage() {
     const path = window.location.pathname;
     return path.includes('/pages/mastery-outlook');
 }
+
+/**
+ * Check if on any course page
+ *
+ * Matches:
+ * - /courses/123 (any course page)
+ * - /courses/123/assignments
+ * - /courses/123/pages/...
+ * - etc.
+ *
+ * Does NOT match:
+ * - /courses (course list)
+ * - /accounts/...
+ * - /dashboard
+ *
+ * @returns {boolean} True if on a course page
+ */
+export function isCoursePage() {
+    const path = window.location.pathname;
+    return /^\/courses\/\d+/.test(path);
+}
