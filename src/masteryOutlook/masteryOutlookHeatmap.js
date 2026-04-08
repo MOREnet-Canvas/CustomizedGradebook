@@ -362,7 +362,7 @@ export function buildHeatmapGrid(cache, options = {}) {
                 cell.style.cssText = `
                     width:${cellWidth}px; height:${cellHeight}px;
                     text-align:center; vertical-align:middle;
-                    font-size:11px; font-weight:500;
+                    font-size:12px; font-weight:600;
                     background:${colors.bg}; color:${colors.text};
                     border:1px solid #fff; cursor:default;
                 `;

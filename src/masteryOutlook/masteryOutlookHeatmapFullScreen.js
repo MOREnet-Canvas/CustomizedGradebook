@@ -245,8 +245,8 @@ export function openFullScreenHeatmap(cache, options = {}) {
             height: 32px;
             text-align: center;
             vertical-align: middle;
-            font-size: 11px;
-            font-weight: 500;
+            font-size: 12px;
+            font-weight: 600;
             border: 1px solid #fff;
             cursor: default;
         }
