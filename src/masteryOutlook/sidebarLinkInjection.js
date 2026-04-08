@@ -18,7 +18,7 @@ import { getPage } from '../services/pageService.js';
 
 const LINK_ID = 'cg-mastery-outlook-nav-link';
 const OUTLOOK_PAGE_URL = 'mastery-outlook';
-const LINK_TEXT = '📊 Mastery Outlook';
+const LINK_TEXT = 'Mastery Outlook';
 
 // ═══════════════════════════════════════════════════════════════════════
 // INJECTION LOGIC
