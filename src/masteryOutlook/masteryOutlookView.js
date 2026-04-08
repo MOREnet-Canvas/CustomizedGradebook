@@ -19,8 +19,12 @@ import { getCourseId } from '../utils/canvas.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 import { buildHeatmapGrid } from './masteryOutlookHeatmap.js';
 import { openFullScreenHeatmap } from './masteryOutlookHeatmapFullScreen.js';
+import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
+
+// Current color scheme (set on init)
+let currentColorScheme = 'soft';
 
 // ─── Outcome Type Helpers ────────────────────────────────────────────────────
 
@@ -165,14 +169,35 @@ function buildShell(containerEl) {
              gap:8px; margin-bottom:1rem;">
         </div>
 
-        <div id="od-threshold-control" style="display:flex; align-items:center;
-             gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px;
-             margin-bottom:1rem;">
-            <span style="font-size:0.9rem; color:#666; font-weight:500;">Re-teach threshold:</span>
-            <input type="range" id="od-threshold-slider" min="1.5" max="3.5"
-                   step="0.1" value="2.2" style="width:150px; cursor:pointer;">
-            <span id="od-threshold-value" style="font-size:0.95rem; font-weight:600;
-                  color:#333; min-width:32px; text-align:center;">2.2</span>
+        <div style="display:flex; justify-content:space-between; align-items:center;
+             gap:16px; margin-bottom:1rem; flex-wrap:wrap;">
+            <div id="od-threshold-control" style="display:flex; align-items:center;
+                 gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px;">
+                <span style="font-size:0.9rem; color:#666; font-weight:500;">Re-teach threshold:</span>
+                <input type="range" id="od-threshold-slider" min="1.5" max="3.5"
+                       step="0.1" value="2.2" style="width:150px; cursor:pointer;">
+                <span id="od-threshold-value" style="font-size:0.95rem; font-weight:600;
+                      color:#333; min-width:32px; text-align:center;">2.2</span>
+            </div>
+
+            <div id="od-color-scheme-control" style="display:flex; align-items:center;
+                 gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px;">
+                <span style="font-size:0.9rem; color:#666; font-weight:500;">Colors:</span>
+                <div style="display:flex; gap:4px; border:1px solid #ddd; border-radius:6px; overflow:hidden;">
+                    <button id="od-color-soft" data-scheme="soft" style="${FONT}
+                            padding:6px 12px; border:none; background:#fff; color:#333;
+                            cursor:pointer; font-size:0.85rem; font-weight:500;
+                            transition:all 0.2s;">
+                        Soft
+                    </button>
+                    <button id="od-color-canvas" data-scheme="canvas" style="${FONT}
+                            padding:6px 12px; border:none; background:#fff; color:#333;
+                            cursor:pointer; font-size:0.85rem; font-weight:500;
+                            transition:all 0.2s;">
+                        Canvas
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="od-body" style="display:grid;
@@ -238,6 +263,8 @@ function buildShell(containerEl) {
         outcomesView:    containerEl.querySelector('#od-outcomes-view'),
         heatmapView:     containerEl.querySelector('#od-heatmap-view'),
         bodyEl:          containerEl.querySelector('#od-body'),
+        colorSoftBtn:    containerEl.querySelector('#od-color-soft'),
+        colorCanvasBtn:  containerEl.querySelector('#od-color-canvas'),
     };
 }
 
@@ -370,7 +397,16 @@ function renderLoadedState(shell, cache, onRefresh) {
          ${cache.meta.outcomeCount} outcomes ·
          Power Law predictions`;
 
+    // Initialize color scheme from localStorage
+    const courseId = cache.meta.courseId;
+    const userId = window.ENV?.current_user_id;
+    if (userId) {
+        currentColorScheme = getColorScheme(courseId, userId);
+        logger.debug(`[MasteryOutlook] Initialized color scheme: ${currentColorScheme}`);
+    }
+
     wireThresholdSlider(shell, cache);
+    wireColorSchemeToggle(shell, cache);
     renderMetricCards(shell.metricsEl, cache);
     renderLoadedOutcomeRows(shell.outcomesEl, cache);
     renderSidebar(shell.sidebarEl, cache);
@@ -839,6 +875,68 @@ function renderSidebar(sidebarEl, cache) {
     renderDefaultSidebar(sidebarEl);
 }
 
+// ─── Color Scheme Toggle ──────────────────────────────────────────────────────
+
+/**
+ * Wire color scheme toggle buttons
+ * Allows switching between 'soft' (pastel) and 'canvas' (Canvas mastery) colors
+ */
+function wireColorSchemeToggle(shell, cache) {
+    const courseId = cache.meta.courseId;
+    const userId = window.ENV?.current_user_id;
+
+    if (!userId) {
+        logger.warn('[MasteryOutlook] No user ID, cannot persist color scheme preference');
+        return;
+    }
+
+    // Update button states based on current scheme
+    const updateButtonStates = () => {
+        const buttons = [shell.colorSoftBtn, shell.colorCanvasBtn];
+        buttons.forEach(btn => {
+            const isActive = btn.dataset.scheme === currentColorScheme;
+            btn.style.background = isActive ? '#0374B5' : '#fff';
+            btn.style.color = isActive ? '#fff' : '#333';
+            btn.style.fontWeight = isActive ? '600' : '500';
+        });
+    };
+
+    // Set initial state
+    updateButtonStates();
+
+    // Wire click handlers
+    [shell.colorSoftBtn, shell.colorCanvasBtn].forEach(btn => {
+        btn.addEventListener('click', () => {
+            const newScheme = btn.dataset.scheme;
+
+            if (newScheme === currentColorScheme) {
+                // Already active, no change
+                return;
+            }
+
+            // Update current scheme
+            currentColorScheme = newScheme;
+
+            // Save to localStorage
+            saveColorScheme(courseId, userId, newScheme);
+
+            // Update button states
+            updateButtonStates();
+
+            // Re-render views to apply new colors
+            logger.info(`[MasteryOutlook] Color scheme changed to: ${newScheme}`);
+            renderMetricCards(shell.metricsEl, cache);
+            renderLoadedOutcomeRows(shell.outcomesEl, cache);
+            renderSidebar(shell.sidebarEl, cache);
+
+            // Re-render heatmap if currently active
+            if (currentViewMode === 'heatmap') {
+                renderHeatmapView(shell, cache);
+            }
+        });
+    });
+}
+
 // ─── Threshold slider ─────────────────────────────────────────────────────────
 
 function wireThresholdSlider(shell, cache) {
@@ -944,11 +1042,28 @@ function statusBadge(classStats) {
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Get proficiency color based on PL prediction value
+ * Supports two color schemes: 'soft' (default pastel) or 'canvas' (Canvas mastery colors)
+ *
+ * @param {number} v - PL prediction value
+ * @returns {Object} { bg: background color, tx: text color }
+ */
 function profColor(v) {
-    if (v >= 3.5) return { bg: '#C0DD97', tx: '#27500A' };
-    if (v >= 3.0) return { bg: '#9FE1CB', tx: '#085041' };
-    if (v >= 2.0) return { bg: '#FAC775', tx: '#633806' };
-    return             { bg: '#F7C1C1', tx: '#791F1F' };
+    if (currentColorScheme === 'canvas') {
+        // Canvas mastery colors (5-level, bold)
+        if (v >= 4.0) return { bg: '#02672D', tx: '#FFFFFF' }; // Exceeds Mastery (dark green)
+        if (v >= 3.0) return { bg: '#03893D', tx: '#FFFFFF' }; // Mastery (medium green)
+        if (v >= 2.0) return { bg: '#FAB901', tx: '#a86700' }; // Near Mastery (yellow/gold)
+        if (v >= 1.0) return { bg: '#FD5D10', tx: '#db3b00' }; // Below Mastery (orange)
+        return { bg: '#E62429', tx: '#FFFFFF' };               // Well Below Mastery (red)
+    } else {
+        // Soft colors (4-level, pastel) - default
+        if (v >= 3.5) return { bg: '#C0DD97', tx: '#27500A' }; // Advanced (light green)
+        if (v >= 3.0) return { bg: '#9FE1CB', tx: '#085041' }; // Proficient (teal)
+        if (v >= 2.0) return { bg: '#FAC775', tx: '#633806' }; // Developing (light orange)
+        return { bg: '#F7C1C1', tx: '#791F1F' };               // Beginning (light red)
+    }
 }
 
 function overallPlAvg(cache, regularOutcomes) {
@@ -1102,9 +1217,10 @@ function renderHeatmapView(shell, cache) {
     const heatmapGrid = buildHeatmapGrid(cache, {
         cellWidth: 80,
         cellHeight: 28,
+        colorScheme: currentColorScheme,
         onFullScreen: () => {
             const courseName = window.ENV?.COURSE?.name || 'Course';
-            openFullScreenHeatmap(cache, { courseName });
+            openFullScreenHeatmap(cache, { courseName, colorScheme: currentColorScheme });
         }
     });
 

@@ -39,10 +39,12 @@ function formatDate(isoString) {
  * @param {Object} cache - Mastery outlook cache data
  * @param {Object} options - Configuration options
  * @param {string} options.courseName - Course name for header
+ * @param {string} options.colorScheme - 'soft' or 'canvas' (default: 'soft')
  */
 export function openFullScreenHeatmap(cache, options = {}) {
     const {
-        courseName = window.ENV?.COURSE?.name || 'Course'
+        courseName = window.ENV?.COURSE?.name || 'Course',
+        colorScheme = 'soft'
     } = options;
 
     logger.info('[HeatmapFullScreen] Opening full-screen heatmap');
@@ -298,6 +300,7 @@ export function openFullScreenHeatmap(cache, options = {}) {
         // Configuration
         const AVG_OUTCOME_NAME = ${JSON.stringify(window.CG_CONFIG?.AVG_OUTCOME_NAME || 'Current Score')};
         const EXCLUDED_OUTCOME_KEYWORDS = ${JSON.stringify(window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS || [])};
+        const COLOR_SCHEME = ${JSON.stringify(colorScheme)};
 
         // State
         let sortState = { column: 'name', direction: 'asc' };
@@ -324,10 +327,21 @@ export function openFullScreenHeatmap(cache, options = {}) {
             if (status === 'NE' || plPrediction === null) {
                 return { bg: '#f0f0f0', text: '#999' };
             }
-            if (plPrediction >= 3.5) return { bg: '#C0DD97', text: '#27500A' };
-            if (plPrediction >= 3.0) return { bg: '#9FE1CB', text: '#085041' };
-            if (plPrediction >= 2.0) return { bg: '#FAC775', text: '#633806' };
-            return { bg: '#F7C1C1', text: '#791F1F' };
+
+            if (COLOR_SCHEME === 'canvas') {
+                // Canvas mastery colors (5-level, bold)
+                if (plPrediction >= 4.0) return { bg: '#02672D', text: '#FFFFFF' };
+                if (plPrediction >= 3.0) return { bg: '#03893D', text: '#FFFFFF' };
+                if (plPrediction >= 2.0) return { bg: '#FAB901', text: '#a86700' };
+                if (plPrediction >= 1.0) return { bg: '#FD5D10', text: '#db3b00' };
+                return { bg: '#E62429', text: '#FFFFFF' };
+            } else {
+                // Soft colors (4-level, pastel) - default
+                if (plPrediction >= 3.5) return { bg: '#C0DD97', text: '#27500A' };
+                if (plPrediction >= 3.0) return { bg: '#9FE1CB', text: '#085041' };
+                if (plPrediction >= 2.0) return { bg: '#FAC775', text: '#633806' };
+                return { bg: '#F7C1C1', text: '#791F1F' };
+            }
         }
 
         function getCellContent(outcomeData, showDetails) {

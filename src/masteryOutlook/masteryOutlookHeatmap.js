@@ -39,15 +39,27 @@ function formatStudentName(student) {
 
 /**
  * Get color for PL prediction value
+ * Supports two color schemes: 'soft' (default pastel) or 'canvas' (Canvas mastery colors)
  */
-function getCellColor(plPrediction, status) {
+function getCellColor(plPrediction, status, colorScheme = 'soft') {
     if (status === 'NE' || plPrediction === null) {
         return { bg: '#f0f0f0', text: '#999' };
     }
-    if (plPrediction >= 3.5) return { bg: '#C0DD97', text: '#27500A' };
-    if (plPrediction >= 3.0) return { bg: '#9FE1CB', text: '#085041' };
-    if (plPrediction >= 2.0) return { bg: '#FAC775', text: '#633806' };
-    return { bg: '#F7C1C1', text: '#791F1F' };
+
+    if (colorScheme === 'canvas') {
+        // Canvas mastery colors (5-level, bold)
+        if (plPrediction >= 4.0) return { bg: '#02672D', text: '#FFFFFF' };
+        if (plPrediction >= 3.0) return { bg: '#03893D', text: '#FFFFFF' };
+        if (plPrediction >= 2.0) return { bg: '#FAB901', text: '#a86700' };
+        if (plPrediction >= 1.0) return { bg: '#FD5D10', text: '#db3b00' };
+        return { bg: '#E62429', text: '#FFFFFF' };
+    } else {
+        // Soft colors (4-level, pastel) - default
+        if (plPrediction >= 3.5) return { bg: '#C0DD97', text: '#27500A' };
+        if (plPrediction >= 3.0) return { bg: '#9FE1CB', text: '#085041' };
+        if (plPrediction >= 2.0) return { bg: '#FAC775', text: '#633806' };
+        return { bg: '#F7C1C1', text: '#791F1F' };
+    }
 }
 
 /**
@@ -134,6 +146,7 @@ function sortStudents(students, sortState) {
  * @param {Object} options - Configuration options
  * @param {number} options.cellWidth - Cell width in px (default: 80)
  * @param {number} options.cellHeight - Cell height in px (default: 28)
+ * @param {string} options.colorScheme - 'soft' or 'canvas' (default: 'soft')
  * @param {Function} options.onFullScreen - Callback when full screen link clicked
  * @returns {HTMLElement} Heatmap container element
  */
@@ -141,6 +154,7 @@ export function buildHeatmapGrid(cache, options = {}) {
     const {
         cellWidth = 80,
         cellHeight = 28,
+        colorScheme = 'soft',
         onFullScreen = null
     } = options;
 
@@ -340,7 +354,7 @@ export function buildHeatmapGrid(cache, options = {}) {
                     String(o.outcomeId) === String(outcome.id)
                 ) || { status: 'NE', plPrediction: null };
 
-                const colors = getCellColor(outcomeData.plPrediction, outcomeData.status);
+                const colors = getCellColor(outcomeData.plPrediction, outcomeData.status, colorScheme);
                 const content = getCellContent(outcomeData, showDetails);
                 const tooltip = buildTooltip(student, outcome, outcomeData);
 
