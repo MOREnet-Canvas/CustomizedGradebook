@@ -712,7 +712,8 @@ function spreadBar(classStats) {
 
 function statusBadge(classStats) {
     if (classStats.plAvg === null) return pendingBadge();
-    const isReteach = classStats.plAvg < classStats.computedThreshold;
+    const threshold = getCurrentThreshold();
+    const isReteach = classStats.plAvg < threshold;
     const isSolid   = classStats.plAvg >= 3.0;
     if (isReteach) return `<span style="${FONT} font-size:12px; font-weight:600;
         padding:3px 8px; border-radius:8px;

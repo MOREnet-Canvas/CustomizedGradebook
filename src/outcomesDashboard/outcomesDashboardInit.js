@@ -20,6 +20,7 @@ import { renderOutcomesDashboard } from './outcomesDashboardView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { fetchAllOutcomeData, computeOutcomeStats } from './outcomesDataService.js';
 import { writeOutcomesCache, readOutcomesCache } from './outcomesCacheService.js';
+import { getThreshold } from './thresholdStorage.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -79,13 +80,19 @@ function initOutcomesDashboardView() {
         // Fetch all data
         const data = await fetchAllOutcomeData(courseId, apiClient, onProgress);
 
+        // Get current user's threshold setting
+        const userId = window.ENV?.current_user_id;
+        const threshold = userId ? getThreshold(courseId, userId) : 2.2;
+        logger.debug(`[OutcomesDashboardInit] Using threshold: ${threshold} for user ${userId}`);
+
         // Compute Power Law stats
         onProgress('Computing Power Law predictions...');
-        const cache = computeOutcomeStats(data, 2.2);
+        const cache = computeOutcomeStats(data, threshold);
 
         // Add courseId to cache metadata
         cache.metadata.courseId = courseId;
         cache.metadata.computedAt = new Date().toISOString();
+        cache.metadata.threshold = threshold;
 
         // Write to cache
         onProgress('Saving cache...');
