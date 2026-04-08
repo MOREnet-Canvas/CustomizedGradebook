@@ -264,11 +264,10 @@ export async function resolveTargetStudentId(courseId = null, apiClient = null) 
  * Matches:
  * - /courses/123/pages/mastery-outlook
  * - /courses/123/pages/mastery-outlook-* (auto-numbered variants)
- * - /courses/123/pages/teacher-mastery-dashboard (legacy, backward compatible)
  *
  * @returns {boolean} True if on mastery outlook page
  */
 export function isMasteryOutlookPage() {
     const path = window.location.pathname;
-    return path.includes('/pages/mastery-outlook') || path.includes('/pages/teacher-mastery-dashboard');
+    return path.includes('/pages/mastery-outlook');
 }
