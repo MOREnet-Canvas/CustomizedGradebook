@@ -96,7 +96,7 @@ function initMasteryOutlookView() {
 
         // Write to cache
         onProgress('Saving cache...');
-        await writeOutcomesCache(courseId, apiClient, cache);
+        await writeMasteryOutlookCache(courseId, apiClient, cache);
 
         logger.info('[MasteryOutlookInit] Data refresh complete');
 
