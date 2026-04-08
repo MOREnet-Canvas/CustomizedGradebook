@@ -1070,7 +1070,7 @@ function profColor(v) {
             txOnDefault: '#03893D' // Medium green text on white
         };
         if (v >= 2.0) return {
-            bg: '#FAB901',        // Yellow background
+            bg: '#EF9F27',        // Yellow background
             tx: '#FFFFFF',        // White text on background (readable!)
             txOnDefault: '#a86700' // Dark brown text on white
         };
