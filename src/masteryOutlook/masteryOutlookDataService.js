@@ -1,4 +1,4 @@
-// src/outcomesDashboard/outcomesDataService.js
+// src/MasteryOutlook/outcomesDataService.js
 /**
  * Outcomes Data Service
  *
@@ -11,7 +11,7 @@
  * 4. fetchAllOutcomeData() - Orchestrate all fetches
  * 5. computeOutcomeStats() - Apply Power Law calculations
  *
- * See: docs/AI_SERVICES_REFERENCE.md and src/outcomesDashboard/API_REFERENCE.md
+ * See: docs/AI_SERVICES_REFERENCE.md and src/MasteryOutlook/API_REFERENCE.md
  */
 
 import { logger } from '../utils/logger.js';
@@ -312,7 +312,7 @@ export function extractAttempts(outcomeResults) {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Orchestrate all data fetches for the Outcomes Dashboard
+ * Orchestrate all data fetches for the Mastery Outlook
  *
  * Steps:
  * 1. Fetch outcome names (metadata)

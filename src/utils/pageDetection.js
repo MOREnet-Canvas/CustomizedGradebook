@@ -10,7 +10,7 @@
  * - isAllGradesPage: Check if on all-grades page (/grades)
  * - isSingleCourseGradesPage: Check if on single course grades page
  * - isCoursePageNeedingCleanup: Check if on course page that needs grade cleanup
- * - isOutcomesDashboardPage: Check if on Teacher Mastery Dashboard page
+ * - isMasteryOutlookPage: Check if on Mastery Outlook page
  */
 
 import {logger} from "./logger.js";
@@ -259,15 +259,16 @@ export async function resolveTargetStudentId(courseId = null, apiClient = null) 
 
 
 /**
- * Check if current page is the Teacher Mastery Dashboard page
+ * Check if current page is the Mastery Outlook page
  *
  * Matches:
- * - /courses/123/pages/teacher-mastery-dashboard
- * - /courses/123/pages/teacher-mastery-dashboard-* (auto-numbered variants)
+ * - /courses/123/pages/mastery-outlook
+ * - /courses/123/pages/mastery-outlook-* (auto-numbered variants)
+ * - /courses/123/pages/teacher-mastery-dashboard (legacy, backward compatible)
  *
- * @returns {boolean} True if on teacher mastery dashboard page
+ * @returns {boolean} True if on mastery outlook page
  */
-export function isOutcomesDashboardPage() {
+export function isMasteryOutlookPage() {
     const path = window.location.pathname;
-    return path.includes('/pages/teacher-mastery-dashboard');
+    return path.includes('/pages/mastery-outlook') || path.includes('/pages/teacher-mastery-dashboard');
 }

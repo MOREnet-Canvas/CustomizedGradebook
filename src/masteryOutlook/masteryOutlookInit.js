@@ -1,25 +1,25 @@
-// src/outcomesDashboard/outcomesDashboardInit.js
+// src/masteryOutlook/masteryOutlookInit.js
 /**
- * Outcomes Dashboard Initialization
- * 
- * Entry point for Outcomes Dashboard module.
- * 
+ * Mastery Outlook Initialization
+ *
+ * Entry point for Mastery Outlook module.
+ *
  * Responsibilities:
  * 1. Check user permissions (teacher_like only)
  * 2. Inject creation button on Course Settings page
- * 3. Initialize dashboard on Outcomes Dashboard page
- * 
+ * 3. Initialize outlook on Mastery Outlook page
+ *
  * See: docs/AI_SERVICES_REFERENCE.md for existing services
  */
 
 import { logger } from '../utils/logger.js';
 import { getUserRoleGroup, getCourseId } from '../utils/canvas.js';
-import { isOutcomesDashboardPage } from '../utils/pageDetection.js';
-import { injectOutcomesDashboardButton } from './outcomesDashboardCreation.js';
-import { renderOutcomesDashboard } from './outcomesDashboardView.js';
+import { isMasteryOutlookPage } from '../utils/pageDetection.js';
+import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
+import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { fetchAllOutcomeData, computeOutcomeStats } from './outcomesDataService.js';
-import { writeOutcomesCache, readOutcomesCache } from './outcomesCacheService.js';
+import { fetchAllOutcomeData, computeOutcomeStats } from './masteryOutlookDataService.js';
+import { writeMasteryOutlookCache, readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { getThreshold } from './thresholdStorage.js';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -27,41 +27,41 @@ import { getThreshold } from './thresholdStorage.js';
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Check if current user can access Outcomes Dashboard
- * 
+ * Check if current user can access Mastery Outlook
+ *
  * Uses getUserRoleGroup() from src/utils/canvas.js (existing utility)
- * 
+ *
  * Permitted roles: teacher, ta, admin, AccountAdmin, designer, root_admin
- * 
- * @returns {boolean} True if user can access dashboard
+ *
+ * @returns {boolean} True if user can access outlook
  */
-function canAccessOutcomesDashboard() {
+function canAccessMasteryOutlook() {
     const roleGroup = getUserRoleGroup();
-    
+
     if (roleGroup === "teacher_like") {
-        logger.debug('[OutcomesDashboardInit] Access granted (teacher_like role)');
+        logger.debug('[MasteryOutlookInit] Access granted (teacher_like role)');
         return true;
     }
-    
-    logger.debug(`[OutcomesDashboardInit] Access denied (role group: ${roleGroup})`);
+
+    logger.debug(`[MasteryOutlookInit] Access denied (role group: ${roleGroup})`);
     return false;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// DASHBOARD VIEW INITIALIZATION
+// OUTLOOK VIEW INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Initialize Teacher Mastery Dashboard view
+ * Initialize Teacher Mastery OUTLOOK VIEW
  *
  * Finds the root container, sets up refresh handler, and renders the dashboard.
- * Uses outcomesDashboardView.js for UI rendering.
+ * Uses MasteryOutlookView.js for UI rendering.
  */
-function initOutcomesDashboardView() {
+function initMasteryOutlookView() {
     const containerEl = document.getElementById('teacher-mastery-dashboard-root');
 
     if (!containerEl) {
-        logger.warn('[OutcomesDashboardInit] Root container not found');
+        logger.warn('[MasteryOutlookInit] Root container not found');
         return;
     }
 
@@ -75,7 +75,7 @@ function initOutcomesDashboardView() {
 
     // Define refresh handler
     const onRefresh = async (onProgress) => {
-        logger.info('[OutcomesDashboardInit] Starting data refresh...');
+        logger.info('[MasteryOutlookInit] Starting data refresh...');
 
         // Fetch all data
         const data = await fetchAllOutcomeData(courseId, apiClient, onProgress);
@@ -83,7 +83,7 @@ function initOutcomesDashboardView() {
         // Get current user's threshold setting
         const userId = window.ENV?.current_user_id;
         const threshold = userId ? getThreshold(courseId, userId) : 2.2;
-        logger.debug(`[OutcomesDashboardInit] Using threshold: ${threshold} for user ${userId}`);
+        logger.debug(`[MasteryOutlookInit] Using threshold: ${threshold} for user ${userId}`);
 
         // Compute Power Law stats
         onProgress('Computing Power Law predictions...');
@@ -98,7 +98,7 @@ function initOutcomesDashboardView() {
         onProgress('Saving cache...');
         await writeOutcomesCache(courseId, apiClient, cache);
 
-        logger.info('[OutcomesDashboardInit] Data refresh complete');
+        logger.info('[MasteryOutlookInit] Data refresh complete');
 
         return {
             meta: cache.metadata,
@@ -108,14 +108,14 @@ function initOutcomesDashboardView() {
     };
 
     // Render dashboard
-    renderOutcomesDashboard({
+    renderMasteryOutlook({
         containerEl,
         courseId,
         apiClient,
         onRefresh
     });
 
-    logger.info('[OutcomesDashboardInit] Dashboard view initialized');
+    logger.info('[MasteryOutlookInit] OUTLOOK VIEW initialized');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -123,41 +123,41 @@ function initOutcomesDashboardView() {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Initialize Outcomes Dashboard module
+ * Initialize Mastery Outlook module
  * 
  * Called from main init (customGradebookInit.js)
  * 
  * Execution flow:
  * 1. Check permissions (teacher_like only)
  * 2. If on Course Settings page → Inject creation button
- * 3. If on Outcomes Dashboard page → Initialize dashboard view
+ * 3. If on Mastery Outlook page → Initialize OUTLOOK VIEW
  */
-export function initOutcomesDashboard() {
-    logger.debug('[OutcomesDashboardInit] Starting initialization...');
+export function initMasteryOutlook() {
+    logger.debug('[MasteryOutlookInit] Starting initialization...');
     
     // Check permissions
-    if (!canAccessOutcomesDashboard()) {
-        logger.debug('[OutcomesDashboardInit] User does not have access, exiting');
+    if (!canAccessMasteryOutlook()) {
+        logger.debug('[MasteryOutlookInit] User does not have access, exiting');
         return;
     }
     
     // Route 1: Course Settings page - inject creation button
     try {
-        injectOutcomesDashboardButton();
+        injectMasteryOutlookButton();
     } catch (error) {
-        logger.error('[OutcomesDashboardInit] Error injecting creation button', error);
+        logger.error('[MasteryOutlookInit] Error injecting creation button', error);
     }
     
     // Route 2: Teacher Mastery Dashboard page - initialize view
-    if (isOutcomesDashboardPage()) {
-        logger.info('[OutcomesDashboardInit] On Teacher Mastery Dashboard page, initializing view...');
+    if (isMasteryOutlookPage()) {
+        logger.info('[MasteryOutlookInit] On Teacher Mastery Dashboard page, initializing view...');
 
         try {
-            initOutcomesDashboardView();
+            initMasteryOutlookView();
         } catch (error) {
-            logger.error('[OutcomesDashboardInit] Error initializing dashboard view', error);
+            logger.error('[MasteryOutlookInit] Error initializing OUTLOOK VIEW', error);
         }
     }
     
-    logger.debug('[OutcomesDashboardInit] Initialization complete');
+    logger.debug('[MasteryOutlookInit] Initialization complete');
 }

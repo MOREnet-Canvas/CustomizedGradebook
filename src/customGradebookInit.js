@@ -35,7 +35,7 @@ import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
 import { initMasteryDashboardCreation } from "./masteryDashboardCreation/masteryDashboardCreationInit.js";
 import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
-import { initOutcomesDashboard } from "./outcomesDashboard/outcomesDashboardInit.js";
+import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
 
 /**
  * Main initialization function
@@ -84,9 +84,9 @@ import { initOutcomesDashboard } from "./outcomesDashboard/outcomesDashboardInit
         initMasteryDashboardCreation();
     }
 
-    // Teacher Mastery Dashboard (outcomes dashboard)
-    // Has internal page detection - runs on both settings page and dashboard page
-    initOutcomesDashboard();
+    // Mastery Outlook (teacher analytics dashboard)
+    // Has internal page detection - runs on both settings page and outlook page
+    initMasteryOutlook();
 
     // Mastery Dashboard Viewer (web version)
     // Only runs if ?cg_web=1 is present in the URL
