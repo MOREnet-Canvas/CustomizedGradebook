@@ -14,6 +14,7 @@ import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { createPage, getPage } from '../services/pageService.js';
 import { isCourseSettingsPage } from '../utils/pageDetection.js';
+import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -61,6 +62,9 @@ export async function createMasteryOutlook(button) {
 
             alert(`Mastery Outlook page already exists!\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}`);
 
+            // Inject sidebar link (in case it was removed or page loaded without it)
+            injectMasteryOutlookLink(courseId);
+
             // Reset button after 3 seconds
             setTimeout(() => {
                 button.disabled = false;
@@ -81,11 +85,15 @@ export async function createMasteryOutlook(button) {
 
         logger.info(`[MasteryOutlook] Page created at: ${createdPage.url}`);
 
+        // Inject sidebar link immediately
+        injectMasteryOutlookLink(courseId);
+        logger.info('[MasteryOutlook] Sidebar link injection triggered');
+
         // Success!
         button.textContent = '✅ Page Created!';
         button.style.backgroundColor = '#28a745';
 
-        alert(`Success! Mastery Outlook page created.\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}\n\nNote: Page is UNPUBLISHED (only visible to teachers)`);
+        alert(`Success! Mastery Outlook page created.\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}\n\nNote: Page is UNPUBLISHED (only visible to teachers)\n\nA link has been added to the course navigation sidebar.`);
 
         // Reset button after 3 seconds
         setTimeout(() => {
