@@ -261,6 +261,19 @@ export async function renderMasteryDashboard() {
             );
 
             if (isTeacher) {
+                // Check for student_id URL parameter for direct student view
+                const urlParams = new URLSearchParams(window.location.search);
+                const preselectedStudentId = urlParams.get('student_id');
+
+                if (preselectedStudentId) {
+                    // Auto-load student data directly (skip picker)
+                    debugLog(`User role: Teacher (auto-loading student ${preselectedStudentId} from URL)`);
+                    statusEl.textContent = "";
+                    await renderStudentData(preselectedStudentId, courseId, apiClient, statusEl, cardsEl);
+                    return;
+                }
+
+                // No student_id parameter - show picker
                 debugLog(`User role: Teacher. Rendering student picker.`);
                 statusEl.textContent = "";
                 renderTeacherMasteryView({
