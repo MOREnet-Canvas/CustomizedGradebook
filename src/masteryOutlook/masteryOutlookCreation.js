@@ -1,11 +1,11 @@
-// src/outcomesDashboard/outcomesDashboardCreation.js
+// src/MasteryOutlook/MasteryOutlookCreation.js
 /**
- * Outcomes Dashboard Creation & Button Injection
+ * Mastery Outlook Creation & Button Injection
  *
  * Injects a button in the course settings sidebar that creates
- * an unpublished Outcomes Dashboard page.
+ * an unpublished Mastery Outlook page.
  *
- * Teachers navigate to the page manually via: Pages → Outcomes Dashboard
+ * Teachers navigate to the page manually via: Pages → Mastery Outlook
  */
 
 import { logger } from '../utils/logger.js';
@@ -19,24 +19,24 @@ import { isCourseSettingsPage } from '../utils/pageDetection.js';
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
 
-const INJECTION_MARKER = 'cg-teacher-mastery-dashboard-creator';
-const OUTCOMES_PAGE_TITLE = 'Teacher Mastery Dashboard';
-const OUTCOMES_PAGE_URL = 'teacher-mastery-dashboard';
-const OUTCOMES_PAGE_BODY = '<div id="teacher-mastery-dashboard-root"></div>';
+const INJECTION_MARKER = 'cg-mastery-outlook-creator';
+const OUTLOOK_PAGE_TITLE = 'Mastery Outlook';
+const OUTLOOK_PAGE_URL = 'mastery-outlook';
+const OUTLOOK_PAGE_BODY = '<div id="teacher-mastery-dashboard-root"></div>';
 
 // ═══════════════════════════════════════════════════════════════════════
-// CREATE OUTCOMES DASHBOARD PAGE
+// CREATE Mastery Outlook PAGE
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Create outcomes dashboard page
+ * Create Mastery Outlook page
  *
  * Creates a single unpublished page that teachers navigate to manually.
  * No front page button, no course settings changes.
  *
  * @param {HTMLButtonElement} button - Button element to update state
  */
-export async function createOutcomesDashboard(button) {
+export async function createMasteryOutlook(button) {
     const courseId = getCourseId();
     if (!courseId) {
         alert('Could not determine course ID');
@@ -49,58 +49,58 @@ export async function createOutcomesDashboard(button) {
         // Disable button during operation
         button.disabled = true;
         button.textContent = 'Creating...';
-        logger.info('[OutcomesDashboard] Creating outcomes dashboard page');
+        logger.info('[MasteryOutlook] Creating Mastery Outlook page');
 
         // Check if page already exists
-        const existingPage = await getPage(courseId, OUTCOMES_PAGE_URL, apiClient);
+        const existingPage = await getPage(courseId, OUTLOOK_PAGE_URL, apiClient);
 
         if (existingPage) {
-            logger.info('[OutcomesDashboard] Page already exists');
+            logger.info('[MasteryOutlook] Page already exists');
             button.textContent = '✅ Already Exists';
             button.style.backgroundColor = '#28a745';
 
-            alert(`Outcomes Dashboard page already exists!\n\nNavigate to: Pages → ${OUTCOMES_PAGE_TITLE}`);
+            alert(`Mastery Outlook page already exists!\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}`);
 
             // Reset button after 3 seconds
             setTimeout(() => {
                 button.disabled = false;
-                button.textContent = `📊 Create ${OUTCOMES_PAGE_TITLE}`;
+                button.textContent = `📊 Create ${OUTLOOK_PAGE_TITLE}`;
                 button.style.backgroundColor = '';
             }, 3000);
 
             return;
         }
 
-        // Create outcomes dashboard page (UNPUBLISHED)
+        // Create Mastery Outlook page (UNPUBLISHED)
         const createdPage = await createPage(courseId, {
-            title: OUTCOMES_PAGE_TITLE,
-            url: OUTCOMES_PAGE_URL,
-            body: OUTCOMES_PAGE_BODY,
+            title: OUTLOOK_PAGE_TITLE,
+            url: OUTLOOK_PAGE_URL,
+            body: OUTLOOK_PAGE_BODY,
             published: false  // UNPUBLISHED - only teachers can access
         }, apiClient);
 
-        logger.info(`[OutcomesDashboard] Page created at: ${createdPage.url}`);
+        logger.info(`[MasteryOutlook] Page created at: ${createdPage.url}`);
 
         // Success!
         button.textContent = '✅ Page Created!';
         button.style.backgroundColor = '#28a745';
 
-        alert(`Success! Outcomes Dashboard page created.\n\nNavigate to: Pages → ${OUTCOMES_PAGE_TITLE}\n\nNote: Page is UNPUBLISHED (only visible to teachers)`);
+        alert(`Success! Mastery Outlook page created.\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}\n\nNote: Page is UNPUBLISHED (only visible to teachers)`);
 
         // Reset button after 3 seconds
         setTimeout(() => {
             button.disabled = false;
-            button.textContent = `📊 Create ${OUTCOMES_PAGE_TITLE}`;
+            button.textContent = `📊 Create ${OUTLOOK_PAGE_TITLE}`;
             button.style.backgroundColor = '';
         }, 3000);
 
     } catch (error) {
-        logger.error('[OutcomesDashboard] Error creating page:', error);
-        alert(`Error creating Outcomes Dashboard page: ${error.message}`);
+        logger.error('[MasteryOutlook] Error creating page:', error);
+        alert(`Error creating Mastery Outlook page: ${error.message}`);
 
         // Reset button
         button.disabled = false;
-        button.textContent = `📊 Create ${OUTCOMES_PAGE_TITLE}`;
+        button.textContent = `📊 Create ${OUTLOOK_PAGE_TITLE}`;
         button.style.backgroundColor = '';
     }
 }
@@ -113,24 +113,24 @@ export async function createOutcomesDashboard(button) {
  * Inject button in Course Settings sidebar
  *
  * Waits for the sidebar to be ready, then injects a button that creates
- * the unpublished Outcomes Dashboard page.
+ * the unpublished Mastery Outlook page.
  */
-export function injectOutcomesDashboardButton() {
+export function injectMasteryOutlookButton() {
     if (!isCourseSettingsPage()) {
-        logger.trace('[OutcomesDashboard] Not on course settings page, skipping injection');
+        logger.trace('[MasteryOutlook] Not on course settings page, skipping injection');
         return;
     }
 
-    logger.debug('[OutcomesDashboard] On course settings page, waiting for sidebar...');
+    logger.debug('[MasteryOutlook] On course settings page, waiting for sidebar...');
 
     waitForSettingsSidebar((sidebar) => {
         // Check if already injected
         if (document.querySelector(`.${INJECTION_MARKER}`)) {
-            logger.debug('[OutcomesDashboard] Button already injected, skipping');
+            logger.debug('[MasteryOutlook] Button already injected, skipping');
             return;
         }
 
-        logger.debug('[OutcomesDashboard] Injecting button into settings sidebar');
+        logger.debug('[MasteryOutlook] Injecting button into settings sidebar');
 
         // Create button container
         const container = document.createElement('div');
@@ -139,16 +139,16 @@ export function injectOutcomesDashboardButton() {
 
         // Create button using existing makeButton utility
         const button = makeButton({
-            label: `📊 Create ${OUTCOMES_PAGE_TITLE}`,
+            label: `📊 Create ${OUTLOOK_PAGE_TITLE}`,
             id: 'create-outcomes-dashboard-button',
-            onClick: () => createOutcomesDashboard(button),
+            onClick: () => createMasteryOutlook(button),
             type: 'primary'
         });
 
         container.appendChild(button);
         sidebar.appendChild(container);
 
-        logger.info('[OutcomesDashboard] Button injected successfully');
+        logger.info('[MasteryOutlook] Button injected successfully');
     });
 }
 
@@ -170,11 +170,11 @@ function waitForSettingsSidebar(callback) {
 
         if (onSettingsPage && documentReady && sidebar) {
             clearInterval(intervalId);
-            logger.debug('[OutcomesDashboard] Settings sidebar found');
+            logger.debug('[MasteryOutlook] Settings sidebar found');
             callback(sidebar);
         } else if (attempts++ >= maxAttempts) {
             clearInterval(intervalId);
-            logger.warn('[OutcomesDashboard] Settings sidebar not found after 10 seconds');
+            logger.warn('[MasteryOutlook] Settings sidebar not found after 10 seconds');
         }
     }, intervalMs);
 }

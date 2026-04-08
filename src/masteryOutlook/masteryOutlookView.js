@@ -1,6 +1,6 @@
-// src/outcomesDashboard/outcomesDashboardView.js
+// src/MasteryOutlook/MasteryOutlookView.js
 /**
- * Outcomes Dashboard — main view
+ * Mastery Outlook — main view
  *
  * Renders in two states:
  *   1. Default (no cache) — outcome names from Canvas, NE placeholders,
@@ -8,12 +8,12 @@
  *   2. Loaded (cache exists) — full Power Law data, distribution bars,
  *      intervention sidebar
  *
- * Entry point: renderOutcomesDashboard()
+ * Entry point: renderMasteryOutlook()
  */
 
 import { logger } from '../utils/logger.js';
-import { readOutcomesCache } from './outcomesCacheService.js';
-import { fetchOutcomeNames } from './outcomesDataService.js';
+import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
+import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getCourseId } from '../utils/canvas.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
@@ -116,7 +116,7 @@ function computeCurrentScoreClassStats(cache) {
  * @param {Function} options.onRefresh       - Async callback that triggers
  *                                            recompute and returns fresh cache
  */
-export async function renderOutcomesDashboard({ containerEl, courseId, apiClient, onRefresh }) {
+export async function renderMasteryOutlook({ containerEl, courseId, apiClient, onRefresh }) {
     containerEl.innerHTML = '';
     containerEl.style.cssText = `${FONT} max-width:1100px; margin:0 auto; padding:1rem;`;
 
@@ -142,7 +142,7 @@ function buildShell(containerEl) {
              align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
             <div>
                 <div id="od-title" style="font-size:1.1rem; font-weight:700;
-                     color:#333;">Outcomes Dashboard</div>
+                     color:#333;">Mastery Outlook</div>
                 <div id="od-subtitle" style="font-size:0.8rem; color:#888;
                      margin-top:2px;">Power Law predictions</div>
             </div>
@@ -233,7 +233,7 @@ async function renderDefaultState(shell, courseId, apiClient, onRefresh) {
     try {
         outcomes = await fetchOutcomeNames(courseId, apiClient);
     } catch (e) {
-        logger.warn('[OutcomesDashboard] Could not fetch outcome names', e);
+        logger.warn('[MasteryOutlook] Could not fetch outcome names', e);
     }
 
     // Render outcome rows in default/empty state
@@ -801,7 +801,7 @@ function wireThresholdSlider(shell, cache) {
     const userId = window.ENV?.current_user_id;
 
     if (!userId) {
-        logger.warn('[OutcomesDashboard] Cannot wire threshold slider - no user ID');
+        logger.warn('[MasteryOutlook] Cannot wire threshold slider - no user ID');
         return;
     }
 
@@ -848,7 +848,7 @@ function wireRefreshButton(shell, onRefresh) {
             renderLoadedState(shell, freshCache, onRefresh);
 
         } catch (e) {
-            logger.error('[OutcomesDashboard] Refresh failed', e);
+            logger.error('[MasteryOutlook] Refresh failed', e);
             setStatus(shell.statusEl, 'Refresh failed — see console for details.');
             shell.refreshBtn.textContent = 'Retry Refresh';
             shell.refreshBtn.disabled = false;
@@ -940,7 +940,7 @@ async function tryLoadCache(courseId, apiClient) {
     try {
         const cache = await readOutcomesCache(courseId, apiClient);
         if (cache) {
-            logger.info('[OutcomesDashboard] Cache loaded successfully');
+            logger.info('[MasteryOutlook] Cache loaded successfully');
             return {
                 meta: cache.metadata,
                 outcomes: cache.outcomes,
@@ -949,7 +949,7 @@ async function tryLoadCache(courseId, apiClient) {
         }
         return null;
     } catch (error) {
-        logger.warn('[OutcomesDashboard] Could not load cache', error);
+        logger.warn('[MasteryOutlook] Could not load cache', error);
         return null;
     }
 }

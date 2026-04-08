@@ -1,4 +1,4 @@
-// src/outcomesDashboard/powerLaw.js
+// src/masteryOutlook/powerLaw.js
 /**
  * Power Law calculation module
  *

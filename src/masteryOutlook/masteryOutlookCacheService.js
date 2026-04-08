@@ -1,9 +1,9 @@
-// src/outcomesDashboard/outcomesCacheService.js
+// src/MasteryOutlook/outcomesCacheService.js
 /**
  * Outcomes Cache Service
  *
  * Handles reading and writing the outcomes cache file to Canvas Files API.
- * Cache file: MOREnet_CustomizedGradebook/outcomes_cache/outcomes_cache.json
+ * Cache file: MOREnet_CustomizedGradebook/mastery_outlook_cache/mastery_outlook_cache.json
  * Permissions: locked (unpublished), hidden: false (teachers can access)
  *
  * Schema versioning: Files with mismatched schemaVersion are discarded.
@@ -22,20 +22,20 @@ import { logger } from '../utils/logger.js';
 const SCHEMA_VERSION = '1.0';
 
 const PARENT_FOLDER_NAME = 'MOREnet_CustomizedGradebook';
-const FOLDER_NAME = 'outcomes_cache';
-const FILE_NAME = 'outcomes_cache.json';
+const FOLDER_NAME = 'mastery_outlook_cache';
+const FILE_NAME = 'mastery_outlook_cache.json';
 
 // ═══════════════════════════════════════════════════════════════════════
 // FOLDER MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Ensure the folder structure exists: MOREnet_CustomizedGradebook/outcomes_cache/
- * Returns the folder ID of the outcomes_cache subfolder.
+ * Ensure the folder structure exists: MOREnet_CustomizedGradebook/mastery_outlook_cache/
+ * Returns the folder ID of the mastery_outlook_cache subfolder.
  *
  * @param {string} courseId - Canvas course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @returns {Promise<string>} Folder ID of outcomes_cache subfolder
+ * @returns {Promise<string>} Folder ID of mastery_outlook_cache subfolder
  */
 export async function ensureFolder(courseId, apiClient) {
     try {
@@ -126,7 +126,7 @@ async function ensureParentFolder(courseId, apiClient, rootFolderId) {
 }
 
 /**
- * Ensure subfolder (outcomes_cache) exists
+ * Ensure subfolder (mastery_outlook_cache) exists
  * @private
  */
 async function ensureSubfolder(courseId, apiClient, parentFolderId) {
@@ -342,7 +342,7 @@ export async function readOutcomesCache(courseId, apiClient) {
             'readOutcomesCache:searchFile'
         );
 
-        // Find exact match in outcomes_cache folder
+        // Find exact match in mastery_outlook_cache folder
         const cacheFile = searchResults.find(f =>
             f.display_name === FILE_NAME &&
             f.folder_id &&
