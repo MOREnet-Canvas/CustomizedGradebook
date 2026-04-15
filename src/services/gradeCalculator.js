@@ -11,6 +11,9 @@
  * - Compare with existing scores to determine which students need updates
  * - Support multiple grading modes (outcome only, override only, or both)
  * - Return only students whose averages have changed
+ *
+ * Shared helpers (also exported for ieGradeCalculator.js):
+ * - buildOutcomeMap, getCurrentOutcomeScore, getRelevantScores, computeAverage
  */
 
 import { EXCLUDED_OUTCOME_KEYWORDS, ENABLE_OUTCOME_UPDATES, ENABLE_GRADE_OVERRIDE, OVERRIDE_SCALE } from "../config.js";
@@ -22,7 +25,7 @@ import { fetchOverrideGrades } from "./gradeOverrideVerification.js";
  * @param {Object} data - Canvas outcome rollup data
  * @returns {Object} Map of outcomeId -> title
  */
-function buildOutcomeMap(data) {
+export function buildOutcomeMap(data) {
     const map = {};
     (data?.linked?.outcomes ?? []).forEach(o => {
         map[String(o.id)] = o.title;
@@ -36,7 +39,7 @@ function buildOutcomeMap(data) {
  * @param {string} outcomeId - The outcome ID to find
  * @returns {number|null} The current score or null if not found
  */
-function getCurrentOutcomeScore(scores, outcomeId) {
+export function getCurrentOutcomeScore(scores, outcomeId) {
     const match = scores.find(s => String(s.links?.outcome) === String(outcomeId));
     return match?.score ?? null;
 }
@@ -49,7 +52,7 @@ function getCurrentOutcomeScore(scores, outcomeId) {
  * @param {Array} excludedKeywords - Array of keywords to exclude from titles
  * @returns {Array} Filtered array of relevant scores
  */
-function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywords) {
+export function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywords) {
     return scores.filter(s => {
         const id = String(s.links?.outcome);
         const title = (outcomeMap[id] || "").toLowerCase();
@@ -67,7 +70,7 @@ function getRelevantScores(scores, outcomeMap, excludedOutcomeIds, excludedKeywo
  * @param {Array} scores - Array of score objects with .score property
  * @returns {number} The average score, rounded to 2 decimal places
  */
-function computeAverage(scores) {
+export function computeAverage(scores) {
     const total = scores.reduce((sum, s) => sum + s.score, 0);
     const average = total / scores.length;
     return Math.round(average * 100) / 100;
@@ -238,95 +241,6 @@ export async function calculateStudentAverages(data, outcomeId, courseId, apiCli
     } else if (ENABLE_GRADE_OVERRIDE) {
         logger.debug(`  (checked override grades only)`);
     }
-
-    return results;
-}
-
-/**
- * Calculate student averages with Insufficient Evidence (IE) detection
- * Used for GraphQL-only grading path
- *
- * Detects if ANY relevant outcome score is zero and marks as IE case.
- * Returns action ("IE" or "SCORE") for each student.
- * Only includes students whose scores have changed (compares old vs new average).
- *
- * @param {Object} data - Canvas outcome rollup data
- * @param {string} outcomeId - The ID of the "Current Score" outcome to exclude
- * @returns {Array<{userId: string, average: number, hasZero: boolean, zeroCount: number, action: "IE"|"SCORE"}>}
- */
-export function calculateStudentAveragesWithIE(data, outcomeId) {
-    logger.info("Calculating student averages with IE detection...");
-
-    const outcomeMap = buildOutcomeMap(data);
-    const excludedOutcomeIds = new Set([String(outcomeId)]);
-
-    const results = [];
-    let totalStudents = 0;
-    let skippedNoChange = 0;
-
-    for (const rollup of (data?.rollups ?? [])) {
-        const userId = rollup.links?.user;
-        if (!userId) continue;
-
-        totalStudents++;
-
-        // Get current outcome score
-        const oldAverage = getCurrentOutcomeScore(rollup.scores ?? [], outcomeId);
-
-        const relevantScores = getRelevantScores(
-            rollup.scores ?? [],
-            outcomeMap,
-            excludedOutcomeIds,
-            EXCLUDED_OUTCOME_KEYWORDS
-        );
-
-        if (relevantScores.length === 0) continue;
-
-        // Calculate new average
-        const newAverage = computeAverage(relevantScores);
-
-        // Check for zeros (IE detection)
-        let hasZero = false;
-        let zeroCount = 0;
-
-        for (const score of relevantScores) {
-            if (score.score === 0) {
-                hasZero = true;
-                zeroCount++;
-            }
-        }
-
-        const action = hasZero ? "IE" : "SCORE";
-
-        // Check if update is needed based on action type
-        if (action === "IE") {
-            // IE case: Always update to ensure comment and status reflect current zero count
-            // Even if score is already null, the comment may need updating with latest zeroCount
-            logger.trace(`User ${userId}: IE case - will update (zeroCount=${zeroCount})`);
-        } else {
-            // SCORE case: Normal comparison
-            if (oldAverage === newAverage) {
-                skippedNoChange++;
-                logger.trace(`User ${userId}: No change needed (current=${oldAverage}, calculated=${newAverage})`);
-                continue;
-            }
-        }
-
-        logger.trace(`User ${userId}: oldAverage=${oldAverage}, newAverage=${newAverage}, hasZero=${hasZero}, zeroCount=${zeroCount}, action=${action}`);
-
-        results.push({
-            userId,
-            average: newAverage,
-            hasZero,
-            zeroCount,
-            action
-        });
-    }
-
-    logger.debug(`Calculation complete: ${results.length} students need updates (${skippedNoChange} unchanged, ${totalStudents} total)`);
-    const ieCount = results.filter(r => r.action === "IE").length;
-    const scoreCount = results.filter(r => r.action === "SCORE").length;
-    logger.debug(`  IE cases: ${ieCount}, SCORE cases: ${scoreCount}`);
 
     return results;
 }
