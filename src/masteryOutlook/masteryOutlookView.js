@@ -21,7 +21,7 @@ import { buildHeatmapGrid } from './masteryOutlookHeatmap.js';
 import { openFullScreenHeatmap } from './masteryOutlookHeatmapFullScreen.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
-import { getPage, updatePage } from '../services/pageService.js';
+import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
 
@@ -1226,17 +1226,23 @@ function countInterventionStudents(cache) {
 
 async function saveCustomOutcomeOrder(courseId, apiClient, orderArray) {
     try {
-        const page = await getPage(courseId, 'mastery-dashboard', apiClient);
+        const pageUrl = await findMasteryDashboardPageUrl(courseId, apiClient);
+        if (!pageUrl) {
+            logger.warn('[MasteryOutlook] Cannot save outcome order — Mastery Dashboard page not found');
+            return;
+        }
+        const page = await getPage(courseId, pageUrl, apiClient);
         if (page && page.body) {
             let newBody = page.body;
+            const orderJson = JSON.stringify(orderArray);
             // Check if data-outcome-order already exists
             if (newBody.includes('data-outcome-order=')) {
-                newBody = newBody.replace(/data-outcome-order=(['"])(.*?)\1/, `data-outcome-order='$1${JSON.stringify(orderArray).replace(/'/g, "\\'")}$1'`.replace(/\$1/g, '"'));
+                newBody = newBody.replace(/data-outcome-order='[^']*'/, `data-outcome-order='${orderJson}'`);
             } else {
                 // Inject into the mastery-dashboard-root div
-                newBody = newBody.replace(/<div\s+id=["']mastery-dashboard-root["']/, `<div id="mastery-dashboard-root" data-outcome-order='${JSON.stringify(orderArray).replace(/'/g, "\\'")}'`);
+                newBody = newBody.replace(/<div\s+id=["']mastery-dashboard-root["']/, `<div id="mastery-dashboard-root" data-outcome-order='${orderJson}'`);
             }
-            await updatePage(courseId, 'mastery-dashboard', { body: newBody }, apiClient);
+            await updatePage(courseId, pageUrl, { body: newBody }, apiClient);
             logger.info('[MasteryOutlook] Saved custom outcome order to wiki page');
         }
     } catch (e) {
@@ -1248,10 +1254,12 @@ async function enrichCache(cache, courseId, apiClient) {
     if (!cache) return null;
 
     try {
-        const [students, dashboardPage] = await Promise.all([
+        const [students, pageUrl] = await Promise.all([
             fetchCourseStudents(courseId, apiClient),
-            getPage(courseId, 'mastery-dashboard', apiClient)
+            findMasteryDashboardPageUrl(courseId, apiClient)
         ]);
+
+        const dashboardPage = pageUrl ? await getPage(courseId, pageUrl, apiClient) : null;
 
         // Map student names
         const studentMap = new Map();
