@@ -20,6 +20,8 @@ import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 import { buildHeatmapGrid } from './masteryOutlookHeatmap.js';
 import { openFullScreenHeatmap } from './masteryOutlookHeatmapFullScreen.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
+import { fetchCourseStudents } from '../services/enrollmentService.js';
+import { getPage, updatePage } from '../services/pageService.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
 
@@ -136,7 +138,7 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
         // No cache yet — pull outcome names from Canvas for the default state
         renderDefaultState(shell, courseId, apiClient, onRefresh);
     } else {
-        renderLoadedState(shell, cache, onRefresh);
+        renderLoadedState(shell, cache, courseId, apiClient, onRefresh);
     }
 }
 
@@ -304,7 +306,7 @@ async function renderDefaultState(shell, courseId, apiClient, onRefresh) {
     setStatus(shell.statusEl, '');
     setLastUpdated(shell.lastUpdatedEl, null);
 
-    wireRefreshButton(shell, onRefresh);
+    wireRefreshButton(shell, courseId, apiClient, onRefresh);
 }
 
 function renderDefaultOutcomeRows(outcomesEl, outcomes) {
@@ -390,7 +392,7 @@ function emptySpread() {
 
 let currentViewMode = 'outcomes';  // 'outcomes' or 'heatmap'
 
-function renderLoadedState(shell, cache, onRefresh) {
+function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
     setLastUpdated(shell.lastUpdatedEl, cache.meta.computedAt);
     shell.subtitleEl.textContent =
         `${cache.meta.studentCount} students ·
@@ -398,20 +400,19 @@ function renderLoadedState(shell, cache, onRefresh) {
          Power Law predictions`;
 
     // Initialize color scheme from localStorage
-    const courseId = cache.meta.courseId;
     const userId = window.ENV?.current_user_id;
     if (userId) {
         currentColorScheme = getColorScheme(courseId, userId);
         logger.debug(`[MasteryOutlook] Initialized color scheme: ${currentColorScheme}`);
     }
 
-    wireThresholdSlider(shell, cache);
-    wireColorSchemeToggle(shell, cache);
+    wireThresholdSlider(shell, cache, courseId, apiClient);
+    wireColorSchemeToggle(shell, cache, courseId, apiClient);
     renderMetricCards(shell.metricsEl, cache);
-    renderLoadedOutcomeRows(shell.outcomesEl, cache);
+    renderLoadedOutcomeRows(shell.outcomesEl, cache, courseId, apiClient);
     renderSidebar(shell.sidebarEl, cache);
 
-    wireRefreshButton(shell, onRefresh);
+    wireRefreshButton(shell, courseId, apiClient, onRefresh);
     wireTabBar(shell, cache);
 }
 
@@ -425,7 +426,7 @@ function getCurrentThreshold() {
     return slider ? parseFloat(slider.value) : 2.2;
 }
 
-function renderLoadedOutcomeRows(outcomesEl, cache) {
+function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
     outcomesEl.innerHTML = '';
 
     // Sort outcomes: Current Score → Excluded → Regular
@@ -445,6 +446,18 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
         `;
         noCurrentScore.textContent = 'No Current Score found';
         outcomesEl.appendChild(noCurrentScore);
+    }
+
+    // Sort regular outcomes if custom order exists
+    if (cache.meta.customOutcomeOrder && Array.isArray(cache.meta.customOutcomeOrder)) {
+        regular.sort((a, b) => {
+            const indexA = cache.meta.customOutcomeOrder.indexOf(a.id);
+            const indexB = cache.meta.customOutcomeOrder.indexOf(b.id);
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return 0; // Default to existing order
+        });
     }
 
     const sortedOutcomes = [
@@ -479,7 +492,7 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
 
         const chevron = isExpanded ? '▼' : '›';
         row.innerHTML = `
-            <div style="font-size:13px; color:#999;">${displayNumber}</div>
+            <div class="od-row-number" style="font-size:13px; color:#999;">${displayNumber}</div>
             <div style="font-size:15px; font-weight:500; color:#333;
                  white-space:nowrap; overflow:hidden;
                  text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
@@ -496,7 +509,7 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
         row.addEventListener('click', () => {
             expandedOutcomeId = (expandedOutcomeId === outcome.id) ? null : outcome.id;
             activeTab = 'students'; // Reset to default tab when expanding
-            renderLoadedOutcomeRows(outcomesEl, cache);
+            renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient);
         });
 
         row.addEventListener('mouseenter', () => {
@@ -511,8 +524,79 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
 
         // Detail panel (expanded content)
         if (isExpanded) {
-            const detailPanel = buildOutcomeDetailPanel(outcome, cache, outcomesEl);
+            const detailPanel = buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient);
             outcomeContainer.appendChild(detailPanel);
+        }
+
+        if (!isSpecial) {
+            outcomeContainer.draggable = true;
+            outcomeContainer.dataset.outcomeId = outcome.id;
+
+            outcomeContainer.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', outcome.id);
+                outcomeContainer.style.opacity = '0.5';
+            });
+
+            outcomeContainer.addEventListener('dragend', () => {
+                outcomeContainer.style.opacity = '1';
+
+                // Collect the new order
+                const newOrder = [];
+                outcomesEl.querySelectorAll('[data-outcome-id]').forEach(el => {
+                    newOrder.push(el.dataset.outcomeId);
+                });
+
+                // Only update if order changed
+                if (JSON.stringify(newOrder) !== JSON.stringify(cache.meta.customOutcomeOrder)) {
+                    cache.meta.customOutcomeOrder = newOrder;
+                    saveCustomOutcomeOrder(courseId, apiClient, newOrder);
+                    // Update index display without full re-render
+                    let newIndex = 0;
+                    outcomesEl.querySelectorAll('[data-outcome-id]').forEach(el => {
+                        newIndex++;
+                        const numEl = el.querySelector('.od-row-number');
+                        if (numEl) numEl.textContent = newIndex;
+                    });
+                }
+            });
+
+            outcomeContainer.addEventListener('dragover', (e) => {
+                e.preventDefault(); // allow drop
+                const bounding = outcomeContainer.getBoundingClientRect();
+                const offset = bounding.y + (bounding.height / 2);
+                if (e.clientY - offset > 0) {
+                    outcomeContainer.style.borderBottom = '2px solid #0374B5';
+                    outcomeContainer.style.borderTop = '';
+                } else {
+                    outcomeContainer.style.borderTop = '2px solid #0374B5';
+                    outcomeContainer.style.borderBottom = '';
+                }
+            });
+
+            outcomeContainer.addEventListener('dragleave', (e) => {
+                outcomeContainer.style.borderTop = '';
+                outcomeContainer.style.borderBottom = '';
+            });
+
+            outcomeContainer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                outcomeContainer.style.borderTop = '';
+                outcomeContainer.style.borderBottom = '';
+
+                const draggedId = e.dataTransfer.getData('text/plain');
+                if (draggedId === outcome.id) return;
+
+                const draggedEl = outcomesEl.querySelector(`[data-outcome-id="${draggedId}"]`);
+                if (draggedEl) {
+                    const bounding = outcomeContainer.getBoundingClientRect();
+                    const offset = bounding.y + (bounding.height / 2);
+                    if (e.clientY - offset > 0) {
+                        outcomeContainer.after(draggedEl);
+                    } else {
+                        outcomeContainer.before(draggedEl);
+                    }
+                }
+            });
         }
 
         outcomesEl.appendChild(outcomeContainer);
@@ -534,7 +618,7 @@ function renderLoadedOutcomeRows(outcomesEl, cache) {
 }
 
 
-function buildOutcomeDetailPanel(outcome, cache, outcomesEl) {
+function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient) {
     const panel = document.createElement('div');
     panel.style.cssText = `
         border:0.5px solid #e0e0e0;
@@ -580,7 +664,7 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl) {
         tabBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             activeTab = tab.id;
-            renderLoadedOutcomeRows(outcomesEl, cache);
+            renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient);
         });
         tabBar.appendChild(tabBtn);
     });
@@ -881,7 +965,7 @@ function renderSidebar(sidebarEl, cache) {
  * Wire color scheme toggle buttons
  * Allows switching between 'soft' (pastel) and 'canvas' (Canvas mastery) colors
  */
-function wireColorSchemeToggle(shell, cache) {
+function wireColorSchemeToggle(shell, cache, courseId, apiClient) {
     const courseId = cache.meta.courseId;
     const userId = window.ENV?.current_user_id;
 
@@ -926,7 +1010,7 @@ function wireColorSchemeToggle(shell, cache) {
             // Re-render views to apply new colors
             logger.info(`[MasteryOutlook] Color scheme changed to: ${newScheme}`);
             renderMetricCards(shell.metricsEl, cache);
-            renderLoadedOutcomeRows(shell.outcomesEl, cache);
+            renderLoadedOutcomeRows(shell.outcomesEl, cache, courseId, apiClient);
             renderSidebar(shell.sidebarEl, cache);
 
             // Re-render heatmap if currently active
@@ -939,8 +1023,7 @@ function wireColorSchemeToggle(shell, cache) {
 
 // ─── Threshold slider ─────────────────────────────────────────────────────────
 
-function wireThresholdSlider(shell, cache) {
-    const courseId = getCourseId();
+function wireThresholdSlider(shell, cache, courseId, apiClient) {
     const userId = window.ENV?.current_user_id;
 
     if (!userId) {
@@ -962,14 +1045,14 @@ function wireThresholdSlider(shell, cache) {
         // Re-render to apply new threshold
         // Note: This just updates the UI, doesn't recompute cache
         renderMetricCards(shell.metricsEl, cache);
-        renderLoadedOutcomeRows(shell.outcomesEl, cache);
+        renderLoadedOutcomeRows(shell.outcomesEl, cache, courseId, apiClient);
         renderSidebar(shell.sidebarEl, cache);
     });
 }
 
 // ─── Refresh button ───────────────────────────────────────────────────────────
 
-function wireRefreshButton(shell, onRefresh) {
+function wireRefreshButton(shell, courseId, apiClient, onRefresh) {
     shell.refreshBtn.addEventListener('click', async () => {
         shell.refreshBtn.disabled = true;
         shell.refreshBtn.textContent = 'Fetching scores…';
@@ -978,17 +1061,20 @@ function wireRefreshButton(shell, onRefresh) {
         try {
             // onRefresh handles fetch → compute → cache write
             // and reports progress via the callback
-            const freshCache = await onRefresh((progressMsg) => {
+            let freshCache = await onRefresh((progressMsg) => {
                 shell.refreshBtn.textContent = progressMsg;
                 setStatus(shell.statusEl, progressMsg);
             });
+
+            // Add dynamically loaded names and custom outcome order
+            freshCache = await enrichCache(freshCache, courseId, apiClient);
 
             // Reset button state after successful refresh
             shell.refreshBtn.textContent = 'Refresh Data';
             shell.refreshBtn.disabled = false;
             setStatus(shell.statusEl, '');
             setLastUpdated(shell.lastUpdatedEl, freshCache.meta.computedAt);
-            renderLoadedState(shell, freshCache, onRefresh);
+            renderLoadedState(shell, freshCache, courseId, apiClient, onRefresh);
 
         } catch (e) {
             logger.error('[MasteryOutlook] Refresh failed', e);
@@ -1139,16 +1225,78 @@ function countInterventionStudents(cache) {
     return Object.keys(lowCounts).length;
 }
 
+async function saveCustomOutcomeOrder(courseId, apiClient, orderArray) {
+    try {
+        const page = await getPage(courseId, 'mastery-dashboard', apiClient);
+        if (page && page.body) {
+            let newBody = page.body;
+            // Check if data-outcome-order already exists
+            if (newBody.includes('data-outcome-order=')) {
+                newBody = newBody.replace(/data-outcome-order=(['"])(.*?)\1/, `data-outcome-order='$1${JSON.stringify(orderArray).replace(/'/g, "\\'")}$1'`.replace(/\$1/g, '"'));
+            } else {
+                // Inject into the mastery-dashboard-root div
+                newBody = newBody.replace(/<div\s+id=["']mastery-dashboard-root["']/, `<div id="mastery-dashboard-root" data-outcome-order='${JSON.stringify(orderArray).replace(/'/g, "\\'")}'`);
+            }
+            await updatePage(courseId, 'mastery-dashboard', { body: newBody }, apiClient);
+            logger.info('[MasteryOutlook] Saved custom outcome order to wiki page');
+        }
+    } catch (e) {
+        logger.warn('[MasteryOutlook] Failed to save custom outcome order', e);
+    }
+}
+
+async function enrichCache(cache, courseId, apiClient) {
+    if (!cache) return null;
+
+    try {
+        const [students, dashboardPage] = await Promise.all([
+            fetchCourseStudents(courseId, apiClient),
+            getPage(courseId, 'mastery-dashboard', apiClient)
+        ]);
+
+        // Map student names
+        const studentMap = new Map();
+        students.forEach(s => studentMap.set(s.userId, s));
+
+        cache.students.forEach(cs => {
+            const stu = studentMap.get(cs.id);
+            if (stu) {
+                cs.name = stu.name;
+                cs.sortableName = stu.sortableName;
+            } else {
+                cs.name = \`Student \${cs.id}\`;
+                cs.sortableName = \`Student \${cs.id}\`;
+            }
+        });
+
+        // Map custom outcome order
+        if (dashboardPage && dashboardPage.body) {
+            const match = dashboardPage.body.match(/data-outcome-order=(['"])(.*?)\1/);
+            if (match && match[2]) {
+                try {
+                    cache.meta.customOutcomeOrder = JSON.parse(match[2].replace(/&quot;/g, '"'));
+                } catch (e) {
+                    logger.warn('[MasteryOutlook] Failed to parse custom outcome order', e);
+                }
+            }
+        }
+    } catch (e) {
+        logger.warn('[MasteryOutlook] Failed to enrich cache', e);
+    }
+    return cache;
+}
+
 async function tryLoadCache(courseId, apiClient) {
     try {
-        const cache = await readMasteryOutlookCache(courseId, apiClient);
+        let cache = await readMasteryOutlookCache(courseId, apiClient);
         if (cache) {
             logger.info('[MasteryOutlook] Cache loaded successfully');
-            return {
+            cache = {
                 meta: cache.metadata,
                 outcomes: cache.outcomes,
                 students: cache.students
             };
+            return await enrichCache(cache, courseId, apiClient);
         }
         return null;
     } catch (error) {

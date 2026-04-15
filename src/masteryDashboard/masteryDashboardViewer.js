@@ -412,7 +412,18 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     }
     debugLog(`Assignment→outcome map: ${Object.keys(assignmentOutcomeMap).length} entries`);
 
-    // Sort outcomes: AVG_OUTCOME first, then null/IE and scores ≤ 1 by score ascending, then by most recent submission
+    // Extract custom outcome order from the root element
+    let customOutcomeOrder = null;
+    const rootEl = document.getElementById("mastery-dashboard-root");
+    if (rootEl && rootEl.dataset.outcomeOrder) {
+        try {
+            customOutcomeOrder = JSON.parse(rootEl.dataset.outcomeOrder);
+        } catch (e) {
+            debugLog('Failed to parse custom outcome order: ' + e.message);
+        }
+    }
+
+    // Sort outcomes: AVG_OUTCOME first, then custom order (if available), then fallback to original logic
     const sortedScores = [...rollupScores].sort((a, b) => {
         const outcomeA = outcomeMap[a.links.outcome];
         const outcomeB = outcomeMap[b.links.outcome];
@@ -420,6 +431,15 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // AVG_OUTCOME always first
         if (outcomeA?.title === AVG_OUTCOME_NAME) return -1;
         if (outcomeB?.title === AVG_OUTCOME_NAME) return 1;
+
+        // Custom order
+        if (customOutcomeOrder) {
+            const indexA = customOutcomeOrder.indexOf(String(a.links.outcome));
+            const indexB = customOutcomeOrder.indexOf(String(b.links.outcome));
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+        }
 
         // Null/IE and scores ≤ 1 bubble to the top
         const aLow = a.score == null || a.score <= 1;
