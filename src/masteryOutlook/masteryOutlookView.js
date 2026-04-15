@@ -966,7 +966,6 @@ function renderSidebar(sidebarEl, cache) {
  * Allows switching between 'soft' (pastel) and 'canvas' (Canvas mastery) colors
  */
 function wireColorSchemeToggle(shell, cache, courseId, apiClient) {
-    const courseId = cache.meta.courseId;
     const userId = window.ENV?.current_user_id;
 
     if (!userId) {
@@ -1264,8 +1263,8 @@ async function enrichCache(cache, courseId, apiClient) {
                 cs.name = stu.name;
                 cs.sortableName = stu.sortableName;
             } else {
-                cs.name = \`Student \${cs.id}\`;
-                cs.sortableName = \`Student \${cs.id}\`;
+                cs.name = `Student ${cs.id}`;
+                cs.sortableName = `Student ${cs.id}`;
             }
         });
 
