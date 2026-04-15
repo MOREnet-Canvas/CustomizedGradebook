@@ -424,8 +424,7 @@ export function computeOutcomeStats(data, threshold = 2.2) {
 
         return {
             id: student.userId.toString(),
-            name: student.name || student.sortableName || `Student ${student.userId}`,
-            sortableName: student.sortableName || student.name,
+            sectionId: student.sectionId,
             outcomes: studentOutcomes
         };
     });
