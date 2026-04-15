@@ -449,10 +449,11 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
     }
 
     // Sort regular outcomes if custom order exists
+    // Note: wiki page stores IDs as strings; outcome.id from cache is a number — coerce to string for comparison
     if (cache.meta.customOutcomeOrder && Array.isArray(cache.meta.customOutcomeOrder)) {
         regular.sort((a, b) => {
-            const indexA = cache.meta.customOutcomeOrder.indexOf(a.id);
-            const indexB = cache.meta.customOutcomeOrder.indexOf(b.id);
+            const indexA = cache.meta.customOutcomeOrder.indexOf(String(a.id));
+            const indexB = cache.meta.customOutcomeOrder.indexOf(String(b.id));
             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
             if (indexA !== -1) return -1;
             if (indexB !== -1) return 1;
