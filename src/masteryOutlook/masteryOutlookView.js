@@ -1236,8 +1236,9 @@ async function saveCustomOutcomeOrder(courseId, apiClient, orderArray) {
             let newBody = page.body;
             const orderJson = JSON.stringify(orderArray);
             // Check if data-outcome-order already exists
+            // Canvas HTML-encodes the body on save (e.g. " → &quot;), so match both quote styles
             if (newBody.includes('data-outcome-order=')) {
-                newBody = newBody.replace(/data-outcome-order='[^']*'/, `data-outcome-order='${orderJson}'`);
+                newBody = newBody.replace(/data-outcome-order=(?:"[^"]*"|'[^']*')/, `data-outcome-order='${orderJson}'`);
             } else {
                 // Inject into the mastery-dashboard-root div
                 newBody = newBody.replace(/<div\s+id=["']mastery-dashboard-root["']/, `<div id="mastery-dashboard-root" data-outcome-order='${orderJson}'`);
