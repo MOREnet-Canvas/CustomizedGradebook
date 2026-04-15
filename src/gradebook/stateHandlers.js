@@ -15,21 +15,18 @@ import {
     AVG_OUTCOME_NAME,
     AVG_ASSIGNMENT_NAME,
     AVG_RUBRIC_NAME,
-    PER_STUDENT_UPDATE_THRESHOLD,
     ENABLE_OUTCOME_UPDATES,
     ENABLE_GRADE_OVERRIDE,
-    ENABLE_GRADE_CUSTOM_STATUS,
     ENFORCE_COURSE_OVERRIDE,
     ENFORCE_COURSE_GRADING_SCHEME,
-    OVERRIDE_SCALE,
-    USE_UNIFIED_GRAPHQL_ONLY
+    OVERRIDE_SCALE
 } from "../config.js";
 import { UserCancelledError } from "../utils/errorHandler.js";
 import { CanvasApiClient } from "../utils/canvasApiClient.js";
-import { calculateStudentAverages, calculateStudentAveragesWithIE } from "../services/gradeCalculator.js";
-import { postPerStudentGrades, beginBulkUpdate, waitForBulkGrading } from "../services/gradeSubmission.js";
+import { calculateStudentAverages } from "../services/gradeCalculator.js";
+import { downloadErrorSummary } from "../services/gradeSubmission.js";
 import { fetchAllSubmissions, fetchRubricAssociationId } from "../services/submissionService.js";
-import { submitUnifiedGrade } from "../services/unifiedGraphQLGrading.js";
+import { submitRubricAssessmentBatch } from "../services/graphqlGradingService.js";
 import { verifyUIScores } from "../services/avgOutcomeVerification.js";
 import { getElapsedTimeSinceStart, stopElapsedTimer } from "../utils/uiHelpers.js";
 
@@ -174,16 +171,9 @@ export async function handleCheckingSetup(stateMachine) {
         }
     }
 
-    // Branch based on grading mode
-    logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}, ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}`);
-    if (USE_UNIFIED_GRAPHQL_ONLY && ENABLE_OUTCOME_UPDATES) {
-        logger.debug('GraphQL-only mode enabled, transitioning to PRELOAD_SUBMISSIONS');
-        return STATES.PRELOAD_SUBMISSIONS;
-    }
-
-    // All resources exist (or not needed), move to calculating
-    logger.debug('Using standard path, transitioning to CALCULATING');
-    return STATES.CALCULATING;
+    // All resources exist — preload submission IDs for GraphQL grading
+    logger.debug('Transitioning to PRELOAD_SUBMISSIONS');
+    return STATES.PRELOAD_SUBMISSIONS;
 }
 
 /**
@@ -240,8 +230,7 @@ export async function handleCreatingRubric(stateMachine) {
 
 /**
  * PRELOAD_SUBMISSIONS State Handler
- * Fetches submission IDs and rubric association ID for GraphQL grading
- * Only used when USE_UNIFIED_GRAPHQL_ONLY is enabled
+ * Fetches submission IDs and rubric association ID needed by the GraphQL grading batch.
  */
 export async function handlePreloadSubmissions(stateMachine) {
     const { courseId, assignmentId, rubricId, banner } = stateMachine.getContext();
@@ -285,263 +274,115 @@ export async function handleCalculating(stateMachine) {
     const { rollupData, outcomeId, courseId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    // Set banner message based on grading mode
     const calculatingMessage = ENABLE_OUTCOME_UPDATES
         ? `Calculating "${AVG_OUTCOME_NAME}" scores...`
         : 'Calculating student averages for grade overrides...';
     banner.setText(calculatingMessage);
 
-    let averages;
-    let numberOfUpdates;
+    const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
+    const numberOfUpdates = averages.length;
 
-    // Use IE-aware calculation for GraphQL-only mode
-    logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}, ENABLE_OUTCOME_UPDATES=${ENABLE_OUTCOME_UPDATES}`);
-    if (USE_UNIFIED_GRAPHQL_ONLY && ENABLE_OUTCOME_UPDATES) {
-        logger.debug('Using IE-aware calculation for GraphQL-only mode');
-        averages = calculateStudentAveragesWithIE(rollupData, outcomeId);
-        numberOfUpdates = averages.length;
-    } else {
-        logger.debug('Using standard calculation');
-        averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
-        numberOfUpdates = averages.length;
-    }
-
-    stateMachine.updateContext({
-        averages,
-        numberOfUpdates,
-        startTime: new Date().toISOString()
-    });
+    stateMachine.updateContext({ averages, numberOfUpdates, startTime: new Date().toISOString() });
 
     if (numberOfUpdates === 0) {
-        // TEMPORARY — REMOVE AFTER 2026-04-07
-        // When status clearing is pending, bypass the zero-updates short-circuit so
-        // UPDATING_GRADES is always reached and existing IE statuses get cleared even
-        // when no score changes are needed. See documents/TODOs/grade-status-cleanup.md.
-        if (!ENABLE_GRADE_CUSTOM_STATUS) {
-            logger.debug('[StatusClear] No score updates needed but status clearing required — proceeding to UPDATING_GRADES');
-            return STATES.UPDATING_GRADES;
-        }
-
-        // Mark as zero updates so COMPLETE handler can handle it appropriately
         stateMachine.updateContext({ zeroUpdates: true });
         return STATES.COMPLETE;
     }
-
-    // Note: Individual localStorage keys removed - state machine context is now the single source of truth
-    // The state machine already has: averages, outcomeId, startTime in its context
-    // State machine will be saved to localStorage after this handler returns
 
     return STATES.UPDATING_GRADES;
 }
 
 /**
  * UPDATING_GRADES State Handler
- * Decides between per-student or bulk update and initiates the update
+ * Submits rubric scores, override scores, and clears custom statuses for all
+ * students via GraphQL using a concurrent batch with retry and second-pass logic.
  */
 export async function handleUpdatingGrades(stateMachine) {
     const { averages, courseId, assignmentId, rubricCriterionId, numberOfUpdates, banner,
             submissionIdByUserId, rubricAssociationId } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    // ---------------------------------------------------------------------------
-    // TEMPORARY — REMOVE AFTER 2026-04-07
-    //
-    // Clears existing custom grade statuses (IE) for all students when
-    // ENABLE_GRADE_CUSTOM_STATUS=false. Runs before the GraphQL/bulk branch so it
-    // covers both update paths.
-    //
-    // Detection via the Canvas REST enrollment API was removed — the REST API does
-    // not reliably return customGradeStatusId in the grades object. Instead we send
-    // null for every student, which is idempotent for those who have no status set.
-    //
-    // handleCalculating bypasses the numberOfUpdates===0 short-circuit when this
-    // flag is off, so this block is always reached even when no scores changed.
-    //
-    // See documents/TODOs/grade-status-cleanup.md for the proper long-term refactor.
-    // ---------------------------------------------------------------------------
-    if (!ENABLE_GRADE_CUSTOM_STATUS) {
-        try {
-            banner.setText('Clearing custom grade statuses...');
-
-            const allEnrollments = await apiClient.getAllPages(
-                `/api/v1/courses/${courseId}/enrollments?type[]=StudentEnrollment`
-            );
-
-            // Use preloaded submission map if available (GraphQL path already ran PRELOAD_SUBMISSIONS),
-            // otherwise fetch now (REST bulk path skips PRELOAD_SUBMISSIONS).
-            const subMap = submissionIdByUserId
-                || (await fetchAllSubmissions(courseId, assignmentId, apiClient)).submissionIdByUserId;
-
-            let clearedCount = 0;
-            for (const enrollment of allEnrollments) {
-                const subId = subMap?.get(String(enrollment.user_id));
-                if (!subId) {
-                    logger.trace(`[StatusClear] No submission ID for user ${enrollment.user_id} — skipping`);
-                    continue;
-                }
-                await apiClient.graphql(
-                    `mutation {
-                        setOverrideStatus(input: { enrollmentId: "${enrollment.id}", customGradeStatusId: null }) { __typename }
-                        updateSubmissionGradeStatus(input: { submissionId: "${subId}", customGradeStatusId: null }) { __typename }
-                    }`,
-                    {},
-                    'clearCustomGradeStatus'
-                );
-                clearedCount++;
-            }
-            logger.debug(`[StatusClear] Cleared custom grade status for ${clearedCount} students`);
-        } catch (err) {
-            // Non-fatal — log and continue with the normal update so scores still apply
-            logger.warn(`[StatusClear] Failed to clear custom grade statuses: ${err.message}`);
-        }
-    }
-
-    // Check if outcome updates are enabled
     if (!ENABLE_OUTCOME_UPDATES) {
         logger.debug('Outcome updates disabled, skipping UPDATING_GRADES state');
         return STATES.VERIFYING;
     }
 
-    // GraphQL-only path
-    logger.debug(`[GraphQL Check] USE_UNIFIED_GRAPHQL_ONLY=${USE_UNIFIED_GRAPHQL_ONLY}`);
-    if (USE_UNIFIED_GRAPHQL_ONLY) {
-        logger.debug('Using GraphQL-only grading path');
-        banner.setText(`Updating grades for ${numberOfUpdates} students...`);
+    banner.setText(`Updating grades for ${numberOfUpdates} students...`);
+    logger.debug(`Starting GraphQL batch grading for ${numberOfUpdates} students`);
 
-        // Get enrollment map
-        const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+    // Fetch enrollment IDs for override operations (when enabled)
+    const enrollmentMap = ENABLE_GRADE_OVERRIDE
+        ? await getAllEnrollmentIds(courseId, apiClient)
+        : new Map();
 
-        const maxAttempts = 3;
-        const errors = [];
-        let successCount = 0;
+    const timestamp = new Date().toLocaleString();
 
-        for (const student of averages) {
-            const { userId, average, action, zeroCount } = student;
+    // Build per-student params for the batch
+    const students = [];
+    for (const { userId, average } of averages) {
+        const submissionId = submissionIdByUserId?.get(String(userId));
+        if (!submissionId) {
+            logger.warn(`[UpdateGrades] No submissionId for user ${userId} — skipping`);
+            continue;
+        }
+        const enrollmentId = enrollmentMap.get(String(userId));
+        students.push({
+            submissionId,
+            rubricAssociationId,
+            rubricCriterionId,
+            points: average,
+            customStatusId: null,   // always clear submission-level custom status
+            ...(ENABLE_GRADE_OVERRIDE && enrollmentId ? {
+                enrollmentId,
+                overrideScore: OVERRIDE_SCALE(average),
+                overrideStatusId: null  // always clear enrollment-level custom status
+            } : {}),
+            comment: `Score: ${average}  Updated: ${timestamp}`,
+            userId,
+            score: average
+        });
+    }
 
-            logger.trace(`[GraphQL] Processing student ${userId}: action=${action}, average=${average}, zeroCount=${zeroCount}`);
-
-            // Get required IDs
-            const enrollmentId = enrollmentMap.get(String(userId));
-            const submissionId = submissionIdByUserId?.get(String(userId));
-
-            if (!enrollmentId || !submissionId) {
-                logger.warn(`Missing IDs for user ${userId}: enrollmentId=${enrollmentId}, submissionId=${submissionId}`);
-                errors.push({ userId, error: 'Missing enrollment or submission ID' });
-                continue;
-            }
-
-            // Determine override score and rubric points based on action
-            let overrideScore = null;
-            let rubricPoints = null;
-            let comment = '';
-            const timestamp = new Date().toLocaleString();
-
-            if (action === "IE") {
-                // IE case: Clear everything, set custom status
-                overrideScore = null;
-                rubricPoints = null;
-                comment = `Insufficient evidence for ${zeroCount} outcome${zeroCount === 1 ? '' : 's'}. ${AVG_OUTCOME_NAME} can not be calculated. Updated: ${timestamp}`;
-            } else {
-                // SCORE case: Set scores
-                overrideScore = OVERRIDE_SCALE(average);
-                rubricPoints = average;
-                comment = `Score: ${average}  Updated: ${timestamp}`;
-            }
-
-            logger.trace(`[GraphQL] Determined: overrideScore=${overrideScore}, rubricPoints=${rubricPoints}`);
-
-            // Retry logic
-            let attempt = 1;
-            let success = false;
-
-            while (attempt <= maxAttempts && !success) {
-                try {
-                    logger.trace(`[GraphQL] Calling submitUnifiedGrade for user ${userId} (attempt ${attempt}/${maxAttempts})`);
-                    await submitUnifiedGrade({
-                        enrollmentId,
-                        submissionId,
-                        rubricAssociationId,
-                        rubricCriterionId,
-                        action,
-                        overrideScore,
-                        rubricPoints,
-                        comment
-                    }, apiClient);
-
-                    successCount++;
-                    success = true;
-                    logger.trace(`[GraphQL] ${action} submitted for user ${userId} (attempt ${attempt})`);
-                } catch (error) {
-                    logger.warn(`[GraphQL] Failed for user ${userId} (attempt ${attempt}/${maxAttempts}):`, error.message);
-                    if (attempt === maxAttempts) {
-                        errors.push({ userId, error: error.message });
-                    }
-                    attempt++;
+    const { successCount, errors, retryCounts } = await submitRubricAssessmentBatch(
+        students,
+        apiClient,
+        {
+            concurrency: 5,
+            maxAttempts: 3,
+            retryDelayMs: 500,
+            onProgress: (done, total) => {
+                if (done % 5 === 0 || done === total) {
+                    banner.soft(`Updated ${done}/${total} students...`);
                 }
             }
-
-            // Update banner periodically
-            if (successCount % 5 === 0) {
-                banner.soft(`Updated ${successCount}/${numberOfUpdates} students...`);
-            }
         }
+    );
 
-        logger.info(`Grading complete: ${successCount}/${numberOfUpdates} successful, ${errors.length} errors`);
+    logger.info(`Grading complete: ${successCount}/${numberOfUpdates} successful, ${errors.length} permanent errors`);
 
-        if (errors.length > 0) {
-            logger.warn('Grading errors:', errors);
+    if (errors.length > 0 || retryCounts.length > 0) {
+        const wantsDownload = confirm(
+            `Export grade update attempt counts and failure logs to a file? \n\n` +
+            `Note: Your browser settings or extensions may block automatic file downloads.\n` +
+            `If nothing downloads, please check your pop-up or download permissions.`
+        );
+        if (wantsDownload) {
+            downloadErrorSummary(retryCounts, errors);
         }
-
-        logger.debug(`handleUpdatingGrades complete, transitioning to REFRESHING_MASTERY`);
-        return STATES.REFRESHING_MASTERY;
     }
 
-    // Existing REST/bulk pipeline (default behavior)
-    logger.debug('Using REST/bulk pipeline (default behavior)');
-    // Decide update mode
-    const usePerStudent = numberOfUpdates < PER_STUDENT_UPDATE_THRESHOLD;
-    const updateMode = usePerStudent ? 'per-student' : 'bulk';
-
-    stateMachine.updateContext({ updateMode });
-
-    if (usePerStudent) {
-        // Per-student update
-        const message = `Detected ${numberOfUpdates} changes - updating scores one at a time for quicker processing.`;
-        banner.hold(message, 3000);
-        logger.debug('Per student update...');
-
-        await postPerStudentGrades(averages, courseId, assignmentId, rubricCriterionId, banner, apiClient, false);
-
-        logger.debug(`handleUpdatingGrades complete, transitioning to REFRESHING_MASTERY`);
-        return STATES.REFRESHING_MASTERY;
-    } else {
-        // Bulk update
-        const message = `Detected ${numberOfUpdates} changes - using bulk update`;
-        banner.hold(message, 3000);
-        logger.debug(`Bulk update, detected ${numberOfUpdates} changes`);
-
-        const progressId = await beginBulkUpdate(courseId, assignmentId, rubricCriterionId, averages, apiClient);
-        stateMachine.updateContext({ progressId });
-        logger.debug(`progressId: ${progressId}`);
-
-        logger.debug(`handleUpdatingGrades complete, transitioning to POLLING_PROGRESS`);
-        return STATES.POLLING_PROGRESS;
-    }
+    logger.debug(`handleUpdatingGrades complete, transitioning to REFRESHING_MASTERY`);
+    return STATES.REFRESHING_MASTERY;
 }
 
 /**
  * POLLING_PROGRESS State Handler
- * Polls the bulk update progress until complete
+ * Previously polled the bulk update REST API. The bulk path has been moved to
+ * bulkGradeSubmission.js and is no longer wired into the state machine.
+ * This handler is retained so the state machine transitions map remains valid.
  */
 export async function handlePollingProgress(stateMachine) {
-    const { banner } = stateMachine.getContext();
-    const apiClient = new CanvasApiClient();
-
-    logger.debug('Starting bulk update polling...');
-    // waitForBulkGrading handles the polling internally
-    await waitForBulkGrading(banner, apiClient, stateMachine);
-
-    logger.debug(`handlePollingProgress complete, transitioning to REFRESHING_MASTERY`);
+    logger.warn('[PollingProgress] This state is no longer reachable — bulk update path has been removed.');
     return STATES.REFRESHING_MASTERY;
 }
 
@@ -569,14 +410,9 @@ export async function handleRefreshingMastery(stateMachine) {
         // Don't fail the entire flow if mastery refresh fails
     }
 
-    // GraphQL mode: Skip verification states (overrides already submitted in UPDATING_GRADES)
-    if (USE_UNIFIED_GRAPHQL_ONLY) {
-        logger.debug(`handleRefreshingMastery complete, transitioning to COMPLETE (GraphQL mode - verification skipped)`);
-        return STATES.COMPLETE;
-    }
-
-    logger.debug(`handleRefreshingMastery complete, transitioning to VERIFYING`);
-    return STATES.VERIFYING;
+    // Rubric + override submitted atomically in UPDATING_GRADES — skip REST verification
+    logger.debug(`handleRefreshingMastery complete, transitioning to COMPLETE`);
+    return STATES.COMPLETE;
 }
 
 /**
