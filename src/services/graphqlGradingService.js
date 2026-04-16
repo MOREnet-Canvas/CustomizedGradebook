@@ -160,7 +160,7 @@ export async function submitRubricAssessment(params, apiClient) {
  * @param {Function} [options.onProgress]      - Callback: (successCount, total) => void
  * @returns {Promise<{
  *   successCount: number,
- *   errors: Array<{index: number, submissionId: string, userId: string, score: number, error: string}>,
+ *   errors: Array<{index: number, submissionId: string, userId: string, average: number, error: string}>,
  *   retryCounts: Array<{userId: string, attempts: number}>
  * }>}
  */
@@ -243,7 +243,7 @@ export async function submitRubricAssessmentBatch(students, apiClient, options =
                     index,
                     submissionId,
                     userId,
-                    score: params.score ?? params.points,
+                    average: params.score ?? params.points,
                     error: finalError ?? "Failed after all retry attempts"
                 });
             }
