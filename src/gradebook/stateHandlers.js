@@ -236,7 +236,7 @@ export async function handlePreloadSubmissions(stateMachine) {
     const { courseId, assignmentId, rubricId, banner } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
-    banner.setText('Preloading submission data for grading...');
+    banner.setText('Gathering grade information');
     logger.debug('Fetching submission IDs and rubric association ID...');
 
     // Fetch all submissions
@@ -351,9 +351,7 @@ export async function handleUpdatingGrades(stateMachine) {
             maxAttempts: 3,
             retryDelayMs: 500,
             onProgress: (done, total) => {
-                if (done % 5 === 0 || done === total) {
-                    banner.soft(`Updated ${done}/${total} students...`);
-                }
+                banner.soft(`Updated ${done}/${total} students...`);
             }
         }
     );
@@ -410,9 +408,9 @@ export async function handleRefreshingMastery(stateMachine) {
         // Don't fail the entire flow if mastery refresh fails
     }
 
-    // Rubric + override submitted atomically in UPDATING_GRADES — skip REST verification
-    logger.debug(`handleRefreshingMastery complete, transitioning to COMPLETE`);
-    return STATES.COMPLETE;
+    // Rubric + override submitted in UPDATING_GRADES — proceed to verify scores landed correctly
+    logger.debug(`handleRefreshingMastery complete, transitioning to VERIFYING`);
+    return STATES.VERIFYING;
 }
 
 /**
@@ -438,7 +436,8 @@ export async function handleVerifying(stateMachine) {
 
 /**
  * VERIFYING_OVERRIDES State Handler
- * Submits and verifies grade overrides for all students
+ * Verifies that override scores submitted in UPDATING_GRADES landed correctly.
+ * Does not re-submit overrides — submission is handled by submitRubricAssessmentBatch.
  */
 export async function handleVerifyingOverrides(stateMachine) {
     const { courseId, averages, banner } = stateMachine.getContext();
@@ -450,41 +449,7 @@ export async function handleVerifyingOverrides(stateMachine) {
         return STATES.COMPLETE;
     }
 
-    logger.debug('Starting grade override submission and verification...');
-    banner.soft('Submitting grade overrides...');
-
-    // Submit all grade overrides sequentially
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const { userId, average } of averages) {
-        try {
-            const enrollmentId = await getEnrollmentIdForUser(courseId, userId, apiClient);
-            if (!enrollmentId) {
-                logger.warn(`[override] No enrollmentId for user ${userId}`);
-                failCount++;
-                continue;
-            }
-
-            const override = OVERRIDE_SCALE(average);
-            await setOverrideScoreGQL(enrollmentId, override, apiClient);
-            logger.trace(`[override] user ${userId} → enrollment ${enrollmentId}: ${override}`);
-            successCount++;
-        } catch (e) {
-            logger.warn(`[override] Failed for user ${userId}:`, e?.message || e);
-            failCount++;
-        }
-    }
-
-    logger.info(`Grade override submission complete: ${successCount} succeeded, ${failCount} failed`);
-
-    // Track if all overrides failed (indicates course override setting may not be enabled)
-    const allOverridesFailed = failCount > 0 && successCount === 0 && averages.length > 0;
-
-    // Store override failure status in context for completion message
-    if (allOverridesFailed && !ENFORCE_COURSE_OVERRIDE) {
-        stateMachine.updateContext({ overridesNotEnabled: true });
-    }
+    logger.debug('Starting grade override verification...');
 
     // Verify override scores with retry logic
     // Option A: Reset counter when mismatches decrease
