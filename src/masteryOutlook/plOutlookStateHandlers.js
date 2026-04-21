@@ -19,8 +19,8 @@ import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 
-/** How far apart PL score and Canvas score must be before a sync is needed */
-const SYNC_THRESHOLD = 0.25;
+/** Compare two scores rounded to the hundredths place */
+const scoresMatch = (a, b) => Math.round(a * 100) === Math.round(b * 100);
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -326,7 +326,7 @@ export async function handleCalculatingChanges(sm) {
         if (plScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
 
         const canvasScore = canvasScoreByUserId.get(userId);
-        if (canvasScore !== undefined && Math.abs(plScore - canvasScore) <= SYNC_THRESHOLD) { skippedNoChange++; continue; }
+        if (canvasScore !== undefined && scoresMatch(plScore, canvasScore)) { skippedNoChange++; continue; }
 
         studentsToSync.push({
             userId,
@@ -425,7 +425,7 @@ export async function handleVerifying(sm) {
 
         mismatches = studentsToSync.filter(s => {
             const actual = actualScores.get(s.userId);
-            return actual === undefined || Math.abs(actual - s.plScore) > SYNC_THRESHOLD;
+            return actual === undefined || !scoresMatch(actual, s.plScore);
         });
 
         if (mismatches.length === 0) {
