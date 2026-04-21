@@ -1,0 +1,111 @@
+/* src/masteryOutlook/plOutlookStyles.css
+ * PL Outlook — styles for PL sync UI elements in the Mastery Outlook view.
+ *
+ * Score pill colors are driven by data-level attributes so no inline color
+ * strings are needed in JS. JS only writes data-level="1|2|3|4|NE".
+ *
+ * Injected via injectStyles() from src/ui/styles.js.
+ */
+
+/* ── PL score pill ─────────────────────────────────────────────────────── */
+
+.pl-score-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.4rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #fff;
+    background: #888;
+    white-space: nowrap;
+}
+
+/* Data-driven score colors — JS writes data-level="1|2|3|4|NE" */
+.pl-score-pill[data-level="4"] { background: #1a7f4b; }   /* exemplary   – dark green */
+.pl-score-pill[data-level="3"] { background: #2e8b57; }   /* target       – green */
+.pl-score-pill[data-level="2"] { background: #c47a00; }   /* developing   – amber */
+.pl-score-pill[data-level="1"] { background: #b93a2b; }   /* beginning    – red */
+.pl-score-pill[data-level="NE"] {
+    background: #6b7280;
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* ── Sync status badge ─────────────────────────────────────────────────── */
+
+.pl-sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.pl-sync-badge--pending  { background: #fef3c7; color: #92400e; }
+.pl-sync-badge--syncing  { background: #dbeafe; color: #1e40af; }
+.pl-sync-badge--done     { background: #d1fae5; color: #065f46; }
+.pl-sync-badge--error    { background: #fee2e2; color: #991b1b; }
+.pl-sync-badge--none     { background: #f3f4f6; color: #6b7280; }
+
+/* ── Sync needs-update count label ────────────────────────────────────── */
+
+.pl-needs-sync-count {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-left: 0.4rem;
+}
+
+.pl-needs-sync-count--nonzero {
+    color: #c47a00;
+    font-weight: 600;
+}
+
+/* ── Inline progress bar ───────────────────────────────────────────────── */
+
+.pl-progress-bar-wrap {
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.3rem;
+}
+
+.pl-progress-bar {
+    height: 100%;
+    background: #2563eb;
+    border-radius: 2px;
+    transition: width 0.2s ease;
+    width: 0%;
+}
+
+/* ── Sync button (inline in outcome row) ───────────────────────────────── */
+
+.pl-sync-btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid #2563eb;
+    border-radius: 4px;
+    background: transparent;
+    color: #2563eb;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.pl-sync-btn:hover {
+    background: #2563eb;
+    color: #fff;
+}
+
+.pl-sync-btn:disabled {
+    border-color: #9ca3af;
+    color: #9ca3af;
+    cursor: not-allowed;
+    background: transparent;
+}

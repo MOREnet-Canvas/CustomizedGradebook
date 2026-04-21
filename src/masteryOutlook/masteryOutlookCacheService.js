@@ -397,3 +397,54 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
  * Export schema version for external validation
  */
 export { SCHEMA_VERSION };
+
+// ═══════════════════════════════════════════════════════════════════════
+// PL ASSIGNMENTS — read/write pl_assignments section of the shared cache
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Read the pl_assignments section from the existing mastery outlook cache.
+ *
+ * pl_assignments stores the one-time Canvas setup per outcome (assignment ID,
+ * rubric ID, rubric association ID, criterion ID, and submission ID map).
+ * This data must survive Refresh Data cycles, so it lives in the same file
+ * and is preserved via a read-before-write merge (see writePLAssignments).
+ *
+ * @param {string} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} pl_assignments object, or {} if not yet set up
+ */
+export async function readPLAssignments(courseId, apiClient) {
+    const cache = await readMasteryOutlookCache(courseId, apiClient);
+    return cache?.pl_assignments || {};
+}
+
+/**
+ * Write an updated pl_assignments map back into the mastery outlook cache.
+ *
+ * Reads the current cache first, merges in the new pl_assignments, then
+ * overwrites the file. If no cache exists yet (first run), creates a minimal
+ * placeholder so the data is not lost.
+ *
+ * @param {string} courseId
+ * @param {Object} plAssignments  - Full pl_assignments map { outcomeId: { assignment_id, ... } }
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} Canvas file object from writeMasteryOutlookCache
+ */
+export async function writePLAssignments(courseId, plAssignments, apiClient) {
+    const existing = await readMasteryOutlookCache(courseId, apiClient);
+
+    const base = existing || {
+        metadata: {
+            courseId,
+            generatedAt: new Date().toISOString()
+        },
+        outcomes: [],
+        students: []
+    };
+
+    const merged = { ...base, pl_assignments: plAssignments };
+
+    logger.info(`[masteryOutlookCacheService] Writing pl_assignments for ${Object.keys(plAssignments).length} outcome(s)`);
+    return writeMasteryOutlookCache(courseId, apiClient, merged);
+}

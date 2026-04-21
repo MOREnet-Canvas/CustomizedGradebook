@@ -19,7 +19,7 @@ import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
 import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { fetchAllOutcomeData, computeOutcomeStats } from './masteryOutlookDataService.js';
-import { writeMasteryOutlookCache, readMasteryOutlookCache } from './masteryOutlookCacheService.js';
+import { writeMasteryOutlookCache, readPLAssignments } from './masteryOutlookCacheService.js';
 import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
 import { findMasteryDashboardPageUrl } from '../services/pageService.js';
@@ -106,8 +106,15 @@ function initMasteryOutlookView() {
         cache.metadata.threshold = threshold;
         cache.metadata.masteryDashboardUrl = masteryDashboardUrl;
 
-        // Write to cache
+        // Preserve pl_assignments across refresh — read from existing cache and merge in
+        // before writing so one-time Canvas setup data (assignment IDs, submission IDs, etc.)
+        // is not lost when outcome data is recomputed.
         onProgress('Saving cache...');
+        const existingPLAssignments = await readPLAssignments(courseId, apiClient);
+        if (existingPLAssignments && Object.keys(existingPLAssignments).length > 0) {
+            cache.pl_assignments = existingPLAssignments;
+        }
+
         await writeMasteryOutlookCache(courseId, apiClient, cache);
 
         logger.info('[MasteryOutlookInit] Data refresh complete');
