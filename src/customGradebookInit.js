@@ -36,6 +36,7 @@ import { isAdminDashboardPage } from "./admin/pageDetection.js";
 import { initMasteryDashboardCreation } from "./masteryDashboardCreation/masteryDashboardCreationInit.js";
 import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
 import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
+import { exposeCGDevTools } from "./masteryOutlook/cgDevTools.js";
 
 /**
  * Main initialization function
@@ -185,5 +186,9 @@ import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
     // Always expose clearAllSnapshots for logout/user change scenarios
     if (!window.CG) window.CG = {};
     window.CG.clearAllSnapshots = clearAllSnapshots;
+
+    // Dev tools — runtime-guarded (logger.isDebugEnabled()), so works in any build
+    // when ?debug=true or sessionStorage.setItem('cg_debug','true') is active.
+    exposeCGDevTools();
 
 })();

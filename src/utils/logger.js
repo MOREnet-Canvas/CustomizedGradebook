@@ -36,29 +36,57 @@ const LOG_LEVELS = {
     ERROR: 3
 };
 
+/** sessionStorage key used to persist debug level across page navigations */
+const SESSION_KEY = 'cg_debug';
+
 /**
- * Determine the current log level based on environment and URL parameters
+ * Determine the current log level.
+ *
+ * Priority (highest wins):
+ *   1. URL parameter (?debug=true | trace | false) — also writes to sessionStorage
+ *      so subsequent navigations in the same tab inherit the level automatically.
+ *   2. sessionStorage key "cg_debug" — set once, persists for the browser session.
+ *      Activate:  sessionStorage.setItem('cg_debug', 'true')   // or 'trace'
+ *      Deactivate: sessionStorage.removeItem('cg_debug')         // then reload
+ *   3. Build-time default (DEBUG in dev builds, INFO in prod builds).
+ *
  * @returns {number} Current log level
  */
 function determineLogLevel() {
-    // Default: DEBUG in dev mode, INFO in production
+    // Build-time default
     let logLevel = ENV_DEV ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
 
-    // Allow URL parameter override: ?debug=true, ?debug=trace, or ?debug=false
+    // 1. sessionStorage override (lower priority than URL param)
     try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const debugParam = urlParams.get('debug');
+        const stored = sessionStorage.getItem(SESSION_KEY);
+        if (stored === 'trace')      logLevel = LOG_LEVELS.TRACE;
+        else if (stored === 'true')  logLevel = LOG_LEVELS.DEBUG;
+        else if (stored === 'false') logLevel = LOG_LEVELS.INFO;
+    } catch (e) {
+        // sessionStorage may be blocked in some private-browsing configurations
+    }
+
+    // 2. URL parameter override — takes priority and persists to sessionStorage
+    try {
+        const debugParam = new URLSearchParams(window.location.search).get('debug');
 
         if (debugParam === 'trace') {
             logLevel = LOG_LEVELS.TRACE;
+            sessionStorage.setItem(SESSION_KEY, 'trace');
+            console.log('[CG] Trace mode enabled via URL — persisted for this session.',
+                'To clear: sessionStorage.removeItem("cg_debug")');
         } else if (debugParam === 'true') {
             logLevel = LOG_LEVELS.DEBUG;
+            sessionStorage.setItem(SESSION_KEY, 'true');
+            console.log('[CG] Debug mode enabled via URL — persisted for this session.',
+                'To clear: sessionStorage.removeItem("cg_debug")');
         } else if (debugParam === 'false') {
             logLevel = LOG_LEVELS.INFO;
+            sessionStorage.removeItem(SESSION_KEY);
+            console.log('[CG] Debug mode disabled and cleared from session storage.');
         }
     } catch (e) {
-        // If URLSearchParams fails (shouldn't happen in modern browsers), use default
-        console.warn("Failed to parse URL parameters for debug mode:", e);
+        console.warn('[CG] Failed to read URL parameters for debug mode:', e);
     }
 
     return logLevel;
