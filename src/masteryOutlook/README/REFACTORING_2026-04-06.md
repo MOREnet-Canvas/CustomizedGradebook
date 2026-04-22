@@ -15,8 +15,9 @@
 **Existing Utility:** `getUserRoleGroup()`
 
 **Usage Pattern:**
+
 ```javascript
-import { getUserRoleGroup } from '../utils/canvas.js';
+import {getUserRoleGroup} from './canvas.js';
 
 // OLD (removed):
 // import { canAccessOutcomesDashboard } from './outcomesPermissions.js';

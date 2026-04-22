@@ -416,8 +416,9 @@ const studentName = rosterMap.get(userId)?.name ?? `User ${userId}`;
 - `[ThresholdStorage]` - Threshold storage
 
 **Example:**
+
 ```javascript
-import { logger } from '../utils/logger.js';
+import {logger} from './logger.js';
 
 logger.trace('[OutcomesDashboard] High-frequency debug');
 logger.debug('[OutcomesDashboard] Detailed info');

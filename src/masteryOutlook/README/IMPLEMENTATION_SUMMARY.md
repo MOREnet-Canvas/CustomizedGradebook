@@ -188,10 +188,11 @@
 ## Key Patterns to Follow
 
 ### Imports
+
 ```javascript
-import { logger } from '../utils/logger.js';
-import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getCourseId } from '../utils/canvas.js';
+import {logger} from './logger.js';
+import {CanvasApiClient} from './canvasApiClient.js';
+import {getCourseId} from './canvas.js';
 ```
 
 ### Logger Tags

@@ -54,9 +54,16 @@ export function exposeCGDevTools() {
         writePLAssignments:  (pl)     => writePLAssignments(courseId, pl, apiClient),
 
         // PL sync
-        runPLSync:           (opts)   => runPLSync({ courseId, apiClient, ...opts }),
-        checkSyncNeeded:     (opts)   => checkSyncNeeded({ courseId, apiClient, ...opts }),
-
+        // PL sync
+        runPLSync: ({ outcome, onProgress, targetUserIds } = {}) => runPLSync({
+            courseId,
+            outcomeId:   String(outcome.id),
+            outcomeName: outcome.title,
+            apiClient,
+            onProgress,
+            targetUserIds
+        }),
+        checkSyncNeeded: (outcomeId) => checkSyncNeeded({ courseId, outcomeId: String(outcomeId), apiClient }),
         // Power Law — pure functions, no wrappers needed
         powerLawPredict,
         computeStudentOutcome,
@@ -87,8 +94,11 @@ function _printHelp(courseId) {
         '  ├── readPLAssignments()    Read pl_assignments section from cache',
         '  ├── writePLAssignments(pl) Write pl_assignments section to cache',
         '  │',
-        '  ├── runPLSync(opts)        Run PL sync for one outcome (see plOutlookSync.js)',
-        '  ├── checkSyncNeeded(opts)  { hasSetup, predictionCount } for one outcome',
+        '  ├── runPLSync({ outcome, onProgress, targetUserIds })',
+        '  │       Run PL sync for one outcome',
+        '  │       outcome: { id, title }  e.g. { id: "598", title: "Outcome 1" }',
+        '  │       targetUserIds: optional array of student IDs to limit sync',
+        '  ├── checkSyncNeeded(outcomeId)  { hasSetup, predictionCount } for one outcome',
         '  │',
         '  ├── powerLawPredict(scores)       Predicted next score from score array',
         '  ├── computeStudentOutcome(scores) Full computed object (status, plPrediction, …)',
