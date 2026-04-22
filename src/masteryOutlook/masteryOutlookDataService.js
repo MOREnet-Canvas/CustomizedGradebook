@@ -17,6 +17,7 @@
 import { logger } from '../utils/logger.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { computeStudentOutcome, computeClassStats, MIN_SCORES } from './powerLaw.js';
+import { readPLAssignments } from './masteryOutlookCacheService.js'
 
 // ═══════════════════════════════════════════════════════════════════════
 // FETCH OUTCOME METADATA
@@ -357,9 +358,26 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
         onProgress('Fetching Canvas rollup scores...');
         const canvasRollups = await fetchOutcomeRollups(courseId, apiClient);
 
-        // Step 5: Extract and group attempts
+        // Step 5: Filter out PL override assignment results before computing Power Law
+        // PL override assignments feed scores back into the outcome, creating a feedback loop
         onProgress('Processing attempts...');
-        const groupedAttempts = extractAttempts(outcomeResults);
+        const plAssignments = await readPLAssignments(courseId, apiClient);
+        const plAssignmentIds = new Set(
+            Object.values(plAssignments).map(a => `assignment_${a.assignment_id}`)
+        );
+        const filteredResults = plAssignmentIds.size > 0
+            ? outcomeResults.filter(result => {
+                const alignmentId = result.links?.assignment || result.links?.alignment;
+                return !plAssignmentIds.has(alignmentId);
+            })
+            : outcomeResults;
+
+        if (plAssignmentIds.size > 0) {
+            const excluded = outcomeResults.length - filteredResults.length;
+            logger.info(`[outcomesDataService] Excluded ${excluded} PL override result(s) from Power Law calculation`);
+        }
+
+        const groupedAttempts = extractAttempts(filteredResults);
 
         onProgress('Data fetch complete');
         logger.info('[outcomesDataService] Complete data fetch finished');
@@ -368,7 +386,8 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
             outcomes,
             students,
             groupedAttempts,
-            canvasRollups
+            canvasRollups,
+            courseId
         };
 
     } catch (error) {
