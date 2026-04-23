@@ -158,8 +158,19 @@ export async function handleCreatingAssignment(sm) {
 
     // Step 7: Flip to hidden
     sm.progress('Hiding assignment from students...');
-    await apiClient.put(`/api/v1/courses/${courseId}/assignments/${assignmentId}`, { assignment: { only_visible_to_overrides: true } }, {}, 'PLSync:hideAssignment');
-    logger.info(`[PLSync] Assignment ${assignmentId} hidden from students`);
+    await apiClient.put(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+        {
+            assignment: {
+                only_visible_to_overrides: true,
+                post_manually:             true,
+                points_possible:           0
+            }
+        },
+        {}, 'PLSync:hideAssignment'
+    );
+    logger.debug(`[PLSync] Assignment finalized — hidden, post_manually:true, points:0`);
+    logger.debug(`[PLSync] Assignment ${assignmentId} hidden from students`);
 
     // Step 8: Merge into pl_assignments and write back
     const submissionIdsObj = {};
