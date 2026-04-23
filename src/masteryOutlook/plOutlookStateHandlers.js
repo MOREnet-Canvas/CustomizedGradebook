@@ -156,21 +156,35 @@ export async function handleCreatingAssignment(sm) {
     });
     logger.debug(`[PLSync] Got ${submissionIdByUserId.size} submission records`);
 
-    // Step 7: Flip to hidden
-    sm.progress('Hiding assignment from students...');
-    await apiClient.put(
-        `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
-        {
-            assignment: {
-                only_visible_to_overrides: true,
-                post_manually:             true,
-                points_possible:           0
+    // Step 7: Flip to hidden + enforce post_manually and points_possible
+    // Note: post_manually must be set via GraphQL setAssignmentPostPolicy —
+    // the REST assignments API accepts it but Canvas ignores it silently.
+        sm.progress('Hiding assignment from students...');
+        await apiClient.put(
+            `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+            {
+                assignment: {
+                    only_visible_to_overrides: true,
+                    points_possible: 0
+                }
+            },
+            {}, 'PLSync:hideAssignment'
+        );
+
+    // Set manual posting policy via GraphQL — REST API silently ignores post_manually
+        await apiClient.graphql(`
+        mutation SetPLAssignmentPostPolicy($assignmentId: ID!) {
+            setAssignmentPostPolicy(input: {
+                assignmentId: $assignmentId
+                postManually: true
+            }) {
+                postPolicy { postManually }
+                errors { attribute message }
             }
-        },
-        {}, 'PLSync:hideAssignment'
-    );
-    logger.debug(`[PLSync] Assignment finalized — hidden, post_manually:true, points:0`);
-    logger.debug(`[PLSync] Assignment ${assignmentId} hidden from students`);
+        }
+    `, { assignmentId: String(assignmentId) }, 'PLSync:setPostPolicy');
+
+        logger.info(`[PLSync] Assignment ${assignmentId} hidden, post_manually enforced via GraphQL`);
 
     // Step 8: Merge into pl_assignments and write back
     const submissionIdsObj = {};
