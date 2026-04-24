@@ -58,17 +58,17 @@ All PL sync data lives in `mastery_outlook_cache.json` alongside the existing `o
   "pl_assignments": {
     "598": {
       "assignment_id": 3595,
-      "rubric_id": 1434,
-      "rubric_association_id": "2651",
-      "criterion_id": "_1024",
+      "rubric_id": 1435,
+      "rubric_association_id": "2652",
+      "criterion_id": "_3175",
       "submission_ids": {
-        "642": "26049",
-        "643": "26050",
-        "644": "26051",
-        "645": "26052",
-        "646": "26053"
+        "642": "26059",
+        "643": "26060",
+        "644": "26061",
+        "645": "26062",
+        "646": "26063"
       },
-      "created_at": "2026-04-22T15:54:55.934Z"
+      "created_at": "2026-04-23T14:58:46.578Z"
     }
   },
 
