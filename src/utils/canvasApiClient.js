@@ -108,6 +108,27 @@ export class CanvasApiClient {
     }
 
     /**
+     * Make a GET request and return the raw Response object so the caller can
+     * read response headers (e.g. the Link header for parallel pagination).
+     *
+     * For normal single-page or sequential paginated fetches, prefer get() or
+     * getAllPages().  This method is intended for the parallel outcome_results
+     * fetcher which needs the Link: rel="last" header to determine total pages.
+     *
+     * @param {string} url - API endpoint URL
+     * @param {Object} options - Additional fetch options
+     * @param {string} context - Context for error logging (optional)
+     * @returns {Promise<Response>} Raw Response (body not yet consumed)
+     */
+    async getWithResponse(url, options = {}, context = 'getWithResponse') {
+        if (!url.includes('per_page=')) {
+            const separator = url.includes('?') ? '&' : '?';
+            url = `${url}${separator}per_page=100`;
+        }
+        return this.#makeRequestWithResponse(url, 'GET', null, options, context);
+    }
+
+    /**
      * Make a POST request to the Canvas API
      * @param {string} url - API endpoint URL
      * @param {Object} data - Request body data

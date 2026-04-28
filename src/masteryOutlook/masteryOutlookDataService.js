@@ -169,6 +169,129 @@ export async function fetchOutcomeRollups(courseId, apiClient) {
  * @param {Function} onProgress - Callback for progress updates: (message) => void
  * @returns {Promise<Array>} Array of outcome result objects
  */
+// ═══════════════════════════════════════════════════════════════════════
+// PARALLEL OUTCOME RESULTS FETCH (4d)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Parse the total page count from a Canvas Link response header.
+ * Canvas emits:  <url?page=N>; rel="last"
+ * Returns null when the header is absent or has no rel="last" entry (single page).
+ *
+ * @param {string|null} linkHeader
+ * @returns {number|null}
+ */
+function parseTotalPagesFromLink(linkHeader) {
+    if (!linkHeader) return null;
+    const m = linkHeader.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);
+    return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Split an array into sequential chunks of at most `size` elements.
+ *
+ * @param {Array}  arr
+ * @param {number} size
+ * @returns {Array[]}
+ */
+function chunk(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+}
+
+/**
+ * Apply the PL assignment exclusion filter to a flat results array.
+ *
+ * @param {Object[]} results        - Raw outcome_result objects
+ * @param {Set<string>} plIds       - Set of "assignment_NNNN" strings to exclude
+ * @returns {Object[]}
+ */
+function filterOutPLResults(results, plIds) {
+    if (!plIds || plIds.size === 0) return results;
+    return results.filter(r => {
+        const alignmentId = r.links?.assignment || r.links?.alignment;
+        return !plIds.has(alignmentId);
+    });
+}
+
+/**
+ * Fetch ALL outcome results using parallel page requests (~13 s vs ~60 s sequential).
+ *
+ * Algorithm:
+ *  1. Fetch page 1 via getWithResponse() to read the Link header for total page count.
+ *  2. Fetch remaining pages in parallel batches of 10 via Promise.allSettled.
+ *  3. Any batch failure throws immediately — caller must treat this as a hard error
+ *     and leave the existing cache unchanged (cache integrity rule).
+ *  4. The PL assignment exclusion filter is applied to the combined results BEFORE
+ *     returning, matching the filter in the sequential fetchOutcomeResults path.
+ *     This is critical: PL override assignments create a feedback loop that corrupts
+ *     the Power Law calculation if their scores are included.
+ *
+ * @param {string}      courseId
+ * @param {CanvasApiClient} apiClient
+ * @param {Set<string>} plAssignmentIds  - "assignment_NNNN" IDs to exclude (may be empty Set)
+ * @param {Function}    onProgress       - (message: string) => void
+ * @returns {Promise<Object[]>}          - Filtered outcome_result objects
+ */
+export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssignmentIds, onProgress = () => {}) {
+    const baseUrl = `/api/v1/courses/${courseId}/outcome_results`
+        + `?include[]=outcomes.alignments&per_page=100`;
+
+    logger.info('[outcomesDataService] Parallel fetch: fetching page 1 for Link header...');
+    onProgress('Fetching outcome results (parallel)... page 1');
+
+    // Page 1 — getWithResponse so we can read the Link header for total pages
+    const page1Response = await apiClient.getWithResponse(`${baseUrl}&page=1`, {}, 'fetchOutcomeResultsParallel:page1');
+    if (!page1Response.ok) {
+        throw new Error(`Parallel fetch failed on page 1: HTTP ${page1Response.status}`);
+    }
+
+    const page1Data   = await page1Response.json();
+    const linkHeader  = page1Response.headers.get('Link');
+    const totalPages  = parseTotalPagesFromLink(linkHeader) ?? 1;
+
+    const allResults = [...(page1Data.outcome_results || [])];
+    logger.debug(`[outcomesDataService] Parallel fetch: ${totalPages} total page(s), ${allResults.length} from page 1`);
+
+    if (totalPages > 1) {
+        const pageNums = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+        const batches  = chunk(pageNums, 10);
+
+        for (const batch of batches) {
+            onProgress(`Fetching outcome results (parallel)... pages ${batch[0]}–${batch[batch.length - 1]} of ${totalPages}`);
+
+            const settled = await Promise.allSettled(
+                batch.map(p =>
+                    apiClient.get(`${baseUrl}&page=${p}`, {}, `fetchOutcomeResultsParallel:page${p}`)
+                             .then(d => d.outcome_results || [])
+                )
+            );
+
+            const failed = settled.filter(r => r.status === 'rejected');
+            if (failed.length > 0) {
+                throw new Error(
+                    `Parallel refresh failed — ${failed.length} page(s) could not be fetched. ` +
+                    `Existing cache is unchanged.`
+                );
+            }
+
+            settled.forEach(r => allResults.push(...r.value));
+        }
+    }
+
+    logger.info(`[outcomesDataService] Parallel fetch complete: ${totalPages} pages, ${allResults.length} raw results`);
+    onProgress(`Loaded ${allResults.length} outcome results`);
+
+    const filtered = filterOutPLResults(allResults, plAssignmentIds);
+    if (plAssignmentIds?.size > 0) {
+        const excluded = allResults.length - filtered.length;
+        logger.info(`[outcomesDataService] Excluded ${excluded} PL override result(s) from parallel fetch`);
+    }
+
+    return filtered;
+}
+
 export async function fetchOutcomeResults(courseId, apiClient, onProgress = () => {}) {
     try {
         logger.info('[outcomesDataService] Fetching ALL outcome results...');
@@ -326,69 +449,76 @@ export function extractAttempts(outcomeResults) {
  * @param {Function} onProgress - Progress callback: (message) => void
  * @returns {Promise<Object>} Combined data: {outcomes, students, groupedAttempts}
  */
-export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () => {}) {
+/**
+ * Orchestrate all fetches needed for a Mastery Outlook cache build.
+ *
+ * @param {string}   courseId
+ * @param {CanvasApiClient} apiClient
+ * @param {Function} onProgress       - (message: string) => void
+ * @param {Object}   [opts]
+ * @param {boolean}  [opts.parallel=false]  When true, uses the parallel page-fetch path
+ *                                          for outcome_results (~13 s vs ~60 s sequential).
+ *                                          The caller must guarantee that all pages succeed
+ *                                          before writing the cache (handled by runFullRefresh).
+ * @returns {Promise<{outcomes, students, groupedAttempts, canvasRollups, courseId}>}
+ */
+export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () => {}, { parallel = false } = {}) {
     try {
-        logger.info('[outcomesDataService] Starting complete data fetch...');
+        logger.info(`[outcomesDataService] Starting complete data fetch (parallel=${parallel})...`);
         onProgress('Starting data fetch...');
 
         // Step 1: Fetch outcome metadata
         onProgress('Fetching outcome names...');
         const outcomes = await fetchOutcomeNames(courseId, apiClient);
-
-        if (outcomes.length === 0) {
-            throw new Error('No outcomes found in course');
-        }
+        if (outcomes.length === 0) throw new Error('No outcomes found in course');
 
         // Step 2: Fetch student roster
         onProgress('Fetching student roster...');
         const students = await fetchCourseStudents(courseId, apiClient);
+        if (students.length === 0) logger.warn('[outcomesDataService] No students found in course');
 
-        if (students.length === 0) {
-            logger.warn('[outcomesDataService] No students found in course');
-        }
+        // Step 2.5: Read PL assignment IDs now — needed by both fetch paths for filtering.
+        // Moving this earlier vs the old Step 5 position is safe (idempotent read).
+        const plAssignments    = await readPLAssignments(courseId, apiClient);
+        const plAssignmentIds  = new Set(
+            Object.values(plAssignments || {}).map(a => `assignment_${a.assignment_id}`)
+        );
 
-        // Step 3: Fetch ALL outcome results
-        const outcomeResults = await fetchOutcomeResults(courseId, apiClient, onProgress);
+        // Step 3: Fetch ALL outcome results — sequential or parallel
+        let filteredResults;
+        if (parallel) {
+            // Parallel path returns already-filtered results
+            filteredResults = await fetchAllOutcomeResultsParallel(
+                courseId, apiClient, plAssignmentIds, onProgress
+            );
+        } else {
+            // Sequential path — filter applied below
+            const outcomeResults = await fetchOutcomeResults(courseId, apiClient, onProgress);
+            if (outcomeResults.length === 0) logger.warn('[outcomesDataService] No outcome results found');
 
-        if (outcomeResults.length === 0) {
-            logger.warn('[outcomesDataService] No outcome results found');
+            filteredResults = plAssignmentIds.size > 0
+                ? outcomeResults.filter(result => {
+                    const alignmentId = result.links?.assignment || result.links?.alignment;
+                    return !plAssignmentIds.has(alignmentId);
+                })
+                : outcomeResults;
+
+            if (plAssignmentIds.size > 0) {
+                const excluded = outcomeResults.length - filteredResults.length;
+                logger.info(`[outcomesDataService] Excluded ${excluded} PL override result(s) from Power Law calculation`);
+            }
         }
 
         // Step 4: Fetch Canvas official rollup scores
         onProgress('Fetching Canvas rollup scores...');
         const canvasRollups = await fetchOutcomeRollups(courseId, apiClient);
 
-        // Step 5: Filter out PL override assignment results before computing Power Law
-        // PL override assignments feed scores back into the outcome, creating a feedback loop
-        onProgress('Processing attempts...');
-        const plAssignments = await readPLAssignments(courseId, apiClient);
-        const plAssignmentIds = new Set(
-            Object.values(plAssignments).map(a => `assignment_${a.assignment_id}`)
-        );
-        const filteredResults = plAssignmentIds.size > 0
-            ? outcomeResults.filter(result => {
-                const alignmentId = result.links?.assignment || result.links?.alignment;
-                return !plAssignmentIds.has(alignmentId);
-            })
-            : outcomeResults;
-
-        if (plAssignmentIds.size > 0) {
-            const excluded = outcomeResults.length - filteredResults.length;
-            logger.info(`[outcomesDataService] Excluded ${excluded} PL override result(s) from Power Law calculation`);
-        }
-
         const groupedAttempts = extractAttempts(filteredResults);
 
         onProgress('Data fetch complete');
         logger.info('[outcomesDataService] Complete data fetch finished');
 
-        return {
-            outcomes,
-            students,
-            groupedAttempts,
-            canvasRollups,
-            courseId
-        };
+        return { outcomes, students, groupedAttempts, canvasRollups, courseId };
 
     } catch (error) {
         logger.error('[outcomesDataService] Failed to fetch outcome data', error);

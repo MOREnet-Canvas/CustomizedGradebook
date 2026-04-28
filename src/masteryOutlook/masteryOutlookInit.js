@@ -20,6 +20,7 @@ import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache, readPLAssignments, readSyncState } from './masteryOutlookCacheService.js';
+import { stopPolling, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
 import { findMasteryDashboardPageUrl } from '../services/pageService.js';
@@ -75,72 +76,15 @@ function initMasteryOutlookView() {
 
     const apiClient = new CanvasApiClient();
 
-    // Define refresh handler
+    // Define refresh handler — delegates to the exported runFullRefresh which uses
+    // parallel page fetching and enforces the cache integrity guarantee.
     const onRefresh = async (onProgress) => {
-        logger.info('[MasteryOutlookInit] Starting data refresh...');
+        // Stop any running poll/visibility listener — they will be restarted by the
+        // view after the new cache is loaded.
+        stopPolling();
+        stopVisibilityListener();
 
-        // Fetch all data
-        const data = await fetchAllOutcomeData(courseId, apiClient, onProgress);
-
-        // Get current user's threshold setting
-        const userId = window.ENV?.current_user_id;
-        const threshold = userId ? getThreshold(courseId, userId) : 2.2;
-        logger.debug(`[MasteryOutlookInit] Using threshold: ${threshold} for user ${userId}`);
-
-        // Compute Power Law stats
-        onProgress('Computing Power Law predictions...');
-        const cache = computeOutcomeStats(data, threshold);
-
-        // Find Mastery Dashboard page URL (handles auto-numbered URLs like mastery-dashboard-2)
-        onProgress('Finding Mastery Dashboard page...');
-        const masteryDashboardUrl = await findMasteryDashboardPageUrl(courseId, apiClient);
-        if (masteryDashboardUrl) {
-            logger.info(`[MasteryOutlookInit] Found Mastery Dashboard at: ${masteryDashboardUrl}`);
-        } else {
-            logger.warn('[MasteryOutlookInit] Mastery Dashboard page not found - student links may not work');
-        }
-
-        // Add courseId to cache metadata
-        cache.metadata.courseId = courseId;
-        cache.metadata.computedAt = new Date().toISOString();
-        cache.metadata.threshold = threshold;
-        cache.metadata.masteryDashboardUrl = masteryDashboardUrl;
-
-        // Step 6: Preserve pl_assignments across refresh — read from existing cache and merge in
-        // before writing so one-time Canvas setup data (assignment IDs, submission IDs, etc.)
-        // is not lost when outcome data is recomputed.
-        onProgress('Saving cache...');
-        const existingPLAssignments = await readPLAssignments(courseId, apiClient);
-        if (existingPLAssignments && Object.keys(existingPLAssignments).length > 0) {
-            cache.pl_assignments = existingPLAssignments;
-        }
-
-        // Step 7: Preserve sync_state across refresh — same read-before-write pattern.
-        // sync_state holds last_synced_score, manual_override, will_post, etc.
-        // These must survive a data refresh unchanged.
-        const existingSyncState = await readSyncState(courseId, apiClient);
-        if (existingSyncState && Object.keys(existingSyncState).length > 0) {
-            cache.sync_state = existingSyncState;
-        }
-
-        // Step 8: Detect possible manual Canvas overrides.
-        // Compares canvasScore vs last_synced_score per student × outcome and sets
-        // outcomeData.possibleManualOverride = true where they diverge.
-        // Never sets manual_override — that requires explicit teacher confirmation.
-        applyPossibleManualOverrides(cache, existingSyncState, existingPLAssignments);
-
-        // Step 9: Write the merged cache (outcomes + students + pl_assignments + sync_state)
-        await writeMasteryOutlookCache(courseId, apiClient, cache);
-
-        logger.info('[MasteryOutlookInit] Data refresh complete');
-
-        return {
-            meta:           cache.metadata,
-            outcomes:       cache.outcomes,
-            students:       cache.students,
-            pl_assignments: cache.pl_assignments  ?? {},
-            sync_state:     cache.sync_state      ?? {},
-        };
+        return runFullRefresh(courseId, apiClient, onProgress);
     };
 
     // Render dashboard
@@ -152,6 +96,86 @@ function initMasteryOutlookView() {
     });
 
     logger.info('[MasteryOutlookInit] OUTLOOK VIEW initialized');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// runFullRefresh — exported so the banner "Refresh now" button can call it
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Perform a full cache rebuild using the parallel outcome_results fetcher.
+ *
+ * Cache integrity guarantee: if ANY page fetch fails, this function throws and
+ * the existing cache on Canvas Files is left completely unchanged.  The caller
+ * (either onRefresh or the banner button) must handle the error and show the
+ * teacher an appropriate message.
+ *
+ * On success the function returns the same shape as the existing onRefresh
+ * callback: { meta, outcomes, students, pl_assignments, sync_state }.
+ *
+ * @param {string}   courseId
+ * @param {CanvasApiClient} apiClient
+ * @param {Function} [onProgress]  - (message: string) => void
+ * @returns {Promise<Object>} Cache object ready for the view
+ */
+export async function runFullRefresh(courseId, apiClient, onProgress = () => {}) {
+    logger.info('[MasteryOutlookInit] runFullRefresh — starting parallel data fetch...');
+
+    // Fetch all data with the parallel page fetcher (4d).
+    // fetchAllOutcomeData throws if any page fails — the cache is never written in that case.
+    const data = await fetchAllOutcomeData(courseId, apiClient, onProgress, { parallel: true });
+
+    // Get current user's threshold setting
+    const userId = window.ENV?.current_user_id;
+    const threshold = userId ? getThreshold(courseId, userId) : 2.2;
+    logger.debug(`[MasteryOutlookInit] Using threshold: ${threshold} for user ${userId}`);
+
+    // Compute Power Law stats
+    onProgress('Computing Power Law predictions...');
+    const cache = computeOutcomeStats(data, threshold);
+
+    // Find Mastery Dashboard page URL
+    onProgress('Finding Mastery Dashboard page...');
+    const masteryDashboardUrl = await findMasteryDashboardPageUrl(courseId, apiClient);
+    if (masteryDashboardUrl) {
+        logger.info(`[MasteryOutlookInit] Found Mastery Dashboard at: ${masteryDashboardUrl}`);
+    } else {
+        logger.warn('[MasteryOutlookInit] Mastery Dashboard page not found - student links may not work');
+    }
+
+    cache.metadata.courseId           = courseId;
+    cache.metadata.computedAt         = new Date().toISOString();
+    cache.metadata.threshold          = threshold;
+    cache.metadata.masteryDashboardUrl = masteryDashboardUrl;
+
+    // Step 6: Preserve pl_assignments across refresh
+    onProgress('Saving cache...');
+    const existingPLAssignments = await readPLAssignments(courseId, apiClient);
+    if (existingPLAssignments && Object.keys(existingPLAssignments).length > 0) {
+        cache.pl_assignments = existingPLAssignments;
+    }
+
+    // Step 7: Preserve sync_state across refresh
+    const existingSyncState = await readSyncState(courseId, apiClient);
+    if (existingSyncState && Object.keys(existingSyncState).length > 0) {
+        cache.sync_state = existingSyncState;
+    }
+
+    // Step 8: Detect possible manual Canvas overrides
+    applyPossibleManualOverrides(cache, existingSyncState, existingPLAssignments);
+
+    // Step 9: Write the merged cache — only reached if all pages succeeded (4e guarantee)
+    await writeMasteryOutlookCache(courseId, apiClient, cache);
+
+    logger.info('[MasteryOutlookInit] runFullRefresh complete');
+
+    return {
+        meta:           cache.metadata,
+        outcomes:       cache.outcomes,
+        students:       cache.students,
+        pl_assignments: cache.pl_assignments ?? {},
+        sync_state:     cache.sync_state     ?? {},
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

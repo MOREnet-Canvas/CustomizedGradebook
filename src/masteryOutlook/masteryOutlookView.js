@@ -17,6 +17,7 @@ import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { getSyncStatus } from './plOutlookSyncStatus.js';
 import { handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride } from './plOutlookActions.js';
+import { startPolling, stopPolling, startVisibilityListener, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getCourseId } from '../utils/canvas.js';
@@ -178,6 +179,22 @@ function buildShell(containerEl) {
             </div>
         </div>
 
+        <!-- 4c: Refresh banner — shown when background poll detects new grading activity -->
+        <div id="od-refresh-banner" style="display:none; margin-bottom:0.75rem;
+             padding:10px 16px; border-radius:8px;
+             background:#EBF5FB; border:0.5px solid #AED6F1;
+             display:none; align-items:center; justify-content:space-between; gap:12px;">
+            <span style="${FONT} font-size:13px; color:#1A5276;">
+                ℹ New scores have been graded — your data may be out of date.
+            </span>
+            <button id="od-banner-refresh-btn"
+                style="${FONT} font-size:12px; font-weight:600; padding:5px 14px;
+                       border-radius:6px; border:1px solid #2E86C1;
+                       background:#2E86C1; color:#fff; cursor:pointer;">
+                Refresh now
+            </button>
+        </div>
+
         <!-- 3e: Cross-outcome exceptions panel (hidden until "View exceptions" clicked) -->
         <div id="od-exceptions-panel" style="display:none; margin-bottom:1rem;
              border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; overflow:hidden;">
@@ -272,6 +289,8 @@ function buildShell(containerEl) {
         subtitleEl:       containerEl.querySelector('#od-subtitle'),
         lastUpdatedEl:    containerEl.querySelector('#od-last-updated'),
         refreshBtn:       containerEl.querySelector('#od-refresh-btn'),
+        bannerEl:         containerEl.querySelector('#od-refresh-banner'),
+        bannerRefreshBtn: containerEl.querySelector('#od-banner-refresh-btn'),
         exceptionsBtn:    containerEl.querySelector('#od-exceptions-btn'),
         exceptionsPanel:  containerEl.querySelector('#od-exceptions-panel'),
         thresholdSlider:  containerEl.querySelector('#od-threshold-slider'),
@@ -436,6 +455,135 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
 
     // 3e — wire "View exceptions" button + cross-outcome panel
     wireExceptionsPanel(shell, cache);
+
+    // 4c + 4f — banner, polling, auto-refresh toggle (Tweaks panel)
+    wirePollingAndBanner(shell, cache, courseId, apiClient, onRefresh);
+    wireTweaksPanel(shell.sidebarEl, courseId);
+}
+
+// ─── Polling + Refresh banner (4a–4c) ────────────────────────────────────────
+
+const AUTO_REFRESH_KEY = (courseId) => `cg_autoRefresh_${courseId}`;
+
+/**
+ * Read the auto-refresh preference from localStorage.
+ * Defaults to true (on) — teacher must explicitly opt out.
+ *
+ * @param {string} courseId
+ * @returns {boolean}
+ */
+function getAutoRefreshEnabled(courseId) {
+    return localStorage.getItem(AUTO_REFRESH_KEY(courseId)) !== 'false';
+}
+
+/**
+ * Wire the refresh banner and start background polling when auto-refresh is on.
+ *
+ * onChangesDetected shows the banner and stops polling.
+ * Banner "Refresh now" calls onRefresh, hides the banner on success, then
+ * restarts polling against the new cache.
+ *
+ * @param {Object}   shell
+ * @param {Object}   cache
+ * @param {string}   courseId
+ * @param {CanvasApiClient} apiClient
+ * @param {Function} onRefresh - (onProgress) => Promise<freshCache>
+ */
+function wirePollingAndBanner(shell, cache, courseId, apiClient, onRefresh) {
+    if (!shell.bannerEl || !shell.bannerRefreshBtn) return;
+
+    let currentComputedAt = cache.meta?.computedAt ?? cache.metadata?.computedAt;
+
+    const showBanner = () => {
+        shell.bannerEl.style.display = 'flex';
+    };
+
+    const hideBanner = () => {
+        shell.bannerEl.style.display = 'none';
+    };
+
+    // "Refresh now" button in the banner
+    shell.bannerRefreshBtn.addEventListener('click', async () => {
+        shell.bannerRefreshBtn.disabled    = true;
+        shell.bannerRefreshBtn.textContent = 'Refreshing…';
+        hideBanner();
+
+        try {
+            // onRefresh (= runFullRefresh) returns the new cache object
+            // The view's existing wireRefreshButton handles progress display;
+            // trigger the same refresh pathway via the existing button click
+            shell.refreshBtn?.click();
+        } catch {
+            shell.bannerRefreshBtn.disabled    = false;
+            shell.bannerRefreshBtn.textContent = 'Refresh now';
+            showBanner();
+        }
+    });
+
+    const autoRefreshOn = getAutoRefreshEnabled(courseId);
+
+    if (!autoRefreshOn) {
+        logger.debug('[MasteryOutlook] Auto-refresh disabled — polling not started');
+        return;
+    }
+
+    const onChangesDetected = () => {
+        logger.info('[MasteryOutlook] Poll: changes detected — showing banner');
+        showBanner();
+    };
+
+    startPolling(courseId, currentComputedAt, onChangesDetected, apiClient);
+    startVisibilityListener(courseId, () => currentComputedAt, onChangesDetected, apiClient);
+}
+
+// ─── Tweaks panel — auto-refresh toggle (4f) ─────────────────────────────────
+
+/**
+ * Append a "Settings" tweaks block to the sidebar that contains the
+ * auto-refresh on/off toggle.  Persists the preference to localStorage.
+ *
+ * @param {HTMLElement} sidebarEl
+ * @param {string}      courseId
+ */
+function wireTweaksPanel(sidebarEl, courseId) {
+    if (!sidebarEl) return;
+
+    const enabled = getAutoRefreshEnabled(courseId);
+
+    const panel = document.createElement('div');
+    panel.style.cssText = `background:#fff; border:0.5px solid #e0e0e0;
+        border-radius:12px; padding:12px; margin-top:10px;`;
+    panel.innerHTML = `
+        <div style="${FONT} font-size:14px; font-weight:700; color:#333; margin-bottom:10px;">
+            Settings
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="od-auto-refresh-toggle"
+                   ${enabled ? 'checked' : ''}
+                   style="width:15px; height:15px; cursor:pointer;">
+            <span style="${FONT} font-size:13px; color:#444;">
+                Auto-refresh (every 5 min)
+            </span>
+        </label>
+        <div style="${FONT} font-size:11px; color:#aaa; margin-top:5px; margin-left:23px;">
+            Checks for new grading activity in the background.
+        </div>`;
+
+    sidebarEl.appendChild(panel);
+
+    const toggle = panel.querySelector('#od-auto-refresh-toggle');
+    toggle.addEventListener('change', () => {
+        const nowEnabled = toggle.checked;
+        localStorage.setItem(AUTO_REFRESH_KEY(courseId), nowEnabled ? 'true' : 'false');
+        logger.info(`[MasteryOutlook] Auto-refresh toggled ${nowEnabled ? 'ON' : 'OFF'}`);
+
+        if (!nowEnabled) {
+            stopPolling();
+            stopVisibilityListener();
+        }
+        // If turned back on, the next Refresh Data call will restart polling
+        // (wirePollingAndBanner re-runs after onRefresh returns the new cache)
+    });
 }
 
 /**
