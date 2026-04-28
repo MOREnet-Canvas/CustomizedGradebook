@@ -113,6 +113,19 @@ export const AVG_OUTCOME_NAME = window.CG_CONFIG?.AVG_OUTCOME_NAME ?? "Current S
 export const AVG_ASSIGNMENT_NAME = window.CG_CONFIG?.AVG_ASSIGNMENT_NAME ?? "Current Score Assignment";
 export const AVG_RUBRIC_NAME = window.CG_CONFIG?.AVG_RUBRIC_NAME ?? "Current Score Rubric";
 
+// PL Override assignment naming
+// Controls the suffix appended to outcome names for PL override assignments.
+// Result: "<Outcome Name> — <PL_ASSIGNMENT_SUFFIX>"
+// e.g. "Argumentative Writing — Projected Score"
+//
+// Teachers can override this in their loader file to match their terminology:
+//   "Growth Score"    — Marzano-aligned language
+//   "Current Level"   — standards-based grading language
+//   "Trend Score"     — data-focused language
+//   "Marzano Score"   — explicit methodology reference
+export const PL_ASSIGNMENT_SUFFIX = window.CG_CONFIG?.PL_ASSIGNMENT_SUFFIX ?? 'Projected Score';
+export const PL_RUBRIC_SUFFIX = window.CG_CONFIG?.PL_RUBRIC_SUFFIX ?? 'Projected Score Rubric';
+
 // Outcome configuration
 export const DEFAULT_MAX_POINTS = window.CG_CONFIG?.DEFAULT_MAX_POINTS ?? 4;
 export const DEFAULT_MASTERY_THRESHOLD = window.CG_CONFIG?.DEFAULT_MASTERY_THRESHOLD ?? 3;

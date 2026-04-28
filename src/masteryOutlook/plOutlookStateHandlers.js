@@ -17,7 +17,7 @@ import { readMasteryOutlookCache, readPLAssignments, writePLAssignments } from '
 import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { logger } from '../utils/logger.js';
-import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
+import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
 
 /** Compare two scores rounded to the hundredths place */
 const scoresMatch = (a, b) => Math.round(a * 100) === Math.round(b * 100);
@@ -80,18 +80,23 @@ export async function handleCreatingAssignment(sm) {
     logger.debug(`[PLSync] Outcome ${outcomeId} calculation_method set to latest`);
 
     // Step 2: Create assignment visible to everyone
+    // Assignment name uses PL_ASSIGNMENT_SUFFIX from config.js (default: 'Projected Score')
+    // Result: "<Outcome Name> — Projected Score" e.g. "Argumentative Writing — Projected Score"
+    // Note: Existing assignments created before this change keep their original names.
+    // To rename: delete the assignment in Canvas, clear the pl_assignments cache entry
+    // for that outcome, and re-run sync to trigger CREATING_ASSIGNMENT.
     const assignmentResp = await apiClient.post(
         `/api/v1/courses/${courseId}/assignments`,
         {
             assignment: {
-                name:                      `PL Override — ${outcomeName}`,
+                name:                      `${outcomeName} — ${PL_ASSIGNMENT_SUFFIX}`,
                 points_possible:           0,
                 published:                 true,
                 only_visible_to_overrides: false,
-                post_manually:             true,
                 grading_type:              'points',
                 submission_types:          ['none'],
                 omit_from_final_grade:     true
+                // post_manually is NOT set — grades auto-post so students see projected scores
             }
         },
         {}, 'PLSync:createAssignment'
@@ -111,7 +116,7 @@ export async function handleCreatingAssignment(sm) {
         `/api/v1/courses/${courseId}/rubrics`,
         {
             rubric: {
-                title:                      `PL Override Rubric — ${outcomeName}`,
+                title:                      `${outcomeName} — ${PL_RUBRIC_SUFFIX}`,
                 free_form_criterion_comments: false,
                 criteria: {
                     '0': {
@@ -156,35 +161,21 @@ export async function handleCreatingAssignment(sm) {
     });
     logger.debug(`[PLSync] Got ${submissionIdByUserId.size} submission records`);
 
-    // Step 7: Flip to hidden + enforce post_manually and points_possible
-    // Note: post_manually must be set via GraphQL setAssignmentPostPolicy —
-    // the REST assignments API accepts it but Canvas ignores it silently.
-        sm.progress('Hiding assignment from students...');
-        await apiClient.put(
-            `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
-            {
-                assignment: {
-                    only_visible_to_overrides: true,
-                    points_possible: 0
-                }
-            },
-            {}, 'PLSync:hideAssignment'
-        );
-
-    // Set manual posting policy via GraphQL — REST API silently ignores post_manually
-        await apiClient.graphql(`
-        mutation SetPLAssignmentPostPolicy($assignmentId: ID!) {
-            setAssignmentPostPolicy(input: {
-                assignmentId: $assignmentId
-                postManually: true
-            }) {
-                postPolicy { postManually }
-                errors { attribute message }
+    // Step 7: Flip assignment to only_visible_to_overrides — hides it from the assignments
+    // list and student gradebook columns. Grades remain auto-posted so students can see
+    // their projected scores in the Learning Mastery Gradebook.
+    sm.progress('Hiding assignment from assignments list...');
+    await apiClient.put(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+        {
+            assignment: {
+                only_visible_to_overrides: true,
+                points_possible:           0
             }
-        }
-    `, { assignmentId: String(assignmentId) }, 'PLSync:setPostPolicy');
-
-        logger.info(`[PLSync] Assignment ${assignmentId} hidden, post_manually enforced via GraphQL`);
+        },
+        {}, 'PLSync:hideAssignment'
+    );
+    logger.info(`[PLSync] Assignment ${assignmentId} finalized — hidden from assignments list, points reset to 0`);
 
     // Step 8: Merge into pl_assignments and write back
     const submissionIdsObj = {};

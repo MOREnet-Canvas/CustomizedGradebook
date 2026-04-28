@@ -110,7 +110,8 @@ function _printHelp(courseId) {
     console.groupCollapsed('Example — run PL sync for one outcome');
     console.log(
         "await __CG_DEV.runPLSync({\n" +
-        "  outcome: { id: '598', title: 'Algebra' },\n" +
+        "  outcome: { id: '598', title: 'Outcome 1' },\n" +
+        "  // Creates assignment: 'Outcome 1 — Projected Score'\n" +
         "  onProgress: (state, name, msg, d, t) => console.log(state, msg, d, t)\n" +
         "})"
     );
