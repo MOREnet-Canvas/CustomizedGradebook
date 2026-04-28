@@ -15,7 +15,7 @@
  * refresh just the affected student row without a full page reload.
  */
 
-import { readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
+import { readSyncState, writeSyncState, readMasteryOutlookCache, writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { runPLSync } from './plOutlookSync.js';
 import { logger } from '../utils/logger.js';
 
@@ -365,6 +365,166 @@ export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, s
         targetUserIds: [studentId],
         onProgress,
     });
+
+    onRerender?.();
+}
+
+// ─── Alignment ignore / un-ignore (Section 9 automatic chain) ────────────────
+
+/**
+ * Ignore a specific alignment for one student × outcome.
+ *
+ * Automatic chain (spec Section 9):
+ *  1. Writes to cache.ignored_alignments
+ *  2. runPLSync for this student — pushes re-computed PL to Canvas outcome rollup
+ *     and writes last_synced_score + last_synced_at
+ *  3. Re-renders student row
+ *
+ * Steps 4-6 (Current Score update + comment posting) require Current Score
+ * assignment infrastructure not yet fully wired — those are left as TODOs.
+ *
+ * @param {Object}  opts
+ * @param {string}  opts.courseId
+ * @param {string}  opts.outcomeId
+ * @param {string}  opts.outcomeName
+ * @param {string}  opts.studentId
+ * @param {string}  opts.alignmentId  - e.g. "assignment_3475"
+ * @param {string}  [opts.reason]     - Teacher-provided reason text
+ * @param {Object}  opts.apiClient
+ * @param {Function} [opts.onProgress]
+ * @param {Function} opts.onRerender
+ */
+export async function handleIgnoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, reason = null, apiClient, onProgress, onRerender }) {
+    logger.info(`[PLActions] Ignore alignment ${alignmentId}: outcome ${outcomeId}, student ${studentId}`);
+
+    // Step 1 — write to cache.ignored_alignments
+    const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
+    rawCache.ignored_alignments = rawCache.ignored_alignments ?? [];
+
+    // Idempotent — do not add a duplicate entry
+    const alreadyIgnored = rawCache.ignored_alignments.some(
+        ia => ia.student_id   === String(studentId) &&
+              ia.outcome_id   === String(outcomeId)  &&
+              ia.alignment_id === alignmentId
+    );
+
+    if (!alreadyIgnored) {
+        rawCache.ignored_alignments.push({
+            student_id:      String(studentId),
+            outcome_id:      String(outcomeId),
+            alignment_id:    alignmentId,
+            reason:          reason || null,
+            ignored_by:      String(window.ENV?.current_user_id ?? 'unknown'),
+            ignored_at:      new Date().toISOString(),
+            comment_posted:  false,
+        });
+        await writeMasteryOutlookCache(courseId, apiClient, rawCache);
+        logger.debug(`[PLActions] ignored_alignments updated (${rawCache.ignored_alignments.length} total)`);
+    }
+
+    // Step 2 — runPLSync re-computes PL without this alignment and pushes to Canvas
+    // TODO step 4-6: update Current Score + post comment to assignment
+    await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId], onProgress });
+
+    onRerender?.();
+}
+
+/**
+ * Un-ignore a previously ignored alignment for one student × outcome.
+ *
+ * Removes the entry from cache.ignored_alignments and triggers the same
+ * automatic chain as handleIgnoreAlignment (runPLSync re-includes the
+ * alignment in the PL calculation, then pushes the updated score to Canvas).
+ *
+ * @param {Object}  opts  - Same as handleIgnoreAlignment (reason not applicable)
+ */
+export async function handleUnignoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, apiClient, onProgress, onRerender }) {
+    logger.info(`[PLActions] Un-ignore alignment ${alignmentId}: outcome ${outcomeId}, student ${studentId}`);
+
+    const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
+    rawCache.ignored_alignments = (rawCache.ignored_alignments ?? []).filter(
+        ia => !(ia.student_id   === String(studentId) &&
+                ia.outcome_id   === String(outcomeId)  &&
+                ia.alignment_id === alignmentId)
+    );
+
+    await writeMasteryOutlookCache(courseId, apiClient, rawCache);
+    logger.debug(`[PLActions] Alignment un-ignored (${rawCache.ignored_alignments.length} remaining)`);
+
+    // TODO step 4-6: update Current Score + post comment
+    await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId], onProgress });
+
+    onRerender?.();
+}
+
+// ─── Current Score overrides (spec Sections 5F and 5G) ───────────────────────
+
+/**
+ * Override the Current Score for one student.
+ *
+ * Writes to cache.current_score_overrides[studentId].
+ * On next Update Current Score run, students with an active override are
+ * skipped — Canvas keeps the manually set score.
+ *
+ * TODO: Push override score to Canvas via the Current Score assignment rubric.
+ *       Post comment to Current Score assignment if reason is provided.
+ *
+ * @param {Object}  opts
+ * @param {string}  opts.courseId
+ * @param {string}  opts.studentId
+ * @param {number}  opts.overrideScore  - Numeric score to set
+ * @param {string}  [opts.reason]       - Teacher-provided reason
+ * @param {Object}  opts.apiClient
+ * @param {Function} opts.onRerender
+ */
+export async function handleOverrideCurrentScore({ courseId, studentId, overrideScore, reason = null, apiClient, onRerender }) {
+    logger.info(`[PLActions] Override Current Score: student ${studentId}, score ${overrideScore}`);
+
+    const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
+    rawCache.current_score_overrides = rawCache.current_score_overrides ?? {};
+
+    rawCache.current_score_overrides[String(studentId)] = {
+        score:          overrideScore,
+        reason:         reason || null,
+        override_by:    String(window.ENV?.current_user_id ?? 'unknown'),
+        override_at:    new Date().toISOString(),
+        comment_posted: false,
+    };
+
+    await writeMasteryOutlookCache(courseId, apiClient, rawCache);
+    logger.debug(`[PLActions] current_score_overrides written for student ${studentId}`);
+
+    // TODO: Push overrideScore to Canvas Current Score assignment rubric
+    // TODO: Post comment to Current Score assignment if reason is provided
+
+    onRerender?.();
+}
+
+/**
+ * Clear the Current Score override for one student, reverting to the
+ * Power Law average.
+ *
+ * Removes cache.current_score_overrides[studentId].
+ *
+ * TODO: Push recalculated Current Score to Canvas avg_assignment.
+ *
+ * @param {Object}  opts
+ * @param {string}  opts.courseId
+ * @param {string}  opts.studentId
+ * @param {Object}  opts.apiClient
+ * @param {Function} opts.onRerender
+ */
+export async function handleClearCurrentScoreOverride({ courseId, studentId, apiClient, onRerender }) {
+    logger.info(`[PLActions] Clear Current Score override: student ${studentId}`);
+
+    const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
+    rawCache.current_score_overrides = rawCache.current_score_overrides ?? {};
+    delete rawCache.current_score_overrides[String(studentId)];
+
+    await writeMasteryOutlookCache(courseId, apiClient, rawCache);
+    logger.debug(`[PLActions] current_score_overrides cleared for student ${studentId}`);
+
+    // TODO: Push recalculated (non-overridden) Current Score to Canvas
 
     onRerender?.();
 }

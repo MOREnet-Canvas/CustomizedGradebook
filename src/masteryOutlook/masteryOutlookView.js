@@ -15,7 +15,7 @@ import { logger } from '../utils/logger.js';
 import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { getSyncStatus } from './plOutlookSyncStatus.js';
+import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import { handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride } from './plOutlookActions.js';
 import { startPolling, stopPolling, startVisibilityListener, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
@@ -696,6 +696,52 @@ function getCurrentThreshold() {
     return slider ? parseFloat(slider.value) : 2.2;
 }
 
+/**
+ * Build the sync count summary line shown beneath the outcome name in each
+ * collapsed outcome row header (spec Section 12).
+ *
+ * Examples:
+ *   "↑ 3 need sync · ⚑ 1 override?"
+ *   "✓ All synced"
+ *   "Setup needed — run sync to initialize"
+ *   "" (empty — outcome has no PL assignment yet and nothing to report)
+ *
+ * Uses aggregateSyncStatus() (pure, synchronous) — no API calls.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {string} HTML string (may be empty string)
+ */
+function buildSyncSummaryLine(outcome, cache) {
+    const plConfig = {
+        pl_assignments: cache.pl_assignments ?? {},
+        sync_state:     cache.sync_state     ?? {},
+    };
+
+    const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
+
+    const SS = `font-size:11px; margin-top:2px;`;
+
+    if (!counts.hasSetup) {
+        // No PL assignment set up yet — show nothing unless we want to prompt setup
+        return '';
+    }
+
+    if (counts.needsSync > 0 || counts.possibleOverride > 0 || counts.manualOverride > 0) {
+        const parts = [];
+        if (counts.needsSync      > 0) parts.push(`<span style="color:#B7791F;">↑ ${counts.needsSync} need sync</span>`);
+        if (counts.possibleOverride > 0) parts.push(`<span style="color:#C05621;">⚑ ${counts.possibleOverride} override?</span>`);
+        if (counts.manualOverride  > 0) parts.push(`<span style="color:#C05621;">⚑ ${counts.manualOverride} confirmed</span>`);
+        return `<div style="${SS} color:#888;">${parts.join(' <span style="color:#ccc;">·</span> ')}</div>`;
+    }
+
+    if (counts.synced > 0 && counts.needsSync === 0 && counts.possibleOverride === 0) {
+        return `<div style="${SS} color:#276749;">✓ All synced</div>`;
+    }
+
+    return '';
+}
+
 function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
     outcomesEl.innerHTML = '';
 
@@ -762,11 +808,18 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
             ${isExpanded ? 'border-bottom-left-radius:0; border-bottom-right-radius:0;' : ''}`;
 
         const chevron = isExpanded ? '▼' : '›';
+
+        // 2i — sync count summary line shown beneath the outcome name
+        const syncSummaryHtml = buildSyncSummaryLine(outcome, cache);
+
         row.innerHTML = `
             <div class="od-row-number" style="font-size:13px; color:#999;">${displayNumber}</div>
-            <div style="font-size:15px; font-weight:500; color:#333;
-                 white-space:nowrap; overflow:hidden;
-                 text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
+            <div>
+                <div style="font-size:15px; font-weight:500; color:#333;
+                     white-space:nowrap; overflow:hidden;
+                     text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
+                ${syncSummaryHtml}
+            </div>
             <div style="text-align:center;">${plAvgChip(displayStats)}</div>
             <div>${spreadBar(displayStats)}</div>
             <div style="text-align:center; font-size:14px;
