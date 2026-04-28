@@ -15,6 +15,8 @@ import { logger } from '../utils/logger.js';
 import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
+import { getSyncStatus } from './plOutlookSyncStatus.js';
+import { handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride } from './plOutlookActions.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getCourseId } from '../utils/canvas.js';
@@ -679,7 +681,43 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
     // Tab content
     const content = document.createElement('div');
     content.style.cssText = `padding:12px; max-height:400px; overflow-y:auto;`;
-    content.innerHTML = buildStudentTable(outcome, cache, activeTab);
+
+    const renderTable = () => {
+        content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
+    };
+    renderTable();
+
+    // Event delegation for per-row sync action buttons
+    content.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || btn.disabled) return;
+
+        const action     = btn.dataset.action;
+        const studentId  = btn.dataset.studentId;
+        const outcomeId  = btn.dataset.outcomeId;
+        const outcomeName = outcome.title || String(outcome.id);
+
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = '…';
+
+        try {
+            if (action === 'sync-one') {
+                await handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, onRerender: renderTable });
+            } else if (action === 'confirm-override') {
+                await handleConfirmOverride({ courseId, outcomeId, studentId, apiClient, onRerender: renderTable });
+            } else if (action === 'dismiss-override') {
+                await handleDismissOverride({ courseId, outcomeId, outcomeName, studentId, apiClient, onRerender: renderTable });
+            } else if (action === 'revert-override') {
+                await handleRevertOverride({ courseId, outcomeId, outcomeName, studentId, apiClient, onRerender: renderTable });
+            }
+        } catch (err) {
+            logger.error('[MasteryOutlook] Action failed', err);
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    });
+
     panel.appendChild(content);
 
     return panel;
@@ -725,8 +763,9 @@ function countGrowingStudents(outcome, cache) {
     }).length;
 }
 
-function buildStudentTable(outcome, cache, filter) {
+function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
     const isCurrentScore = isCurrentScoreOutcome(outcome.title);
+    const plConfig = { pl_assignments: cache.pl_assignments ?? {}, sync_state: cache.sync_state ?? {} };
 
     let students = cache.students.map(student => {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
@@ -814,6 +853,26 @@ function buildStudentTable(outcome, cache, filter) {
 
         const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
 
+        // Sync status badge + action buttons
+        const syncInfo = getSyncStatus(s.id, outcome.id, s.plPrediction, s.canvasScore, plConfig);
+        const oIdStr   = String(outcome.id);
+        const sIdStr   = String(s.id);
+        let syncBadgeHtml = `<span class="sync-badge ${syncInfo.cssClass}">${syncInfo.label}</span>`;
+        let syncActionsHtml = '';
+        if (syncInfo.status === 'needs_sync') {
+            syncActionsHtml = `<button class="btn btn-sm btn-ghost" style="margin-top:3px; font-size:10.5px;"
+                data-action="sync-one" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">↑ Sync</button>`;
+        } else if (syncInfo.status === 'possible_override') {
+            syncActionsHtml = `
+                <button class="btn btn-sm btn-danger" style="margin-top:3px; font-size:10px; padding:2px 6px;"
+                    data-action="confirm-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Keep Canvas</button>
+                <button class="btn btn-sm btn-ghost" style="margin-top:3px; font-size:10px; padding:2px 6px;"
+                    data-action="dismiss-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Use PL</button>`;
+        } else if (syncInfo.status === 'manual_override') {
+            syncActionsHtml = `<button class="btn btn-sm btn-warn" style="margin-top:3px; font-size:10px; padding:2px 6px;"
+                data-action="revert-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Revert to PL</button>`;
+        }
+
         // Use cached masteryDashboardUrl or fallback to default
         const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
 
@@ -834,6 +893,12 @@ function buildStudentTable(outcome, cache, filter) {
                            font-size:12px; font-weight:500;">${plDisplay}</span>
                 </td>
                 <td style="text-align:center; font-size:13px; padding:6px 8px;">${canvasScoreDisplay}</td>
+                <td style="padding:6px 8px; text-align:center; vertical-align:middle;">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                        ${syncBadgeHtml}
+                        ${syncActionsHtml}
+                    </div>
+                </td>
                 <td style="text-align:center; font-size:13px; padding:6px 8px;">${decayingAvgDisplay}</td>
                 <td style="text-align:center; font-size:13px; padding:6px 8px;">${meanDisplay}</td>
                 <td style="text-align:center; font-size:13px; padding:6px 8px;">${recentDisplay}</td>
@@ -857,6 +922,8 @@ function buildStudentTable(outcome, cache, filter) {
                                padding:6px 8px; font-size:12px;">${plColumnHeader}</th>
                     <th style="font-weight:500; color:#666; text-align:center;
                                padding:6px 8px; font-size:12px;">Canvas Score</th>
+                    <th style="font-weight:500; color:#666; text-align:center;
+                               padding:6px 8px; font-size:12px;">Sync Status</th>
                     <th style="font-weight:500; color:#666; text-align:center;
                                padding:6px 8px; font-size:12px;">Decaying Avg</th>
                     <th style="font-weight:500; color:#666; text-align:center;
@@ -1305,9 +1372,12 @@ async function tryLoadCache(courseId, apiClient) {
         if (cache) {
             logger.info('[MasteryOutlook] Cache loaded successfully');
             cache = {
-                meta: cache.metadata,
-                outcomes: cache.outcomes,
-                students: cache.students
+                meta:          cache.metadata,
+                outcomes:      cache.outcomes,
+                students:      cache.students,
+                // Preserve PL data so sync status badges and action buttons work
+                pl_assignments: cache.pl_assignments  ?? {},
+                sync_state:     cache.sync_state      ?? {},
             };
             return await enrichCache(cache, courseId, apiClient);
         }

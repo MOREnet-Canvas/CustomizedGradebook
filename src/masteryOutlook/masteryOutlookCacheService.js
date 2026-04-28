@@ -448,3 +448,58 @@ export async function writePLAssignments(courseId, plAssignments, apiClient) {
     logger.info(`[masteryOutlookCacheService] Writing pl_assignments for ${Object.keys(plAssignments).length} outcome(s)`);
     return writeMasteryOutlookCache(courseId, apiClient, merged);
 }
+
+/**
+ * Read the sync_state section from the mastery outlook cache.
+ *
+ * sync_state stores per-student per-outcome PL sync metadata so that the
+ * Refresh Data cycle can detect possible manual Canvas overrides.
+ *
+ * Shape: { [outcomeId]: { [studentId]: {
+ *   status, last_synced_score, last_synced_at, manual_override,
+ *   will_post, will_post_lock, will_post_note
+ * }}}
+ *
+ * Returns an empty object (never null) so callers can always safely do
+ * syncState[outcomeId]?.[studentId] without extra null-guards.
+ *
+ * @param {string} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} sync_state object, or {} if none recorded yet
+ */
+export async function readSyncState(courseId, apiClient) {
+    const cache = await readMasteryOutlookCache(courseId, apiClient);
+    return cache?.sync_state ?? {};
+}
+
+/**
+ * Write an updated sync_state map back into the mastery outlook cache.
+ *
+ * Uses a read-before-write merge so that outcomes/students/pl_assignments
+ * are never clobbered. Pass the FULL sync_state object — callers that need
+ * to update a single student entry should readSyncState first, mutate the
+ * returned object in place, then pass the whole thing here.
+ *
+ * @param {string} courseId
+ * @param {Object} syncState  - Full sync_state map { outcomeId: { studentId: {...} } }
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} Canvas file object from writeMasteryOutlookCache
+ */
+export async function writeSyncState(courseId, syncState, apiClient) {
+    const existing = await readMasteryOutlookCache(courseId, apiClient);
+
+    const base = existing || {
+        metadata: {
+            courseId,
+            generatedAt: new Date().toISOString()
+        },
+        outcomes: [],
+        students: []
+    };
+
+    const merged = { ...base, sync_state: syncState };
+
+    const outcomeCount = Object.keys(syncState).length;
+    logger.info(`[masteryOutlookCacheService] Writing sync_state for ${outcomeCount} outcome(s)`);
+    return writeMasteryOutlookCache(courseId, apiClient, merged);
+}

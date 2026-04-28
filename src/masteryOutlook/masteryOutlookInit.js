@@ -18,8 +18,8 @@ import { isMasteryOutlookPage } from '../utils/pageDetection.js';
 import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
 import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { fetchAllOutcomeData, computeOutcomeStats } from './masteryOutlookDataService.js';
-import { writeMasteryOutlookCache, readPLAssignments } from './masteryOutlookCacheService.js';
+import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides } from './masteryOutlookDataService.js';
+import { writeMasteryOutlookCache, readPLAssignments, readSyncState } from './masteryOutlookCacheService.js';
 import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
 import { findMasteryDashboardPageUrl } from '../services/pageService.js';
@@ -106,7 +106,7 @@ function initMasteryOutlookView() {
         cache.metadata.threshold = threshold;
         cache.metadata.masteryDashboardUrl = masteryDashboardUrl;
 
-        // Preserve pl_assignments across refresh — read from existing cache and merge in
+        // Step 6: Preserve pl_assignments across refresh — read from existing cache and merge in
         // before writing so one-time Canvas setup data (assignment IDs, submission IDs, etc.)
         // is not lost when outcome data is recomputed.
         onProgress('Saving cache...');
@@ -115,14 +115,31 @@ function initMasteryOutlookView() {
             cache.pl_assignments = existingPLAssignments;
         }
 
+        // Step 7: Preserve sync_state across refresh — same read-before-write pattern.
+        // sync_state holds last_synced_score, manual_override, will_post, etc.
+        // These must survive a data refresh unchanged.
+        const existingSyncState = await readSyncState(courseId, apiClient);
+        if (existingSyncState && Object.keys(existingSyncState).length > 0) {
+            cache.sync_state = existingSyncState;
+        }
+
+        // Step 8: Detect possible manual Canvas overrides.
+        // Compares canvasScore vs last_synced_score per student × outcome and sets
+        // outcomeData.possibleManualOverride = true where they diverge.
+        // Never sets manual_override — that requires explicit teacher confirmation.
+        applyPossibleManualOverrides(cache, existingSyncState, existingPLAssignments);
+
+        // Step 9: Write the merged cache (outcomes + students + pl_assignments + sync_state)
         await writeMasteryOutlookCache(courseId, apiClient, cache);
 
         logger.info('[MasteryOutlookInit] Data refresh complete');
 
         return {
-            meta: cache.metadata,
-            outcomes: cache.outcomes,
-            students: cache.students
+            meta:           cache.metadata,
+            outcomes:       cache.outcomes,
+            students:       cache.students,
+            pl_assignments: cache.pl_assignments  ?? {},
+            sync_state:     cache.sync_state      ?? {},
         };
     };
 

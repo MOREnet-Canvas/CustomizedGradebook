@@ -21,7 +21,8 @@
 
 import { PLOutlookStateMachine, PL_STATES } from './plOutlookStateMachine.js';
 import { PL_STATE_HANDLERS }                from './plOutlookStateHandlers.js';
-import { readMasteryOutlookCache, readPLAssignments } from './masteryOutlookCacheService.js';
+import { readMasteryOutlookCache, readPLAssignments, readSyncState } from './masteryOutlookCacheService.js';
+import { aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import { logger } from '../utils/logger.js';
 
 // ─── Run a full sync for one outcome ─────────────────────────────────────────
@@ -98,7 +99,7 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
 // ─── Pre-flight check (read-only) ─────────────────────────────────────────────
 
 /**
- * Check whether a sync is needed for a given outcome without writing anything.
+ * Check sync status counts for a given outcome without writing anything.
  *
  * Reads from the mastery outlook cache only — no Canvas API calls beyond what
  * readMasteryOutlookCache already does.
@@ -107,25 +108,42 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
  * @param {string} opts.courseId
  * @param {string} opts.outcomeId
  * @param {Object} opts.apiClient
- * @returns {Promise<{ hasSetup: boolean, predictionCount: number }>}
+ * @returns {Promise<{
+ *   hasSetup:         boolean,
+ *   predictionCount:  number,
+ *   total:            number,
+ *   synced:           number,
+ *   needsSync:        number,
+ *   possibleOverride: number,
+ *   manualOverride:   number,
+ *   ne:               number,
+ *   notSetup:         number,
+ * }>}
  */
 export async function checkSyncNeeded({ courseId, outcomeId, apiClient }) {
-    const [cache, plAssignments] = await Promise.all([
+    const [cache, plAssignments, syncState] = await Promise.all([
         readMasteryOutlookCache(courseId, apiClient),
-        readPLAssignments(courseId, apiClient)
+        readPLAssignments(courseId, apiClient),
+        readSyncState(courseId, apiClient),
     ]);
 
-    const hasSetup = !!(plAssignments[outcomeId]?.assignment_id);
+    const hasSetup = !!(plAssignments?.[outcomeId]?.assignment_id);
 
-    let predictionCount = 0;
-    if (cache?.students) {
-        predictionCount = cache.students.filter(student => {
-            const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-            return od?.plPrediction !== null && od?.plPrediction !== undefined && od?.status !== 'NE';
-        }).length;
-    }
+    const students = cache?.students || [];
+    const plConfig = { pl_assignments: plAssignments ?? {}, sync_state: syncState ?? {} };
 
-    return { hasSetup, predictionCount };
+    const counts = aggregateSyncStatus(students, outcomeId, plConfig);
+
+    const predictionCount = students.filter(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+        return od?.plPrediction != null && od?.status !== 'NE';
+    }).length;
+
+    return {
+        hasSetup,
+        predictionCount,
+        ...counts,
+    };
 }
 
 // ─── Sync all outcomes in a course ────────────────────────────────────────────

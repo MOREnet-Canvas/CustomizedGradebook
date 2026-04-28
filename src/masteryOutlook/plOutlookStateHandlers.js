@@ -13,14 +13,12 @@
  */
 
 import { PL_STATES } from './plOutlookStateMachine.js';
-import { readMasteryOutlookCache, readPLAssignments, writePLAssignments } from './masteryOutlookCacheService.js';
+import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
 import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
-
-/** Compare two scores rounded to the hundredths place */
-const scoresMatch = (a, b) => Math.round(a * 100) === Math.round(b * 100);
+import { scoresMatch } from './plOutlookSyncStatus.js';
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -328,13 +326,25 @@ export async function handleCalculatingChanges(sm) {
         if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
     });
 
+    // Read sync_state so we can honour manual_override flags (2d)
+    const syncState  = await readSyncState(courseId, apiClient);
+    const outcomeSync = syncState[String(outcomeId)] ?? {};
+
     // Build sync list
-    const studentsToSync      = [];
-    let skippedNoChange       = 0;
-    let skippedNoSubmission   = 0;
-    let skippedNoPrediction   = 0;
+    const studentsToSync          = [];
+    let skippedNoChange           = 0;
+    let skippedNoSubmission       = 0;
+    let skippedNoPrediction       = 0;
+    let skippedManualOverride     = 0;
 
     for (const userId of effectiveTargetIds) {
+        // 2d — skip students where a teacher has confirmed Canvas should win
+        if (outcomeSync[userId]?.manual_override === true) {
+            skippedManualOverride++;
+            logger.debug(`[PLSync] Skipping student ${userId} — manual_override is set`);
+            continue;
+        }
+
         const submissionId = submissionIdByUserId?.get(userId);
         if (!submissionId) { skippedNoSubmission++; logger.warn(`[PLSync] No submission ID for student ${userId} — skipping`); continue; }
 
@@ -359,7 +369,8 @@ export async function handleCalculatingChanges(sm) {
     const numberOfUpdates = studentsToSync.length;
     logger.info(
         `[PLSync] ${outcomeName}: ${numberOfUpdates} need sync, ` +
-        `${skippedNoChange} no change, ${skippedNoPrediction} no prediction, ${skippedNoSubmission} no submission`
+        `${skippedNoChange} no change, ${skippedNoPrediction} no prediction, ` +
+        `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped`
     );
 
     sm.updateContext({ studentsToSync, numberOfUpdates, startTime: new Date().toISOString() });
@@ -379,7 +390,7 @@ export async function handleCalculatingChanges(sm) {
  * Uses the existing submitRubricAssessmentBatch — same as handleUpdatingGrades.
  */
 export async function handleSyncing(sm) {
-    const { studentsToSync, numberOfUpdates, apiClient } = sm.getContext();
+    const { courseId, outcomeId, studentsToSync, numberOfUpdates, apiClient } = sm.getContext();
     sm.progress(`Syncing ${numberOfUpdates} student(s)...`, 0, numberOfUpdates);
     logger.info(`[PLSync] SYNCING ${numberOfUpdates} student(s)`);
 
@@ -399,6 +410,24 @@ export async function handleSyncing(sm) {
     if (errors.length > 0) {
         logger.warn('[PLSync] Permanent errors:', errors.map(e => ({ userId: e.userId, score: e.average, error: e.error })));
     }
+
+    // 2c — write last_synced_score + last_synced_at for every successfully synced student
+    const errorUserIds = new Set(errors.map(e => String(e.userId)));
+    const now          = new Date().toISOString();
+    const syncState    = await readSyncState(courseId, apiClient);
+    const oId          = String(outcomeId);
+    if (!syncState[oId]) syncState[oId] = {};
+
+    for (const s of studentsToSync) {
+        if (errorUserIds.has(String(s.userId))) continue;  // skip permanent failures
+        syncState[oId][String(s.userId)] = {
+            ...syncState[oId][String(s.userId)],
+            last_synced_score: s.plScore,
+            last_synced_at:    now,
+        };
+    }
+    await writeSyncState(courseId, syncState, apiClient);
+    logger.debug(`[PLSync] sync_state updated for ${successCount} student(s) on outcome ${outcomeId}`);
 
     sm.updateContext({ successCount, errors, retryCounts });
     return PL_STATES.VERIFYING;

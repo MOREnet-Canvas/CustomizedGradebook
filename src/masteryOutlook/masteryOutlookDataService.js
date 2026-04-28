@@ -516,3 +516,56 @@ export function computeOutcomeStats(data, threshold = 2.2) {
         students: studentData
     };
 }
+
+/**
+ * Refresh Data — step 8: detect possible manual Canvas overrides.
+ *
+ * After a Refresh Data cycle computes the new cache, this function walks every
+ * student × outcome and checks whether the Canvas rollup score has changed
+ * since the last PL sync push.  If it has, the teacher may have manually
+ * overridden the grade in Canvas, so we flag it for the teacher to review.
+ *
+ * Rules:
+ *  - Only checked when a PL assignment exists for the outcome.
+ *  - possibleManualOverride = true  ↔  canvasScore ≠ lastSyncedScore
+ *                                       AND manual_override is NOT already set.
+ *  - Never sets manual_override (that requires explicit teacher confirmation).
+ *  - Mutates cache.students in place and returns cache for chaining.
+ *
+ * @param {Object} cache        - Result of computeOutcomeStats()
+ * @param {Object} syncState    - Result of readSyncState() — may be {}
+ * @param {Object} plAssignments - Result of readPLAssignments() — may be {}
+ * @returns {Object} The same cache object (mutated)
+ */
+export function applyPossibleManualOverrides(cache, syncState, plAssignments) {
+    const scoresMatch = (a, b) =>
+        a != null && b != null && Math.round(a * 100) === Math.round(b * 100);
+
+    for (const student of (cache.students || [])) {
+        for (const outcomeData of (student.outcomes || [])) {
+            const oId = String(outcomeData.outcomeId);
+            const sId = String(student.id);
+
+            // Only relevant when the outcome has a PL assignment set up
+            if (!plAssignments?.[oId]?.assignment_id) {
+                outcomeData.possibleManualOverride = false;
+                continue;
+            }
+
+            const state          = syncState?.[oId]?.[sId];
+            const canvasScore    = outcomeData.canvasScore;
+            const lastSynced     = state?.last_synced_score ?? null;
+            const manualOverride = state?.manual_override ?? false;
+
+            // Flag only when: not already confirmed, was pushed before, and now differs
+            outcomeData.possibleManualOverride = (
+                !manualOverride
+                && lastSynced !== null
+                && canvasScore !== null
+                && !scoresMatch(canvasScore, lastSynced)
+            );
+        }
+    }
+
+    return cache;
+}
