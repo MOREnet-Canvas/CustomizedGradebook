@@ -264,7 +264,7 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
     injectStyles(PL_OUTLOOK_CSS, 'pl-outlook-styles');
 
     containerEl.innerHTML = '';
-    containerEl.style.cssText = `${FONT} max-width:1100px; margin:0 auto; padding:1rem;`;
+    containerEl.style.cssText = `${FONT} max-width:1375px; margin:0 auto; padding:1rem; font-size:125%;`;
     // Apply .mo-shell so all scoped CSS rules resolve correctly
     containerEl.classList.add('mo-shell');
 
@@ -370,7 +370,7 @@ function buildShell(containerEl) {
         </div>
 
         <div id="od-body" style="display:grid;
-             grid-template-columns:1fr 260px; gap:12px;">
+             grid-template-columns:1fr; gap:12px;">
             <div id="od-outcomes-col">
                 <!-- Tab bar -->
                 <div id="od-tab-bar" style="display:flex; gap:4px;
@@ -2504,8 +2504,8 @@ function switchToView(viewMode, shell, cache) {
         // Show outcomes view, show sidebar
         shell.outcomesView.style.display = 'block';
         shell.heatmapView.style.display = 'none';
-        shell.sidebarEl.style.display = 'block';
-        shell.bodyEl.style.gridTemplateColumns = '1fr 260px';
+        shell.sidebarEl.style.display = 'none';
+        shell.bodyEl.style.gridTemplateColumns = '1fr';
 
         logger.debug('[MasteryOutlook] Switched to outcomes view');
     } else if (viewMode === 'heatmap') {
