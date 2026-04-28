@@ -16,7 +16,12 @@ import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
-import { handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride } from './plOutlookActions.js';
+import {
+    handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
+    handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
+    handleLockWillPost, handleUnlockWillPost, handleNoteChanged,
+    handleIgnoreAlignment, handleUnignoreAlignment,
+} from './plOutlookActions.js';
 import { startPolling, stopPolling, startVisibilityListener, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
@@ -49,6 +54,132 @@ function isSpecialOutcome(title) {
 
 function isRegularOutcome(outcome) {
     return !isSpecialOutcome(outcome.title);
+}
+
+// ─── Handoff helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Compare two numeric values with a small floating-point epsilon.
+ * Handles null/undefined gracefully (null ≠ anything).
+ */
+function approxEq(a, b, eps = 0.001) {
+    if (a == null || b == null) return false;
+    return Math.abs(a - b) < eps;
+}
+
+/**
+ * Map a 0-4 score to a tone key used for color styling.
+ * Matches the prototype thresholds exactly.
+ * Returns 'ne' for null/undefined.
+ *
+ * @param {number|null} v
+ * @returns {'hi'|'good'|'dev'|'low'|'ne'}
+ */
+function scoreTone(v) {
+    if (v == null) return 'ne';
+    const c = Math.max(0, Math.min(4, v));
+    if (c >= 3.25) return 'hi';
+    if (c >= 2.5)  return 'good';
+    if (c >= 1.75) return 'dev';
+    return 'low';
+}
+
+/**
+ * Format an ISO date string to a short month-day string, e.g. "Apr 9".
+ * Returns '—' for null/invalid input.
+ *
+ * @param {string|null} iso
+ * @returns {string}
+ */
+function formatDateShort(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Return an inline background+color style string for a score tone.
+ * Uses the CSS custom properties defined in plOutlookStyles.js :root.
+ *
+ * @param {string} tone - one of 'hi'|'good'|'dev'|'low'|'ne'
+ * @returns {string}
+ */
+function scoreToneStyle(tone) {
+    if (tone === 'ne') return 'background:var(--bg-secondary);color:var(--text-tertiary);';
+    return `background:var(--s-${tone});color:var(--s-${tone}-ink);`;
+}
+
+/**
+ * Build the per-student handoff state object used by renderHoRow.
+ * Maps cache fields to the same logical shape as the prototype's ensureHandoffState().
+ *
+ * @param {Object}   student             - entry from cache.students
+ * @param {Object}   outcomeData         - student.outcomes entry matching this outcome
+ * @param {Object}   syncEntry           - sync_state[outcomeId][studentId] (may be {})
+ * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
+ * @param {string|number} outcomeId
+ * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, pushing}}
+ */
+function buildHandoffStudentState(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
+    const canvas  = outcomeData?.canvasScore  ?? null;
+    const marzano = outcomeData?.plPrediction ?? null;
+
+    const storedWP = syncEntry?.will_post ?? null;
+    const willPost = storedWP ?? marzano;
+
+    // Derive lock state — mirrors prototype ensureHandoffState() logic
+    let lock;
+    if (syncEntry?.will_post_lock === 'locked') {
+        lock = 'locked';
+    } else if (canvas !== null && marzano !== null && !approxEq(canvas, marzano) && storedWP === null) {
+        // Canvas score differs from Marzano but teacher hasn't explicitly set Will Post yet
+        lock = 'unlocked';
+    } else {
+        lock = 'none';
+    }
+
+    const note = syncEntry?.will_post_note ?? '';
+
+    // Build dots from this student's attempts for this outcome
+    const oidStr   = String(outcomeId);
+    const sidStr   = String(student.id);
+    const ignored  = ignoredAlignments ?? [];
+    const dots = (outcomeData?.attempts ?? []).map((attempt, i) => ({
+        assignmentId: attempt.assignmentId ?? null,
+        a: attempt.assignmentName ?? (attempt.assignmentId ? `Alignment ${i + 1}` : '—'),
+        d: formatDateShort(attempt.timestamp),
+        v: attempt.score != null ? Math.max(0, Math.min(4, attempt.score)) : null,
+        ignored: ignored.some(ig =>
+            String(ig.studentId)  === sidStr &&
+            String(ig.outcomeId)  === oidStr &&
+            ig.assignmentId       === attempt.assignmentId
+        )
+    }));
+
+    // Status — mirrors prototype hoStatus() logic
+    let status;
+    if (marzano === null) {
+        status = 'ne';
+    } else if (willPost !== null && canvas !== null && approxEq(willPost, canvas)) {
+        status = 'synced';
+    } else {
+        status = 'needs';
+    }
+
+    return {
+        id:           sidStr,
+        name:         student.name ?? student.sortableName ?? sidStr,
+        sortableName: student.sortableName ?? student.name ?? sidStr,
+        canvas,
+        marzano,
+        willPost,
+        lock,
+        note,
+        dots,
+        status,
+        pushing: false
+    };
 }
 
 /**
@@ -134,6 +265,8 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
 
     containerEl.innerHTML = '';
     containerEl.style.cssText = `${FONT} max-width:1100px; margin:0 auto; padding:1rem;`;
+    // Apply .mo-shell so all scoped CSS rules resolve correctly
+    containerEl.classList.add('mo-shell');
 
     // Shell renders immediately — no waiting on cache or outcomes fetch
     const shell = buildShell(containerEl);
@@ -431,6 +564,16 @@ function emptySpread() {
 let currentViewMode = 'outcomes';  // 'outcomes' or 'heatmap'
 
 function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
+    // Apply handoff design-token variants to the shell container so that
+    // .mo-shell[data-density="comfortable"] and similar CSS rules resolve.
+    const shellEl = shell.outcomesEl?.closest('.mo-shell');
+    if (shellEl) {
+        shellEl.dataset.density  = 'comfortable';
+        shellEl.dataset.summary  = 'chip';
+        shellEl.dataset.palette  = 'vivid';
+        shellEl.dataset.emphasis = 'prosecutorial';
+    }
+
     setLastUpdated(shell.lastUpdatedEl, cache.meta.computedAt);
     shell.subtitleEl.textContent =
         `${cache.meta.studentCount} students ·
@@ -1002,47 +1145,197 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
 
     // Tab content
     const content = document.createElement('div');
-    content.style.cssText = `padding:12px; max-height:400px; overflow-y:auto;`;
+    content.style.cssText = `padding:12px; overflow:visible;`;
+
+    let activeDotKey = null;  // tracks which dot popover is open: "oid:sid:idx"
 
     const renderTable = () => {
-        // 3d — route the Exceptions tab to its own table; all others use the student table
         if (activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);
-        } else {
-            content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
+            return;
         }
+        if (activeTab === 'students') {
+            content.innerHTML = renderHandoffTable(outcome, cache);
+            return;
+        }
+        content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
     };
     renderTable();
 
-    // Event delegation for per-row sync action buttons
-    content.addEventListener('click', async (e) => {
-        const btn = e.target.closest('[data-action]');
-        if (!btn || btn.disabled) return;
+    // Close open dot popover when clicking outside any dot
+    document.addEventListener('click', (e) => {
+        if (activeDotKey && !e.target.closest('.dot')) {
+            activeDotKey = null;
+            content.querySelectorAll('.dot.active').forEach(d => d.classList.remove('active'));
+        }
+    });
 
-        const action     = btn.dataset.action;
-        const studentId  = btn.dataset.studentId;
-        const outcomeId  = btn.dataset.outcomeId;
+    // ── Event delegation — all tab types ──────────────────────────────────
+    content.addEventListener('click', async (e) => {
+        const target = e.target;
+        const el = target.closest('[data-action]');
+        if (!el) return;
+
+        const action    = el.dataset.action;
+        const stuId     = el.dataset.stu    || el.dataset.studentId;
+        const oId       = el.dataset.oid    || el.dataset.outcomeId;
         const outcomeName = outcome.title || String(outcome.id);
 
-        btn.disabled = true;
-        const originalText = btn.textContent;
-        btn.textContent = '…';
-
-        try {
-            if (action === 'sync-one') {
-                await handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, onRerender: renderTable });
-            } else if (action === 'confirm-override') {
-                await handleConfirmOverride({ courseId, outcomeId, studentId, apiClient, onRerender: renderTable });
-            } else if (action === 'dismiss-override') {
-                await handleDismissOverride({ courseId, outcomeId, outcomeName, studentId, apiClient, onRerender: renderTable });
-            } else if (action === 'revert-override') {
-                await handleRevertOverride({ courseId, outcomeId, outcomeName, studentId, apiClient, onRerender: renderTable });
+        // ── Legacy per-row sync buttons (non-students tabs) ───────────────
+        if (action === 'sync-one' && el.tagName === 'BUTTON') {
+            if (el.disabled) return;
+            el.disabled = true;
+            el.textContent = '…';
+            try {
+                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable });
+            } catch (err) {
+                logger.error('[MasteryOutlook] sync-one failed', err);
+                el.disabled = false; el.textContent = '↑ Sync';
             }
-        } catch (err) {
-            logger.error('[MasteryOutlook] Action failed', err);
-            btn.disabled = false;
-            btn.textContent = originalText;
+            return;
         }
+        if (action === 'confirm-override') { await handleConfirmOverride({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable }); return; }
+        if (action === 'dismiss-override') { await handleDismissOverride({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable }); return; }
+        if (action === 'revert-override')  { await handleRevertOverride({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable }); return; }
+
+        // ── Handoff: dot popover toggle ───────────────────────────────────
+        if (action === 'dot-toggle') {
+            e.stopPropagation();
+            const dotEl = el.closest('.dot');
+            if (!dotEl) return;
+            const key = `${oId}:${stuId}:${el.dataset.dotIdx}`;
+            if (activeDotKey === key) {
+                activeDotKey = null;
+                dotEl.classList.remove('active');
+            } else {
+                content.querySelectorAll('.dot.active').forEach(d => d.classList.remove('active'));
+                activeDotKey = key;
+                dotEl.classList.add('active');
+            }
+            return;
+        }
+
+        // ── Handoff: ignore/unignore alignment ────────────────────────────
+        if (action === 'dot-ignore-toggle') {
+            e.stopPropagation();
+            const asgnId  = el.dataset.asgnId;
+            const ignored = (cache.ignored_alignments ?? []).some(
+                ia => String(ia.studentId) === stuId && String(ia.outcomeId) === oId && ia.assignmentId === asgnId
+            );
+            try {
+                if (ignored) {
+                    await handleUnignoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, apiClient, onRerender: renderTable });
+                } else {
+                    await handleIgnoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, apiClient, onRerender: renderTable });
+                }
+            } catch (err) { logger.error('[MasteryOutlook] ignore toggle failed', err); }
+            return;
+        }
+
+        // ── Handoff: Canvas pill → set Will Post = canvas score ───────────
+        if (action === 'ho-use-canvas') {
+            const cv = parseFloat(el.dataset.canvas);
+            if (isNaN(cv)) return;
+            await handleCanvasPillClick({ courseId, outcomeId: oId, studentId: stuId, canvasScore: cv, apiClient, onRerender: renderTable });
+            return;
+        }
+
+        // ── Handoff: Marzano pill → revert Will Post to auto-track ────────
+        if (action === 'ho-use-marzano') {
+            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
+            return;
+        }
+
+        // ── Handoff: Will Post box click → inline edit ────────────────────
+        if (action === 'ho-wp-click') {
+            const wrap = el.closest('.ho-wp-box-wrap');
+            if (!wrap || wrap.querySelector('.ho-wp-input')) return; // already editing
+            const boxEl  = wrap.querySelector('.ho-wp-box');
+            const curVal = boxEl?.textContent?.trim() ?? '';
+            const input  = document.createElement('input');
+            input.className = 'ho-wp-input';
+            input.type = 'text'; input.inputMode = 'decimal';
+            input.value = (curVal !== 'NE' && curVal !== '—') ? curVal : '';
+            boxEl?.replaceWith(input);
+            input.select();
+
+            const commitEdit = async () => {
+                const raw = parseFloat(input.value);
+                if (!isNaN(raw)) {
+                    const clamped = Math.max(0, Math.min(4, raw));
+                    await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: clamped, apiClient, onRerender: renderTable });
+                } else {
+                    renderTable(); // restore on invalid input
+                }
+            };
+            input.addEventListener('blur',   commitEdit);
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
+                if (ev.key === 'Escape') { input.removeEventListener('blur', commitEdit); renderTable(); }
+            });
+            return;
+        }
+
+        // ── Handoff: padlock → lock ────────────────────────────────────────
+        if (action === 'ho-lock') {
+            await handleLockWillPost({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
+            return;
+        }
+        // ── Handoff: padlock → unlock ─────────────────────────────────────
+        if (action === 'ho-unlock') {
+            await handleUnlockWillPost({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
+            return;
+        }
+
+        // ── Handoff: save row → push to Canvas ────────────────────────────
+        if (action === 'ho-save') {
+            if (el.disabled) return;
+            el.disabled = true;
+            try {
+                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable });
+            } catch (err) {
+                logger.error('[MasteryOutlook] ho-save failed', err);
+                el.disabled = false;
+            }
+            return;
+        }
+
+        // ── Handoff: save all ─────────────────────────────────────────────
+        if (action === 'ho-post-all') {
+            if (el.disabled) return;
+            el.disabled = true;
+            const syncState   = cache.sync_state ?? {};
+            const outcomeSync = syncState[String(outcome.id)] ?? {};
+            const ignored     = cache.ignored_alignments ?? [];
+            const oidStr      = String(outcome.id);
+            const pending = cache.students
+                .map(student => {
+                    const sId = String(student.id);
+                    const od  = student.outcomes.find(o => String(o.outcomeId) === oidStr);
+                    return buildHandoffStudentState(student, od, outcomeSync[sId] ?? {}, ignored, outcome.id);
+                })
+                .filter(s => s.status === 'needs');
+            for (const s of pending) {
+                try {
+                    await handleSyncOneStudent({ courseId, outcomeId: oidStr, outcomeName, studentId: s.id, apiClient, onRerender: renderTable });
+                } catch (err) { logger.error(`[MasteryOutlook] ho-post-all failed for ${s.id}`, err); }
+            }
+            renderTable();
+            return;
+        }
+    });
+
+    // ── Note input — debounced (not click, so separate listener) ─────────
+    content.addEventListener('input', (e) => {
+        const el = e.target.closest('[data-action="ho-note"]');
+        if (!el) return;
+        handleNoteChanged({
+            courseId,
+            outcomeId: el.dataset.oid,
+            studentId: el.dataset.stu,
+            noteValue: el.value,
+            apiClient,
+        });
     });
 
     panel.appendChild(content);
@@ -1308,6 +1601,224 @@ function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgno
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
     </table>`;
+}
+
+// ─── Handoff panel: HTML renderers ───────────────────────────────────────────
+
+/**
+ * Render one alignment dot with hover preview + click-to-open popover.
+ *
+ * @param {Object} dot    - { a, d, v, ignored, assignmentId }
+ * @param {string} oidStr - outcome ID string
+ * @param {string} sidStr - student ID string
+ * @param {number} i      - dot index within student's attempts
+ * @returns {string} HTML
+ */
+function renderDot(dot, oidStr, sidStr, i) {
+    const tone       = scoreTone(dot.v);
+    const bgStyle    = scoreToneStyle(tone);
+    const valStr     = dot.v != null ? dot.v.toFixed(2) : '—';
+    const label      = dot.v != null ? dot.v.toFixed(1) : '?';
+    const asgn       = escapeHtml(dot.a || `Alignment ${i + 1}`);
+    const dateStr    = escapeHtml(dot.d || '—');
+    const asgnId     = escapeHtml(dot.assignmentId || '');
+    const ignoredCls = dot.ignored ? 'ignored' : '';
+    const statusStr  = dot.ignored ? 'Ignored' : 'In Marzano';
+    const statusCol  = dot.ignored ? 'var(--amber)' : 'var(--green)';
+
+    return `<div class="dot ${ignoredCls}" style="${bgStyle}"
+        data-action="dot-toggle" data-dot-idx="${i}"
+        data-stu="${sidStr}" data-oid="${oidStr}"
+        data-asgn-id="${asgnId}" tabindex="0" role="button" aria-label="${asgn}: ${valStr}">
+      ${label}
+      <div class="dot-preview">${asgn} · ${valStr}</div>
+      <div class="dot-popover">
+        <div class="dp-hd">
+          <span class="dp-title">${asgn}</span>
+          <span class="dp-score" style="${bgStyle}">${valStr}</span>
+        </div>
+        <div class="dp-rows">
+          <div class="dp-row"><span class="lbl">Date</span><span class="val">${dateStr}</span></div>
+          <div class="dp-row"><span class="lbl">Score</span><span class="val">${valStr}</span></div>
+          <div class="dp-row"><span class="lbl">Status</span>
+            <span class="val" style="color:${statusCol};">${statusStr}</span></div>
+        </div>
+        <div class="dp-divider"></div>
+        <div class="dp-toggle">
+          <span>Ignore this alignment</span>
+          <div class="toggle-sw ${dot.ignored ? 'on' : ''}"
+               data-action="dot-ignore-toggle" data-dot-idx="${i}"
+               data-stu="${sidStr}" data-oid="${oidStr}" data-asgn-id="${asgnId}"></div>
+        </div>
+        <div class="dp-footnote">Ignored alignments are excluded from the Marzano calculation but remain visible in Canvas.</div>
+      </div>
+    </div>`;
+}
+
+/**
+ * Render one student row in the handoff table.
+ *
+ * @param {Object} s      - handoff state from buildHandoffStudentState()
+ * @param {string} oidStr - outcome ID string (for data attributes)
+ * @returns {string} HTML <tr>
+ */
+function renderHoRow(s, oidStr) {
+    const needsCls   = s.status === 'needs' ? 'ho-needs-row' : '';
+    const differsCls = s.lock !== 'none'    ? 'differs'     : '';
+
+    const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
+    const marzDisp    = s.marzano != null ? s.marzano.toFixed(2) : 'NE';
+    const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
+    const canvasFaded = s.lock === 'none' && !approxEq(s.canvas, s.willPost) ? '' : 'faded';
+    const marzFaded   = s.lock !== 'none' ? 'faded' : '';
+
+    const dotsHtml = s.dots.length
+        ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
+        : `<span style="font-size:10px;color:var(--text-tertiary);">—</span>`;
+
+    const lockHtml = s.lock !== 'none' ? `
+        <button class="ho-wp-lock ${s.lock}"
+                data-action="${s.lock === 'locked' ? 'ho-unlock' : 'ho-lock'}"
+                data-stu="${s.id}" data-oid="${oidStr}"
+                aria-label="${s.lock === 'locked' ? 'Unlock Will Post' : 'Lock Will Post'}">
+          ${s.lock === 'locked' ? '🔒' : '🔓'}
+          <span class="ho-lock-tip">${
+              s.lock === 'locked'
+                  ? 'Will Post is locked. Click to revert to Marzano.'
+                  : 'Score differs from Marzano. Click to lock this value.'
+          }</span>
+        </button>` : '';
+
+    const saveHtml = s.pushing
+        ? `<span class="ho-posting"><span class="spinner"></span> Pushing…</span>`
+        : `<button class="ho-save-row-btn" data-action="ho-save" data-stu="${s.id}" data-oid="${oidStr}"
+               ${s.status !== 'needs' ? 'disabled' : ''} title="Push ${wpDisp} to Canvas">
+             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
+               <polyline points="2,7 6,3 10,7"/><line x1="6" y1="3" x2="6" y2="11"/>
+             </svg>
+             <span class="sr-tip">Push to Canvas</span>
+           </button>`;
+
+    return `<tr class="${needsCls}" data-stu="${s.id}" data-oid="${oidStr}">
+      <td><span class="ho-stu-name">${escapeHtml(s.name)}</span></td>
+      <td><div class="dot-row">${dotsHtml}</div></td>
+      <td class="c">
+        <button class="ho-pill-btn ${canvasFaded}" data-action="ho-use-canvas"
+                data-stu="${s.id}" data-oid="${oidStr}" data-canvas="${s.canvas ?? ''}">
+          <span class="ho-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
+          <span class="ho-pill-tip">Set Will Post = ${canvasDisp}</span>
+        </button>
+      </td>
+      <td class="c">
+        <button class="ho-pill-btn ${marzFaded}" data-action="ho-use-marzano"
+                data-stu="${s.id}" data-oid="${oidStr}">
+          <span class="ho-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
+          <span class="ho-pill-tip">Set Will Post = ${marzDisp} (Marzano)</span>
+        </button>
+      </td>
+      <td class="c">
+        <div class="ho-wp-outer">
+          <div class="ho-wp-box-wrap ${differsCls}" data-action="ho-wp-click"
+               data-stu="${s.id}" data-oid="${oidStr}" tabindex="0" role="button"
+               aria-label="Will Post: ${wpDisp}">
+            <div class="ho-wp-box">${wpDisp}</div>
+            ${lockHtml}
+          </div>
+        </div>
+      </td>
+      <td class="ho-td-comment">
+        <input class="ho-comment-input ${s.lock !== 'none' ? 'prompted' : ''}"
+               type="text" value="${escapeHtml(s.note)}"
+               placeholder="${s.lock !== 'none' ? 'Reason for override…' : 'Note…'}"
+               data-action="ho-note" data-stu="${s.id}" data-oid="${oidStr}"
+               aria-label="Note for ${escapeHtml(s.name)}">
+      </td>
+      <td class="c">${saveHtml}</td>
+    </tr>`;
+}
+
+/**
+ * Build the full handoff table HTML for the "All Students" tab.
+ * Replaces buildStudentTable for the 'students' filter.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {string} HTML string
+ */
+function renderHandoffTable(outcome, cache) {
+    const syncState   = cache.sync_state ?? {};
+    const outcomeSync = syncState[String(outcome.id)] ?? {};
+    const ignored     = cache.ignored_alignments ?? [];
+    const oidStr      = String(outcome.id);
+
+    const studentStates = cache.students
+        .map(student => {
+            const sId         = String(student.id);
+            const outcomeData = student.outcomes.find(o => String(o.outcomeId) === oidStr);
+            const entry       = outcomeSync[sId] ?? {};
+            return buildHandoffStudentState(student, outcomeData, entry, ignored, outcome.id);
+        })
+        .sort((a, b) => a.sortableName.localeCompare(b.sortableName));
+
+    const needsRows  = studentStates.filter(s => s.status === 'needs');
+    const syncedRows = studentStates.filter(s => s.status === 'synced');
+    const neRows     = studentStates.filter(s => s.status === 'ne');
+    const needsCount = needsRows.length;
+
+    const toolbarHtml = `
+        <div class="ho-post-toolbar">
+          <span class="ho-post-toolbar-left">
+            <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
+          </span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-primary" data-action="ho-post-all"
+                    ${needsCount === 0 ? 'disabled' : ''}>↑ Save all to Canvas</button>
+          </div>
+        </div>`;
+
+    const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
+    const legendHtml = `
+        <div class="ho-legend">
+          <span style="font-size:10px;color:var(--text-tertiary);font-weight:600;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;">Score</span>
+          ${tones.map(([t, lbl]) =>
+              `<span class="ho-leg"><span class="ho-leg-sw" style="${scoreToneStyle(t)}"></span><span>${lbl}</span></span>`
+          ).join('')}
+        </div>`;
+
+    const sectionDivider = (rows, isNeeds) => {
+        if (!rows.length) return '';
+        const label = isNeeds
+            ? `⬆ ${rows.length} student${rows.length !== 1 ? 's' : ''} need${rows.length === 1 ? 's' : ''} updating`
+            : `✓ Up to date (${rows.length})`;
+        const cls = isNeeds ? 'ho-sdiv needs' : 'ho-sdiv';
+        return `<tr class="${cls}"><td colspan="7"><div class="sdlabel">${label}</div></td></tr>`;
+    };
+
+    const bodyHtml = [
+        sectionDivider(needsRows, true),
+        needsRows.map(s => renderHoRow(s, oidStr)).join(''),
+        needsRows.length && syncedRows.length ? sectionDivider(syncedRows, false) : '',
+        syncedRows.map(s => renderHoRow(s, oidStr)).join(''),
+        neRows.map(s => renderHoRow(s, oidStr)).join(''),
+    ].join('');
+
+    return `
+        ${toolbarHtml}
+        ${legendHtml}
+        <div class="ho-block">
+          <table>
+            <thead><tr>
+              <th style="min-width:130px;">Student</th>
+              <th>Alignments</th>
+              <th class="c">Canvas</th>
+              <th class="c">Marzano</th>
+              <th class="c">Will Post</th>
+              <th>Note</th>
+              <th class="c">Save</th>
+            </tr></thead>
+            <tbody>${bodyHtml}</tbody>
+          </table>
+        </div>`;
 }
 
 function buildStudentTable(outcome, cache, filter, courseId, apiClient) {

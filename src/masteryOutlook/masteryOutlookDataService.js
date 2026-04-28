@@ -201,6 +201,22 @@ function chunk(arr, size) {
 }
 
 /**
+ * Build a { alignmentId → name } lookup map from a Canvas linked.alignments array.
+ * Each alignment object has at minimum: { id: "assignment_NNN", name: "Quiz 1" }
+ *
+ * @param {Object[]} alignments  - From response.linked?.alignments ?? []
+ * @returns {Object}             - e.g. { "assignment_123": "Quiz 1" }
+ */
+function buildAlignmentNameMap(alignments) {
+    const map = {};
+    if (!Array.isArray(alignments)) return map;
+    alignments.forEach(a => {
+        if (a.id && a.name) map[a.id] = a.name;
+    });
+    return map;
+}
+
+/**
  * Apply the PL assignment exclusion filter to a flat results array.
  *
  * @param {Object[]} results        - Raw outcome_result objects
@@ -252,6 +268,8 @@ export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssi
     const totalPages  = parseTotalPagesFromLink(linkHeader) ?? 1;
 
     const allResults = [...(page1Data.outcome_results || [])];
+    // Collect alignment names: { alignmentId → name } cumulative across all pages
+    const alignmentNameMap = buildAlignmentNameMap(page1Data.linked?.alignments ?? []);
     logger.debug(`[outcomesDataService] Parallel fetch: ${totalPages} total page(s), ${allResults.length} from page 1`);
 
     if (totalPages > 1) {
@@ -264,7 +282,7 @@ export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssi
             const settled = await Promise.allSettled(
                 batch.map(p =>
                     apiClient.get(`${baseUrl}&page=${p}`, {}, `fetchOutcomeResultsParallel:page${p}`)
-                             .then(d => d.outcome_results || [])
+                             .then(d => ({ results: d.outcome_results || [], names: buildAlignmentNameMap(d.linked?.alignments ?? []) }))
                 )
             );
 
@@ -276,7 +294,10 @@ export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssi
                 );
             }
 
-            settled.forEach(r => allResults.push(...r.value));
+            settled.forEach(r => {
+                allResults.push(...r.value.results);
+                Object.assign(alignmentNameMap, r.value.names);
+            });
         }
     }
 
@@ -289,7 +310,7 @@ export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssi
         logger.info(`[outcomesDataService] Excluded ${excluded} PL override result(s) from parallel fetch`);
     }
 
-    return filtered;
+    return { results: filtered, alignmentNameMap };
 }
 
 export async function fetchOutcomeResults(courseId, apiClient, onProgress = () => {}) {
@@ -300,6 +321,7 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
         // Manual pagination because Canvas API returns { outcome_results: [...] }
         // not a direct array like other endpoints
         let allResults = [];
+        const alignmentNameMap = {};
         let page = 1;
         let hasMore = true;
         let nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=outcomes.alignments&per_page=100`;
@@ -314,6 +336,9 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
             // Extract outcome_results array from response
             const pageResults = response.outcome_results || [];
             allResults = allResults.concat(pageResults);
+
+            // Collect alignment name metadata from this page
+            Object.assign(alignmentNameMap, buildAlignmentNameMap(response.linked?.alignments ?? []));
 
             logger.debug(`[outcomesDataService] Page ${page}: ${pageResults.length} results`);
             onProgress(`Fetching outcome results... page ${page} (${allResults.length} total)`);
@@ -333,7 +358,7 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
         logger.info(`[outcomesDataService] Fetched ${allResults.length} outcome results`);
         onProgress(`Loaded ${allResults.length} outcome results`);
 
-        return allResults;
+        return { results: allResults, alignmentNameMap };
 
     } catch (error) {
         logger.error('[outcomesDataService] Failed to fetch outcome results', error);
@@ -354,10 +379,11 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
  * Sorts each group by submitted_or_assessed_at (oldest first)
  * Deduplicates by submission ID if needed
  *
- * @param {Array} outcomeResults - Raw outcome_results from Canvas API
- * @returns {Object} Grouped attempts: { "studentId_outcomeId": [{score, timestamp, assignmentId}] }
+ * @param {Array}  outcomeResults   - Raw outcome_results from Canvas API
+ * @param {Object} [alignmentNameMap={}] - { alignmentId → assignmentName } from linked.alignments
+ * @returns {Object} Grouped attempts: { "studentId_outcomeId": [{score, timestamp, assignmentId, assignmentName}] }
  */
-export function extractAttempts(outcomeResults) {
+export function extractAttempts(outcomeResults, alignmentNameMap = {}) {
     // Defensive check
     if (!Array.isArray(outcomeResults)) {
         logger.error(`[outcomesDataService] extractAttempts received non-array: ${typeof outcomeResults}`);
@@ -391,11 +417,12 @@ export function extractAttempts(outcomeResults) {
             grouped[key] = [];
         }
 
-        // Add attempt
+        // Add attempt — include assignmentName if available from linked.alignments
         grouped[key].push({
             score: parseFloat(score),
             timestamp: timestamp,
             assignmentId: assignmentId,
+            assignmentName: alignmentNameMap[assignmentId] ?? null,
             resultId: result.id
         });
     });
@@ -484,16 +511,23 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
             Object.values(plAssignments || {}).map(a => `assignment_${a.assignment_id}`)
         );
 
-        // Step 3: Fetch ALL outcome results — sequential or parallel
+        // Step 3: Fetch ALL outcome results — sequential or parallel.
+        // Both paths now return { results, alignmentNameMap } for assignment name resolution in dots.
         let filteredResults;
+        let alignmentNameMap = {};
+
         if (parallel) {
-            // Parallel path returns already-filtered results
-            filteredResults = await fetchAllOutcomeResultsParallel(
+            // Parallel path returns already-filtered results + alignment names
+            const parallelData = await fetchAllOutcomeResultsParallel(
                 courseId, apiClient, plAssignmentIds, onProgress
             );
+            filteredResults  = parallelData.results;
+            alignmentNameMap = parallelData.alignmentNameMap;
         } else {
             // Sequential path — filter applied below
-            const outcomeResults = await fetchOutcomeResults(courseId, apiClient, onProgress);
+            const fetchData = await fetchOutcomeResults(courseId, apiClient, onProgress);
+            const outcomeResults = fetchData.results;
+            alignmentNameMap     = fetchData.alignmentNameMap;
             if (outcomeResults.length === 0) logger.warn('[outcomesDataService] No outcome results found');
 
             filteredResults = plAssignmentIds.size > 0
@@ -513,7 +547,8 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
         onProgress('Fetching Canvas rollup scores...');
         const canvasRollups = await fetchOutcomeRollups(courseId, apiClient);
 
-        const groupedAttempts = extractAttempts(filteredResults);
+        // Pass alignmentNameMap so each attempt gets its assignment name populated
+        const groupedAttempts = extractAttempts(filteredResults, alignmentNameMap);
 
         onProgress('Data fetch complete');
         logger.info('[outcomesDataService] Complete data fetch finished');

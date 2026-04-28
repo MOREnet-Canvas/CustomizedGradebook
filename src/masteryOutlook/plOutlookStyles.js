@@ -772,4 +772,23 @@ tr.ho-needs-row td { background:#FFFDF7; }
 .pl-sync-btn { font-size:0.75rem; padding:0.2rem 0.65rem; border:1px solid #2563eb; border-radius:4px; background:transparent; color:#2563eb; cursor:pointer; white-space:nowrap; transition:background 0.15s, color 0.15s; }
 .pl-sync-btn:hover    { background:#2563eb; color:#fff; }
 .pl-sync-btn:disabled { border-color:#9ca3af; color:#9ca3af; cursor:not-allowed; background:transparent; }
+
+/* ── Density: comfortable ────────────────────────────────────────────── */
+/* The default density tokens are tighter (compact). Comfortable adds     */
+/* a bit more breathing room to rows and cells.                           */
+.mo-shell[data-density="comfortable"] {
+  --row-py:  7px;
+  --cell-py: 7px;
+  --gap:     9px;
+}
+
+/* ── Status emphasis: prosecutorial ─────────────────────────────────── */
+/* "Urgent" emphasis: Will Post .differs box uses red instead of amber.  */
+.mo-shell[data-emphasis="prosecutorial"] .ho-wp-box-wrap.differs .ho-wp-box {
+  border-color: var(--red);
+  background:   var(--red-bg);
+}
+.mo-shell[data-emphasis="prosecutorial"] .ho-wp-box-wrap.differs .ho-wp-box::before {
+  background: var(--red);
+}
 `;
