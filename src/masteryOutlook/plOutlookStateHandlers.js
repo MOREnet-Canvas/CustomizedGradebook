@@ -336,20 +336,35 @@ export async function handleCalculatingChanges(sm) {
     let skippedNoSubmission       = 0;
     let skippedNoPrediction       = 0;
     let skippedManualOverride     = 0;
+    let skippedWillPostLocked     = 0;
 
     for (const userId of effectiveTargetIds) {
+        const entry = outcomeSync[userId];
+
         // 2d — skip students where a teacher has confirmed Canvas should win
-        if (outcomeSync[userId]?.manual_override === true) {
+        if (entry?.manual_override === true) {
             skippedManualOverride++;
             logger.debug(`[PLSync] Skipping student ${userId} — manual_override is set`);
+            continue;
+        }
+
+        // 3b — skip students where will_post is locked (teacher committed a specific score;
+        // Marzano must never overwrite it — push happens via explicit "Save grades to Canvas")
+        if (entry?.will_post_lock === 'locked') {
+            skippedWillPostLocked++;
+            logger.debug(`[PLSync] Skipping student ${userId} — will_post_lock is locked`);
             continue;
         }
 
         const submissionId = submissionIdByUserId?.get(userId);
         if (!submissionId) { skippedNoSubmission++; logger.warn(`[PLSync] No submission ID for student ${userId} — skipping`); continue; }
 
-        const plScore = plPredictionByUserId.get(userId);
-        if (plScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
+        const rawPlScore = plPredictionByUserId.get(userId);
+        if (rawPlScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
+
+        // 3b — use teacher-set will_post value when provided (will_post_lock: "unlocked"),
+        // otherwise fall back to the Power Law prediction
+        const plScore = (entry?.will_post != null) ? entry.will_post : rawPlScore;
 
         const canvasScore = canvasScoreByUserId.get(userId);
         if (canvasScore !== undefined && scoresMatch(plScore, canvasScore)) { skippedNoChange++; continue; }
@@ -370,7 +385,8 @@ export async function handleCalculatingChanges(sm) {
     logger.info(
         `[PLSync] ${outcomeName}: ${numberOfUpdates} need sync, ` +
         `${skippedNoChange} no change, ${skippedNoPrediction} no prediction, ` +
-        `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped`
+        `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped, ` +
+        `${skippedWillPostLocked} will_post_locked skipped`
     );
 
     sm.updateContext({ studentsToSync, numberOfUpdates, startTime: new Date().toISOString() });
@@ -420,11 +436,24 @@ export async function handleSyncing(sm) {
 
     for (const s of studentsToSync) {
         if (errorUserIds.has(String(s.userId))) continue;  // skip permanent failures
-        syncState[oId][String(s.userId)] = {
-            ...syncState[oId][String(s.userId)],
+        const sId     = String(s.userId);
+        const existing = syncState[oId][sId] ?? {};
+
+        const update = {
+            ...existing,
             last_synced_score: s.plScore,
             last_synced_at:    now,
         };
+
+        // 3c (write timing event 7) — reset will_post once the committed score has been
+        // pushed to Canvas (will_post intent has been fulfilled)
+        if (existing.will_post != null && scoresMatch(s.plScore, existing.will_post)) {
+            update.will_post      = null;
+            update.will_post_lock = 'none';
+            logger.debug(`[PLSync] Cleared will_post for student ${sId} — score committed to Canvas`);
+        }
+
+        syncState[oId][sId] = update;
     }
     await writeSyncState(courseId, syncState, apiClient);
     logger.debug(`[PLSync] sync_state updated for ${successCount} student(s) on outcome ${outcomeId}`);

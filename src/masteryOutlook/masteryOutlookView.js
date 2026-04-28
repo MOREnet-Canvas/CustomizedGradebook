@@ -163,6 +163,12 @@ function buildShell(containerEl) {
             <div style="display:flex; align-items:center; gap:10px;">
                 <span id="od-last-updated" style="font-size:0.8rem;
                       color:#888;"></span>
+                <button id="od-exceptions-btn" style="${FONT} font-size:0.8rem;
+                        padding:6px 12px; border-radius:6px; border:1px solid #ccc;
+                        background:transparent; color:#666; cursor:pointer;
+                        font-weight:500; display:none;">
+                    View exceptions
+                </button>
                 <button id="od-refresh-btn" style="${FONT} font-size:0.85rem;
                         padding:7px 16px; border-radius:6px; border:1px solid #0374B5;
                         background:#0374B5; color:#fff; cursor:pointer;
@@ -170,6 +176,11 @@ function buildShell(containerEl) {
                     Refresh Data
                 </button>
             </div>
+        </div>
+
+        <!-- 3e: Cross-outcome exceptions panel (hidden until "View exceptions" clicked) -->
+        <div id="od-exceptions-panel" style="display:none; margin-bottom:1rem;
+             border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; overflow:hidden;">
         </div>
 
         <div id="od-metrics" style="display:grid;
@@ -257,22 +268,24 @@ function buildShell(containerEl) {
     `;
 
     return {
-        titleEl:         containerEl.querySelector('#od-title'),
-        subtitleEl:      containerEl.querySelector('#od-subtitle'),
-        lastUpdatedEl:   containerEl.querySelector('#od-last-updated'),
-        refreshBtn:      containerEl.querySelector('#od-refresh-btn'),
-        thresholdSlider: containerEl.querySelector('#od-threshold-slider'),
-        thresholdValue:  containerEl.querySelector('#od-threshold-value'),
-        metricsEl:       containerEl.querySelector('#od-metrics'),
-        outcomesEl:      containerEl.querySelector('#od-outcomes-list'),
-        sidebarEl:       containerEl.querySelector('#od-sidebar'),
-        statusEl:        containerEl.querySelector('#od-status-bar'),
-        tabBar:          containerEl.querySelector('#od-tab-bar'),
-        outcomesView:    containerEl.querySelector('#od-outcomes-view'),
-        heatmapView:     containerEl.querySelector('#od-heatmap-view'),
-        bodyEl:          containerEl.querySelector('#od-body'),
-        colorSoftBtn:    containerEl.querySelector('#od-color-soft'),
-        colorCanvasBtn:  containerEl.querySelector('#od-color-canvas'),
+        titleEl:          containerEl.querySelector('#od-title'),
+        subtitleEl:       containerEl.querySelector('#od-subtitle'),
+        lastUpdatedEl:    containerEl.querySelector('#od-last-updated'),
+        refreshBtn:       containerEl.querySelector('#od-refresh-btn'),
+        exceptionsBtn:    containerEl.querySelector('#od-exceptions-btn'),
+        exceptionsPanel:  containerEl.querySelector('#od-exceptions-panel'),
+        thresholdSlider:  containerEl.querySelector('#od-threshold-slider'),
+        thresholdValue:   containerEl.querySelector('#od-threshold-value'),
+        metricsEl:        containerEl.querySelector('#od-metrics'),
+        outcomesEl:       containerEl.querySelector('#od-outcomes-list'),
+        sidebarEl:        containerEl.querySelector('#od-sidebar'),
+        statusEl:         containerEl.querySelector('#od-status-bar'),
+        tabBar:           containerEl.querySelector('#od-tab-bar'),
+        outcomesView:     containerEl.querySelector('#od-outcomes-view'),
+        heatmapView:      containerEl.querySelector('#od-heatmap-view'),
+        bodyEl:           containerEl.querySelector('#od-body'),
+        colorSoftBtn:     containerEl.querySelector('#od-color-soft'),
+        colorCanvasBtn:   containerEl.querySelector('#od-color-canvas'),
     };
 }
 
@@ -420,6 +433,109 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
 
     wireRefreshButton(shell, courseId, apiClient, onRefresh);
     wireTabBar(shell, cache);
+
+    // 3e — wire "View exceptions" button + cross-outcome panel
+    wireExceptionsPanel(shell, cache);
+}
+
+/**
+ * Wire up the "View exceptions" button and the cross-outcome exceptions panel.
+ * Filter chips inside the panel use event delegation on the panel element.
+ *
+ * @param {Object} shell - Shell object from buildShell
+ * @param {Object} cache - Enriched cache
+ */
+function wireExceptionsPanel(shell, cache) {
+    if (!shell.exceptionsBtn || !shell.exceptionsPanel) return;
+
+    // Determine whether there are any exceptions at all
+    const syncState   = cache.sync_state ?? {};
+    const ignoredList = cache.ignored_alignments ?? [];
+    let hasAny = ignoredList.length > 0;
+
+    if (!hasAny) {
+        for (const studentMap of Object.values(syncState)) {
+            for (const entry of Object.values(studentMap)) {
+                if (entry.manual_override || entry.will_post_lock === 'locked') {
+                    hasAny = true;
+                    break;
+                }
+            }
+            if (hasAny) break;
+        }
+    }
+
+    if (!hasAny) return;  // nothing to show — keep button hidden
+
+    shell.exceptionsBtn.style.display = 'inline-block';
+
+    let panelOpen        = false;
+    let showOverrides    = true;
+    let showIgnored      = true;
+
+    const renderPanel = () => {
+        shell.exceptionsPanel.innerHTML = `
+            <div style="padding:10px 14px 8px; border-bottom:0.5px solid #e0e0e0;
+                 display:flex; align-items:center; justify-content:space-between; gap:12px;
+                 background:#fafafa; flex-wrap:wrap; gap:8px;">
+                <span style="${FONT} font-size:12px; font-weight:600; color:#333;">
+                    Exceptions across all outcomes
+                </span>
+                <div style="display:flex; gap:5px;">
+                    <button data-filter="overrides"
+                        style="${FONT} font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer;
+                               border:0.5px solid ${showOverrides ? '#791F1F' : '#ccc'};
+                               background:${showOverrides ? '#FCEBEB' : '#fff'};
+                               color:${showOverrides ? '#791F1F' : '#888'}; font-weight:500;">
+                        Overrides
+                    </button>
+                    <button data-filter="ignored"
+                        style="${FONT} font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer;
+                               border:0.5px solid ${showIgnored ? '#55534D' : '#ccc'};
+                               background:${showIgnored ? '#F3F2EE' : '#fff'};
+                               color:${showIgnored ? '#55534D' : '#888'}; font-weight:500;">
+                        Ignored alignments
+                    </button>
+                    <button data-filter="close"
+                        style="${FONT} font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer;
+                               border:0.5px solid #ccc; background:#fff; color:#888; font-weight:500;">
+                        ✕ Close
+                    </button>
+                </div>
+            </div>
+            <div style="padding:0; overflow-x:auto;">
+                ${buildCrossOutcomeExceptionsView(cache, { showOverrides, showIgnored })}
+            </div>`;
+    };
+
+    shell.exceptionsBtn.addEventListener('click', () => {
+        panelOpen = !panelOpen;
+        if (panelOpen) {
+            renderPanel();
+            shell.exceptionsPanel.style.display = 'block';
+            shell.exceptionsBtn.textContent = 'Hide exceptions';
+        } else {
+            shell.exceptionsPanel.style.display = 'none';
+            shell.exceptionsBtn.textContent = 'View exceptions';
+        }
+    });
+
+    shell.exceptionsPanel.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-filter]');
+        if (!btn) return;
+        const f = btn.dataset.filter;
+        if (f === 'close') {
+            panelOpen = false;
+            shell.exceptionsPanel.style.display = 'none';
+            shell.exceptionsBtn.textContent = 'View exceptions';
+        } else if (f === 'overrides') {
+            showOverrides = !showOverrides;
+            renderPanel();
+        } else if (f === 'ignored') {
+            showIgnored = !showIgnored;
+            renderPanel();
+        }
+    });
 }
 
 // ─── Outcome row expansion ───────────────────────────────────────────────────
@@ -643,15 +759,20 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
         border-bottom:0.5px solid #e0e0e0;
         background:#fafafa;`;
 
-    const strugglingCount = countStrugglingStudents(outcome, cache);
-    const decliningCount = countDecliningStudents(outcome, cache);
-    const growingCount = countGrowingStudents(outcome, cache);
+    const strugglingCount  = countStrugglingStudents(outcome, cache);
+    const decliningCount   = countDecliningStudents(outcome, cache);
+    const growingCount     = countGrowingStudents(outcome, cache);
+    const exceptionsCount  = countExceptionStudents(outcome, cache);
 
     const tabs = [
-        { id: 'students', label: `All Students (${cache.students.length})` },
+        { id: 'students',   label: `All Students (${cache.students.length})` },
         { id: 'struggling', label: `Struggling (${strugglingCount})` },
-        { id: 'declining', label: `Declining (${decliningCount})` },
-        { id: 'growing', label: `Growing (${growingCount})` }
+        { id: 'declining',  label: `Declining (${decliningCount})` },
+        { id: 'growing',    label: `Growing (${growingCount})` },
+        // Only show the Exceptions tab when there are exceptions to review (3d)
+        ...(exceptionsCount > 0
+            ? [{ id: 'exceptions', label: `Exceptions (${exceptionsCount})` }]
+            : []),
     ];
 
     tabs.forEach(tab => {
@@ -683,7 +804,12 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
     content.style.cssText = `padding:12px; max-height:400px; overflow-y:auto;`;
 
     const renderTable = () => {
-        content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
+        // 3d — route the Exceptions tab to its own table; all others use the student table
+        if (activeTab === 'exceptions') {
+            content.innerHTML = buildExceptionsTable(outcome, cache);
+        } else {
+            content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
+        }
     };
     renderTable();
 
@@ -761,6 +887,226 @@ function countGrowingStudents(outcome, cache) {
         const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
         return outcomeData && outcomeData.slope !== null && outcomeData.slope > 0.05;
     }).length;
+}
+
+/**
+ * Count students who have at least one exception for a given outcome.
+ * An exception is: locked Will Post, confirmed manual override, or an ignored alignment.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {number}
+ */
+function countExceptionStudents(outcome, cache) {
+    const syncState    = cache.sync_state ?? {};
+    const outcomeSync  = syncState[String(outcome.id)] ?? {};
+    const ignored      = (cache.ignored_alignments ?? []).filter(
+        ia => String(ia.outcomeId) === String(outcome.id)
+    );
+    const ignoredStudentIds = new Set(ignored.map(ia => String(ia.studentId)));
+
+    return cache.students.filter(student => {
+        const sId   = String(student.id);
+        const entry = outcomeSync[sId];
+        return (
+            entry?.will_post_lock === 'locked' ||
+            entry?.manual_override === true     ||
+            ignoredStudentIds.has(sId)
+        );
+    }).length;
+}
+
+/**
+ * Build the per-outcome Exceptions table (read-only).
+ * Shows students with locked Will Post, confirmed overrides, or ignored alignments.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {string} HTML string
+ */
+function buildExceptionsTable(outcome, cache) {
+    const syncState   = cache.sync_state ?? {};
+    const outcomeSync = syncState[String(outcome.id)] ?? {};
+    const ignored     = (cache.ignored_alignments ?? []).filter(
+        ia => String(ia.outcomeId) === String(outcome.id)
+    );
+    const ignoredStudentIds = new Set(ignored.map(ia => String(ia.studentId)));
+
+    const exceptionStudents = cache.students.filter(student => {
+        const sId   = String(student.id);
+        const entry = outcomeSync[sId];
+        return (
+            entry?.will_post_lock === 'locked' ||
+            entry?.manual_override === true     ||
+            ignoredStudentIds.has(sId)
+        );
+    });
+
+    if (exceptionStudents.length === 0) {
+        return `<p style="${FONT} font-size:13px; color:#888; padding:12px 0;">No exceptions for this outcome.</p>`;
+    }
+
+    const TH = `font-weight:600; color:#888; font-size:11px; text-transform:uppercase;
+                 letter-spacing:.04em; padding:6px 8px; text-align:left;
+                 border-bottom:0.5px solid #e0e0e0; background:#fafafa;`;
+    const TD = `font-size:12px; padding:6px 8px; border-bottom:0.5px solid #f0f0f0; vertical-align:middle;`;
+
+    const rows = exceptionStudents.map(student => {
+        const sId       = String(student.id);
+        const entry     = outcomeSync[sId] ?? {};
+        const od        = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
+        const marzDisp   = od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE';
+        const wpDisp     = entry.will_post != null ? entry.will_post.toFixed(2) : '—';
+        const note       = escapeHtml(entry.will_post_note ?? '');
+        const dateRaw    = entry.override_at ?? entry.last_synced_at ?? '';
+        const dateFmt    = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
+
+        const types = [];
+        if (entry.manual_override)          types.push('<span style="background:#FCEBEB;color:#791F1F;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:8px;">Override</span>');
+        if (entry.will_post_lock === 'locked') types.push('<span style="background:#FAEEDA;color:#633806;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:8px;">Locked WP</span>');
+        if (ignoredStudentIds.has(sId))     types.push('<span style="background:#F3F2EE;color:#55534D;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:8px;">Ignored</span>');
+
+        return `<tr>
+            <td style="${TD} font-weight:500;">${escapeHtml(student.name || `Student ${student.id}`)}</td>
+            <td style="${TD}">${types.join(' ')}</td>
+            <td style="${TD} text-align:center;">${canvasDisp}</td>
+            <td style="${TD} text-align:center;">${marzDisp}</td>
+            <td style="${TD} text-align:center;">${wpDisp}</td>
+            <td style="${TD} color:#666;">${note}</td>
+            <td style="${TD} color:#999;">${dateFmt}</td>
+        </tr>`;
+    }).join('');
+
+    return `<table style="${FONT} width:100%; border-collapse:collapse; font-size:12px;">
+        <thead><tr>
+            <th style="${TH}">Student</th>
+            <th style="${TH}">Type</th>
+            <th style="${TH} text-align:center;">Canvas</th>
+            <th style="${TH} text-align:center;">Marzano</th>
+            <th style="${TH} text-align:center;">Will Post</th>
+            <th style="${TH}">Note</th>
+            <th style="${TH}">Date</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/**
+ * Build the cross-outcome exceptions table for 3e.
+ * Shows every override, locked Will Post, and ignored alignment across all outcomes.
+ * Read-only — no action buttons.
+ *
+ * @param {Object}   cache
+ * @param {Object}   opts
+ * @param {boolean}  opts.showOverrides   - Include manual_override + locked Will Post rows
+ * @param {boolean}  opts.showIgnored     - Include ignored alignment rows
+ * @returns {string} HTML string
+ */
+function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgnored = true } = {}) {
+    const syncState    = cache.sync_state ?? {};
+    const ignoredList  = cache.ignored_alignments ?? [];
+
+    // Build lookup maps
+    const outcomeById  = {};
+    (cache.outcomes || []).forEach(o => { outcomeById[String(o.id)] = o; });
+    const studentById  = {};
+    (cache.students || []).forEach(s => { studentById[String(s.id)] = s; });
+
+    const rows = [];
+
+    // Collect from sync_state — overrides and locked Will Post
+    if (showOverrides) {
+        for (const [outcomeId, studentMap] of Object.entries(syncState)) {
+            const outcome = outcomeById[outcomeId];
+            if (!outcome) continue;
+
+            for (const [studentId, entry] of Object.entries(studentMap)) {
+                const student = studentById[studentId];
+                if (!student) continue;
+                if (!entry.manual_override && entry.will_post_lock !== 'locked') continue;
+
+                const od         = student.outcomes?.find(o => String(o.outcomeId) === outcomeId);
+                const typeParts  = [];
+                if (entry.manual_override)              typeParts.push('Override');
+                if (entry.will_post_lock === 'locked')  typeParts.push('Locked WP');
+
+                rows.push({
+                    outcomeName: outcome.title,
+                    studentName: student.name || `Student ${studentId}`,
+                    type:        typeParts.join(' + '),
+                    typeClass:   'override',
+                    canvas:      od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—',
+                    marzano:     od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE',
+                    willPost:    entry.will_post != null ? entry.will_post.toFixed(2) : '—',
+                    note:        entry.will_post_note ?? '',
+                    date:        entry.override_at ?? entry.last_synced_at ?? '',
+                });
+            }
+        }
+    }
+
+    // Collect from ignored_alignments
+    if (showIgnored) {
+        for (const ia of ignoredList) {
+            const outcome = outcomeById[String(ia.outcomeId)];
+            const student = studentById[String(ia.studentId)];
+            if (!outcome || !student) continue;
+
+            rows.push({
+                outcomeName: outcome.title,
+                studentName: student.name || `Student ${ia.studentId}`,
+                type:        'Ignored alignment',
+                typeClass:   'ignored',
+                canvas:      '—',
+                marzano:     '—',
+                willPost:    '—',
+                note:        ia.reason ?? '',
+                date:        ia.ignored_at ?? '',
+            });
+        }
+    }
+
+    if (rows.length === 0) {
+        return `<p style="${FONT} font-size:13px; color:#888; padding:16px;">
+            No overrides or ignored alignments recorded for this course.</p>`;
+    }
+
+    const TH = `font-weight:600; color:#888; font-size:11px; text-transform:uppercase;
+                 letter-spacing:.04em; padding:6px 10px; text-align:left;
+                 border-bottom:0.5px solid #e0e0e0; background:#fafafa;`;
+    const TD = `font-size:12px; padding:6px 10px; border-bottom:0.5px solid #f0f0f0; vertical-align:middle;`;
+
+    const rowsHtml = rows.map(r => {
+        const dateDisp = r.date ? new Date(r.date).toLocaleDateString() : '—';
+        const typeBg   = r.typeClass === 'override' ? 'background:#FCEBEB;color:#791F1F;'
+                                                     : 'background:#F3F2EE;color:#55534D;';
+        return `<tr>
+            <td style="${TD}">${escapeHtml(r.outcomeName)}</td>
+            <td style="${TD} font-weight:500;">${escapeHtml(r.studentName)}</td>
+            <td style="${TD}"><span style="${typeBg} font-size:10.5px;font-weight:600;
+                padding:1px 6px;border-radius:8px;">${escapeHtml(r.type)}</span></td>
+            <td style="${TD} text-align:center;">${r.canvas}</td>
+            <td style="${TD} text-align:center;">${r.marzano}</td>
+            <td style="${TD} text-align:center;">${r.willPost}</td>
+            <td style="${TD} color:#666; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.note)}</td>
+            <td style="${TD} color:#999; white-space:nowrap;">${dateDisp}</td>
+        </tr>`;
+    }).join('');
+
+    return `<table style="${FONT} width:100%; border-collapse:collapse; font-size:12px;">
+        <thead><tr>
+            <th style="${TH}">Outcome</th>
+            <th style="${TH}">Student</th>
+            <th style="${TH}">Type</th>
+            <th style="${TH} text-align:center;">Canvas</th>
+            <th style="${TH} text-align:center;">Marzano</th>
+            <th style="${TH} text-align:center;">Will Post</th>
+            <th style="${TH}">Note</th>
+            <th style="${TH}">Date</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+    </table>`;
 }
 
 function buildStudentTable(outcome, cache, filter, courseId, apiClient) {

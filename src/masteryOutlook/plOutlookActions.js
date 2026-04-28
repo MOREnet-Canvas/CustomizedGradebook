@@ -188,6 +188,160 @@ export async function handleClearWillPost({ courseId, outcomeId, studentId, apiC
     onRerender?.();
 }
 
+// ─── Will Post: granular pill-click handlers (write timing table events 1–6) ──
+
+/**
+ * Event 1 — Teacher clicks the Marzano pill → revert will_post to auto-track.
+ * Clears will_post + will_post_lock; preserves any note.
+ *
+ * @param {Object}   opts
+ * @param {string}   opts.courseId
+ * @param {string}   opts.outcomeId
+ * @param {string}   opts.studentId
+ * @param {Object}   opts.apiClient
+ * @param {Function} opts.onRerender
+ */
+export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+    logger.debug(`[PLActions] Marzano pill click: outcome ${outcomeId}, student ${studentId}`);
+
+    const syncState = await readSyncState(courseId, apiClient);
+    const entry     = getOrInitEntry(syncState, outcomeId, studentId);
+
+    entry.will_post      = null;
+    entry.will_post_lock = 'none';
+    // will_post_note intentionally preserved — teacher may have context notes
+
+    await writeSyncState(courseId, syncState, apiClient);
+    onRerender?.();
+}
+
+/**
+ * Event 2 — Teacher clicks the Canvas pill → adopt Canvas score as will_post.
+ *
+ * @param {Object}  opts
+ * @param {string}  opts.courseId
+ * @param {string}  opts.outcomeId
+ * @param {string}  opts.studentId
+ * @param {number}  opts.canvasScore
+ * @param {Object}  opts.apiClient
+ * @param {Function} opts.onRerender
+ */
+export async function handleCanvasPillClick({ courseId, outcomeId, studentId, canvasScore, apiClient, onRerender }) {
+    logger.debug(`[PLActions] Canvas pill click (${canvasScore}): outcome ${outcomeId}, student ${studentId}`);
+
+    const syncState = await readSyncState(courseId, apiClient);
+    const entry     = getOrInitEntry(syncState, outcomeId, studentId);
+
+    entry.will_post      = canvasScore;
+    entry.will_post_lock = 'unlocked';
+
+    await writeSyncState(courseId, syncState, apiClient);
+    onRerender?.();
+}
+
+/**
+ * Event 3 — Teacher types a custom score into the Will Post input box.
+ * Preserves an existing "locked" state; otherwise sets "unlocked".
+ *
+ * @param {Object}  opts
+ * @param {string}  opts.courseId
+ * @param {string}  opts.outcomeId
+ * @param {string}  opts.studentId
+ * @param {number}  opts.value      - Parsed numeric score
+ * @param {Object}  opts.apiClient
+ * @param {Function} opts.onRerender
+ */
+export async function handleCustomValueTyped({ courseId, outcomeId, studentId, value, apiClient, onRerender }) {
+    logger.debug(`[PLActions] Custom value typed (${value}): outcome ${outcomeId}, student ${studentId}`);
+
+    const syncState = await readSyncState(courseId, apiClient);
+    const entry     = getOrInitEntry(syncState, outcomeId, studentId);
+
+    entry.will_post = value;
+    // Promote to unlocked if not already locked — typing doesn't downgrade a lock
+    if (entry.will_post_lock !== 'locked') entry.will_post_lock = 'unlocked';
+
+    await writeSyncState(courseId, syncState, apiClient);
+    onRerender?.();
+}
+
+/**
+ * Event 4 — Teacher clicks the padlock to lock the will_post value.
+ *
+ * @param {Object}   opts
+ * @param {string}   opts.courseId
+ * @param {string}   opts.outcomeId
+ * @param {string}   opts.studentId
+ * @param {Object}   opts.apiClient
+ * @param {Function} opts.onRerender
+ */
+export async function handleLockWillPost({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+    logger.debug(`[PLActions] Lock will_post: outcome ${outcomeId}, student ${studentId}`);
+
+    const syncState = await readSyncState(courseId, apiClient);
+    const entry     = getOrInitEntry(syncState, outcomeId, studentId);
+
+    entry.will_post_lock = 'locked';
+
+    await writeSyncState(courseId, syncState, apiClient);
+    onRerender?.();
+}
+
+/**
+ * Event 5 — Teacher clicks the padlock again to unlock / revert.
+ * Clears will_post and resets lock to "none".
+ *
+ * @param {Object}   opts  - Same as handleLockWillPost
+ */
+export async function handleUnlockWillPost({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+    logger.debug(`[PLActions] Unlock will_post: outcome ${outcomeId}, student ${studentId}`);
+
+    const syncState = await readSyncState(courseId, apiClient);
+    const entry     = getOrInitEntry(syncState, outcomeId, studentId);
+
+    entry.will_post      = null;
+    entry.will_post_lock = 'none';
+
+    await writeSyncState(courseId, syncState, apiClient);
+    onRerender?.();
+}
+
+// ─── Debounced note handler (event 6) ────────────────────────────────────────
+
+/** @private Timer map for debouncing per-cell note saves. */
+const _noteDebounceTimers = new Map();
+
+/**
+ * Event 6 — Teacher types in the will_post_note field.
+ * Debounced 600 ms so we don't spam the cache on every keystroke.
+ *
+ * This function is synchronous (returns void, not a Promise) so callers can
+ * call it directly from an input event handler without await.
+ *
+ * @param {Object}   opts
+ * @param {string}   opts.courseId
+ * @param {string}   opts.outcomeId
+ * @param {string}   opts.studentId
+ * @param {string}   opts.noteValue  - Current field value (empty string → null)
+ * @param {Object}   opts.apiClient
+ * @param {Function} [opts.onRerender]
+ */
+export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, apiClient, onRerender }) {
+    const key = `${outcomeId}:${studentId}`;
+    clearTimeout(_noteDebounceTimers.get(key));
+
+    _noteDebounceTimers.set(key, setTimeout(async () => {
+        _noteDebounceTimers.delete(key);
+
+        const syncState = await readSyncState(courseId, apiClient);
+        const entry     = getOrInitEntry(syncState, outcomeId, studentId);
+        entry.will_post_note = noteValue.trim() || null;
+
+        await writeSyncState(courseId, syncState, apiClient);
+        onRerender?.();
+    }, 600));
+}
+
 // ─── Per-student sync ─────────────────────────────────────────────────────────
 
 /**
