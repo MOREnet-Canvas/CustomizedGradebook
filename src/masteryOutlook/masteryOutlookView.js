@@ -12,6 +12,8 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { injectStyles } from '../ui/styles.js';
+import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
@@ -125,6 +127,8 @@ function computeCurrentScoreClassStats(cache) {
  *                                            recompute and returns fresh cache
  */
 export async function renderMasteryOutlook({ containerEl, courseId, apiClient, onRefresh }) {
+    injectStyles(PL_OUTLOOK_CSS, 'pl-outlook-styles');
+
     containerEl.innerHTML = '';
     containerEl.style.cssText = `${FONT} max-width:1100px; margin:0 auto; padding:1rem;`;
 
