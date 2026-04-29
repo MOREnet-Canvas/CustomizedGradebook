@@ -1903,9 +1903,9 @@ function renderMetricCards(metricsEl, cache) {
 
     metricsEl.innerHTML = cards.map(c => `
         <div class="od-metric-card">
-            <div class="label">${c.label}</div>
-            <div class="value" style="color:${c.color};">${c.value}</div>
-            <div class="sub">${c.sub}</div>
+            <div class="od-mc-label">${c.label}</div>
+            <div class="od-mc-value" style="color:${c.color};">${c.value}</div>
+            <div class="od-mc-sub">${c.sub}</div>
         </div>`
     ).join('');
 }

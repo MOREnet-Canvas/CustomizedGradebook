@@ -858,9 +858,9 @@ tr.ho-needs-row td { background:#FFFDF7; }
 
 /* --- renderMetricCards --- */
 .mo-shell .od-metric-card { background:#f5f5f3; border-radius:8px; padding:10px 12px; }
-.mo-shell .od-metric-card .label { font-size:13px; color:#666; margin-bottom:3px; }
-.mo-shell .od-metric-card .value { font-size:24px; font-weight:700; }
-.mo-shell .od-metric-card .sub { font-size:12px; color:#999; margin-top:1px; }
+.mo-shell .od-metric-card .od-mc-label { font-size:13px; color:#666; margin-bottom:3px; background:transparent; padding:0; }
+.mo-shell .od-metric-card .od-mc-value { font-size:24px; font-weight:700; background:transparent; padding:0; }
+.mo-shell .od-metric-card .od-mc-sub   { font-size:12px; color:#999; margin-top:1px; background:transparent; padding:0; }
 
 /* --- renderDefaultSidebar --- */
 .mo-shell .od-sidebar-card { background:#fff; border:0.5px solid #e0e0e0; border-radius:12px; padding:12px; margin-bottom:10px; }
