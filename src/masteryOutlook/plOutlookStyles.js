@@ -19,6 +19,7 @@ export const PL_OUTLOOK_CSS = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 :root {
   --mo-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mo-legacy-font: LatoWeb, 'Lato Extended', Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   --bg:           #FAFAF8;
   --bg-surface:   #FFFFFF;
@@ -791,4 +792,179 @@ tr.ho-needs-row td { background:#FFFDF7; }
 .mo-shell[data-emphasis="prosecutorial"] .ho-wp-box-wrap.differs .ho-wp-box::before {
   background: var(--red);
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   OUTCOME-DASHBOARD (od-*) LEGACY VIEW CLASSES
+   Extracted from inline styles in masteryOutlookView.js
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* --- buildShell --- */
+.mo-shell .od-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px; }
+.mo-shell .od-title { font-size:1.1rem; font-weight:700; color:#333; }
+.mo-shell #od-subtitle { font-size:0.8rem; color:#888; margin-top:2px; }
+.mo-shell .od-header-actions { display:flex; align-items:center; gap:10px; }
+.mo-shell #od-last-updated { font-size:0.8rem; color:#888; }
+.mo-shell .od-btn-exceptions { font-family:var(--mo-legacy-font); font-size:0.8rem; padding:6px 12px; border-radius:6px; border:1px solid #ccc; background:transparent; color:#666; cursor:pointer; font-weight:500; display:none; }
+.mo-shell .od-btn-refresh { font-family:var(--mo-legacy-font); font-size:0.85rem; padding:7px 16px; border-radius:6px; border:1px solid #0374B5; background:#0374B5; color:#fff; cursor:pointer; font-weight:600; min-width:120px; }
+.mo-shell .od-refresh-banner { display:none; margin-bottom:0.75rem; padding:10px 16px; border-radius:8px; background:#EBF5FB; border:0.5px solid #AED6F1; align-items:center; justify-content:space-between; gap:12px; }
+.mo-shell .od-refresh-banner-text { font-family:var(--mo-legacy-font); font-size:13px; color:#1A5276; }
+.mo-shell .od-btn-banner-refresh { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; padding:5px 14px; border-radius:6px; border:1px solid #2E86C1; background:#2E86C1; color:#fff; cursor:pointer; }
+.mo-shell .od-exceptions-panel { display:none; margin-bottom:1rem; border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; overflow:hidden; }
+.mo-shell .od-metrics { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; margin-bottom:1rem; }
+.mo-shell .od-controls-row { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:1rem; flex-wrap:wrap; }
+.mo-shell .od-threshold-control,
+.mo-shell .od-color-scheme-control { display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px; }
+.mo-shell .od-control-label { font-size:0.9rem; color:#666; font-weight:500; }
+.mo-shell .od-threshold-slider { width:150px; cursor:pointer; }
+.mo-shell .od-threshold-value { font-size:0.95rem; font-weight:600; color:#333; min-width:32px; text-align:center; }
+.mo-shell .od-color-toggle { display:flex; gap:4px; border:1px solid #ddd; border-radius:6px; overflow:hidden; }
+.mo-shell .od-color-btn { font-family:var(--mo-legacy-font); padding:6px 12px; border:none; cursor:pointer; font-size:0.85rem; transition:all 0.2s; background:#fff; color:#333; font-weight:500; }
+.mo-shell .od-color-btn.active { background:#0374B5; color:#fff; font-weight:600; }
+.mo-shell .od-body { display:grid; grid-template-columns:1fr; gap:12px; }
+.mo-shell .od-tab-bar { display:flex; gap:4px; border-bottom:2px solid #e0e0e0; margin-bottom:8px; }
+.mo-shell .od-tab { font-family:var(--mo-legacy-font); font-size:13px; padding:8px 16px; cursor:pointer; border:none; background:transparent; color:#666; border-bottom:2px solid transparent; font-weight:400; }
+.mo-shell .od-tab.active { background:#fff; color:#185FA5; border-bottom:2px solid #185FA5; font-weight:500; }
+.mo-shell .od-col-headers { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; padding:4px 12px 6px; border-bottom:1px solid #e0e0e0; margin-bottom:4px; }
+.mo-shell .od-status-bar { font-size:0.8rem; color:#888; margin-top:12px; min-height:20px; }
+
+/* --- colHeader --- */
+.mo-shell .od-col-header { font-size:12px; font-weight:600; color:#999; text-transform:uppercase; letter-spacing:.04em; }
+.mo-shell .od-col-header.center { text-align:center; }
+
+/* --- renderDefaultOutcomeRows --- */
+.mo-shell .od-default-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; margin-bottom:6px; background:#fff; }
+.mo-shell .od-default-row .num { font-size:13px; color:#999; font-weight:500; }
+.mo-shell .od-default-row .name { font-size:15px; color:#333; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mo-shell .od-default-row .center { text-align:center; }
+.mo-shell .od-default-row .below { text-align:center; font-size:13px; color:#bbb; }
+
+/* --- buildEmptyPrompt / buildRefreshPrompt --- */
+.mo-shell .od-empty-prompt { text-align:center; padding:2rem 1rem; color:#888; }
+.mo-shell .od-empty-prompt .ep-icon { font-size:2rem; margin-bottom:0.5rem; }
+.mo-shell .od-empty-prompt .ep-title { font-size:0.95rem; font-weight:600; color:#555; margin-bottom:0.4rem; }
+.mo-shell .od-empty-prompt .ep-body { font-size:0.85rem; line-height:1.6; max-width:340px; margin:0 auto; }
+.mo-shell .od-refresh-prompt { margin-top:10px; padding:10px 14px; background:#f0f7ff; border:1px solid #b8d6f5; border-radius:8px; font-size:0.82rem; color:#0374B5; line-height:1.6; }
+
+/* --- neChip / pendingBadge / emptySpread --- */
+.mo-shell .od-ne-chip,
+.mo-shell .od-pending-badge { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; padding:3px 8px; border-radius:8px; background:#f0f0f0; color:#999; }
+.mo-shell .od-empty-spread { height:16px; border-radius:4px; background:#f0f0f0; width:100%; }
+
+/* --- buildOutcomeDetailPanel --- */
+.mo-shell .od-detail-panel { border:0.5px solid #e0e0e0; border-top:none; border-bottom-left-radius:8px; border-bottom-right-radius:8px; background:#fff; overflow:hidden; }
+.mo-shell .od-detail-tabs { display:flex; gap:0; border-bottom:0.5px solid #e0e0e0; background:#fafafa; }
+.mo-shell .od-detail-tab { font-family:var(--mo-legacy-font); font-size:13px; padding:8px 16px; cursor:pointer; border:none; }
+.mo-shell .od-detail-content { padding:12px; overflow:visible; }
+
+/* --- renderMetricCards --- */
+.mo-shell .od-metric-card { background:#f5f5f3; border-radius:8px; padding:10px 12px; }
+.mo-shell .od-metric-card .label { font-size:13px; color:#666; margin-bottom:3px; }
+.mo-shell .od-metric-card .value { font-size:24px; font-weight:700; }
+.mo-shell .od-metric-card .sub { font-size:12px; color:#999; margin-top:1px; }
+
+/* --- renderDefaultSidebar --- */
+.mo-shell .od-sidebar-card { background:#fff; border:0.5px solid #e0e0e0; border-radius:12px; padding:12px; margin-bottom:10px; }
+.mo-shell .od-sidebar-card:last-child { margin-bottom:0; }
+.mo-shell .od-sidebar-title { font-size:15px; font-weight:700; color:#333; margin-bottom:8px; }
+.mo-shell .od-sidebar-empty { font-size:13px; color:#aaa; padding:8px 0; }
+
+/* --- wireTweaksPanel --- */
+.mo-shell .od-tweaks-card { background:#fff; border:0.5px solid #e0e0e0; border-radius:12px; padding:12px; margin-top:10px; }
+.mo-shell .od-tweaks-title { font-family:var(--mo-legacy-font); font-size:14px; font-weight:700; color:#333; margin-bottom:10px; }
+.mo-shell .od-tweaks-toggle-label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.mo-shell .od-tweaks-toggle-input { width:15px; height:15px; cursor:pointer; }
+.mo-shell .od-tweaks-toggle-text { font-family:var(--mo-legacy-font); font-size:13px; color:#444; }
+.mo-shell .od-tweaks-help { font-family:var(--mo-legacy-font); font-size:11px; color:#aaa; margin-top:5px; margin-left:23px; }
+
+/* --- buildExceptionsTable / buildCrossOutcomeExceptionsView --- */
+.mo-shell .od-ex-empty { font-family:var(--mo-legacy-font); font-size:13px; color:#888; padding:12px 0; }
+.mo-shell .od-ex-empty.padded { padding:16px; }
+.mo-shell .od-ex-table { font-family:var(--mo-legacy-font); width:100%; border-collapse:collapse; font-size:12px; }
+.mo-shell .od-ex-table th { font-weight:600; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:6px 8px; text-align:left; border-bottom:0.5px solid #e0e0e0; background:#fafafa; }
+.mo-shell .od-ex-table th.center { text-align:center; }
+.mo-shell .od-ex-table td { font-size:12px; padding:6px 8px; border-bottom:0.5px solid #f0f0f0; vertical-align:middle; }
+.mo-shell .od-ex-table td.center { text-align:center; }
+.mo-shell .od-ex-table td.name { font-weight:500; }
+.mo-shell .od-ex-table td.note { color:#666; }
+.mo-shell .od-ex-table td.date { color:#999; }
+.mo-shell .od-ex-table.wide th,
+.mo-shell .od-ex-table.wide td { padding:6px 10px; }
+.mo-shell .od-ex-table .note-clip { color:#666; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mo-shell .od-ex-table .nowrap { white-space:nowrap; }
+.mo-shell .od-ex-pill { font-size:10.5px; font-weight:600; padding:1px 6px; border-radius:8px; display:inline-block; }
+.mo-shell .od-ex-pill.override { background:#FCEBEB; color:#791F1F; }
+.mo-shell .od-ex-pill.locked   { background:#FAEEDA; color:#633806; }
+.mo-shell .od-ex-pill.ignored  { background:#F3F2EE; color:#55534D; }
+
+/* --- buildStudentTable --- */
+.mo-shell .od-stu-empty { font-family:var(--mo-legacy-font); font-size:13px; color:#666; padding:12px 0; }
+.mo-shell .od-stu-table { font-family:var(--mo-legacy-font); width:100%; border-collapse:collapse; font-size:13px; }
+.mo-shell .od-stu-table thead tr { border-bottom:0.5px solid #e0e0e0; }
+.mo-shell .od-stu-table th { font-weight:500; color:#666; padding:6px 8px; font-size:12px; text-align:left; }
+.mo-shell .od-stu-table th.center { text-align:center; }
+.mo-shell .od-stu-table tr.flagged { background:rgba(252,235,235,0.3); }
+.mo-shell .od-stu-table td { padding:6px 8px; }
+.mo-shell .od-stu-table td.name      { font-size:13px; }
+.mo-shell .od-stu-table td.center    { text-align:center; font-size:13px; }
+.mo-shell .od-stu-table td.pill-cell { text-align:center; }
+.mo-shell .od-stu-table td.history   { font-size:11px; color:#999; letter-spacing:1px; }
+.mo-shell .od-stu-table td.sync-cell { text-align:center; vertical-align:middle; }
+.mo-shell .od-stu-link { color:#333; text-decoration:none; }
+.mo-shell .od-stu-pl-pill { padding:2px 8px; border-radius:6px; font-size:12px; font-weight:500; }
+.mo-shell .od-sync-actions { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.mo-shell .od-sync-action-btn { margin-top:3px; }
+.mo-shell .od-sync-action-btn.compact { font-size:10px; padding:2px 6px; }
+.mo-shell .od-trend { font-size:13px; }
+.mo-shell .od-score-history-attempt { opacity:0.6; }
+.mo-shell .od-stu-link:hover { color:#0374B5; text-decoration:underline; }
+
+/* --- wireExceptionsPanel (renderPanel) --- */
+.mo-shell .od-ex-panel-header { padding:10px 14px 8px; border-bottom:0.5px solid #e0e0e0; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fafafa; flex-wrap:wrap; }
+.mo-shell .od-ex-panel-title { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; color:#333; }
+.mo-shell .od-ex-panel-actions { display:flex; gap:5px; }
+.mo-shell .od-ex-chip { font-family:var(--mo-legacy-font); font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer; font-weight:500; border:0.5px solid #ccc; background:#fff; color:#888; }
+.mo-shell .od-ex-chip.active.overrides { border-color:#791F1F; background:#FCEBEB; color:#791F1F; }
+.mo-shell .od-ex-chip.active.ignored   { border-color:#55534D; background:#F3F2EE; color:#55534D; }
+.mo-shell .od-ex-panel-body { padding:0; overflow-x:auto; }
+
+/* --- renderLoadedOutcomeRows --- */
+.mo-shell .od-no-current-score { padding:12px; font-size:13px; color:#888; font-style:italic; margin-bottom:6px; }
+.mo-shell .od-outcome-container { margin-bottom:6px; }
+.mo-shell .od-outcome-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; cursor:pointer; }
+.mo-shell .od-outcome-row.expanded { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+.mo-shell .od-outcome-row:hover { background:#f5f5f3; }
+.mo-shell .od-outcome-row .row-num { font-size:13px; color:#999; }
+.mo-shell .od-outcome-row .row-title { font-size:15px; font-weight:500; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mo-shell .od-outcome-row .row-cell-center { text-align:center; }
+.mo-shell .od-outcome-row .row-below { text-align:center; font-size:14px; color:#666; }
+.mo-shell .od-outcome-row .row-below.flag { color:#A32D2D; }
+.mo-shell .od-outcome-row .row-chevron { font-size:14px; color:#999; text-align:center; }
+.mo-shell .od-outcome-divider { height:1px; background:#e0e0e0; margin:12px 0; }
+
+/* --- buildSyncSummaryLine --- */
+.mo-shell .od-sync-summary { font-size:11px; margin-top:2px; color:#888; }
+.mo-shell .od-sync-summary.synced { color:#276749; }
+.mo-shell .od-sync-summary .needs { color:#B7791F; }
+.mo-shell .od-sync-summary .override { color:#C05621; }
+.mo-shell .od-sync-summary .sep { color:#ccc; }
+
+/* --- renderHeatmapView empty state --- */
+.mo-shell .od-heatmap-empty { text-align:center; padding:2rem 1rem; color:#888; }
+.mo-shell .od-heatmap-empty .he-icon { font-size:2rem; margin-bottom:0.5rem; }
+.mo-shell .od-heatmap-empty .he-title { font-size:0.95rem; font-weight:600; color:#555; margin-bottom:0.4rem; }
+.mo-shell .od-heatmap-empty .he-body { font-size:0.85rem; line-height:1.6; max-width:340px; margin:0 auto; }
+
+/* --- buildShell container root --- */
+.mo-shell { font-family:var(--mo-legacy-font); max-width:1375px; margin:0 auto; padding:1rem; font-size:125%; }
+.mo-shell #od-heatmap-view { display:none; }
+
+/* --- plAvgChip / statusBadge --- */
+.mo-shell .od-pl-chip { font-family:var(--mo-legacy-font); font-size:13px; font-weight:600; padding:3px 10px; border-radius:8px; }
+.mo-shell .od-status-badge { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; padding:3px 8px; border-radius:8px; }
+.mo-shell .od-status-badge.reteach { background:#FCEBEB; color:#791F1F; }
+.mo-shell .od-status-badge.solid   { background:#E1F5EE; color:#085041; }
+.mo-shell .od-status-badge.monitor { background:#FAEEDA; color:#633806; }
+
+/* --- spreadBar --- */
+.mo-shell .od-spread-bar { display:flex; height:16px; border-radius:4px; overflow:hidden; gap:1px; }
 `;

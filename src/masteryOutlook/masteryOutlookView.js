@@ -264,7 +264,6 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
     injectStyles(PL_OUTLOOK_CSS, 'pl-outlook-styles');
 
     containerEl.innerHTML = '';
-    containerEl.style.cssText = `${FONT} max-width:1375px; margin:0 auto; padding:1rem; font-size:125%;`;
     // Apply .mo-shell so all scoped CSS rules resolve correctly
     containerEl.classList.add('mo-shell');
 
@@ -286,115 +285,73 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
 
 function buildShell(containerEl) {
     containerEl.innerHTML = `
-        <div id="od-header" style="display:flex; justify-content:space-between;
-             align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
+        <div id="od-header" class="od-header">
             <div>
-                <div id="od-title" style="font-size:1.1rem; font-weight:700;
-                     color:#333;">Mastery Outlook</div>
-                <div id="od-subtitle" style="font-size:0.8rem; color:#888;
-                     margin-top:2px;">Power Law predictions</div>
+                <div id="od-title" class="od-title">Mastery Outlook</div>
+                <div id="od-subtitle">Power Law predictions</div>
             </div>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span id="od-last-updated" style="font-size:0.8rem;
-                      color:#888;"></span>
-                <button id="od-exceptions-btn" style="${FONT} font-size:0.8rem;
-                        padding:6px 12px; border-radius:6px; border:1px solid #ccc;
-                        background:transparent; color:#666; cursor:pointer;
-                        font-weight:500; display:none;">
+            <div class="od-header-actions">
+                <span id="od-last-updated"></span>
+                <button id="od-exceptions-btn" class="od-btn-exceptions">
                     View exceptions
                 </button>
-                <button id="od-refresh-btn" style="${FONT} font-size:0.85rem;
-                        padding:7px 16px; border-radius:6px; border:1px solid #0374B5;
-                        background:#0374B5; color:#fff; cursor:pointer;
-                        font-weight:600; min-width:120px;">
+                <button id="od-refresh-btn" class="od-btn-refresh">
                     Refresh Data
                 </button>
             </div>
         </div>
 
         <!-- 4c: Refresh banner — shown when background poll detects new grading activity -->
-        <div id="od-refresh-banner" style="display:none; margin-bottom:0.75rem;
-             padding:10px 16px; border-radius:8px;
-             background:#EBF5FB; border:0.5px solid #AED6F1;
-             display:none; align-items:center; justify-content:space-between; gap:12px;">
-            <span style="${FONT} font-size:13px; color:#1A5276;">
+        <div id="od-refresh-banner" class="od-refresh-banner">
+            <span class="od-refresh-banner-text">
                 ℹ New scores have been graded — your data may be out of date.
             </span>
-            <button id="od-banner-refresh-btn"
-                style="${FONT} font-size:12px; font-weight:600; padding:5px 14px;
-                       border-radius:6px; border:1px solid #2E86C1;
-                       background:#2E86C1; color:#fff; cursor:pointer;">
+            <button id="od-banner-refresh-btn" class="od-btn-banner-refresh">
                 Refresh now
             </button>
         </div>
 
         <!-- 3e: Cross-outcome exceptions panel (hidden until "View exceptions" clicked) -->
-        <div id="od-exceptions-panel" style="display:none; margin-bottom:1rem;
-             border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; overflow:hidden;">
-        </div>
+        <div id="od-exceptions-panel" class="od-exceptions-panel"></div>
 
-        <div id="od-metrics" style="display:grid;
-             grid-template-columns:repeat(4, minmax(0,1fr));
-             gap:8px; margin-bottom:1rem;">
-        </div>
+        <div id="od-metrics" class="od-metrics"></div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center;
-             gap:16px; margin-bottom:1rem; flex-wrap:wrap;">
-            <div id="od-threshold-control" style="display:flex; align-items:center;
-                 gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px;">
-                <span style="font-size:0.9rem; color:#666; font-weight:500;">Re-teach threshold:</span>
-                <input type="range" id="od-threshold-slider" min="1.5" max="3.5"
-                       step="0.1" value="2.2" style="width:150px; cursor:pointer;">
-                <span id="od-threshold-value" style="font-size:0.95rem; font-weight:600;
-                      color:#333; min-width:32px; text-align:center;">2.2</span>
+        <div class="od-controls-row">
+            <div id="od-threshold-control" class="od-threshold-control">
+                <span class="od-control-label">Re-teach threshold:</span>
+                <input type="range" id="od-threshold-slider" class="od-threshold-slider"
+                       min="1.5" max="3.5" step="0.1" value="2.2">
+                <span id="od-threshold-value" class="od-threshold-value">2.2</span>
             </div>
 
-            <div id="od-color-scheme-control" style="display:flex; align-items:center;
-                 gap:10px; padding:10px 12px; background:#f9f9f9; border-radius:8px;">
-                <span style="font-size:0.9rem; color:#666; font-weight:500;">Colors:</span>
-                <div style="display:flex; gap:4px; border:1px solid #ddd; border-radius:6px; overflow:hidden;">
-                    <button id="od-color-soft" data-scheme="soft" style="${FONT}
-                            padding:6px 12px; border:none; background:#fff; color:#333;
-                            cursor:pointer; font-size:0.85rem; font-weight:500;
-                            transition:all 0.2s;">
+            <div id="od-color-scheme-control" class="od-color-scheme-control">
+                <span class="od-control-label">Colors:</span>
+                <div class="od-color-toggle">
+                    <button id="od-color-soft" class="od-color-btn" data-scheme="soft">
                         Soft
                     </button>
-                    <button id="od-color-canvas" data-scheme="canvas" style="${FONT}
-                            padding:6px 12px; border:none; background:#fff; color:#333;
-                            cursor:pointer; font-size:0.85rem; font-weight:500;
-                            transition:all 0.2s;">
+                    <button id="od-color-canvas" class="od-color-btn" data-scheme="canvas">
                         Canvas
                     </button>
                 </div>
             </div>
         </div>
 
-        <div id="od-body" style="display:grid;
-             grid-template-columns:1fr; gap:12px;">
+        <div id="od-body" class="od-body">
             <div id="od-outcomes-col">
                 <!-- Tab bar -->
-                <div id="od-tab-bar" style="display:flex; gap:4px;
-                     border-bottom:2px solid #e0e0e0; margin-bottom:8px;">
-                    <button class="od-tab" data-tab="outcomes" style="${FONT}
-                        font-size:13px; padding:8px 16px; cursor:pointer;
-                        border:none; background:transparent; color:#666;
-                        border-bottom:2px solid transparent; font-weight:400;">
+                <div id="od-tab-bar" class="od-tab-bar">
+                    <button class="od-tab" data-tab="outcomes">
                         Outcomes
                     </button>
-                    <button class="od-tab" data-tab="heatmap" style="${FONT}
-                        font-size:13px; padding:8px 16px; cursor:pointer;
-                        border:none; background:transparent; color:#666;
-                        border-bottom:2px solid transparent; font-weight:400;">
+                    <button class="od-tab" data-tab="heatmap">
                         🔥 Heatmap
                     </button>
                 </div>
 
                 <!-- Outcomes view -->
                 <div id="od-outcomes-view">
-                    <div id="od-col-headers" style="display:grid;
-                         grid-template-columns:20px 1fr 80px 100px 80px 80px 24px;
-                         gap:8px; padding:4px 12px 6px;
-                         border-bottom:1px solid #e0e0e0; margin-bottom:4px;">
+                    <div id="od-col-headers" class="od-col-headers">
                         ${colHeader('#')}
                         ${colHeader('Outcome')}
                         ${colHeader('PL avg', true)}
@@ -407,14 +364,12 @@ function buildShell(containerEl) {
                 </div>
 
                 <!-- Heatmap view -->
-                <div id="od-heatmap-view" style="display:none;">
-                </div>
+                <div id="od-heatmap-view"></div>
             </div>
             <div id="od-sidebar"></div>
         </div>
 
-        <div id="od-status-bar" style="font-size:0.8rem; color:#888;
-             margin-top:12px; min-height:20px;"></div>
+        <div id="od-status-bar" class="od-status-bar"></div>
     `;
 
     return {
@@ -442,9 +397,7 @@ function buildShell(containerEl) {
 }
 
 function colHeader(label, center = false) {
-    return `<div style="font-size:12px; font-weight:600; color:#999;
-            text-transform:uppercase; letter-spacing:.04em;
-            ${center ? 'text-align:center;' : ''}">${label}</div>`;
+    return `<div class="od-col-header${center ? ' center' : ''}">${label}</div>`;
 }
 
 // ─── Default state (no cache) ─────────────────────────────────────────────────
@@ -490,20 +443,14 @@ function renderDefaultOutcomeRows(outcomesEl, outcomes) {
 
     outcomes.forEach((outcome, i) => {
         const row = document.createElement('div');
-        row.style.cssText = `display:grid;
-            grid-template-columns:20px 1fr 80px 100px 80px 80px 24px;
-            gap:8px; align-items:center; padding:9px 12px;
-            border:0.5px solid #e0e0e0; border-radius:8px;
-            margin-bottom:6px; background:#fff;`;
+        row.className = 'od-default-row';
         row.innerHTML = `
-            <div style="font-size:13px; color:#999; font-weight:500;">${i + 1}</div>
-            <div style="font-size:15px; color:#333; font-weight:500;
-                 white-space:nowrap; overflow:hidden;
-                 text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
-            <div style="text-align:center;">${neChip()}</div>
+            <div class="num">${i + 1}</div>
+            <div class="name">${escapeHtml(outcome.title)}</div>
+            <div class="center">${neChip()}</div>
             <div>${emptySpread()}</div>
-            <div style="text-align:center; font-size:13px; color:#bbb;">—</div>
-            <div style="text-align:center;">${pendingBadge()}</div>
+            <div class="below">—</div>
+            <div class="center">${pendingBadge()}</div>
             <div></div>
         `;
         outcomesEl.appendChild(row);
@@ -517,14 +464,10 @@ function renderDefaultOutcomeRows(outcomesEl, outcomes) {
 
 function buildEmptyPrompt() {
     return `
-        <div style="text-align:center; padding:2rem 1rem; color:#888;">
-            <div style="font-size:2rem; margin-bottom:0.5rem;">📋</div>
-            <div style="font-size:0.95rem; font-weight:600;
-                 color:#555; margin-bottom:0.4rem;">
-                No outcome data yet
-            </div>
-            <div style="font-size:0.85rem; line-height:1.6; max-width:340px;
-                 margin:0 auto;">
+        <div class="od-empty-prompt">
+            <div class="ep-icon">📋</div>
+            <div class="ep-title">No outcome data yet</div>
+            <div class="ep-body">
                 Hit <strong>Refresh Data</strong> to calculate Power Law
                 predictions for all students and outcomes in this course.
             </div>
@@ -533,9 +476,7 @@ function buildEmptyPrompt() {
 
 function buildRefreshPrompt() {
     return `
-        <div style="margin-top:10px; padding:10px 14px; background:#f0f7ff;
-             border:1px solid #b8d6f5; border-radius:8px;
-             font-size:0.82rem; color:#0374B5; line-height:1.6;">
+        <div class="od-refresh-prompt">
             Outcome names loaded from Canvas. Hit
             <strong>Refresh Data</strong> to calculate Power Law predictions,
             class distribution, and intervention flags.
@@ -543,20 +484,15 @@ function buildRefreshPrompt() {
 }
 
 function neChip() {
-    return `<span style="${FONT} font-size:12px; font-weight:600;
-            padding:3px 8px; border-radius:8px;
-            background:#f0f0f0; color:#999;">NE</span>`;
+    return `<span class="od-ne-chip">NE</span>`;
 }
 
 function pendingBadge() {
-    return `<span style="${FONT} font-size:12px; font-weight:600;
-            padding:3px 8px; border-radius:8px;
-            background:#f0f0f0; color:#999;">Pending</span>`;
+    return `<span class="od-pending-badge">Pending</span>`;
 }
 
 function emptySpread() {
-    return `<div style="height:16px; border-radius:4px;
-            background:#f0f0f0; width:100%;"></div>`;
+    return `<div class="od-empty-spread"></div>`;
 }
 
 // ─── Loaded state (cache exists) ─────────────────────────────────────────────
@@ -694,21 +630,18 @@ function wireTweaksPanel(sidebarEl, courseId) {
     const enabled = getAutoRefreshEnabled(courseId);
 
     const panel = document.createElement('div');
-    panel.style.cssText = `background:#fff; border:0.5px solid #e0e0e0;
-        border-radius:12px; padding:12px; margin-top:10px;`;
+    panel.className = 'od-tweaks-card';
     panel.innerHTML = `
-        <div style="${FONT} font-size:14px; font-weight:700; color:#333; margin-bottom:10px;">
-            Settings
-        </div>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <div class="od-tweaks-title">Settings</div>
+        <label class="od-tweaks-toggle-label">
             <input type="checkbox" id="od-auto-refresh-toggle"
-                   ${enabled ? 'checked' : ''}
-                   style="width:15px; height:15px; cursor:pointer;">
-            <span style="${FONT} font-size:13px; color:#444;">
+                   class="od-tweaks-toggle-input"
+                   ${enabled ? 'checked' : ''}>
+            <span class="od-tweaks-toggle-text">
                 Auto-refresh (every 5 min)
             </span>
         </label>
-        <div style="${FONT} font-size:11px; color:#aaa; margin-top:5px; margin-left:23px;">
+        <div class="od-tweaks-help">
             Checks for new grading activity in the background.
         </div>`;
 
@@ -766,35 +699,23 @@ function wireExceptionsPanel(shell, cache) {
 
     const renderPanel = () => {
         shell.exceptionsPanel.innerHTML = `
-            <div style="padding:10px 14px 8px; border-bottom:0.5px solid #e0e0e0;
-                 display:flex; align-items:center; justify-content:space-between; gap:12px;
-                 background:#fafafa; flex-wrap:wrap; gap:8px;">
-                <span style="${FONT} font-size:12px; font-weight:600; color:#333;">
+            <div class="od-ex-panel-header">
+                <span class="od-ex-panel-title">
                     Exceptions across all outcomes
                 </span>
-                <div style="display:flex; gap:5px;">
-                    <button data-filter="overrides"
-                        style="${FONT} font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer;
-                               border:0.5px solid ${showOverrides ? '#791F1F' : '#ccc'};
-                               background:${showOverrides ? '#FCEBEB' : '#fff'};
-                               color:${showOverrides ? '#791F1F' : '#888'}; font-weight:500;">
+                <div class="od-ex-panel-actions">
+                    <button class="od-ex-chip overrides${showOverrides ? ' active' : ''}" data-filter="overrides">
                         Overrides
                     </button>
-                    <button data-filter="ignored"
-                        style="${FONT} font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer;
-                               border:0.5px solid ${showIgnored ? '#55534D' : '#ccc'};
-                               background:${showIgnored ? '#F3F2EE' : '#fff'};
-                               color:${showIgnored ? '#55534D' : '#888'}; font-weight:500;">
+                    <button class="od-ex-chip ignored${showIgnored ? ' active' : ''}" data-filter="ignored">
                         Ignored alignments
                     </button>
-                    <button data-filter="close"
-                        style="${FONT} font-size:11px; padding:3px 10px; border-radius:10px; cursor:pointer;
-                               border:0.5px solid #ccc; background:#fff; color:#888; font-weight:500;">
+                    <button class="od-ex-chip" data-filter="close">
                         ✕ Close
                     </button>
                 </div>
             </div>
-            <div style="padding:0; overflow-x:auto;">
+            <div class="od-ex-panel-body">
                 ${buildCrossOutcomeExceptionsView(cache, { showOverrides, showIgnored })}
             </div>`;
     };
@@ -863,8 +784,6 @@ function buildSyncSummaryLine(outcome, cache) {
 
     const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
 
-    const SS = `font-size:11px; margin-top:2px;`;
-
     if (!counts.hasSetup) {
         // No PL assignment set up yet — show nothing unless we want to prompt setup
         return '';
@@ -872,14 +791,14 @@ function buildSyncSummaryLine(outcome, cache) {
 
     if (counts.needsSync > 0 || counts.possibleOverride > 0 || counts.manualOverride > 0) {
         const parts = [];
-        if (counts.needsSync      > 0) parts.push(`<span style="color:#B7791F;">↑ ${counts.needsSync} need sync</span>`);
-        if (counts.possibleOverride > 0) parts.push(`<span style="color:#C05621;">⚑ ${counts.possibleOverride} override?</span>`);
-        if (counts.manualOverride  > 0) parts.push(`<span style="color:#C05621;">⚑ ${counts.manualOverride} confirmed</span>`);
-        return `<div style="${SS} color:#888;">${parts.join(' <span style="color:#ccc;">·</span> ')}</div>`;
+        if (counts.needsSync      > 0) parts.push(`<span class="needs">↑ ${counts.needsSync} need sync</span>`);
+        if (counts.possibleOverride > 0) parts.push(`<span class="override">⚑ ${counts.possibleOverride} override?</span>`);
+        if (counts.manualOverride  > 0) parts.push(`<span class="override">⚑ ${counts.manualOverride} confirmed</span>`);
+        return `<div class="od-sync-summary">${parts.join(' <span class="sep">·</span> ')}</div>`;
     }
 
     if (counts.synced > 0 && counts.needsSync === 0 && counts.possibleOverride === 0) {
-        return `<div style="${SS} color:#276749;">✓ All synced</div>`;
+        return `<div class="od-sync-summary synced">✓ All synced</div>`;
     }
 
     return '';
@@ -896,13 +815,7 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
     // Add "No Current Score found" message if missing
     if (!currentScore) {
         const noCurrentScore = document.createElement('div');
-        noCurrentScore.style.cssText = `
-            padding: 12px;
-            font-size: 13px;
-            color: #888;
-            font-style: italic;
-            margin-bottom: 6px;
-        `;
+        noCurrentScore.className = 'od-no-current-score';
         noCurrentScore.textContent = 'No Current Score found';
         outcomesEl.appendChild(noCurrentScore);
     }
@@ -938,53 +851,36 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
         const displayStats = isCurrentScoreRow ? computeCurrentScoreClassStats(cache) : outcome.classStats;
 
         const outcomeContainer = document.createElement('div');
-        outcomeContainer.style.cssText = `margin-bottom:6px;`;
+        outcomeContainer.className = 'od-outcome-container';
 
         // Header row (clickable)
         const row = document.createElement('div');
         const isExpanded = expandedOutcomeId === outcome.id;
-        row.style.cssText = `display:grid;
-            grid-template-columns:20px 1fr 80px 100px 80px 80px 24px;
-            gap:8px; align-items:center; padding:9px 12px;
-            border:0.5px solid #e0e0e0; border-radius:8px;
-            background:#fff; cursor:pointer;
-            ${isExpanded ? 'border-bottom-left-radius:0; border-bottom-right-radius:0;' : ''}`;
+        row.className = `od-outcome-row${isExpanded ? ' expanded' : ''}`;
 
         const chevron = isExpanded ? '▼' : '›';
+        const belowFlag = displayStats.belowThresholdCount > 3 ? ' flag' : '';
 
         // 2i — sync count summary line shown beneath the outcome name
         const syncSummaryHtml = buildSyncSummaryLine(outcome, cache);
 
         row.innerHTML = `
-            <div class="od-row-number" style="font-size:13px; color:#999;">${displayNumber}</div>
+            <div class="od-row-number row-num">${displayNumber}</div>
             <div>
-                <div style="font-size:15px; font-weight:500; color:#333;
-                     white-space:nowrap; overflow:hidden;
-                     text-overflow:ellipsis;">${escapeHtml(outcome.title)}</div>
+                <div class="row-title">${escapeHtml(outcome.title)}</div>
                 ${syncSummaryHtml}
             </div>
-            <div style="text-align:center;">${plAvgChip(displayStats)}</div>
+            <div class="row-cell-center">${plAvgChip(displayStats)}</div>
             <div>${spreadBar(displayStats)}</div>
-            <div style="text-align:center; font-size:14px;
-                 color:${displayStats.belowThresholdCount > 3 ? '#A32D2D' : '#666'};">
-                ${displayStats.belowThresholdCount}
-            </div>
-            <div style="text-align:center;">${statusBadge(displayStats)}</div>
-            <div style="font-size:14px; color:#999; text-align:center;">${chevron}</div>
+            <div class="row-below${belowFlag}">${displayStats.belowThresholdCount}</div>
+            <div class="row-cell-center">${statusBadge(displayStats)}</div>
+            <div class="row-chevron">${chevron}</div>
         `;
 
         row.addEventListener('click', () => {
             expandedOutcomeId = (expandedOutcomeId === outcome.id) ? null : outcome.id;
             activeTab = 'students'; // Reset to default tab when expanding
             renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient);
-        });
-
-        row.addEventListener('mouseenter', () => {
-            row.style.background = '#f5f5f3';
-        });
-
-        row.addEventListener('mouseleave', () => {
-            row.style.background = '#fff';
         });
 
         outcomeContainer.appendChild(row);
@@ -1074,11 +970,7 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
 
         if (isLastSpecial && regular.length > 0) {
             const divider = document.createElement('div');
-            divider.style.cssText = `
-                height: 1px;
-                background: #e0e0e0;
-                margin: 12px 0;
-            `;
+            divider.className = 'od-outcome-divider';
             outcomesEl.appendChild(divider);
         }
     });
@@ -1087,21 +979,11 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
 
 function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient) {
     const panel = document.createElement('div');
-    panel.style.cssText = `
-        border:0.5px solid #e0e0e0;
-        border-top:none;
-        border-bottom-left-radius:8px;
-        border-bottom-right-radius:8px;
-        background:#fff;
-        overflow:hidden;`;
+    panel.className = 'od-detail-panel';
 
     // Tabs
     const tabBar = document.createElement('div');
-    tabBar.style.cssText = `
-        display:flex;
-        gap:0;
-        border-bottom:0.5px solid #e0e0e0;
-        background:#fafafa;`;
+    tabBar.className = 'od-detail-tabs';
 
     const strugglingCount  = countStrugglingStudents(outcome, cache);
     const decliningCount   = countDecliningStudents(outcome, cache);
@@ -1122,13 +1004,10 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
         const isActive = activeTab === tab.id;
+        tabBtn.className = 'od-detail-tab';
+        /* dynamic — keep inline */
         tabBtn.style.cssText = `
-            ${FONT}
-            font-size:13px;
-            padding:8px 16px;
-            cursor:pointer;
             color:${isActive ? '#185FA5' : '#666'};
-            border:none;
             border-bottom:2px solid ${isActive ? '#185FA5' : 'transparent'};
             background:${isActive ? '#fff' : 'transparent'};
             font-weight:${isActive ? '500' : '400'};`;
@@ -1145,7 +1024,7 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
 
     // Tab content
     const content = document.createElement('div');
-    content.style.cssText = `padding:12px; overflow:visible;`;
+    content.className = 'od-detail-content';
 
     let activeDotKey = null;  // tracks which dot popover is open: "oid:sid:idx"
 
@@ -1437,13 +1316,8 @@ function buildExceptionsTable(outcome, cache) {
     });
 
     if (exceptionStudents.length === 0) {
-        return `<p style="${FONT} font-size:13px; color:#888; padding:12px 0;">No exceptions for this outcome.</p>`;
+        return `<p class="od-ex-empty">No exceptions for this outcome.</p>`;
     }
-
-    const TH = `font-weight:600; color:#888; font-size:11px; text-transform:uppercase;
-                 letter-spacing:.04em; padding:6px 8px; text-align:left;
-                 border-bottom:0.5px solid #e0e0e0; background:#fafafa;`;
-    const TD = `font-size:12px; padding:6px 8px; border-bottom:0.5px solid #f0f0f0; vertical-align:middle;`;
 
     const rows = exceptionStudents.map(student => {
         const sId       = String(student.id);
@@ -1457,30 +1331,30 @@ function buildExceptionsTable(outcome, cache) {
         const dateFmt    = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
 
         const types = [];
-        if (entry.manual_override)          types.push('<span style="background:#FCEBEB;color:#791F1F;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:8px;">Override</span>');
-        if (entry.will_post_lock === 'locked') types.push('<span style="background:#FAEEDA;color:#633806;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:8px;">Locked WP</span>');
-        if (ignoredStudentIds.has(sId))     types.push('<span style="background:#F3F2EE;color:#55534D;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:8px;">Ignored</span>');
+        if (entry.manual_override)             types.push('<span class="od-ex-pill override">Override</span>');
+        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked WP</span>');
+        if (ignoredStudentIds.has(sId))        types.push('<span class="od-ex-pill ignored">Ignored</span>');
 
         return `<tr>
-            <td style="${TD} font-weight:500;">${escapeHtml(student.name || `Student ${student.id}`)}</td>
-            <td style="${TD}">${types.join(' ')}</td>
-            <td style="${TD} text-align:center;">${canvasDisp}</td>
-            <td style="${TD} text-align:center;">${marzDisp}</td>
-            <td style="${TD} text-align:center;">${wpDisp}</td>
-            <td style="${TD} color:#666;">${note}</td>
-            <td style="${TD} color:#999;">${dateFmt}</td>
+            <td class="name">${escapeHtml(student.name || `Student ${student.id}`)}</td>
+            <td>${types.join(' ')}</td>
+            <td class="center">${canvasDisp}</td>
+            <td class="center">${marzDisp}</td>
+            <td class="center">${wpDisp}</td>
+            <td class="note">${note}</td>
+            <td class="date">${dateFmt}</td>
         </tr>`;
     }).join('');
 
-    return `<table style="${FONT} width:100%; border-collapse:collapse; font-size:12px;">
+    return `<table class="od-ex-table">
         <thead><tr>
-            <th style="${TH}">Student</th>
-            <th style="${TH}">Type</th>
-            <th style="${TH} text-align:center;">Canvas</th>
-            <th style="${TH} text-align:center;">Marzano</th>
-            <th style="${TH} text-align:center;">Will Post</th>
-            <th style="${TH}">Note</th>
-            <th style="${TH}">Date</th>
+            <th>Student</th>
+            <th>Type</th>
+            <th class="center">Canvas</th>
+            <th class="center">Marzano</th>
+            <th class="center">Will Post</th>
+            <th>Note</th>
+            <th>Date</th>
         </tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
@@ -1562,42 +1436,35 @@ function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgno
     }
 
     if (rows.length === 0) {
-        return `<p style="${FONT} font-size:13px; color:#888; padding:16px;">
+        return `<p class="od-ex-empty padded">
             No overrides or ignored alignments recorded for this course.</p>`;
     }
 
-    const TH = `font-weight:600; color:#888; font-size:11px; text-transform:uppercase;
-                 letter-spacing:.04em; padding:6px 10px; text-align:left;
-                 border-bottom:0.5px solid #e0e0e0; background:#fafafa;`;
-    const TD = `font-size:12px; padding:6px 10px; border-bottom:0.5px solid #f0f0f0; vertical-align:middle;`;
-
     const rowsHtml = rows.map(r => {
-        const dateDisp = r.date ? new Date(r.date).toLocaleDateString() : '—';
-        const typeBg   = r.typeClass === 'override' ? 'background:#FCEBEB;color:#791F1F;'
-                                                     : 'background:#F3F2EE;color:#55534D;';
+        const dateDisp  = r.date ? new Date(r.date).toLocaleDateString() : '—';
+        const pillClass = r.typeClass === 'override' ? 'override' : 'ignored';
         return `<tr>
-            <td style="${TD}">${escapeHtml(r.outcomeName)}</td>
-            <td style="${TD} font-weight:500;">${escapeHtml(r.studentName)}</td>
-            <td style="${TD}"><span style="${typeBg} font-size:10.5px;font-weight:600;
-                padding:1px 6px;border-radius:8px;">${escapeHtml(r.type)}</span></td>
-            <td style="${TD} text-align:center;">${r.canvas}</td>
-            <td style="${TD} text-align:center;">${r.marzano}</td>
-            <td style="${TD} text-align:center;">${r.willPost}</td>
-            <td style="${TD} color:#666; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.note)}</td>
-            <td style="${TD} color:#999; white-space:nowrap;">${dateDisp}</td>
+            <td>${escapeHtml(r.outcomeName)}</td>
+            <td class="name">${escapeHtml(r.studentName)}</td>
+            <td><span class="od-ex-pill ${pillClass}">${escapeHtml(r.type)}</span></td>
+            <td class="center">${r.canvas}</td>
+            <td class="center">${r.marzano}</td>
+            <td class="center">${r.willPost}</td>
+            <td><div class="note-clip">${escapeHtml(r.note)}</div></td>
+            <td class="date nowrap">${dateDisp}</td>
         </tr>`;
     }).join('');
 
-    return `<table style="${FONT} width:100%; border-collapse:collapse; font-size:12px;">
+    return `<table class="od-ex-table wide">
         <thead><tr>
-            <th style="${TH}">Outcome</th>
-            <th style="${TH}">Student</th>
-            <th style="${TH}">Type</th>
-            <th style="${TH} text-align:center;">Canvas</th>
-            <th style="${TH} text-align:center;">Marzano</th>
-            <th style="${TH} text-align:center;">Will Post</th>
-            <th style="${TH}">Note</th>
-            <th style="${TH}">Date</th>
+            <th>Outcome</th>
+            <th>Student</th>
+            <th>Type</th>
+            <th class="center">Canvas</th>
+            <th class="center">Marzano</th>
+            <th class="center">Will Post</th>
+            <th>Note</th>
+            <th>Date</th>
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
     </table>`;
@@ -1878,7 +1745,7 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
     }
 
     if (students.length === 0) {
-        return `<p style="${FONT} font-size:13px; color:#666; padding:12px 0;">No students in this category.</p>`;
+        return `<p class="od-stu-empty">No students in this category.</p>`;
     }
 
     const rowsHTML = students.map(s => {
@@ -1906,7 +1773,7 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
 
         // Score history
         const scoreHistory = (s.attempts || [])
-            .map(a => `<span style="opacity:0.6">${a.score}</span>`)
+            .map(a => `<span class="od-score-history-attempt">${a.score}</span>`)
             .join(' ');
 
         const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
@@ -1918,16 +1785,16 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
         let syncBadgeHtml = `<span class="sync-badge ${syncInfo.cssClass}">${syncInfo.label}</span>`;
         let syncActionsHtml = '';
         if (syncInfo.status === 'needs_sync') {
-            syncActionsHtml = `<button class="btn btn-sm btn-ghost" style="margin-top:3px; font-size:10.5px;"
+            syncActionsHtml = `<button class="btn btn-sm btn-ghost od-sync-action-btn"
                 data-action="sync-one" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">↑ Sync</button>`;
         } else if (syncInfo.status === 'possible_override') {
             syncActionsHtml = `
-                <button class="btn btn-sm btn-danger" style="margin-top:3px; font-size:10px; padding:2px 6px;"
+                <button class="btn btn-sm btn-danger od-sync-action-btn compact"
                     data-action="confirm-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Keep Canvas</button>
-                <button class="btn btn-sm btn-ghost" style="margin-top:3px; font-size:10px; padding:2px 6px;"
+                <button class="btn btn-sm btn-ghost od-sync-action-btn compact"
                     data-action="dismiss-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Use PL</button>`;
         } else if (syncInfo.status === 'manual_override') {
-            syncActionsHtml = `<button class="btn btn-sm btn-warn" style="margin-top:3px; font-size:10px; padding:2px 6px;"
+            syncActionsHtml = `<button class="btn btn-sm btn-warn od-sync-action-btn compact"
                 data-action="revert-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Revert to PL</button>`;
         }
 
@@ -1935,35 +1802,32 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
         const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
 
         return `
-            <tr style="${isFlagged ? 'background:rgba(252,235,235,0.3);' : ''}">
-                <td style="font-size:13px; padding:6px 8px;">
-                    <a href="/courses/${cache.meta.courseId}/pages/${masteryDashboardUrl}?cg_web=1&student_id=${s.id}"
-                       style="color:#333; text-decoration:none;"
-                       onmouseenter="this.style.textDecoration='underline'; this.style.color='#0374B5';"
-                       onmouseleave="this.style.textDecoration='none'; this.style.color='#333';"
+            <tr class="${isFlagged ? 'flagged' : ''}">
+                <td class="name">
+                    <a class="od-stu-link"
+                       href="/courses/${cache.meta.courseId}/pages/${masteryDashboardUrl}?cg_web=1&student_id=${s.id}"
                        title="View ${escapeHtml(s.name)}'s individual mastery dashboard">
                         ${escapeHtml(s.name)}
                     </a>
                 </td>
-                <td style="text-align:center; padding:6px 8px;">
-                    <span style="background:${c.bg}; color:${c.tx};
-                           padding:2px 8px; border-radius:6px;
-                           font-size:12px; font-weight:500;">${plDisplay}</span>
+                <td class="pill-cell">
+                    <span class="od-stu-pl-pill"
+                          style="background:${c.bg}; color:${c.tx};">${plDisplay}</span>
                 </td>
-                <td style="text-align:center; font-size:13px; padding:6px 8px;">${canvasScoreDisplay}</td>
-                <td style="padding:6px 8px; text-align:center; vertical-align:middle;">
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                <td class="center">${canvasScoreDisplay}</td>
+                <td class="sync-cell">
+                    <div class="od-sync-actions">
                         ${syncBadgeHtml}
                         ${syncActionsHtml}
                     </div>
                 </td>
-                <td style="text-align:center; font-size:13px; padding:6px 8px;">${decayingAvgDisplay}</td>
-                <td style="text-align:center; font-size:13px; padding:6px 8px;">${meanDisplay}</td>
-                <td style="text-align:center; font-size:13px; padding:6px 8px;">${recentDisplay}</td>
-                <td style="text-align:center; padding:6px 8px;">
-                    <span style="color:${trendColor}; font-size:13px;">${trendIcon}</span>
+                <td class="center">${decayingAvgDisplay}</td>
+                <td class="center">${meanDisplay}</td>
+                <td class="center">${recentDisplay}</td>
+                <td class="center">
+                    <span class="od-trend" style="color:${trendColor};">${trendIcon}</span>
                 </td>
-                <td style="font-size:11px; color:#999; letter-spacing:1px; padding:6px 8px;">${scoreHistory}</td>
+                <td class="history">${scoreHistory}</td>
             </tr>`;
     }).join('');
 
@@ -1971,27 +1835,18 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
     const plColumnHeader = isCurrentScore ? 'PL Avg' : 'PL Pred.';
 
     return `
-        <table style="${FONT} width:100%; border-collapse:collapse; font-size:13px;">
+        <table class="od-stu-table">
             <thead>
-                <tr style="border-bottom:0.5px solid #e0e0e0;">
-                    <th style="font-weight:500; color:#666; text-align:left;
-                               padding:6px 8px; font-size:12px;">Student</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">${plColumnHeader}</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">Canvas Score</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">Sync Status</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">Decaying Avg</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">Mean</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">Recent</th>
-                    <th style="font-weight:500; color:#666; text-align:center;
-                               padding:6px 8px; font-size:12px;">Trend</th>
-                    <th style="font-weight:500; color:#666; text-align:left;
-                               padding:6px 8px; font-size:12px;">Score History</th>
+                <tr>
+                    <th>Student</th>
+                    <th class="center">${plColumnHeader}</th>
+                    <th class="center">Canvas Score</th>
+                    <th class="center">Sync Status</th>
+                    <th class="center">Decaying Avg</th>
+                    <th class="center">Mean</th>
+                    <th class="center">Recent</th>
+                    <th class="center">Trend</th>
+                    <th>Score History</th>
                 </tr>
             </thead>
             <tbody>
@@ -2047,16 +1902,10 @@ function renderMetricCards(metricsEl, cache) {
     ];
 
     metricsEl.innerHTML = cards.map(c => `
-        <div style="background:#f5f5f3; border-radius:8px; padding:10px 12px;">
-            <div style="font-size:13px; color:#666; margin-bottom:3px;">
-                ${c.label}
-            </div>
-            <div style="font-size:24px; font-weight:700; color:${c.color};">
-                ${c.value}
-            </div>
-            <div style="font-size:12px; color:#999; margin-top:1px;">
-                ${c.sub}
-            </div>
+        <div class="od-metric-card">
+            <div class="label">${c.label}</div>
+            <div class="value" style="color:${c.color};">${c.value}</div>
+            <div class="sub">${c.sub}</div>
         </div>`
     ).join('');
 }
@@ -2065,19 +1914,15 @@ function renderMetricCards(metricsEl, cache) {
 
 function renderDefaultSidebar(sidebarEl) {
     sidebarEl.innerHTML = `
-        <div style="background:#fff; border:0.5px solid #e0e0e0;
-             border-radius:12px; padding:12px; margin-bottom:10px;">
-            <div style="font-size:15px; font-weight:700; color:#333;
-                 margin-bottom:8px;">Intervention list</div>
-            <div style="font-size:13px; color:#aaa; padding:8px 0;">
+        <div class="od-sidebar-card">
+            <div class="od-sidebar-title">Intervention list</div>
+            <div class="od-sidebar-empty">
                 Refresh to identify students low on 3+ outcomes.
             </div>
         </div>
-        <div style="background:#fff; border:0.5px solid #e0e0e0;
-             border-radius:12px; padding:12px;">
-            <div style="font-size:15px; font-weight:700; color:#333;
-                 margin-bottom:8px;">Re-teach now</div>
-            <div style="font-size:13px; color:#aaa; padding:8px 0;">
+        <div class="od-sidebar-card">
+            <div class="od-sidebar-title">Re-teach now</div>
+            <div class="od-sidebar-empty">
                 Refresh to flag outcomes below threshold.
             </div>
         </div>`;
@@ -2107,10 +1952,7 @@ function wireColorSchemeToggle(shell, cache, courseId, apiClient) {
     const updateButtonStates = () => {
         const buttons = [shell.colorSoftBtn, shell.colorCanvasBtn];
         buttons.forEach(btn => {
-            const isActive = btn.dataset.scheme === currentColorScheme;
-            btn.style.background = isActive ? '#0374B5' : '#fff';
-            btn.style.color = isActive ? '#fff' : '#333';
-            btn.style.fontWeight = isActive ? '600' : '500';
+            btn.classList.toggle('active', btn.dataset.scheme === currentColorScheme);
         });
     };
 
@@ -2219,9 +2061,8 @@ function wireRefreshButton(shell, courseId, apiClient, onRefresh) {
 function plAvgChip(classStats) {
     if (classStats.plAvg === null) return neChip();
     const c = profColor(classStats.plAvg);
-    return `<span style="${FONT} font-size:13px; font-weight:600;
-            padding:3px 10px; border-radius:8px;
-            background:${c.bg}; color:${c.tx};">
+    /* dynamic — keep inline */
+    return `<span class="od-pl-chip" style="background:${c.bg}; color:${c.tx};">
             ${classStats.plAvg.toFixed(2)}
             </span>`;
 }
@@ -2237,8 +2078,8 @@ function spreadBar(classStats) {
     const level2Color = profColor(2.0).bg;   // Developing/Near Mastery
     const level1Color = profColor(1.0).bg;   // Beginning/Below Mastery
 
-    return `<div style="display:flex; height:16px; border-radius:4px;
-            overflow:hidden; gap:1px;">
+    /* dynamic — keep inline (widths/colors derived from distribution) */
+    return `<div class="od-spread-bar">
         <div style="width:${d['4']/total*100}%; background:${level4Color};"></div>
         <div style="width:${d['3']/total*100}%; background:${level3Color};"></div>
         <div style="width:${d['2']/total*100}%; background:${level2Color};"></div>
@@ -2251,15 +2092,9 @@ function statusBadge(classStats) {
     const threshold = getCurrentThreshold();
     const isReteach = classStats.plAvg < threshold;
     const isSolid   = classStats.plAvg >= 3.0;
-    if (isReteach) return `<span style="${FONT} font-size:12px; font-weight:600;
-        padding:3px 8px; border-radius:8px;
-        background:#FCEBEB; color:#791F1F;">Re-teach</span>`;
-    if (isSolid)   return `<span style="${FONT} font-size:12px; font-weight:600;
-        padding:3px 8px; border-radius:8px;
-        background:#E1F5EE; color:#085041;">Solid</span>`;
-    return `<span style="${FONT} font-size:12px; font-weight:600;
-        padding:3px 8px; border-radius:8px;
-        background:#FAEEDA; color:#633806;">Monitor</span>`;
+    if (isReteach) return `<span class="od-status-badge reteach">Re-teach</span>`;
+    if (isSolid)   return `<span class="od-status-badge solid">Solid</span>`;
+    return `<span class="od-status-badge monitor">Monitor</span>`;
 }
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -2493,11 +2328,7 @@ function switchToView(viewMode, shell, cache) {
 
     const tabs = shell.tabBar.querySelectorAll('.od-tab');
     tabs.forEach(tab => {
-        const isActive = tab.dataset.tab === viewMode;
-        tab.style.color = isActive ? '#185FA5' : '#666';
-        tab.style.borderBottom = isActive ? '2px solid #185FA5' : '2px solid transparent';
-        tab.style.fontWeight = isActive ? '500' : '400';
-        tab.style.background = isActive ? '#fff' : 'transparent';
+        tab.classList.toggle('active', tab.dataset.tab === viewMode);
     });
 
     if (viewMode === 'outcomes') {
@@ -2530,14 +2361,10 @@ function renderHeatmapView(shell, cache) {
     if (!cache || !cache.students || cache.students.length === 0) {
         // No data state
         shell.heatmapView.innerHTML = `
-            <div style="text-align:center; padding:2rem 1rem; color:#888;">
-                <div style="font-size:2rem; margin-bottom:0.5rem;">🔥</div>
-                <div style="font-size:0.95rem; font-weight:600;
-                     color:#555; margin-bottom:0.4rem;">
-                    No heatmap data yet
-                </div>
-                <div style="font-size:0.85rem; line-height:1.6; max-width:340px;
-                     margin:0 auto;">
+            <div class="od-heatmap-empty">
+                <div class="he-icon">🔥</div>
+                <div class="he-title">No heatmap data yet</div>
+                <div class="he-body">
                     Hit <strong>Refresh Data</strong> to calculate Power Law
                     predictions and generate the class heatmap.
                 </div>
