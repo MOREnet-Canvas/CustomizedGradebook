@@ -15,7 +15,7 @@ import { logger } from '../utils/logger.js';
 import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
+import { getSyncStatus, aggregateSyncStatus, scoresMatch } from './plOutlookSyncStatus.js';
 import {
     handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
     handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
@@ -56,16 +56,7 @@ function isRegularOutcome(outcome) {
     return !isSpecialOutcome(outcome.title);
 }
 
-// ─── Handoff helpers ─────────────────────────────────────────────────────────
-
-/**
- * Compare two numeric values with a small floating-point epsilon.
- * Handles null/undefined gracefully (null ≠ anything).
- */
-function approxEq(a, b, eps = 0.001) {
-    if (a == null || b == null) return false;
-    return Math.abs(a - b) < eps;
-}
+// ─── Outcome student row helpers ─────────────────────────────────────────────
 
 /**
  * Map a 0-4 score to a tone key used for color styling.
@@ -111,8 +102,7 @@ function scoreToneStyle(tone) {
 }
 
 /**
- * Build the per-student handoff state object used by renderHoRow.
- * Maps cache fields to the same logical shape as the prototype's ensureHandoffState().
+ * Build the per-student row state object used by renderOutcomeStudentRow.
  *
  * @param {Object}   student             - entry from cache.students
  * @param {Object}   outcomeData         - student.outcomes entry matching this outcome
@@ -121,18 +111,17 @@ function scoreToneStyle(tone) {
  * @param {string|number} outcomeId
  * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, pushing}}
  */
-function buildHandoffStudentState(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
+function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
     const canvas  = outcomeData?.canvasScore  ?? null;
     const marzano = outcomeData?.plPrediction ?? null;
 
     const storedWP = syncEntry?.will_post ?? null;
     const willPost = storedWP ?? marzano;
 
-    // Derive lock state — mirrors prototype ensureHandoffState() logic
     let lock;
     if (syncEntry?.will_post_lock === 'locked') {
         lock = 'locked';
-    } else if (canvas !== null && marzano !== null && !approxEq(canvas, marzano) && storedWP === null) {
+    } else if (canvas !== null && marzano !== null && !scoresMatch(canvas, marzano) && storedWP === null) {
         // Canvas score differs from Marzano but teacher hasn't explicitly set Will Post yet
         lock = 'unlocked';
     } else {
@@ -161,7 +150,7 @@ function buildHandoffStudentState(student, outcomeData, syncEntry, ignoredAlignm
     let status;
     if (marzano === null) {
         status = 'ne';
-    } else if (willPost !== null && canvas !== null && approxEq(willPost, canvas)) {
+    } else if (willPost !== null && canvas !== null && scoresMatch(willPost, canvas)) {
         status = 'synced';
     } else {
         status = 'needs';
@@ -500,7 +489,7 @@ function emptySpread() {
 let currentViewMode = 'outcomes';  // 'outcomes' or 'heatmap'
 
 function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
-    // Apply handoff design-token variants to the shell container so that
+    // Apply design-token variants to the shell container so that
     // .mo-shell[data-density="comfortable"] and similar CSS rules resolve.
     const shellEl = shell.outcomesEl?.closest('.mo-shell');
     if (shellEl) {
@@ -1034,7 +1023,7 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
             return;
         }
         if (activeTab === 'students') {
-            content.innerHTML = renderHandoffTable(outcome, cache);
+            content.innerHTML = renderOutcomeStudentTable(outcome, cache);
             return;
         }
         content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
@@ -1077,7 +1066,7 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
         if (action === 'dismiss-override') { await handleDismissOverride({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable }); return; }
         if (action === 'revert-override')  { await handleRevertOverride({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable }); return; }
 
-        // ── Handoff: dot popover toggle ───────────────────────────────────
+        // ── Dot popover toggle ────────────────────────────────────────────
         if (action === 'dot-toggle') {
             e.stopPropagation();
             const dotEl = el.closest('.dot');
@@ -1094,7 +1083,7 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
             return;
         }
 
-        // ── Handoff: ignore/unignore alignment ────────────────────────────
+        // ── Ignore/unignore alignment ─────────────────────────────────────
         if (action === 'dot-ignore-toggle') {
             e.stopPropagation();
             const asgnId  = el.dataset.asgnId;
@@ -1111,28 +1100,28 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
             return;
         }
 
-        // ── Handoff: Canvas pill → set Will Post = canvas score ───────────
-        if (action === 'ho-use-canvas') {
+        // ── Canvas pill → set Will Post = canvas score ────────────────────
+        if (action === 'os-use-canvas') {
             const cv = parseFloat(el.dataset.canvas);
             if (isNaN(cv)) return;
             await handleCanvasPillClick({ courseId, outcomeId: oId, studentId: stuId, canvasScore: cv, apiClient, onRerender: renderTable });
             return;
         }
 
-        // ── Handoff: Marzano pill → revert Will Post to auto-track ────────
-        if (action === 'ho-use-marzano') {
+        // ── Marzano pill → revert Will Post to auto-track ─────────────────
+        if (action === 'os-use-marzano') {
             await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
             return;
         }
 
-        // ── Handoff: Will Post box click → inline edit ────────────────────
-        if (action === 'ho-wp-click') {
-            const wrap = el.closest('.ho-wp-box-wrap');
-            if (!wrap || wrap.querySelector('.ho-wp-input')) return; // already editing
-            const boxEl  = wrap.querySelector('.ho-wp-box');
+        // ── Will Post box click → inline edit ─────────────────────────────
+        if (action === 'os-wp-click') {
+            const wrap = el.closest('.os-wp-box-wrap');
+            if (!wrap || wrap.querySelector('.os-wp-input')) return; // already editing
+            const boxEl  = wrap.querySelector('.os-wp-box');
             const curVal = boxEl?.textContent?.trim() ?? '';
             const input  = document.createElement('input');
-            input.className = 'ho-wp-input';
+            input.className = 'os-wp-input';
             input.type = 'text'; input.inputMode = 'decimal';
             input.value = (curVal !== 'NE' && curVal !== '—') ? curVal : '';
             boxEl?.replaceWith(input);
@@ -1155,32 +1144,32 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
             return;
         }
 
-        // ── Handoff: padlock → lock ────────────────────────────────────────
-        if (action === 'ho-lock') {
+        // ── Padlock → lock ────────────────────────────────────────────────
+        if (action === 'os-lock') {
             await handleLockWillPost({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
             return;
         }
-        // ── Handoff: padlock → unlock ─────────────────────────────────────
-        if (action === 'ho-unlock') {
+        // ── Padlock → unlock ──────────────────────────────────────────────
+        if (action === 'os-unlock') {
             await handleUnlockWillPost({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
             return;
         }
 
-        // ── Handoff: save row → push to Canvas ────────────────────────────
-        if (action === 'ho-save') {
+        // ── Save row → push to Canvas ─────────────────────────────────────
+        if (action === 'os-save') {
             if (el.disabled) return;
             el.disabled = true;
             try {
                 await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable });
             } catch (err) {
-                logger.error('[MasteryOutlook] ho-save failed', err);
+                logger.error('[MasteryOutlook] os-save failed', err);
                 el.disabled = false;
             }
             return;
         }
 
-        // ── Handoff: save all ─────────────────────────────────────────────
-        if (action === 'ho-post-all') {
+        // ── Save all ──────────────────────────────────────────────────────
+        if (action === 'os-post-all') {
             if (el.disabled) return;
             el.disabled = true;
             const syncState   = cache.sync_state ?? {};
@@ -1191,13 +1180,13 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
                 .map(student => {
                     const sId = String(student.id);
                     const od  = student.outcomes.find(o => String(o.outcomeId) === oidStr);
-                    return buildHandoffStudentState(student, od, outcomeSync[sId] ?? {}, ignored, outcome.id);
+                    return buildOutcomeStudentRow(student, od, outcomeSync[sId] ?? {}, ignored, outcome.id);
                 })
                 .filter(s => s.status === 'needs');
             for (const s of pending) {
                 try {
                     await handleSyncOneStudent({ courseId, outcomeId: oidStr, outcomeName, studentId: s.id, apiClient, onRerender: renderTable });
-                } catch (err) { logger.error(`[MasteryOutlook] ho-post-all failed for ${s.id}`, err); }
+                } catch (err) { logger.error(`[MasteryOutlook] os-post-all failed for ${s.id}`, err); }
             }
             renderTable();
             return;
@@ -1206,7 +1195,7 @@ function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient
 
     // ── Note input — debounced (not click, so separate listener) ─────────
     content.addEventListener('input', (e) => {
-        const el = e.target.closest('[data-action="ho-note"]');
+        const el = e.target.closest('[data-action="os-note"]');
         if (!el) return;
         handleNoteChanged({
             courseId,
@@ -1470,7 +1459,7 @@ function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgno
     </table>`;
 }
 
-// ─── Handoff panel: HTML renderers ───────────────────────────────────────────
+// ─── Outcome student panel: HTML renderers ──────────────────────────────────
 
 /**
  * Render one alignment dot with hover preview + click-to-open popover.
@@ -1523,20 +1512,20 @@ function renderDot(dot, oidStr, sidStr, i) {
 }
 
 /**
- * Render one student row in the handoff table.
+ * Render one student row in the outcome student table.
  *
- * @param {Object} s      - handoff state from buildHandoffStudentState()
+ * @param {Object} s      - row state from buildOutcomeStudentRow()
  * @param {string} oidStr - outcome ID string (for data attributes)
  * @returns {string} HTML <tr>
  */
-function renderHoRow(s, oidStr) {
-    const needsCls   = s.status === 'needs' ? 'ho-needs-row' : '';
+function renderOutcomeStudentRow(s, oidStr) {
+    const needsCls   = s.status === 'needs' ? 'os-needs-row' : '';
     const differsCls = s.lock !== 'none'    ? 'differs'     : '';
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
     const marzDisp    = s.marzano != null ? s.marzano.toFixed(2) : 'NE';
     const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
-    const canvasFaded = s.lock === 'none' && !approxEq(s.canvas, s.willPost) ? '' : 'faded';
+    const canvasFaded = s.lock === 'none' && !scoresMatch(s.canvas, s.willPost) ? '' : 'faded';
     const marzFaded   = s.lock !== 'none' ? 'faded' : '';
 
     const dotsHtml = s.dots.length
@@ -1544,12 +1533,12 @@ function renderHoRow(s, oidStr) {
         : `<span style="font-size:10px;color:var(--text-tertiary);">—</span>`;
 
     const lockHtml = s.lock !== 'none' ? `
-        <button class="ho-wp-lock ${s.lock}"
-                data-action="${s.lock === 'locked' ? 'ho-unlock' : 'ho-lock'}"
+        <button class="os-wp-lock ${s.lock}"
+                data-action="${s.lock === 'locked' ? 'os-unlock' : 'os-lock'}"
                 data-stu="${s.id}" data-oid="${oidStr}"
                 aria-label="${s.lock === 'locked' ? 'Unlock Will Post' : 'Lock Will Post'}">
           ${s.lock === 'locked' ? '🔒' : '🔓'}
-          <span class="ho-lock-tip">${
+          <span class="os-lock-tip">${
               s.lock === 'locked'
                   ? 'Will Post is locked. Click to revert to Marzano.'
                   : 'Score differs from Marzano. Click to lock this value.'
@@ -1557,8 +1546,8 @@ function renderHoRow(s, oidStr) {
         </button>` : '';
 
     const saveHtml = s.pushing
-        ? `<span class="ho-posting"><span class="spinner"></span> Pushing…</span>`
-        : `<button class="ho-save-row-btn" data-action="ho-save" data-stu="${s.id}" data-oid="${oidStr}"
+        ? `<span class="os-posting"><span class="spinner"></span> Pushing…</span>`
+        : `<button class="os-save-row-btn" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
                ${s.status !== 'needs' ? 'disabled' : ''} title="Push ${wpDisp} to Canvas">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
                <polyline points="2,7 6,3 10,7"/><line x1="6" y1="3" x2="6" y2="11"/>
@@ -1567,37 +1556,37 @@ function renderHoRow(s, oidStr) {
            </button>`;
 
     return `<tr class="${needsCls}" data-stu="${s.id}" data-oid="${oidStr}">
-      <td><span class="ho-stu-name">${escapeHtml(s.name)}</span></td>
+      <td><span class="os-stu-name">${escapeHtml(s.name)}</span></td>
       <td><div class="dot-row">${dotsHtml}</div></td>
       <td class="c">
-        <button class="ho-pill-btn ${canvasFaded}" data-action="ho-use-canvas"
+        <button class="os-pill-btn ${canvasFaded}" data-action="os-use-canvas"
                 data-stu="${s.id}" data-oid="${oidStr}" data-canvas="${s.canvas ?? ''}">
-          <span class="ho-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
-          <span class="ho-pill-tip">Set Will Post = ${canvasDisp}</span>
+          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
+          <span class="os-pill-tip">Set Will Post = ${canvasDisp}</span>
         </button>
       </td>
       <td class="c">
-        <button class="ho-pill-btn ${marzFaded}" data-action="ho-use-marzano"
+        <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
                 data-stu="${s.id}" data-oid="${oidStr}">
-          <span class="ho-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
-          <span class="ho-pill-tip">Set Will Post = ${marzDisp} (Marzano)</span>
+          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
+          <span class="os-pill-tip">Set Will Post = ${marzDisp} (Marzano)</span>
         </button>
       </td>
       <td class="c">
-        <div class="ho-wp-outer">
-          <div class="ho-wp-box-wrap ${differsCls}" data-action="ho-wp-click"
+        <div class="os-wp-outer">
+          <div class="os-wp-box-wrap ${differsCls}" data-action="os-wp-click"
                data-stu="${s.id}" data-oid="${oidStr}" tabindex="0" role="button"
                aria-label="Will Post: ${wpDisp}">
-            <div class="ho-wp-box">${wpDisp}</div>
+            <div class="os-wp-box">${wpDisp}</div>
             ${lockHtml}
           </div>
         </div>
       </td>
-      <td class="ho-td-comment">
-        <input class="ho-comment-input ${s.lock !== 'none' ? 'prompted' : ''}"
+      <td class="os-td-comment">
+        <input class="os-comment-input ${s.lock !== 'none' ? 'prompted' : ''}"
                type="text" value="${escapeHtml(s.note)}"
                placeholder="${s.lock !== 'none' ? 'Reason for override…' : 'Note…'}"
-               data-action="ho-note" data-stu="${s.id}" data-oid="${oidStr}"
+               data-action="os-note" data-stu="${s.id}" data-oid="${oidStr}"
                aria-label="Note for ${escapeHtml(s.name)}">
       </td>
       <td class="c">${saveHtml}</td>
@@ -1605,14 +1594,14 @@ function renderHoRow(s, oidStr) {
 }
 
 /**
- * Build the full handoff table HTML for the "All Students" tab.
+ * Build the full outcome student table HTML for the "All Students" tab.
  * Replaces buildStudentTable for the 'students' filter.
  *
  * @param {Object} outcome
  * @param {Object} cache
  * @returns {string} HTML string
  */
-function renderHandoffTable(outcome, cache) {
+function renderOutcomeStudentTable(outcome, cache) {
     const syncState   = cache.sync_state ?? {};
     const outcomeSync = syncState[String(outcome.id)] ?? {};
     const ignored     = cache.ignored_alignments ?? [];
@@ -1623,7 +1612,7 @@ function renderHandoffTable(outcome, cache) {
             const sId         = String(student.id);
             const outcomeData = student.outcomes.find(o => String(o.outcomeId) === oidStr);
             const entry       = outcomeSync[sId] ?? {};
-            return buildHandoffStudentState(student, outcomeData, entry, ignored, outcome.id);
+            return buildOutcomeStudentRow(student, outcomeData, entry, ignored, outcome.id);
         })
         .sort((a, b) => a.sortableName.localeCompare(b.sortableName));
 
@@ -1633,22 +1622,22 @@ function renderHandoffTable(outcome, cache) {
     const needsCount = needsRows.length;
 
     const toolbarHtml = `
-        <div class="ho-post-toolbar">
-          <span class="ho-post-toolbar-left">
+        <div class="os-post-toolbar">
+          <span class="os-post-toolbar-left">
             <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
           </span>
           <div style="display:flex;gap:6px;">
-            <button class="btn btn-sm btn-primary" data-action="ho-post-all"
+            <button class="btn btn-sm btn-primary" data-action="os-post-all"
                     ${needsCount === 0 ? 'disabled' : ''}>↑ Save all to Canvas</button>
           </div>
         </div>`;
 
     const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
     const legendHtml = `
-        <div class="ho-legend">
+        <div class="os-legend">
           <span style="font-size:10px;color:var(--text-tertiary);font-weight:600;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;">Score</span>
           ${tones.map(([t, lbl]) =>
-              `<span class="ho-leg"><span class="ho-leg-sw" style="${scoreToneStyle(t)}"></span><span>${lbl}</span></span>`
+              `<span class="os-leg"><span class="os-leg-sw" style="${scoreToneStyle(t)}"></span><span>${lbl}</span></span>`
           ).join('')}
         </div>`;
 
@@ -1657,22 +1646,22 @@ function renderHandoffTable(outcome, cache) {
         const label = isNeeds
             ? `⬆ ${rows.length} student${rows.length !== 1 ? 's' : ''} need${rows.length === 1 ? 's' : ''} updating`
             : `✓ Up to date (${rows.length})`;
-        const cls = isNeeds ? 'ho-sdiv needs' : 'ho-sdiv';
+        const cls = isNeeds ? 'os-sdiv needs' : 'os-sdiv';
         return `<tr class="${cls}"><td colspan="7"><div class="sdlabel">${label}</div></td></tr>`;
     };
 
     const bodyHtml = [
         sectionDivider(needsRows, true),
-        needsRows.map(s => renderHoRow(s, oidStr)).join(''),
+        needsRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
         needsRows.length && syncedRows.length ? sectionDivider(syncedRows, false) : '',
-        syncedRows.map(s => renderHoRow(s, oidStr)).join(''),
-        neRows.map(s => renderHoRow(s, oidStr)).join(''),
+        syncedRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
+        neRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
     ].join('');
 
     return `
         ${toolbarHtml}
         ${legendHtml}
-        <div class="ho-block">
+        <div class="os-block">
           <table>
             <thead><tr>
               <th style="min-width:130px;">Student</th>
