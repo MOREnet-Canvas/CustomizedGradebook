@@ -8,6 +8,7 @@
 
 import { logger } from '../utils/logger.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
+import { getMasteryColor, NE_HEATMAP_COLOR } from '../ui/masteryColors.js';
 
 const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
 
@@ -38,28 +39,15 @@ function formatStudentName(student) {
 }
 
 /**
- * Get color for PL prediction value
- * Supports two color schemes: 'soft' (default pastel) or 'canvas' (Canvas mastery colors)
+ * Get color for PL prediction value.
+ * Delegates to the shared mastery palette in src/ui/masteryColors.js.
  */
 function getCellColor(plPrediction, status, colorScheme = 'soft') {
     if (status === 'NE' || plPrediction === null) {
-        return { bg: '#f0f0f0', text: '#999' };
+        return { bg: NE_HEATMAP_COLOR.bg, text: NE_HEATMAP_COLOR.text };
     }
-
-    if (colorScheme === 'canvas') {
-        // Canvas mastery colors (5-level, bold)
-        if (plPrediction >= 4.0) return { bg: '#02672D', text: '#FFFFFF' };
-        if (plPrediction >= 3.0) return { bg: '#03893D', text: '#FFFFFF' };
-        if (plPrediction >= 2.0) return { bg: '#EF9F27', text: '#FFFFFF' }; // White text on yellow
-        if (plPrediction >= 1.0) return { bg: '#FD5D10', text: '#FFFFFF' }; // White text on orange
-        return { bg: '#E62429', text: '#FFFFFF' };
-    } else {
-        // Soft colors (4-level, pastel) - default
-        if (plPrediction >= 3.5) return { bg: '#C0DD97', text: '#27500A' };
-        if (plPrediction >= 3.0) return { bg: '#9FE1CB', text: '#085041' };
-        if (plPrediction >= 2.0) return { bg: '#FAC775', text: '#633806' };
-        return { bg: '#F7C1C1', text: '#791F1F' };
-    }
+    const c = getMasteryColor(plPrediction, { scheme: colorScheme });
+    return { bg: c.bg, text: c.fg };
 }
 
 /**

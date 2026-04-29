@@ -19,6 +19,7 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { renderTeacherMasteryView } from './teacherMasteryView.js';
 import { renderObserverMasteryView } from './observerMasteryView.js';
 import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
+import { getMasteryColor } from '../ui/masteryColors.js';
 
 /**
  * Rating scale for calculating letter grades
@@ -461,7 +462,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
 
     // Extract AVG outcome score, date, and comments for header stat box (before card loop)
     let avgScore = null;
-    let avgScoreColor = '#E62429';
+    let avgScoreColor = getMasteryColor(0, { scheme: 'canvas' }).fgOnSurface;
     let avgLetterGrade = '';
     let avgUpdatedDate = null;
     let avgComments = [];
@@ -470,11 +471,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         avgScore = avgRollupScore.score;
         if (avgScore != null) {
             avgLetterGrade = getLetterGrade(avgScore);
-            if (avgScore >= 4) avgScoreColor = "#02672D";
-            else if (avgScore >= 3) avgScoreColor = "#03893D";
-            else if (avgScore >= 2) avgScoreColor = "#a86700";
-            else if (avgScore >= 1) avgScoreColor = "#db3b00";
-            else avgScoreColor = "#E62429";
+            avgScoreColor = getMasteryColor(avgScore, { scheme: 'canvas' }).fgOnSurface;
         }
         avgUpdatedDate = avgRollupScore.submitted_at
             ? new Date(avgRollupScore.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -580,24 +577,10 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // Use raw rollup score (server-calculated decaying average) - no rounding
         const score = rollupScore.score != null ? rollupScore.score : "—";
 
-        // Determine mastery color based on actual score value
-        let masteryColor = "#E62429"; // Red - Insufficient Evidence (null/no score)
-
-        if (rollupScore.score != null) {
-            const scoreValue = rollupScore.score;
-
-            // Map score directly to color ranges (inclusive of whole number)
-            if (scoreValue >= 4) masteryColor = "#02672D";      // 4.0+ - Exceeds Mastery (dark green)
-            else if (scoreValue >= 3) masteryColor = "#03893D"; // 3.0-3.99 - Mastery (medium green)
-            else if (scoreValue >= 2) masteryColor = "#FAB901"; // 2.0-2.99 - Near Mastery (yellow/gold)
-            else if (scoreValue >= 1) masteryColor = "#FD5D10"; // 1.0-1.99 - Below Mastery (orange)
-            else masteryColor = "#E62429";                       // 0.0-0.99 - Well Below Mastery (red)
-        }
-
-        // Accessible font-only variants for yellow/orange (better contrast on white)
-        const masteryFontColor = masteryColor === '#FAB901' ? '#a86700'
-            : masteryColor === '#FD5D10' ? '#db3b00'
-            : masteryColor;
+        // Mastery palette band for this score (null/no score → lowest band)
+        const masteryBand = getMasteryColor(rollupScore.score, { scheme: 'canvas' });
+        const masteryColor = masteryBand.accent;        // border + bullet (decorative)
+        const masteryFontColor = masteryBand.fgOnSurface; // readable text on white
 
         // Use display_name if present, fall back to title
         const outcomeName = outcome.display_name || outcome.title;
@@ -701,12 +684,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                                 const assignmentScore = result.score;
                                 const letterGrade = getLetterGrade(result.score);
 
-                                // Calculate mastery color for this result
-                                let assignmentMasteryColor = "#E62429";
-                                if (result.score >= 4) assignmentMasteryColor = "#02672D";
-                                else if (result.score >= 3) assignmentMasteryColor = "#03893D";
-                                else if (result.score >= 2) assignmentMasteryColor = "#FAB901";
-                                else if (result.score >= 1) assignmentMasteryColor = "#FD5D10";
+                                // Calculate mastery color for this result (decorative bullet)
+                                const assignmentMasteryColor = getMasteryColor(result.score, { scheme: 'canvas' }).accent;
 
                                 // Format date
                                 const date = result.submitted_or_assessed_at

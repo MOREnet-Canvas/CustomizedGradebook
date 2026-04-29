@@ -39,7 +39,7 @@ export const PL_RUBRIC_SUFFIX = window.CG_CONFIG?.PL_RUBRIC_SUFFIX ?? 'Projected
 Add `PL_ASSIGNMENT_SUFFIX` and `PL_RUBRIC_SUFFIX` to the existing config import:
 
 ```javascript
-import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
+import {DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX} from './config.js';
 ```
 
 ### 2b. Update assignment and rubric names in `handleCreatingAssignment`

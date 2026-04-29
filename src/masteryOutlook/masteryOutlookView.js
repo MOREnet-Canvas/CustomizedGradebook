@@ -29,6 +29,7 @@ import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 import { buildHeatmapGrid } from './masteryOutlookHeatmap.js';
 import { openFullScreenHeatmap } from './masteryOutlookHeatmapFullScreen.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
+import { getMasteryColor } from '../ui/masteryColors.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
 
@@ -1615,63 +1616,15 @@ function spreadBar(classStats) {
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 
 /**
- * Get proficiency color based on PL prediction value
- * Supports two color schemes: 'soft' (default pastel) or 'canvas' (Canvas mastery colors)
+ * Get proficiency color based on PL prediction value.
+ * Thin wrapper over the shared mastery palette in src/ui/masteryColors.js.
  *
  * @param {number} v - PL prediction value
- * @returns {Object} { bg: background color, tx: text color on bg, txOnDefault: text color on white }
+ * @returns {{ bg:string, tx:string, txOnDefault:string }}
  */
 function profColor(v) {
-    if (currentColorScheme === 'canvas') {
-        // Canvas mastery colors (5-level, bold)
-        if (v >= 4.0) return {
-            bg: '#02672D',        // Dark green background
-            tx: '#FFFFFF',        // White text on background
-            txOnDefault: '#02672D' // Dark green text on white
-        };
-        if (v >= 3.0) return {
-            bg: '#03893D',        // Medium green background
-            tx: '#FFFFFF',        // White text on background
-            txOnDefault: '#03893D' // Medium green text on white
-        };
-        if (v >= 2.0) return {
-            bg: '#EF9F27',        // Yellow background
-            tx: '#FFFFFF',        // White text on background (readable!)
-            txOnDefault: '#a86700' // Dark brown text on white
-        };
-        if (v >= 1.0) return {
-            bg: '#FD5D10',        // Orange background
-            tx: '#FFFFFF',        // White text on background (readable!)
-            txOnDefault: '#db3b00' // Dark orange text on white
-        };
-        return {
-            bg: '#E62429',        // Red background
-            tx: '#FFFFFF',        // White text on background
-            txOnDefault: '#E62429' // Red text on white
-        };
-    } else {
-        // Soft colors (4-level, pastel) - default
-        if (v >= 3.5) return {
-            bg: '#C0DD97',
-            tx: '#27500A',
-            txOnDefault: '#27500A'
-        };
-        if (v >= 3.0) return {
-            bg: '#9FE1CB',
-            tx: '#085041',
-            txOnDefault: '#085041'
-        };
-        if (v >= 2.0) return {
-            bg: '#FAC775',
-            tx: '#633806',
-            txOnDefault: '#633806'
-        };
-        return {
-            bg: '#F7C1C1',
-            tx: '#791F1F',
-            txOnDefault: '#791F1F'
-        };
-    }
+    const c = getMasteryColor(v, { scheme: currentColorScheme });
+    return { bg: c.bg, tx: c.fg, txOnDefault: c.fgOnSurface };
 }
 
 function overallPlAvg(cache, regularOutcomes) {

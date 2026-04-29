@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { MASTERY_PALETTES, NE_HEATMAP_COLOR } from '../ui/masteryColors.js';
 
 /**
  * Escape HTML for safe rendering
@@ -269,23 +270,23 @@ export function openFullScreenHeatmap(cache, options = {}) {
 
         <div id="legend">
             <div class="legend-item">
-                <div class="legend-color" style="background:#C0DD97;"></div>
+                <div class="legend-color" style="background:${MASTERY_PALETTES.soft[0].bg};"></div>
                 <span>Advanced (≥3.5)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background:#9FE1CB;"></div>
+                <div class="legend-color" style="background:${MASTERY_PALETTES.soft[1].bg};"></div>
                 <span>Proficient (≥3.0)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background:#FAC775;"></div>
+                <div class="legend-color" style="background:${MASTERY_PALETTES.soft[2].bg};"></div>
                 <span>Developing (≥2.0)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background:#F7C1C1;"></div>
+                <div class="legend-color" style="background:${MASTERY_PALETTES.soft[3].bg};"></div>
                 <span>Beginning (&lt;2.0)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background:#f0f0f0;"></div>
+                <div class="legend-color" style="background:${NE_HEATMAP_COLOR.bg};"></div>
                 <span>NE (Not Enough data)</span>
             </div>
         </div>
@@ -301,6 +302,11 @@ export function openFullScreenHeatmap(cache, options = {}) {
         const AVG_OUTCOME_NAME = ${JSON.stringify(window.CG_CONFIG?.AVG_OUTCOME_NAME || 'Current Score')};
         const EXCLUDED_OUTCOME_KEYWORDS = ${JSON.stringify(window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS || [])};
         const COLOR_SCHEME = ${JSON.stringify(colorScheme)};
+
+        // Mastery palette serialized from src/ui/masteryColors.js so the popup
+        // and the in-dashboard heatmap stay in lockstep.
+        const MASTERY_PALETTES = ${JSON.stringify(MASTERY_PALETTES)};
+        const NE_HEATMAP_COLOR = ${JSON.stringify(NE_HEATMAP_COLOR)};
 
         // State
         let sortState = { column: 'name', direction: 'asc' };
@@ -325,23 +331,15 @@ export function openFullScreenHeatmap(cache, options = {}) {
 
         function getCellColor(plPrediction, status) {
             if (status === 'NE' || plPrediction === null) {
-                return { bg: '#f0f0f0', text: '#999' };
+                return { bg: NE_HEATMAP_COLOR.bg, text: NE_HEATMAP_COLOR.text };
             }
-
-            if (COLOR_SCHEME === 'canvas') {
-                // Canvas mastery colors (5-level, bold)
-                if (plPrediction >= 4.0) return { bg: '#02672D', text: '#FFFFFF' };
-                if (plPrediction >= 3.0) return { bg: '#03893D', text: '#FFFFFF' };
-                if (plPrediction >= 2.0) return { bg: '#EF9F27', text: '#FFFFFF' }; // White text on yellow
-                if (plPrediction >= 1.0) return { bg: '#FD5D10', text: '#FFFFFF' }; // White text on orange
-                return { bg: '#E62429', text: '#FFFFFF' };
-            } else {
-                // Soft colors (4-level, pastel) - default
-                if (plPrediction >= 3.5) return { bg: '#C0DD97', text: '#27500A' };
-                if (plPrediction >= 3.0) return { bg: '#9FE1CB', text: '#085041' };
-                if (plPrediction >= 2.0) return { bg: '#FAC775', text: '#633806' };
-                return { bg: '#F7C1C1', text: '#791F1F' };
+            const palette = MASTERY_PALETTES[COLOR_SCHEME === 'canvas' ? 'canvas' : 'soft'];
+            const v = (plPrediction == null || isNaN(plPrediction)) ? 0 : Number(plPrediction);
+            for (const band of palette) {
+                if (v >= band.min) return { bg: band.bg, text: band.fg };
             }
+            const last = palette[palette.length - 1];
+            return { bg: last.bg, text: last.fg };
         }
 
         function getCellContent(outcomeData, showDetails) {

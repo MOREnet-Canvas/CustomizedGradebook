@@ -36,6 +36,7 @@ import {
     createContentBox
 } from './canvasFormHelpers.js';
 import {renderHeader} from "./newHeader.js";
+import { injectAdminDashboardStyles } from './adminDashboardStyles.js';
 
 
 /**
@@ -72,9 +73,11 @@ export function renderAdminDashboard() {
 }
 
 /**
- * Inject dashboard styles (CSS + page reset)
+ * Inject dashboard styles (page reset + admin component CSS)
  */
 function injectDashboardStyles() {
+    // Page-reset rules: hide Canvas chrome so the admin dashboard owns the viewport.
+    // Kept inline because they're specific to this full-page takeover.
     const style = document.createElement('style');
     style.textContent = `
         /* Hide all Canvas content */
@@ -100,8 +103,8 @@ function injectDashboardStyles() {
     `;
     document.head.appendChild(style);
 
-    // Note: Dashboard panel styles (.cg-panel, .cg-tip, etc.) are loaded via Canvas Theme CSS override
-    // The CSS is merged into the main theme CSS file (css_loader.css) and loaded by Canvas automatically
+    // Component styles (.cg-panel, .cg-tip, .cg-status, .cg-pill, .cg-toolbar, .cg-summary*)
+    injectAdminDashboardStyles();
 
     // Update page title
     document.title = 'CG Admin Dashboard';

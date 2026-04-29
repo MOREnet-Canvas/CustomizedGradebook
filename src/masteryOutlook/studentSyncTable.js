@@ -19,42 +19,13 @@
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
+import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
     handleSyncOneStudent,
     handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
     handleLockWillPost, handleUnlockWillPost, handleNoteChanged,
     handleIgnoreAlignment, handleUnignoreAlignment,
 } from './plOutlookActions.js';
-
-// ─── Tone helpers ────────────────────────────────────────────────────────────
-
-/**
- * Map a 0-4 score to a tone key used for color styling.
- * Returns 'ne' for null/undefined.
- *
- * @param {number|null} v
- * @returns {'hi'|'good'|'dev'|'low'|'ne'}
- */
-function scoreTone(v) {
-    if (v == null) return 'ne';
-    const c = Math.max(0, Math.min(4, v));
-    if (c >= 3.25) return 'hi';
-    if (c >= 2.5)  return 'good';
-    if (c >= 1.75) return 'dev';
-    return 'low';
-}
-
-/**
- * Inline background+color style string for a score tone.
- * Uses CSS custom properties defined in plOutlookStyles.js :root.
- *
- * @param {string} tone - one of 'hi'|'good'|'dev'|'low'|'ne'
- * @returns {string}
- */
-function scoreToneStyle(tone) {
-    if (tone === 'ne') return 'background:var(--bg-secondary);color:var(--text-tertiary);';
-    return `background:var(--s-${tone});color:var(--s-${tone}-ink);`;
-}
 
 /**
  * Format an ISO date string to a short month-day string, e.g. "Apr 9".
