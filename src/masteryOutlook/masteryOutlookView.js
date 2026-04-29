@@ -1525,8 +1525,8 @@ function renderOutcomeStudentRow(s, oidStr) {
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
     const marzDisp    = s.marzano != null ? s.marzano.toFixed(2) : 'NE';
     const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
-    const canvasFaded = s.lock === 'none' && !scoresMatch(s.canvas, s.willPost) ? '' : 'faded';
-    const marzFaded   = s.lock !== 'none' ? 'faded' : '';
+    const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
+    const marzFaded   = scoresMatch(s.marzano, s.willPost) ? '' : 'faded';
 
     const dotsHtml = s.dots.length
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
@@ -1621,16 +1621,20 @@ function renderOutcomeStudentTable(outcome, cache) {
     const neRows     = studentStates.filter(s => s.status === 'ne');
     const needsCount = needsRows.length;
 
-    const toolbarHtml = `
-        <div class="os-post-toolbar">
-          <span class="os-post-toolbar-left">
-            <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-          </span>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-sm btn-primary" data-action="os-post-all"
-                    ${needsCount === 0 ? 'disabled' : ''}>↑ Save all to Canvas</button>
-          </div>
-        </div>`;
+    const toolbarHtml = needsCount > 0
+        ? `<div class="os-post-toolbar">
+             <div class="os-post-toolbar-left">
+               <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} — ready to save
+             </div>
+             <button class="btn btn-sm btn-primary" data-action="os-post-all">
+               Save grades to Canvas
+             </button>
+           </div>`
+        : `<div class="os-post-toolbar">
+             <div class="os-post-toolbar-left" style="color:var(--green);">
+               ✓ Canvas gradebook is up to date
+             </div>
+           </div>`;
 
     const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
     const legendHtml = `
@@ -1639,6 +1643,9 @@ function renderOutcomeStudentTable(outcome, cache) {
           ${tones.map(([t, lbl]) =>
               `<span class="os-leg"><span class="os-leg-sw" style="${scoreToneStyle(t)}"></span><span>${lbl}</span></span>`
           ).join('')}
+          <span class="os-leg" style="margin-left:auto;color:var(--text-tertiary);">
+            <span style="text-decoration:line-through;">2.5</span><span>Ignored alignment</span>
+          </span>
         </div>`;
 
     const sectionDivider = (rows, isNeeds) => {

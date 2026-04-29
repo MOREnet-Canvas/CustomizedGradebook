@@ -62,10 +62,10 @@ export const PL_OUTLOOK_CSS = `
   --green:        #3B6D11;
   --green-bg:     #EAF3DE;
 
-  /* density — compact default; .cozy on .mo-shell for roomier rows */
-  --row-py:  6px;
-  --cell-py: 6px;
-  --gap:     8px;
+  /* density — comfortable default; .cozy on .mo-shell for roomier rows */
+  --row-py:  7px;
+  --cell-py: 7px;
+  --gap:     9px;
 }
 
 .mo-shell.cozy { --row-py: 10px; --cell-py: 9px; --gap: 10px; }
@@ -629,23 +629,10 @@ tr.os-needs-row td:first-child { border-left:2.5px solid var(--s-dev); }
 tr.os-needs-row td { background:#FFFDF7; }
 .os-stu-name { font-weight:500; font-size:12px; }
 
-/* Alignment dots */
-.os-dot-row { display:flex; gap:3px; flex-wrap:wrap; align-items:center; }
-.os-dot {
-  width:26px; height:22px; border-radius:var(--radius-sm);
-  font-size:10px; font-weight:600;
-  display:flex; align-items:center; justify-content:center;
-  position:relative; flex-shrink:0; cursor:default;
-  border:0.5px solid transparent; transition:transform .08s;
-}
-.os-dot:hover { transform:scale(1.1); border-color:rgba(0,0,0,.12); }
-.os-dot.ignored { opacity:0.32; }
-.os-dot.ignored::after { content:''; position:absolute; top:50%; left:-2px; right:-2px; height:1.5px; background:var(--text-secondary); transform:translateY(-50%) rotate(-12deg); }
-
-/* Score pills (Canvas, Marzano) — clickable, fade when not driving */
+/* Score pills (Canvas, Marzano) — clickable, fade when value ≠ Will Post */
 .os-pill-btn { display:inline-block; position:relative; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; border-radius:10px; transition:opacity .15s, box-shadow .12s; }
 .os-pill-btn:focus-visible { outline:2px solid var(--blue); outline-offset:2px; border-radius:10px; }
-.os-pill-btn.faded { opacity:0.28; }
+.os-pill-btn.faded { opacity:0.55; }
 .os-pill-btn:not(.faded):hover { box-shadow:0 0 0 1.5px var(--border-primary); }
 .os-pill { font-size:11px; font-weight:600; padding:3px 10px; border-radius:8px; display:inline-block; min-width:46px; text-align:center; white-space:nowrap; line-height:1.4; }
 .os-pill-tip { display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:var(--text-primary); color:#fff; padding:4px 7px; border-radius:var(--radius-sm); font-size:10px; font-weight:400; white-space:nowrap; z-index:40; pointer-events:none; }
