@@ -121,8 +121,12 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     let lock;
     if (syncEntry?.will_post_lock === 'locked') {
         lock = 'locked';
-    } else if (canvas !== null && marzano !== null && !scoresMatch(canvas, marzano) && storedWP === null) {
-        // Canvas score differs from Marzano but teacher hasn't explicitly set Will Post yet
+    } else if (
+        storedWP !== null &&
+        !scoresMatch(storedWP, canvas) &&
+        !scoresMatch(storedWP, marzano)
+    ) {
+        // Will Post is a true manual override — matches neither Canvas nor Marzano
         lock = 'unlocked';
     } else {
         lock = 'none';
@@ -346,7 +350,6 @@ function buildShell(containerEl) {
                         ${colHeader('PL avg', true)}
                         ${colHeader('Spread', true)}
                         ${colHeader('Below threshold', true)}
-                        ${colHeader('Status', true)}
                         <div></div>
                     </div>
                     <div id="od-outcomes-list"></div>
@@ -439,7 +442,6 @@ function renderDefaultOutcomeRows(outcomesEl, outcomes) {
             <div class="od-center">${neChip()}</div>
             <div>${emptySpread()}</div>
             <div class="od-below">—</div>
-            <div class="od-center">${pendingBadge()}</div>
             <div></div>
         `;
         outcomesEl.appendChild(row);
@@ -476,9 +478,6 @@ function neChip() {
     return `<span class="od-ne-chip">NE</span>`;
 }
 
-function pendingBadge() {
-    return `<span class="od-pending-badge">Pending</span>`;
-}
 
 function emptySpread() {
     return `<div class="od-empty-spread"></div>`;
@@ -862,7 +861,6 @@ function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
             <div class="row-cell-center">${plAvgChip(displayStats)}</div>
             <div>${spreadBar(displayStats)}</div>
             <div class="row-below${belowFlag}">${displayStats.belowThresholdCount}</div>
-            <div class="row-cell-center">${statusBadge(displayStats)}</div>
             <div class="row-chevron">${chevron}</div>
         `;
 
@@ -2081,16 +2079,6 @@ function spreadBar(classStats) {
         <div style="width:${d['2']/total*100}%; background:${level2Color};"></div>
         <div style="width:${d['1']/total*100}%; background:${level1Color};"></div>
     </div>`;
-}
-
-function statusBadge(classStats) {
-    if (classStats.plAvg === null) return pendingBadge();
-    const threshold = getCurrentThreshold();
-    const isReteach = classStats.plAvg < threshold;
-    const isSolid   = classStats.plAvg >= 3.0;
-    if (isReteach) return `<span class="od-status-badge reteach">Re-teach</span>`;
-    if (isSolid)   return `<span class="od-status-badge solid">Solid</span>`;
-    return `<span class="od-status-badge monitor">Monitor</span>`;
 }
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────

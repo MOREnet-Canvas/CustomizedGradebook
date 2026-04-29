@@ -811,7 +811,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-tab-bar { display:flex; gap:4px; border-bottom:2px solid #e0e0e0; margin-bottom:8px; }
 .mo-shell .od-tab { font-family:var(--mo-legacy-font); font-size:13px; padding:8px 16px; cursor:pointer; border:none; background:transparent; color:#666; border-bottom:2px solid transparent; font-weight:400; }
 .mo-shell .od-tab.active { background:#fff; color:#185FA5; border-bottom:2px solid #185FA5; font-weight:500; }
-.mo-shell .od-col-headers { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; padding:4px 12px 6px; border-bottom:1px solid #e0e0e0; margin-bottom:4px; }
+.mo-shell .od-col-headers { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 24px; gap:8px; padding:4px 12px 6px; border-bottom:1px solid #e0e0e0; margin-bottom:4px; }
 .mo-shell .od-status-bar { font-size:0.8rem; color:#888; margin-top:12px; min-height:20px; }
 
 /* --- colHeader --- */
@@ -819,7 +819,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-col-header.center { text-align:center; }
 
 /* --- renderDefaultOutcomeRows --- */
-.mo-shell .od-default-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; margin-bottom:6px; background:#fff; }
+.mo-shell .od-default-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; margin-bottom:6px; background:#fff; }
 .mo-shell .od-default-row .od-num { font-size:13px; color:#999; font-weight:500; }
 .mo-shell .od-default-row .od-name { font-size:15px; color:#333; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mo-shell .od-default-row .od-center { text-align:center; }
@@ -832,9 +832,8 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-empty-prompt .ep-body { font-size:0.85rem; line-height:1.6; max-width:340px; margin:0 auto; }
 .mo-shell .od-refresh-prompt { margin-top:10px; padding:10px 14px; background:#f0f7ff; border:1px solid #b8d6f5; border-radius:8px; font-size:0.82rem; color:#0374B5; line-height:1.6; }
 
-/* --- neChip / pendingBadge / emptySpread --- */
-.mo-shell .od-ne-chip,
-.mo-shell .od-pending-badge { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; padding:3px 8px; border-radius:8px; background:#f0f0f0; color:#999; }
+/* --- neChip / emptySpread --- */
+.mo-shell .od-ne-chip { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; padding:3px 8px; border-radius:8px; background:#f0f0f0; color:#999; }
 .mo-shell .od-empty-spread { height:16px; border-radius:4px; background:#f0f0f0; width:100%; }
 
 /* --- buildOutcomeDetailPanel --- */
@@ -917,7 +916,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 /* --- renderLoadedOutcomeRows --- */
 .mo-shell .od-no-current-score { padding:12px; font-size:13px; color:#888; font-style:italic; margin-bottom:6px; }
 .mo-shell .od-outcome-container { margin-bottom:6px; }
-.mo-shell .od-outcome-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; cursor:pointer; }
+.mo-shell .od-outcome-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; cursor:pointer; }
 .mo-shell .od-outcome-row.expanded { border-bottom-left-radius:0; border-bottom-right-radius:0; }
 .mo-shell .od-outcome-row:hover { background:#f5f5f3; }
 .mo-shell .od-outcome-row .row-num { font-size:13px; color:#999; }
@@ -945,12 +944,8 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell { font-family:var(--mo-legacy-font); max-width:1375px; margin:0 auto; padding:1rem; font-size:125%; }
 .mo-shell #od-heatmap-view { display:none; }
 
-/* --- plAvgChip / statusBadge --- */
+/* --- plAvgChip --- */
 .mo-shell .od-pl-chip { font-family:var(--mo-legacy-font); font-size:13px; font-weight:600; padding:3px 10px; border-radius:8px; }
-.mo-shell .od-status-badge { font-family:var(--mo-legacy-font); font-size:12px; font-weight:600; padding:3px 8px; border-radius:8px; }
-.mo-shell .od-status-badge.reteach { background:#FCEBEB; color:#791F1F; }
-.mo-shell .od-status-badge.solid   { background:#E1F5EE; color:#085041; }
-.mo-shell .od-status-badge.monitor { background:#FAEEDA; color:#633806; }
 
 /* --- spreadBar --- */
 .mo-shell .od-spread-bar { display:flex; height:16px; border-radius:4px; overflow:hidden; gap:1px; }
