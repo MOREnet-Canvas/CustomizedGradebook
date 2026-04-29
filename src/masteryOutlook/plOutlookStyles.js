@@ -833,10 +833,10 @@ tr.ho-needs-row td { background:#FFFDF7; }
 
 /* --- renderDefaultOutcomeRows --- */
 .mo-shell .od-default-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; margin-bottom:6px; background:#fff; }
-.mo-shell .od-default-row .num { font-size:13px; color:#999; font-weight:500; }
-.mo-shell .od-default-row .name { font-size:15px; color:#333; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.mo-shell .od-default-row .center { text-align:center; }
-.mo-shell .od-default-row .below { text-align:center; font-size:13px; color:#bbb; }
+.mo-shell .od-default-row .od-num { font-size:13px; color:#999; font-weight:500; }
+.mo-shell .od-default-row .od-name { font-size:15px; color:#333; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mo-shell .od-default-row .od-center { text-align:center; }
+.mo-shell .od-default-row .od-below { text-align:center; font-size:13px; color:#bbb; }
 
 /* --- buildEmptyPrompt / buildRefreshPrompt --- */
 .mo-shell .od-empty-prompt { text-align:center; padding:2rem 1rem; color:#888; }
@@ -881,16 +881,16 @@ tr.ho-needs-row td { background:#FFFDF7; }
 .mo-shell .od-ex-empty.padded { padding:16px; }
 .mo-shell .od-ex-table { font-family:var(--mo-legacy-font); width:100%; border-collapse:collapse; font-size:12px; }
 .mo-shell .od-ex-table th { font-weight:600; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:6px 8px; text-align:left; border-bottom:0.5px solid #e0e0e0; background:#fafafa; }
-.mo-shell .od-ex-table th.center { text-align:center; }
+.mo-shell .od-ex-table th.od-center { text-align:center; }
 .mo-shell .od-ex-table td { font-size:12px; padding:6px 8px; border-bottom:0.5px solid #f0f0f0; vertical-align:middle; }
-.mo-shell .od-ex-table td.center { text-align:center; }
-.mo-shell .od-ex-table td.name { font-weight:500; }
-.mo-shell .od-ex-table td.note { color:#666; }
-.mo-shell .od-ex-table td.date { color:#999; }
+.mo-shell .od-ex-table td.od-center { text-align:center; }
+.mo-shell .od-ex-table td.od-name { font-weight:500; }
+.mo-shell .od-ex-table td.od-note { color:#666; }
+.mo-shell .od-ex-table td.od-date { color:#999; }
 .mo-shell .od-ex-table.wide th,
 .mo-shell .od-ex-table.wide td { padding:6px 10px; }
-.mo-shell .od-ex-table .note-clip { color:#666; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.mo-shell .od-ex-table .nowrap { white-space:nowrap; }
+.mo-shell .od-ex-table .od-note-clip { color:#666; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mo-shell .od-ex-table .od-nowrap { white-space:nowrap; }
 .mo-shell .od-ex-pill { font-size:10.5px; font-weight:600; padding:1px 6px; border-radius:8px; display:inline-block; }
 .mo-shell .od-ex-pill.override { background:#FCEBEB; color:#791F1F; }
 .mo-shell .od-ex-pill.locked   { background:#FAEEDA; color:#633806; }
@@ -901,14 +901,14 @@ tr.ho-needs-row td { background:#FFFDF7; }
 .mo-shell .od-stu-table { font-family:var(--mo-legacy-font); width:100%; border-collapse:collapse; font-size:13px; }
 .mo-shell .od-stu-table thead tr { border-bottom:0.5px solid #e0e0e0; }
 .mo-shell .od-stu-table th { font-weight:500; color:#666; padding:6px 8px; font-size:12px; text-align:left; }
-.mo-shell .od-stu-table th.center { text-align:center; }
-.mo-shell .od-stu-table tr.flagged { background:rgba(252,235,235,0.3); }
+.mo-shell .od-stu-table th.od-center { text-align:center; }
+.mo-shell .od-stu-table tr.od-flagged { background:rgba(252,235,235,0.3); }
 .mo-shell .od-stu-table td { padding:6px 8px; }
-.mo-shell .od-stu-table td.name      { font-size:13px; }
-.mo-shell .od-stu-table td.center    { text-align:center; font-size:13px; }
-.mo-shell .od-stu-table td.pill-cell { text-align:center; }
-.mo-shell .od-stu-table td.history   { font-size:11px; color:#999; letter-spacing:1px; }
-.mo-shell .od-stu-table td.sync-cell { text-align:center; vertical-align:middle; }
+.mo-shell .od-stu-table td.od-name      { font-size:13px; }
+.mo-shell .od-stu-table td.od-center    { text-align:center; font-size:13px; }
+.mo-shell .od-stu-table td.od-pill-cell { text-align:center; }
+.mo-shell .od-stu-table td.od-history   { font-size:11px; color:#999; letter-spacing:1px; }
+.mo-shell .od-stu-table td.od-sync-cell { text-align:center; vertical-align:middle; }
 .mo-shell .od-stu-link { color:#333; text-decoration:none; }
 .mo-shell .od-stu-pl-pill { padding:2px 8px; border-radius:6px; font-size:12px; font-weight:500; }
 .mo-shell .od-sync-actions { display:flex; flex-direction:column; align-items:center; gap:2px; }

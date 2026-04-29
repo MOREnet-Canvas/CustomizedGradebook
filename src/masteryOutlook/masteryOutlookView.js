@@ -445,12 +445,12 @@ function renderDefaultOutcomeRows(outcomesEl, outcomes) {
         const row = document.createElement('div');
         row.className = 'od-default-row';
         row.innerHTML = `
-            <div class="num">${i + 1}</div>
-            <div class="name">${escapeHtml(outcome.title)}</div>
-            <div class="center">${neChip()}</div>
+            <div class="od-num">${i + 1}</div>
+            <div class="od-name">${escapeHtml(outcome.title)}</div>
+            <div class="od-center">${neChip()}</div>
             <div>${emptySpread()}</div>
-            <div class="below">—</div>
-            <div class="center">${pendingBadge()}</div>
+            <div class="od-below">—</div>
+            <div class="od-center">${pendingBadge()}</div>
             <div></div>
         `;
         outcomesEl.appendChild(row);
@@ -1336,13 +1336,13 @@ function buildExceptionsTable(outcome, cache) {
         if (ignoredStudentIds.has(sId))        types.push('<span class="od-ex-pill ignored">Ignored</span>');
 
         return `<tr>
-            <td class="name">${escapeHtml(student.name || `Student ${student.id}`)}</td>
+            <td class="od-name">${escapeHtml(student.name || `Student ${student.id}`)}</td>
             <td>${types.join(' ')}</td>
-            <td class="center">${canvasDisp}</td>
-            <td class="center">${marzDisp}</td>
-            <td class="center">${wpDisp}</td>
-            <td class="note">${note}</td>
-            <td class="date">${dateFmt}</td>
+            <td class="od-center">${canvasDisp}</td>
+            <td class="od-center">${marzDisp}</td>
+            <td class="od-center">${wpDisp}</td>
+            <td class="od-note">${note}</td>
+            <td class="od-date">${dateFmt}</td>
         </tr>`;
     }).join('');
 
@@ -1350,9 +1350,9 @@ function buildExceptionsTable(outcome, cache) {
         <thead><tr>
             <th>Student</th>
             <th>Type</th>
-            <th class="center">Canvas</th>
-            <th class="center">Marzano</th>
-            <th class="center">Will Post</th>
+            <th class="od-center">Canvas</th>
+            <th class="od-center">Marzano</th>
+            <th class="od-center">Will Post</th>
             <th>Note</th>
             <th>Date</th>
         </tr></thead>
@@ -1445,13 +1445,13 @@ function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgno
         const pillClass = r.typeClass === 'override' ? 'override' : 'ignored';
         return `<tr>
             <td>${escapeHtml(r.outcomeName)}</td>
-            <td class="name">${escapeHtml(r.studentName)}</td>
+            <td class="od-name">${escapeHtml(r.studentName)}</td>
             <td><span class="od-ex-pill ${pillClass}">${escapeHtml(r.type)}</span></td>
-            <td class="center">${r.canvas}</td>
-            <td class="center">${r.marzano}</td>
-            <td class="center">${r.willPost}</td>
-            <td><div class="note-clip">${escapeHtml(r.note)}</div></td>
-            <td class="date nowrap">${dateDisp}</td>
+            <td class="od-center">${r.canvas}</td>
+            <td class="od-center">${r.marzano}</td>
+            <td class="od-center">${r.willPost}</td>
+            <td><div class="od-note-clip">${escapeHtml(r.note)}</div></td>
+            <td class="od-date od-nowrap">${dateDisp}</td>
         </tr>`;
     }).join('');
 
@@ -1460,9 +1460,9 @@ function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgno
             <th>Outcome</th>
             <th>Student</th>
             <th>Type</th>
-            <th class="center">Canvas</th>
-            <th class="center">Marzano</th>
-            <th class="center">Will Post</th>
+            <th class="od-center">Canvas</th>
+            <th class="od-center">Marzano</th>
+            <th class="od-center">Will Post</th>
             <th>Note</th>
             <th>Date</th>
         </tr></thead>
@@ -1802,32 +1802,32 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
         const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
 
         return `
-            <tr class="${isFlagged ? 'flagged' : ''}">
-                <td class="name">
+            <tr class="${isFlagged ? 'od-flagged' : ''}">
+                <td class="od-name">
                     <a class="od-stu-link"
                        href="/courses/${cache.meta.courseId}/pages/${masteryDashboardUrl}?cg_web=1&student_id=${s.id}"
                        title="View ${escapeHtml(s.name)}'s individual mastery dashboard">
                         ${escapeHtml(s.name)}
                     </a>
                 </td>
-                <td class="pill-cell">
+                <td class="od-pill-cell">
                     <span class="od-stu-pl-pill"
                           style="background:${c.bg}; color:${c.tx};">${plDisplay}</span>
                 </td>
-                <td class="center">${canvasScoreDisplay}</td>
-                <td class="sync-cell">
+                <td class="od-center">${canvasScoreDisplay}</td>
+                <td class="od-sync-cell">
                     <div class="od-sync-actions">
                         ${syncBadgeHtml}
                         ${syncActionsHtml}
                     </div>
                 </td>
-                <td class="center">${decayingAvgDisplay}</td>
-                <td class="center">${meanDisplay}</td>
-                <td class="center">${recentDisplay}</td>
-                <td class="center">
+                <td class="od-center">${decayingAvgDisplay}</td>
+                <td class="od-center">${meanDisplay}</td>
+                <td class="od-center">${recentDisplay}</td>
+                <td class="od-center">
                     <span class="od-trend" style="color:${trendColor};">${trendIcon}</span>
                 </td>
-                <td class="history">${scoreHistory}</td>
+                <td class="od-history">${scoreHistory}</td>
             </tr>`;
     }).join('');
 
@@ -1839,13 +1839,13 @@ function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
             <thead>
                 <tr>
                     <th>Student</th>
-                    <th class="center">${plColumnHeader}</th>
-                    <th class="center">Canvas Score</th>
-                    <th class="center">Sync Status</th>
-                    <th class="center">Decaying Avg</th>
-                    <th class="center">Mean</th>
-                    <th class="center">Recent</th>
-                    <th class="center">Trend</th>
+                    <th class="od-center">${plColumnHeader}</th>
+                    <th class="od-center">Canvas Score</th>
+                    <th class="od-center">Sync Status</th>
+                    <th class="od-center">Decaying Avg</th>
+                    <th class="od-center">Mean</th>
+                    <th class="od-center">Recent</th>
+                    <th class="od-center">Trend</th>
                     <th>Score History</th>
                 </tr>
             </thead>
