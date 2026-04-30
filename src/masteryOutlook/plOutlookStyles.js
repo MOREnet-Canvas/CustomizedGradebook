@@ -84,6 +84,8 @@ export const PL_OUTLOOK_CSS = `
   -webkit-font-smoothing: antialiased;
   line-height: 1.4;
   padding: 1.692em 2.154em 6.154em;
+  max-width: 105.769em;
+  margin: 0 auto;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -903,9 +905,6 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-heatmap-empty .he-icon { font-size:2rem; margin-bottom:0.5rem; }
 .mo-shell .od-heatmap-empty .he-title { font-size:0.95rem; font-weight:600; color:#555; margin-bottom:0.4rem; }
 .mo-shell .od-heatmap-empty .he-body { font-size:0.85rem; line-height:1.6; max-width:26.154em; margin:0 auto; }
-
-/* --- buildShell container root --- */
-.mo-shell { font-family:var(--mo-legacy-font); max-width:105.769em; margin:0 auto; padding:1rem; font-size:125%; }
 
 /* --- plAvgChip --- */
 .mo-shell .od-pl-chip { font-family:var(--mo-legacy-font); font-size:1em; font-weight:600; padding:0.231em 0.769em; border-radius:0.615em; }
