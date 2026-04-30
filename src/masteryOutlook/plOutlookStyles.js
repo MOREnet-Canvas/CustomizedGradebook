@@ -791,7 +791,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell #od-subtitle { font-size:0.8rem; color:#888; margin-top:2px; }
 .mo-shell .od-header-actions { display:flex; align-items:center; gap:10px; }
 .mo-shell #od-last-updated { font-size:0.8rem; color:#888; }
-.mo-shell .od-btn-exceptions { font-family:var(--mo-legacy-font); font-size:0.8rem; padding:6px 12px; border-radius:6px; border:1px solid #ccc; background:transparent; color:#666; cursor:pointer; font-weight:500; display:none; }
+.mo-shell .od-btn-exceptions { font-family:var(--mo-legacy-font); font-size:0.8rem; padding:6px 12px; border-radius:6px; border:1px solid #ccc; background:transparent; color:#666; cursor:pointer; font-weight:500; }
 .mo-shell .od-btn-refresh { font-family:var(--mo-legacy-font); font-size:0.85rem; padding:7px 16px; border-radius:6px; border:1px solid #0374B5; background:#0374B5; color:#fff; cursor:pointer; font-weight:600; min-width:120px; }
 .mo-shell .od-refresh-banner { display:none; margin-bottom:0.75rem; padding:10px 16px; border-radius:8px; background:#EBF5FB; border:0.5px solid #AED6F1; align-items:center; justify-content:space-between; gap:12px; }
 .mo-shell .od-refresh-banner-text { font-family:var(--mo-legacy-font); font-size:13px; color:#1A5276; }
@@ -942,7 +942,6 @@ tr.os-needs-row td { background:#FFFDF7; }
 
 /* --- buildShell container root --- */
 .mo-shell { font-family:var(--mo-legacy-font); max-width:1375px; margin:0 auto; padding:1rem; font-size:125%; }
-.mo-shell #od-heatmap-view { display:none; }
 
 /* --- plAvgChip --- */
 .mo-shell .od-pl-chip { font-family:var(--mo-legacy-font); font-size:13px; font-weight:600; padding:3px 10px; border-radius:8px; }

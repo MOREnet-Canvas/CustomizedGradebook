@@ -15,114 +15,21 @@ import { logger } from '../utils/logger.js';
 import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
-import {
-    handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
-} from './plOutlookActions.js';
-import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
-import { escapeHtml } from '../utils/html.js';
 import { startPolling, stopPolling, startVisibilityListener, stopVisibilityListener } from './masteryOutlookPollingService.js';
-import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
-import { getCourseId } from '../utils/canvas.js';
-import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
-import { buildHeatmapGrid } from './masteryOutlookHeatmap.js';
-import { openFullScreenHeatmap } from './masteryOutlookHeatmapFullScreen.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
-import { getMasteryColor } from '../ui/masteryColors.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
-import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
+import { findMasteryDashboardPageUrl, getPage } from '../services/pageService.js';
+import { VIEWS, getView } from './viewRegistry.js';
+import {
+    isRegularOutcome,
+    renderOutcomeSyncDefault,
+    buildCrossOutcomeExceptionsView,
+} from './outcomeSyncView.js';
 
-const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
-
-// Current color scheme (set on init)
+// Current color scheme (set on init). Read by buildViewContext so views
+// always see the live selection.
 let currentColorScheme = 'soft';
-
-// ─── Outcome Type Helpers ────────────────────────────────────────────────────
-
-function isCurrentScoreOutcome(title) {
-    return title === AVG_OUTCOME_NAME;
-}
-
-function isExcludedOutcome(title) {
-    return EXCLUDED_OUTCOME_KEYWORDS.some(kw => title.includes(kw));
-}
-
-function isSpecialOutcome(title) {
-    return isCurrentScoreOutcome(title) || isExcludedOutcome(title);
-}
-
-function isRegularOutcome(outcome) {
-    return !isSpecialOutcome(outcome.title);
-}
-
-/**
- * Calculate a student's PL Avg from their regular outcome PL Predictions
- * Used for Current Score outcome
- */
-function calculateStudentPLAvg(student, cache) {
-    const regularOutcomes = cache.outcomes.filter(o => isRegularOutcome(o));
-
-    const plPredictions = student.outcomes
-        .filter(so => {
-            // Check if this outcome is a regular outcome
-            const outcome = regularOutcomes.find(ro => String(ro.id) === String(so.outcomeId));
-            return outcome && so.plPrediction !== null;
-        })
-        .map(so => so.plPrediction);
-
-    if (plPredictions.length === 0) return null;
-
-    return plPredictions.reduce((sum, p) => sum + p, 0) / plPredictions.length;
-}
-
-/**
- * Compute class stats for Current Score outcome
- * Based on student PL Avgs (average of their regular outcome PL Predictions)
- */
-function computeCurrentScoreClassStats(cache) {
-    const threshold = getCurrentThreshold();
-
-    // Calculate PL Avg for each student
-    const studentPLAvgs = cache.students
-        .map(student => calculateStudentPLAvg(student, cache))
-        .filter(v => v !== null);
-
-    if (studentPLAvgs.length === 0) {
-        return {
-            plAvg: null,
-            distribution: { '1': 0, '2': 0, '3': 0, '4': 0 },
-            belowThresholdCount: 0,
-            computedThreshold: threshold,
-            avgSlope: null,
-            neCount: cache.students.length
-        };
-    }
-
-    // Compute distribution
-    const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
-    studentPLAvgs.forEach(plAvg => {
-        if (plAvg < 1.5)      distribution['1']++;
-        else if (plAvg < 2.5) distribution['2']++;
-        else if (plAvg < 3.5) distribution['3']++;
-        else                  distribution['4']++;
-    });
-
-    // Compute class PL avg
-    const classPLAvg = studentPLAvgs.reduce((sum, v) => sum + v, 0) / studentPLAvgs.length;
-
-    // Count below threshold
-    const belowThresholdCount = studentPLAvgs.filter(plAvg => plAvg < threshold).length;
-
-    return {
-        plAvg: parseFloat(classPLAvg.toFixed(4)),
-        distribution,
-        belowThresholdCount,
-        computedThreshold: threshold,
-        avgSlope: null,  // Not meaningful for Current Score
-        neCount: cache.students.length - studentPLAvgs.length
-    };
-}
 
 // ─── Main entry point ────────────────────────────────────────────────────────
 
@@ -213,37 +120,33 @@ function buildShell(containerEl) {
 
         <div id="od-body" class="od-body">
             <div id="od-outcomes-col">
-                <!-- Tab bar -->
+                <!-- Tab bar + view containers are generated from VIEWS registry -->
                 <div id="od-tab-bar" class="od-tab-bar">
-                    <button class="od-tab" data-tab="outcomes">
-                        Outcomes
-                    </button>
-                    <button class="od-tab" data-tab="heatmap">
-                        🔥 Heatmap
-                    </button>
+                    ${VIEWS.map(v => `
+                        <button class="od-tab" data-tab="${v.id}">${v.label}</button>
+                    `).join('')}
                 </div>
-
-                <!-- Outcomes view -->
-                <div id="od-outcomes-view">
-                    <div id="od-col-headers" class="od-col-headers">
-                        ${colHeader('#')}
-                        ${colHeader('Outcome')}
-                        ${colHeader('PL avg', true)}
-                        ${colHeader('Spread', true)}
-                        ${colHeader('Below threshold', true)}
-                        <div></div>
-                    </div>
-                    <div id="od-outcomes-list"></div>
-                </div>
-
-                <!-- Heatmap view -->
-                <div id="od-heatmap-view"></div>
+                ${VIEWS.map(v => `
+                    <div id="od-${v.id}-view" class="od-view-container" data-view-id="${v.id}"></div>
+                `).join('')}
             </div>
             <div id="od-sidebar"></div>
         </div>
 
         <div id="od-status-bar" class="od-status-bar"></div>
     `;
+
+    // Per-view container init (e.g. outcomes view scaffolds its column
+    // headers + list). Stored in a map so switchToView can iterate. Only
+    // the first registered view starts visible; switchToView toggles
+    // visibility once the loaded-state tab bar wires up.
+    const viewContainers = {};
+    VIEWS.forEach((v, i) => {
+        const el = containerEl.querySelector(`#od-${v.id}-view`);
+        viewContainers[v.id] = el;
+        v.initContainer?.(el);
+        el.style.display = i === 0 ? 'block' : 'none';
+    });
 
     return {
         titleEl:          containerEl.querySelector('#od-title'),
@@ -261,16 +164,13 @@ function buildShell(containerEl) {
         sidebarEl:        containerEl.querySelector('#od-sidebar'),
         statusEl:         containerEl.querySelector('#od-status-bar'),
         tabBar:           containerEl.querySelector('#od-tab-bar'),
-        outcomesView:     containerEl.querySelector('#od-outcomes-view'),
-        heatmapView:      containerEl.querySelector('#od-heatmap-view'),
+        viewContainers,
+        // Convenience aliases for views that still reference shell.heatmapView etc.
+        heatmapView:      viewContainers.heatmap,
         bodyEl:           containerEl.querySelector('#od-body'),
         colorSoftBtn:     containerEl.querySelector('#od-color-soft'),
         colorCanvasBtn:   containerEl.querySelector('#od-color-canvas'),
     };
-}
-
-function colHeader(label, center = false) {
-    return `<div class="od-col-header${center ? ' center' : ''}">${label}</div>`;
 }
 
 // ─── Default state (no cache) ─────────────────────────────────────────────────
@@ -278,27 +178,12 @@ function colHeader(label, center = false) {
 async function renderDefaultState(shell, courseId, apiClient, onRefresh) {
     setStatus(shell.statusEl, 'Loading outcomes…');
 
-    // Render empty metric cards immediately
     renderMetricCards(shell.metricsEl, null);
-
-    // Render default sidebar
     renderDefaultSidebar(shell.sidebarEl);
 
-    // Fetch outcome names from Canvas
-    let outcomes = [];
-    try {
-        outcomes = await fetchOutcomeNames(courseId, apiClient);
-    } catch (e) {
-        logger.warn('[MasteryOutlook] Could not fetch outcome names', e);
-    }
-
-    // Render outcome rows in default/empty state
-    renderDefaultOutcomeRows(shell.outcomesEl, outcomes);
-
-    // Prominent refresh prompt if no outcomes loaded
-    if (outcomes.length === 0) {
-        shell.outcomesEl.innerHTML = buildEmptyPrompt();
-    }
+    // Outcome-row default state lives with the outcomes view module so it
+    // owns its own markup + empty/refresh prompts.
+    await renderOutcomeSyncDefault(shell, courseId, apiClient);
 
     setStatus(shell.statusEl, '');
     setLastUpdated(shell.lastUpdatedEl, null);
@@ -306,67 +191,12 @@ async function renderDefaultState(shell, courseId, apiClient, onRefresh) {
     wireRefreshButton(shell, courseId, apiClient, onRefresh);
 }
 
-function renderDefaultOutcomeRows(outcomesEl, outcomes) {
-    outcomesEl.innerHTML = '';
-
-    if (outcomes.length === 0) {
-        outcomesEl.innerHTML = buildEmptyPrompt();
-        return;
-    }
-
-    outcomes.forEach((outcome, i) => {
-        const row = document.createElement('div');
-        row.className = 'od-default-row';
-        row.innerHTML = `
-            <div class="od-num">${i + 1}</div>
-            <div class="od-name">${escapeHtml(outcome.title)}</div>
-            <div class="od-center">${neChip()}</div>
-            <div>${emptySpread()}</div>
-            <div class="od-below">—</div>
-            <div></div>
-        `;
-        outcomesEl.appendChild(row);
-    });
-
-    // Prompt below rows
-    const prompt = document.createElement('div');
-    prompt.innerHTML = buildRefreshPrompt();
-    outcomesEl.appendChild(prompt);
-}
-
-function buildEmptyPrompt() {
-    return `
-        <div class="od-empty-prompt">
-            <div class="ep-icon">📋</div>
-            <div class="ep-title">No outcome data yet</div>
-            <div class="ep-body">
-                Hit <strong>Refresh Data</strong> to calculate Power Law
-                predictions for all students and outcomes in this course.
-            </div>
-        </div>`;
-}
-
-function buildRefreshPrompt() {
-    return `
-        <div class="od-refresh-prompt">
-            Outcome names loaded from Canvas. Hit
-            <strong>Refresh Data</strong> to calculate Power Law predictions,
-            class distribution, and intervention flags.
-        </div>`;
-}
-
-function neChip() {
-    return `<span class="od-ne-chip">NE</span>`;
-}
-
-
-function emptySpread() {
-    return `<div class="od-empty-spread"></div>`;
-}
-
 // ─── Loaded state (cache exists) ─────────────────────────────────────────────
 
-let currentViewMode = 'outcomes';  // 'outcomes' or 'heatmap'
+// Controller object for the currently mounted view: { id, teardown, refresh }.
+// Set by switchToView; consumed by wireColorSchemeToggle / wireThresholdSlider
+// to trigger a re-render in place when shared chrome state changes.
+let activeViewController = null;
 
 function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
     // Apply design-token variants to the shell container so that
@@ -395,11 +225,11 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
     wireThresholdSlider(shell, cache, courseId, apiClient);
     wireColorSchemeToggle(shell, cache, courseId, apiClient);
     renderMetricCards(shell.metricsEl, cache);
-    renderLoadedOutcomeRows(shell.outcomesEl, cache, courseId, apiClient);
     renderSidebar(shell.sidebarEl, cache);
 
     wireRefreshButton(shell, courseId, apiClient, onRefresh);
-    wireTabBar(shell, cache);
+    // wireTabBar mounts the initial 'outcomes' view from the registry.
+    wireTabBar(shell, cache, courseId, apiClient, onRefresh);
 
     // 3e — wire "View exceptions" button + cross-outcome panel
     wireExceptionsPanel(shell, cache);
@@ -541,30 +371,9 @@ function wireTweaksPanel(sidebarEl, courseId) {
 function wireExceptionsPanel(shell, cache) {
     if (!shell.exceptionsBtn || !shell.exceptionsPanel) return;
 
-    // Determine whether there are any exceptions at all
-    const syncState   = cache.sync_state ?? {};
-    const ignoredList = cache.ignored_alignments ?? [];
-    let hasAny = ignoredList.length > 0;
-
-    if (!hasAny) {
-        for (const studentMap of Object.values(syncState)) {
-            for (const entry of Object.values(studentMap)) {
-                if (entry.manual_override || entry.will_post_lock === 'locked') {
-                    hasAny = true;
-                    break;
-                }
-            }
-            if (hasAny) break;
-        }
-    }
-
-    if (!hasAny) return;  // nothing to show — keep button hidden
-
-    shell.exceptionsBtn.style.display = 'inline-block';
-
-    let panelOpen        = false;
-    let showOverrides    = true;
-    let showIgnored      = true;
+    let panelOpen     = false;
+    let showOverrides = true;
+    let showIgnored   = true;
 
     const renderPanel = () => {
         shell.exceptionsPanel.innerHTML = `
@@ -619,766 +428,11 @@ function wireExceptionsPanel(shell, cache) {
     });
 }
 
-// ─── Outcome row expansion ───────────────────────────────────────────────────
-
-let expandedOutcomeId = null;
-let activeTab = 'students';
-
-// Teardown for the currently mounted outcome-detail panel's document-level
-// listeners (set by buildOutcomeDetailPanel via wireOutcomeStudentTable).
-// Invoked before the next render to prevent listener accumulation.
-let currentDetailTeardown = null;
+// ─── Threshold helper (read live slider value for shared chrome) ─────────────
 
 function getCurrentThreshold() {
     const slider = document.querySelector('#od-threshold-slider');
     return slider ? parseFloat(slider.value) : 2.2;
-}
-
-/**
- * Build the sync count summary line shown beneath the outcome name in each
- * collapsed outcome row header (spec Section 12).
- *
- * Examples:
- *   "↑ 3 need sync · ⚑ 1 override?"
- *   "✓ All synced"
- *   "Setup needed — run sync to initialize"
- *   "" (empty — outcome has no PL assignment yet and nothing to report)
- *
- * Uses aggregateSyncStatus() (pure, synchronous) — no API calls.
- *
- * @param {Object} outcome
- * @param {Object} cache
- * @returns {string} HTML string (may be empty string)
- */
-function buildSyncSummaryLine(outcome, cache) {
-    const plConfig = {
-        pl_assignments: cache.pl_assignments ?? {},
-        sync_state:     cache.sync_state     ?? {},
-    };
-
-    const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
-
-    if (!counts.hasSetup) {
-        // No PL assignment set up yet — show nothing unless we want to prompt setup
-        return '';
-    }
-
-    if (counts.needsSync > 0 || counts.possibleOverride > 0 || counts.manualOverride > 0) {
-        const parts = [];
-        if (counts.needsSync      > 0) parts.push(`<span class="needs">↑ ${counts.needsSync} need sync</span>`);
-        if (counts.possibleOverride > 0) parts.push(`<span class="override">⚑ ${counts.possibleOverride} override?</span>`);
-        if (counts.manualOverride  > 0) parts.push(`<span class="override">⚑ ${counts.manualOverride} confirmed</span>`);
-        return `<div class="od-sync-summary">${parts.join(' <span class="sep">·</span> ')}</div>`;
-    }
-
-    if (counts.synced > 0 && counts.needsSync === 0 && counts.possibleOverride === 0) {
-        return `<div class="od-sync-summary synced">✓ All synced</div>`;
-    }
-
-    return '';
-}
-
-function renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient) {
-    // Tear down listeners owned by the previous detail panel before its DOM
-    // is dropped, so document-level handlers don't accumulate across renders.
-    if (typeof currentDetailTeardown === 'function') {
-        try { currentDetailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
-        currentDetailTeardown = null;
-    }
-    outcomesEl.innerHTML = '';
-
-    // Sort outcomes: Current Score → Excluded → Regular
-    const currentScore = cache.outcomes.find(o => isCurrentScoreOutcome(o.title));
-    const excluded = cache.outcomes.filter(o => isExcludedOutcome(o.title) && !isCurrentScoreOutcome(o.title));
-    const regular = cache.outcomes.filter(o => isRegularOutcome(o));
-
-    // Add "No Current Score found" message if missing
-    if (!currentScore) {
-        const noCurrentScore = document.createElement('div');
-        noCurrentScore.className = 'od-no-current-score';
-        noCurrentScore.textContent = 'No Current Score found';
-        outcomesEl.appendChild(noCurrentScore);
-    }
-
-    // Sort regular outcomes if custom order exists
-    // Note: wiki page stores IDs as strings; outcome.id from cache is a number — coerce to string for comparison
-    if (cache.meta.customOutcomeOrder && Array.isArray(cache.meta.customOutcomeOrder)) {
-        regular.sort((a, b) => {
-            const indexA = cache.meta.customOutcomeOrder.indexOf(String(a.id));
-            const indexB = cache.meta.customOutcomeOrder.indexOf(String(b.id));
-            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-            if (indexA !== -1) return -1;
-            if (indexB !== -1) return 1;
-            return 0; // Default to existing order
-        });
-    }
-
-    const sortedOutcomes = [
-        ...(currentScore ? [currentScore] : []),
-        ...excluded,
-        ...regular
-    ];
-
-    // Track regular outcome numbering
-    let regularIndex = 0;
-
-    sortedOutcomes.forEach((outcome, i) => {
-        const isSpecial = isSpecialOutcome(outcome.title);
-        const displayNumber = isSpecial ? '' : ++regularIndex;
-        const isCurrentScoreRow = isCurrentScoreOutcome(outcome.title);
-
-        // For Current Score, use computed stats instead of cached stats
-        const displayStats = isCurrentScoreRow ? computeCurrentScoreClassStats(cache) : outcome.classStats;
-
-        const outcomeContainer = document.createElement('div');
-        outcomeContainer.className = 'od-outcome-container';
-
-        // Header row (clickable)
-        const row = document.createElement('div');
-        const isExpanded = expandedOutcomeId === outcome.id;
-        row.className = `od-outcome-row${isExpanded ? ' expanded' : ''}`;
-
-        const chevron = isExpanded ? '▼' : '›';
-        const belowFlag = displayStats.belowThresholdCount > 3 ? ' flag' : '';
-
-        // 2i — sync count summary line shown beneath the outcome name
-        const syncSummaryHtml = buildSyncSummaryLine(outcome, cache);
-
-        row.innerHTML = `
-            <div class="od-row-number row-num">${displayNumber}</div>
-            <div>
-                <div class="row-title">${escapeHtml(outcome.title)}</div>
-                ${syncSummaryHtml}
-            </div>
-            <div class="row-cell-center">${plAvgChip(displayStats)}</div>
-            <div>${spreadBar(displayStats)}</div>
-            <div class="row-below${belowFlag}">${displayStats.belowThresholdCount}</div>
-            <div class="row-chevron">${chevron}</div>
-        `;
-
-        row.addEventListener('click', () => {
-            expandedOutcomeId = (expandedOutcomeId === outcome.id) ? null : outcome.id;
-            activeTab = 'students'; // Reset to default tab when expanding
-            renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient);
-        });
-
-        outcomeContainer.appendChild(row);
-
-        // Detail panel (expanded content)
-        if (isExpanded) {
-            const detailPanel = buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient);
-            outcomeContainer.appendChild(detailPanel);
-        }
-
-        if (!isSpecial) {
-            outcomeContainer.draggable = true;
-            outcomeContainer.dataset.outcomeId = outcome.id;
-
-            outcomeContainer.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', outcome.id);
-                outcomeContainer.style.opacity = '0.5';
-            });
-
-            outcomeContainer.addEventListener('dragend', () => {
-                outcomeContainer.style.opacity = '1';
-
-                // Collect the new order
-                const newOrder = [];
-                outcomesEl.querySelectorAll('[data-outcome-id]').forEach(el => {
-                    newOrder.push(el.dataset.outcomeId);
-                });
-
-                // Only update if order changed
-                if (JSON.stringify(newOrder) !== JSON.stringify(cache.meta.customOutcomeOrder)) {
-                    cache.meta.customOutcomeOrder = newOrder;
-                    saveCustomOutcomeOrder(courseId, apiClient, newOrder);
-                    // Update index display without full re-render
-                    let newIndex = 0;
-                    outcomesEl.querySelectorAll('[data-outcome-id]').forEach(el => {
-                        newIndex++;
-                        const numEl = el.querySelector('.od-row-number');
-                        if (numEl) numEl.textContent = newIndex;
-                    });
-                }
-            });
-
-            outcomeContainer.addEventListener('dragover', (e) => {
-                e.preventDefault(); // allow drop
-                const bounding = outcomeContainer.getBoundingClientRect();
-                const offset = bounding.y + (bounding.height / 2);
-                if (e.clientY - offset > 0) {
-                    outcomeContainer.style.borderBottom = '2px solid #0374B5';
-                    outcomeContainer.style.borderTop = '';
-                } else {
-                    outcomeContainer.style.borderTop = '2px solid #0374B5';
-                    outcomeContainer.style.borderBottom = '';
-                }
-            });
-
-            outcomeContainer.addEventListener('dragleave', (e) => {
-                outcomeContainer.style.borderTop = '';
-                outcomeContainer.style.borderBottom = '';
-            });
-
-            outcomeContainer.addEventListener('drop', (e) => {
-                e.preventDefault();
-                outcomeContainer.style.borderTop = '';
-                outcomeContainer.style.borderBottom = '';
-
-                const draggedId = e.dataTransfer.getData('text/plain');
-                if (draggedId === outcome.id) return;
-
-                const draggedEl = outcomesEl.querySelector(`[data-outcome-id="${draggedId}"]`);
-                if (draggedEl) {
-                    const bounding = outcomeContainer.getBoundingClientRect();
-                    const offset = bounding.y + (bounding.height / 2);
-                    if (e.clientY - offset > 0) {
-                        outcomeContainer.after(draggedEl);
-                    } else {
-                        outcomeContainer.before(draggedEl);
-                    }
-                }
-            });
-        }
-
-        outcomesEl.appendChild(outcomeContainer);
-
-        // Add divider after last special outcome, before first regular
-        const isLastSpecial = isSpecial &&
-                              (i === sortedOutcomes.length - 1 || !isSpecialOutcome(sortedOutcomes[i + 1].title));
-
-        if (isLastSpecial && regular.length > 0) {
-            const divider = document.createElement('div');
-            divider.className = 'od-outcome-divider';
-            outcomesEl.appendChild(divider);
-        }
-    });
-}
-
-
-function buildOutcomeDetailPanel(outcome, cache, outcomesEl, courseId, apiClient) {
-    const panel = document.createElement('div');
-    panel.className = 'od-detail-panel';
-
-    // Tabs
-    const tabBar = document.createElement('div');
-    tabBar.className = 'od-detail-tabs';
-
-    const strugglingCount  = countStrugglingStudents(outcome, cache);
-    const decliningCount   = countDecliningStudents(outcome, cache);
-    const growingCount     = countGrowingStudents(outcome, cache);
-    const exceptionsCount  = countExceptionStudents(outcome, cache);
-
-    const tabs = [
-        { id: 'students',   label: `All Students (${cache.students.length})` },
-        { id: 'struggling', label: `Struggling (${strugglingCount})` },
-        { id: 'declining',  label: `Declining (${decliningCount})` },
-        { id: 'growing',    label: `Growing (${growingCount})` },
-        // Only show the Exceptions tab when there are exceptions to review (3d)
-        ...(exceptionsCount > 0
-            ? [{ id: 'exceptions', label: `Exceptions (${exceptionsCount})` }]
-            : []),
-    ];
-
-    tabs.forEach(tab => {
-        const tabBtn = document.createElement('button');
-        const isActive = activeTab === tab.id;
-        tabBtn.className = 'od-detail-tab';
-        /* dynamic — keep inline */
-        tabBtn.style.cssText = `
-            color:${isActive ? '#185FA5' : '#666'};
-            border-bottom:2px solid ${isActive ? '#185FA5' : 'transparent'};
-            background:${isActive ? '#fff' : 'transparent'};
-            font-weight:${isActive ? '500' : '400'};`;
-        tabBtn.textContent = tab.label;
-        tabBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            activeTab = tab.id;
-            renderLoadedOutcomeRows(outcomesEl, cache, courseId, apiClient);
-        });
-        tabBar.appendChild(tabBtn);
-    });
-
-    panel.appendChild(tabBar);
-
-    // Tab content
-    const content = document.createElement('div');
-    content.className = 'od-detail-content';
-
-    const renderTable = () => {
-        if (activeTab === 'exceptions') {
-            content.innerHTML = buildExceptionsTable(outcome, cache);
-            return;
-        }
-        if (activeTab === 'students') {
-            content.innerHTML = renderOutcomeStudentTable(outcome, cache);
-            return;
-        }
-        content.innerHTML = buildStudentTable(outcome, cache, activeTab, courseId, apiClient);
-    };
-    renderTable();
-
-    // ── Legacy per-row actions (non-students tabs only) ──────────────────
-    content.addEventListener('click', async (e) => {
-        const el = e.target.closest('[data-action]');
-        if (!el) return;
-
-        const action      = el.dataset.action;
-        const stuId       = el.dataset.stu || el.dataset.studentId;
-        const oId         = el.dataset.oid || el.dataset.outcomeId;
-        const outcomeName = outcome.title || String(outcome.id);
-
-        if (action === 'sync-one' && el.tagName === 'BUTTON') {
-            if (el.disabled) return;
-            el.disabled = true;
-            el.textContent = '…';
-            try {
-                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable });
-            } catch (err) {
-                logger.error('[MasteryOutlook] sync-one failed', err);
-                el.disabled = false; el.textContent = '↑ Sync';
-            }
-            return;
-        }
-        if (action === 'confirm-override') { await handleConfirmOverride({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable }); return; }
-        if (action === 'dismiss-override') { await handleDismissOverride({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable }); return; }
-        if (action === 'revert-override')  { await handleRevertOverride({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable }); return; }
-    });
-
-    // ── Student-table slice (os-* + dot-* + os-note) ─────────────────────
-    // Owns its own document-level "click outside dot" listener; teardown is
-    // captured into module state so the next render can release it.
-    currentDetailTeardown = wireOutcomeStudentTable({
-        contentEl: content,
-        outcome,
-        cache,
-        courseId,
-        apiClient,
-        renderTable,
-    });
-
-    panel.appendChild(content);
-
-    return panel;
-}
-
-function countStrugglingStudents(outcome, cache) {
-    const threshold = getCurrentThreshold();
-    const isCurrentScore = isCurrentScoreOutcome(outcome.title);
-
-    return cache.students.filter(student => {
-        let plValue;
-
-        if (isCurrentScore) {
-            // For Current Score, use calculated PL Avg (average of regular outcome PL Predictions)
-            plValue = calculateStudentPLAvg(student, cache);
-        } else {
-            // For regular outcomes, use stored plPrediction
-            const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
-            plValue = outcomeData ? outcomeData.plPrediction : null;
-        }
-
-        return plValue !== null && plValue < threshold;
-    }).length;
-}
-
-function countDecliningStudents(outcome, cache) {
-    // NOTE: For Current Score, this uses the outcome's own slope data (from Current Score attempts)
-    // If we want to calculate a "meta-slope" based on how student PL Avgs are trending over time,
-    // we would need to add special handling here similar to countStrugglingStudents()
-    return cache.students.filter(student => {
-        const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return outcomeData && outcomeData.slope !== null && outcomeData.slope < -0.05;
-    }).length;
-}
-
-function countGrowingStudents(outcome, cache) {
-    // NOTE: For Current Score, this uses the outcome's own slope data (from Current Score attempts)
-    // If we want to calculate a "meta-slope" based on how student PL Avgs are trending over time,
-    // we would need to add special handling here similar to countStrugglingStudents()
-    return cache.students.filter(student => {
-        const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return outcomeData && outcomeData.slope !== null && outcomeData.slope > 0.05;
-    }).length;
-}
-
-/**
- * Count students who have at least one exception for a given outcome.
- * An exception is: locked Will Post, confirmed manual override, or an ignored alignment.
- *
- * @param {Object} outcome
- * @param {Object} cache
- * @returns {number}
- */
-function countExceptionStudents(outcome, cache) {
-    const syncState    = cache.sync_state ?? {};
-    const outcomeSync  = syncState[String(outcome.id)] ?? {};
-    const ignored      = (cache.ignored_alignments ?? []).filter(
-        ia => String(ia.outcomeId) === String(outcome.id)
-    );
-    const ignoredStudentIds = new Set(ignored.map(ia => String(ia.studentId)));
-
-    return cache.students.filter(student => {
-        const sId   = String(student.id);
-        const entry = outcomeSync[sId];
-        return (
-            entry?.will_post_lock === 'locked' ||
-            entry?.manual_override === true     ||
-            ignoredStudentIds.has(sId)
-        );
-    }).length;
-}
-
-/**
- * Build the per-outcome Exceptions table (read-only).
- * Shows students with locked Will Post, confirmed overrides, or ignored alignments.
- *
- * @param {Object} outcome
- * @param {Object} cache
- * @returns {string} HTML string
- */
-function buildExceptionsTable(outcome, cache) {
-    const syncState   = cache.sync_state ?? {};
-    const outcomeSync = syncState[String(outcome.id)] ?? {};
-    const ignored     = (cache.ignored_alignments ?? []).filter(
-        ia => String(ia.outcomeId) === String(outcome.id)
-    );
-    const ignoredStudentIds = new Set(ignored.map(ia => String(ia.studentId)));
-
-    const exceptionStudents = cache.students.filter(student => {
-        const sId   = String(student.id);
-        const entry = outcomeSync[sId];
-        return (
-            entry?.will_post_lock === 'locked' ||
-            entry?.manual_override === true     ||
-            ignoredStudentIds.has(sId)
-        );
-    });
-
-    if (exceptionStudents.length === 0) {
-        return `<p class="od-ex-empty">No exceptions for this outcome.</p>`;
-    }
-
-    const rows = exceptionStudents.map(student => {
-        const sId       = String(student.id);
-        const entry     = outcomeSync[sId] ?? {};
-        const od        = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
-        const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
-        const marzDisp   = od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE';
-        const wpDisp     = entry.will_post != null ? entry.will_post.toFixed(2) : '—';
-        const note       = escapeHtml(entry.will_post_note ?? '');
-        const dateRaw    = entry.override_at ?? entry.last_synced_at ?? '';
-        const dateFmt    = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
-
-        const types = [];
-        if (entry.manual_override)             types.push('<span class="od-ex-pill override">Override</span>');
-        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked WP</span>');
-        if (ignoredStudentIds.has(sId))        types.push('<span class="od-ex-pill ignored">Ignored</span>');
-
-        return `<tr>
-            <td class="od-name">${escapeHtml(student.name || `Student ${student.id}`)}</td>
-            <td>${types.join(' ')}</td>
-            <td class="od-center">${canvasDisp}</td>
-            <td class="od-center">${marzDisp}</td>
-            <td class="od-center">${wpDisp}</td>
-            <td class="od-note">${note}</td>
-            <td class="od-date">${dateFmt}</td>
-        </tr>`;
-    }).join('');
-
-    return `<table class="od-ex-table">
-        <thead><tr>
-            <th>Student</th>
-            <th>Type</th>
-            <th class="od-center">Canvas</th>
-            <th class="od-center">Marzano</th>
-            <th class="od-center">Will Post</th>
-            <th>Note</th>
-            <th>Date</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-    </table>`;
-}
-
-/**
- * Build the cross-outcome exceptions table for 3e.
- * Shows every override, locked Will Post, and ignored alignment across all outcomes.
- * Read-only — no action buttons.
- *
- * @param {Object}   cache
- * @param {Object}   opts
- * @param {boolean}  opts.showOverrides   - Include manual_override + locked Will Post rows
- * @param {boolean}  opts.showIgnored     - Include ignored alignment rows
- * @returns {string} HTML string
- */
-function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, showIgnored = true } = {}) {
-    const syncState    = cache.sync_state ?? {};
-    const ignoredList  = cache.ignored_alignments ?? [];
-
-    // Build lookup maps
-    const outcomeById  = {};
-    (cache.outcomes || []).forEach(o => { outcomeById[String(o.id)] = o; });
-    const studentById  = {};
-    (cache.students || []).forEach(s => { studentById[String(s.id)] = s; });
-
-    const rows = [];
-
-    // Collect from sync_state — overrides and locked Will Post
-    if (showOverrides) {
-        for (const [outcomeId, studentMap] of Object.entries(syncState)) {
-            const outcome = outcomeById[outcomeId];
-            if (!outcome) continue;
-
-            for (const [studentId, entry] of Object.entries(studentMap)) {
-                const student = studentById[studentId];
-                if (!student) continue;
-                if (!entry.manual_override && entry.will_post_lock !== 'locked') continue;
-
-                const od         = student.outcomes?.find(o => String(o.outcomeId) === outcomeId);
-                const typeParts  = [];
-                if (entry.manual_override)              typeParts.push('Override');
-                if (entry.will_post_lock === 'locked')  typeParts.push('Locked WP');
-
-                rows.push({
-                    outcomeName: outcome.title,
-                    studentName: student.name || `Student ${studentId}`,
-                    type:        typeParts.join(' + '),
-                    typeClass:   'override',
-                    canvas:      od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—',
-                    marzano:     od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE',
-                    willPost:    entry.will_post != null ? entry.will_post.toFixed(2) : '—',
-                    note:        entry.will_post_note ?? '',
-                    date:        entry.override_at ?? entry.last_synced_at ?? '',
-                });
-            }
-        }
-    }
-
-    // Collect from ignored_alignments
-    if (showIgnored) {
-        for (const ia of ignoredList) {
-            const outcome = outcomeById[String(ia.outcomeId)];
-            const student = studentById[String(ia.studentId)];
-            if (!outcome || !student) continue;
-
-            rows.push({
-                outcomeName: outcome.title,
-                studentName: student.name || `Student ${ia.studentId}`,
-                type:        'Ignored alignment',
-                typeClass:   'ignored',
-                canvas:      '—',
-                marzano:     '—',
-                willPost:    '—',
-                note:        ia.reason ?? '',
-                date:        ia.ignored_at ?? '',
-            });
-        }
-    }
-
-    if (rows.length === 0) {
-        return `<p class="od-ex-empty padded">
-            No overrides or ignored alignments recorded for this course.</p>`;
-    }
-
-    const rowsHtml = rows.map(r => {
-        const dateDisp  = r.date ? new Date(r.date).toLocaleDateString() : '—';
-        const pillClass = r.typeClass === 'override' ? 'override' : 'ignored';
-        return `<tr>
-            <td>${escapeHtml(r.outcomeName)}</td>
-            <td class="od-name">${escapeHtml(r.studentName)}</td>
-            <td><span class="od-ex-pill ${pillClass}">${escapeHtml(r.type)}</span></td>
-            <td class="od-center">${r.canvas}</td>
-            <td class="od-center">${r.marzano}</td>
-            <td class="od-center">${r.willPost}</td>
-            <td><div class="od-note-clip">${escapeHtml(r.note)}</div></td>
-            <td class="od-date od-nowrap">${dateDisp}</td>
-        </tr>`;
-    }).join('');
-
-    return `<table class="od-ex-table wide">
-        <thead><tr>
-            <th>Outcome</th>
-            <th>Student</th>
-            <th>Type</th>
-            <th class="od-center">Canvas</th>
-            <th class="od-center">Marzano</th>
-            <th class="od-center">Will Post</th>
-            <th>Note</th>
-            <th>Date</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-    </table>`;
-}
-
-// ─── Filter tables (Struggling / Declining / Growing) ───────────────────────
-// The All-Students sync table lives in ./studentSyncTable.js
-// ────────────────────────────────────────────────────────────────────────────
-
-function buildStudentTable(outcome, cache, filter, courseId, apiClient) {
-    const isCurrentScore = isCurrentScoreOutcome(outcome.title);
-    const plConfig = { pl_assignments: cache.pl_assignments ?? {}, sync_state: cache.sync_state ?? {} };
-
-    let students = cache.students.map(student => {
-        const outcomeData = student.outcomes.find(o => o.outcomeId === outcome.id);
-        const studentRow = {
-            id: student.id,  // Add student ID for linking
-            name: student.name || student.sortableName,
-            sortableName: student.sortableName,
-            ...outcomeData
-        };
-
-        // For Current Score, override plPrediction with calculated PL Avg
-        if (isCurrentScore) {
-            studentRow.plPrediction = calculateStudentPLAvg(student, cache);
-        }
-
-        return studentRow;
-    });
-
-    const threshold = getCurrentThreshold();
-
-    // Filter students based on active tab
-    if (filter === 'struggling') {
-        students = students.filter(s => s.plPrediction !== null && s.plPrediction < threshold);
-    } else if (filter === 'declining') {
-        students = students.filter(s => s.slope !== null && s.slope < -0.05);
-    } else if (filter === 'growing') {
-        students = students.filter(s => s.slope !== null && s.slope > 0.05);
-    }
-
-    // Sort based on active tab
-    if (filter === 'students') {
-        // All Students: Alphabetical order by name
-        students.sort((a, b) => {
-            const nameA = (a.sortableName || a.name || '').toLowerCase();
-            const nameB = (b.sortableName || b.name || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-        });
-    } else if (filter === 'declining') {
-        // Declining: Sort by slope (most negative first)
-        students.sort((a, b) => {
-            if (a.slope === null) return 1;
-            if (b.slope === null) return -1;
-            return a.slope - b.slope;  // Most negative first
-        });
-    } else {
-        // Struggling/Growing: Sort by PL prediction (lowest first)
-        students.sort((a, b) => {
-            if (a.plPrediction === null) return 1;
-            if (b.plPrediction === null) return -1;
-            return a.plPrediction - b.plPrediction;
-        });
-    }
-
-    if (students.length === 0) {
-        return `<p class="od-stu-empty">No students in this category.</p>`;
-    }
-
-    const rowsHTML = students.map(s => {
-        const c = s.plPrediction !== null ? profColor(s.plPrediction) : { bg: '#f5f5f3', tx: '#999' };
-        const plDisplay = s.plPrediction !== null ? s.plPrediction.toFixed(2) : 'NE';
-        const canvasScoreDisplay = s.canvasScore !== null && s.canvasScore !== undefined
-            ? s.canvasScore.toFixed(2)
-            : '—';
-        const decayingAvgDisplay = s.decayingAvg !== null ? s.decayingAvg.toFixed(2) : '—';
-        const meanDisplay = s.mean !== null ? s.mean.toFixed(2) : '—';
-        const recentDisplay = s.mostRecent !== null ? s.mostRecent.toFixed(2) : '—';
-
-        // Trend indicator
-        let trendIcon = '→';
-        let trendColor = '#999';
-        if (s.slope !== null) {
-            if (s.slope > 0.1) {
-                trendIcon = '▲';
-                trendColor = '#0F6E56';
-            } else if (s.slope < -0.1) {
-                trendIcon = '▼';
-                trendColor = '#A32D2D';
-            }
-        }
-
-        // Score history
-        const scoreHistory = (s.attempts || [])
-            .map(a => `<span class="od-score-history-attempt">${a.score}</span>`)
-            .join(' ');
-
-        const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
-
-        // Sync status badge + action buttons
-        const syncInfo = getSyncStatus(s.id, outcome.id, s.plPrediction, s.canvasScore, plConfig);
-        const oIdStr   = String(outcome.id);
-        const sIdStr   = String(s.id);
-        let syncBadgeHtml = `<span class="sync-badge ${syncInfo.cssClass}">${syncInfo.label}</span>`;
-        let syncActionsHtml = '';
-        if (syncInfo.status === 'needs_sync') {
-            syncActionsHtml = `<button class="btn btn-sm btn-ghost od-sync-action-btn"
-                data-action="sync-one" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">↑ Sync</button>`;
-        } else if (syncInfo.status === 'possible_override') {
-            syncActionsHtml = `
-                <button class="btn btn-sm btn-danger od-sync-action-btn compact"
-                    data-action="confirm-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Keep Canvas</button>
-                <button class="btn btn-sm btn-ghost od-sync-action-btn compact"
-                    data-action="dismiss-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Use PL</button>`;
-        } else if (syncInfo.status === 'manual_override') {
-            syncActionsHtml = `<button class="btn btn-sm btn-warn od-sync-action-btn compact"
-                data-action="revert-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Revert to PL</button>`;
-        }
-
-        // Use cached masteryDashboardUrl or fallback to default
-        const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
-
-        return `
-            <tr class="${isFlagged ? 'od-flagged' : ''}">
-                <td class="od-name">
-                    <a class="od-stu-link"
-                       href="/courses/${cache.meta.courseId}/pages/${masteryDashboardUrl}?cg_web=1&student_id=${s.id}"
-                       title="View ${escapeHtml(s.name)}'s individual mastery dashboard">
-                        ${escapeHtml(s.name)}
-                    </a>
-                </td>
-                <td class="od-pill-cell">
-                    <span class="od-stu-pl-pill"
-                          style="background:${c.bg}; color:${c.tx};">${plDisplay}</span>
-                </td>
-                <td class="od-center">${canvasScoreDisplay}</td>
-                <td class="od-sync-cell">
-                    <div class="od-sync-actions">
-                        ${syncBadgeHtml}
-                        ${syncActionsHtml}
-                    </div>
-                </td>
-                <td class="od-center">${decayingAvgDisplay}</td>
-                <td class="od-center">${meanDisplay}</td>
-                <td class="od-center">${recentDisplay}</td>
-                <td class="od-center">
-                    <span class="od-trend" style="color:${trendColor};">${trendIcon}</span>
-                </td>
-                <td class="od-history">${scoreHistory}</td>
-            </tr>`;
-    }).join('');
-
-    // Use "PL Avg" header for Current Score, "PL Pred." for all others
-    const plColumnHeader = isCurrentScore ? 'PL Avg' : 'PL Pred.';
-
-    return `
-        <table class="od-stu-table">
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th class="od-center">${plColumnHeader}</th>
-                    <th class="od-center">Canvas Score</th>
-                    <th class="od-center">Sync Status</th>
-                    <th class="od-center">Decaying Avg</th>
-                    <th class="od-center">Mean</th>
-                    <th class="od-center">Recent</th>
-                    <th class="od-center">Trend</th>
-                    <th>Score History</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${rowsHTML}
-            </tbody>
-        </table>`;
 }
 
 // ─── Metric cards ─────────────────────────────────────────────────────────────
@@ -1504,16 +558,11 @@ function wireColorSchemeToggle(shell, cache, courseId, apiClient) {
             // Update button states
             updateButtonStates();
 
-            // Re-render views to apply new colors
+            // Re-render shared chrome + ask the active view to refresh in place.
             logger.info(`[MasteryOutlook] Color scheme changed to: ${newScheme}`);
             renderMetricCards(shell.metricsEl, cache);
-            renderLoadedOutcomeRows(shell.outcomesEl, cache, courseId, apiClient);
             renderSidebar(shell.sidebarEl, cache);
-
-            // Re-render heatmap if currently active
-            if (currentViewMode === 'heatmap') {
-                renderHeatmapView(shell, cache);
-            }
+            activeViewController?.refresh?.();
         });
     });
 }
@@ -1539,11 +588,11 @@ function wireThresholdSlider(shell, cache, courseId, apiClient) {
         shell.thresholdValue.textContent = newThreshold.toFixed(1);
         saveThreshold(courseId, userId, newThreshold);
 
-        // Re-render to apply new threshold
-        // Note: This just updates the UI, doesn't recompute cache
+        // Re-render shared chrome + ask the active view to refresh in place.
+        // Note: This just updates the UI, doesn't recompute cache.
         renderMetricCards(shell.metricsEl, cache);
-        renderLoadedOutcomeRows(shell.outcomesEl, cache, courseId, apiClient);
         renderSidebar(shell.sidebarEl, cache);
+        activeViewController?.refresh?.();
     });
 }
 
@@ -1582,50 +631,7 @@ function wireRefreshButton(shell, courseId, apiClient, onRefresh) {
     });
 }
 
-// ─── Chip / badge helpers ─────────────────────────────────────────────────────
-
-function plAvgChip(classStats) {
-    if (classStats.plAvg === null) return neChip();
-    const c = profColor(classStats.plAvg);
-    /* dynamic — keep inline */
-    return `<span class="od-pl-chip" style="background:${c.bg}; color:${c.tx};">
-            ${classStats.plAvg.toFixed(2)}
-            </span>`;
-}
-
-function spreadBar(classStats) {
-    const total = Object.values(classStats.distribution).reduce((a, b) => a + b, 0);
-    if (total === 0) return emptySpread();
-    const d = classStats.distribution;
-
-    // Get colors based on current color scheme
-    const level4Color = profColor(4.0).bg;   // Advanced/Exceeds Mastery
-    const level3Color = profColor(3.0).bg;   // Proficient/Mastery
-    const level2Color = profColor(2.0).bg;   // Developing/Near Mastery
-    const level1Color = profColor(1.0).bg;   // Beginning/Below Mastery
-
-    /* dynamic — keep inline (widths/colors derived from distribution) */
-    return `<div class="od-spread-bar">
-        <div style="width:${d['4']/total*100}%; background:${level4Color};"></div>
-        <div style="width:${d['3']/total*100}%; background:${level3Color};"></div>
-        <div style="width:${d['2']/total*100}%; background:${level2Color};"></div>
-        <div style="width:${d['1']/total*100}%; background:${level1Color};"></div>
-    </div>`;
-}
-
-// ─── Utility helpers ──────────────────────────────────────────────────────────
-
-/**
- * Get proficiency color based on PL prediction value.
- * Thin wrapper over the shared mastery palette in src/ui/masteryColors.js.
- *
- * @param {number} v - PL prediction value
- * @returns {{ bg:string, tx:string, txOnDefault:string }}
- */
-function profColor(v) {
-    const c = getMasteryColor(v, { scheme: currentColorScheme });
-    return { bg: c.bg, tx: c.fg, txOnDefault: c.fgOnSurface };
-}
+// ─── Metric-card math helpers ────────────────────────────────────────────────
 
 function overallPlAvg(cache, regularOutcomes) {
     const outcomes = regularOutcomes || cache.outcomes;
@@ -1655,33 +661,6 @@ function countInterventionStudents(cache) {
     });
 
     return Object.keys(lowCounts).length;
-}
-
-async function saveCustomOutcomeOrder(courseId, apiClient, orderArray) {
-    try {
-        const pageUrl = await findMasteryDashboardPageUrl(courseId, apiClient);
-        if (!pageUrl) {
-            logger.warn('[MasteryOutlook] Cannot save outcome order — Mastery Dashboard page not found');
-            return;
-        }
-        const page = await getPage(courseId, pageUrl, apiClient);
-        if (page && page.body) {
-            let newBody = page.body;
-            const orderJson = JSON.stringify(orderArray);
-            // Check if data-outcome-order already exists
-            // Canvas HTML-encodes the body on save (e.g. " → &quot;), so match both quote styles
-            if (newBody.includes('data-outcome-order=')) {
-                newBody = newBody.replace(/data-outcome-order=(?:"[^"]*"|'[^']*')/, `data-outcome-order='${orderJson}'`);
-            } else {
-                // Inject into the mastery-dashboard-root div
-                newBody = newBody.replace(/<div\s+id=["']mastery-dashboard-root["']/, `<div id="mastery-dashboard-root" data-outcome-order='${orderJson}'`);
-            }
-            await updatePage(courseId, pageUrl, { body: newBody }, apiClient);
-            logger.info('[MasteryOutlook] Saved custom outcome order to wiki page');
-        }
-    } catch (e) {
-        logger.warn('[MasteryOutlook] Failed to save custom outcome order', e);
-    }
 }
 
 async function enrichCache(cache, courseId, apiClient) {
@@ -1733,12 +712,13 @@ async function tryLoadCache(courseId, apiClient) {
         if (cache) {
             logger.info('[MasteryOutlook] Cache loaded successfully');
             cache = {
-                meta:          cache.metadata,
-                outcomes:      cache.outcomes,
-                students:      cache.students,
+                meta:               cache.metadata,
+                outcomes:           cache.outcomes,
+                students:           cache.students,
                 // Preserve PL data so sync status badges and action buttons work
-                pl_assignments: cache.pl_assignments  ?? {},
-                sync_state:     cache.sync_state      ?? {},
+                pl_assignments:     cache.pl_assignments     ?? {},
+                sync_state:         cache.sync_state         ?? {},
+                ignored_alignments: cache.ignored_alignments ?? [],
             };
             return await enrichCache(cache, courseId, apiClient);
         }
@@ -1763,88 +743,73 @@ function setLastUpdated(el, isoString) {
     el.textContent = `Last updated: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 }
 
-// ─── Tab Bar (Outcomes / Heatmap) ────────────────────────────────────────────
+// ─── Tab Bar / View router ───────────────────────────────────────────────────
 
 /**
- * Wire tab bar to switch between outcomes view and heatmap view
+ * Build the per-render context handed to each view's mount() function.
+ * Functions (not values) for color/threshold so the view always reads the
+ * current selection without needing to be re-mounted.
  */
-function wireTabBar(shell, cache) {
-    const tabs = shell.tabBar.querySelectorAll('.od-tab');
+function buildViewContext(courseId, apiClient, onRefresh) {
+    return {
+        courseId,
+        apiClient,
+        onRefresh,
+        getColorScheme: () => currentColorScheme,
+        getThreshold:   () => getCurrentThreshold(),
+    };
+}
 
-    tabs.forEach(tab => {
+/**
+ * Wire the tab bar to switch between registered views and mount the
+ * initial 'outcomes' view.
+ */
+function wireTabBar(shell, cache, courseId, apiClient, onRefresh) {
+    const ctx = buildViewContext(courseId, apiClient, onRefresh);
+
+    shell.tabBar.querySelectorAll('.od-tab').forEach(tab => {
         tab.addEventListener('click', () => {
-            const tabName = tab.dataset.tab;
-            switchToView(tabName, shell, cache);
+            switchToView(tab.dataset.tab, shell, cache, ctx);
         });
     });
 
-    // Set initial active tab
-    switchToView('outcomes', shell, cache);
+    switchToView('outcomes', shell, cache, ctx);
 }
 
 /**
- * Switch between outcomes and heatmap views
+ * Tear down the active view (if any) and mount the requested one. Toggles
+ * tab .active state, hides every view container, then shows + mounts the
+ * target. Sidebar visibility comes from the descriptor's hasSidebar flag.
  */
-function switchToView(viewMode, shell, cache) {
-    currentViewMode = viewMode;
-
-    const tabs = shell.tabBar.querySelectorAll('.od-tab');
-    tabs.forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.tab === viewMode);
-    });
-
-    if (viewMode === 'outcomes') {
-        // Show outcomes view, show sidebar
-        shell.outcomesView.style.display = 'block';
-        shell.heatmapView.style.display = 'none';
-        shell.sidebarEl.style.display = 'none';
-        shell.bodyEl.style.gridTemplateColumns = '1fr';
-
-        logger.debug('[MasteryOutlook] Switched to outcomes view');
-    } else if (viewMode === 'heatmap') {
-        // Show heatmap view, hide sidebar
-        shell.outcomesView.style.display = 'none';
-        shell.heatmapView.style.display = 'block';
-        shell.sidebarEl.style.display = 'none';
-        shell.bodyEl.style.gridTemplateColumns = '1fr';
-
-        renderHeatmapView(shell, cache);
-
-        logger.debug('[MasteryOutlook] Switched to heatmap view');
-    }
-}
-
-/**
- * Render heatmap view
- */
-function renderHeatmapView(shell, cache) {
-    shell.heatmapView.innerHTML = '';
-
-    if (!cache || !cache.students || cache.students.length === 0) {
-        // No data state
-        shell.heatmapView.innerHTML = `
-            <div class="od-heatmap-empty">
-                <div class="he-icon">🔥</div>
-                <div class="he-title">No heatmap data yet</div>
-                <div class="he-body">
-                    Hit <strong>Refresh Data</strong> to calculate Power Law
-                    predictions and generate the class heatmap.
-                </div>
-            </div>
-        `;
+function switchToView(viewId, shell, cache, ctx) {
+    const descriptor = getView(viewId);
+    if (!descriptor) {
+        logger.warn(`[MasteryOutlook] Unknown view id: ${viewId}`);
         return;
     }
 
-    const heatmapGrid = buildHeatmapGrid(cache, {
-        cellWidth: 80,
-        cellHeight: 28,
-        colorScheme: currentColorScheme,
-        onFullScreen: () => {
-            const courseName = window.ENV?.COURSE?.name || 'Course';
-            openFullScreenHeatmap(cache, { courseName, colorScheme: currentColorScheme });
-        }
+    if (activeViewController?.teardown) {
+        try { activeViewController.teardown(); } catch (err) { logger.warn('[MasteryOutlook] view teardown failed', err); }
+    }
+    activeViewController = null;
+
+    shell.tabBar.querySelectorAll('.od-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === viewId);
     });
 
-    shell.heatmapView.appendChild(heatmapGrid);
-    logger.info('[MasteryOutlook] Heatmap rendered');
+    // Hide every registered view container; the active one is shown below.
+    Object.values(shell.viewContainers).forEach(el => {
+        if (el) el.style.display = 'none';
+    });
+
+    const containerEl = shell.viewContainers[viewId];
+    if (containerEl) containerEl.style.display = 'block';
+
+    shell.sidebarEl.style.display       = descriptor.hasSidebar ? '' : 'none';
+    shell.bodyEl.style.gridTemplateColumns = descriptor.hasSidebar ? '' : '1fr';
+
+    const controller = descriptor.mount(shell, cache, ctx) || {};
+    activeViewController = { id: viewId, ...controller };
+
+    logger.debug(`[MasteryOutlook] Switched to ${viewId} view`);
 }
