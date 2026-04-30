@@ -21,7 +21,8 @@
 
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
-import { mountOutcomeRow } from './outcomeRow.js';
+import { mountOutcomeRow, isOutcomeInitialized } from './outcomeRow.js';
+import { aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
@@ -116,15 +117,74 @@ function computeCurrentScoreClassStats(cache, threshold) {
  */
 export function initOutcomeSyncContainer(containerEl) {
     containerEl.innerHTML = `
+        <div id="od-course-sync" class="course-sync"></div>
         <div id="od-col-headers" class="od-col-headers">
             <div class="od-col-header">#</div>
             <div class="od-col-header">Outcome</div>
             <div class="od-col-header center">PL avg</div>
             <div class="od-col-header center">Spread</div>
             <div class="od-col-header center">Below threshold</div>
+            <div class="od-col-header center">Canvas sync</div>
             <div></div>
         </div>
         <div id="od-outcomes-list"></div>`;
+}
+
+/**
+ * Render the course-level sync strip above the outcome list. Aggregates
+ * counts across initialized regular outcomes so the user sees overall
+ * Canvas-sync health at a glance. Idempotent — safe to call on every
+ * render.
+ *
+ * @param {Object} cache
+ */
+function renderCourseSyncStrip(cache) {
+    const stripEl = document.getElementById('od-course-sync');
+    if (!stripEl) return;
+
+    const plConfig = {
+        pl_assignments: cache.pl_assignments ?? {},
+        sync_state:     cache.sync_state     ?? {},
+    };
+
+    const regular     = (cache.outcomes || []).filter(o => isRegularOutcome(o));
+    const initialized = regular.filter(o => isOutcomeInitialized(o, cache));
+
+    const totals = { synced: 0, needsSync: 0, override: 0 };
+    for (const o of initialized) {
+        const c = aggregateSyncStatus(cache.students || [], o.id, plConfig);
+        totals.synced    += c.synced;
+        totals.needsSync += c.needsSync;
+        totals.override  += c.possibleOverride + c.manualOverride;
+    }
+
+    const setupX = initialized.length;
+    const setupY = regular.length;
+
+    stripEl.innerHTML = `
+        <div class="cs-left">
+            <span class="cs-stat">
+                <span class="cs-dot" style="background:var(--green);"></span>
+                <b>${totals.synced}</b> synced
+            </span>
+            <span class="cs-stat">
+                <span class="cs-dot" style="background:var(--amber);"></span>
+                <b>${totals.needsSync}</b> need sync
+            </span>
+            <span class="cs-stat">
+                <span class="cs-dot" style="background:var(--red);"></span>
+                <b>${totals.override}</b> override${totals.override === 1 ? '' : 's'}
+            </span>
+            <span class="cs-stat">
+                <b>${setupX}</b> / ${setupY} outcomes set up
+            </span>
+        </div>
+        <div class="cs-progress">
+            <span class="spinner"></span>
+            <span>Pushing scores to Canvas…</span>
+            <div class="ps-bar"><div class="ps-bar-fill"></div></div>
+        </div>
+    `;
 }
 
 // ─── Default state (no cache) ────────────────────────────────────────────────
@@ -169,6 +229,7 @@ function renderDefaultOutcomeRows(outcomesEl, outcomes) {
             <div class="od-center">${neChip()}</div>
             <div>${emptySpread()}</div>
             <div class="od-below">—</div>
+            <div class="od-sync-cell"><span class="od-sync-chip none">—</span></div>
             <div></div>
         `;
         outcomesEl.appendChild(row);
@@ -431,6 +492,8 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
                 outcomesEl.appendChild(divider);
             }
         });
+
+        renderCourseSyncStrip(cache);
     }
 
     async function saveCustomOutcomeOrder(orderArray) {

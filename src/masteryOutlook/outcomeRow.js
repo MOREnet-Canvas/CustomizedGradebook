@@ -82,10 +82,25 @@ function makeRenderers(ctx) {
     return { profColor, plAvgChip, spreadBar };
 }
 
-// ─── Sync summary line (collapsed row sub-text) ──────────────────────────────
+// ─── Sync chip (collapsed row column 6) ──────────────────────────────────────
 
-function buildSyncSummaryLine(outcome, cache) {
-    if (!isOutcomeInitialized(outcome, cache)) return '';
+/**
+ * Build the compact Canvas-sync chip rendered in the 6th column of each
+ * collapsed outcome row. Returns a single span chip whose modifier reflects
+ * the worst-priority state across the student cohort.
+ *
+ * Priority: needs > override > setup > synced > none.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @param {Object} [opts]
+ * @param {boolean} [opts.isSpecial]
+ * @returns {string} HTML
+ */
+function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
+    if (!isOutcomeInitialized(outcome, cache, { isSpecial })) {
+        return `<span class="od-sync-chip setup">⚙ Setup</span>`;
+    }
 
     const plConfig = {
         pl_assignments: cache.pl_assignments ?? {},
@@ -93,19 +108,17 @@ function buildSyncSummaryLine(outcome, cache) {
     };
     const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
 
-    if (counts.needsSync > 0 || counts.possibleOverride > 0 || counts.manualOverride > 0) {
-        const parts = [];
-        if (counts.needsSync        > 0) parts.push(`<span class="needs">↑ ${counts.needsSync} need sync</span>`);
-        if (counts.possibleOverride > 0) parts.push(`<span class="override">⚑ ${counts.possibleOverride} override?</span>`);
-        if (counts.manualOverride   > 0) parts.push(`<span class="override">⚑ ${counts.manualOverride} confirmed</span>`);
-        return `<div class="od-sync-summary">${parts.join(' <span class="sep">·</span> ')}</div>`;
+    if (counts.needsSync > 0) {
+        return `<span class="od-sync-chip needs">↑ ${counts.needsSync} need</span>`;
     }
-
-    if (counts.synced > 0 && counts.needsSync === 0 && counts.possibleOverride === 0) {
-        return `<div class="od-sync-summary synced">✓ All synced</div>`;
+    if (counts.possibleOverride > 0 || counts.manualOverride > 0) {
+        const n = counts.possibleOverride + counts.manualOverride;
+        return `<span class="od-sync-chip override">⚑ ${n}</span>`;
     }
-
-    return '';
+    if (counts.synced > 0) {
+        return `<span class="od-sync-chip synced">✓ Synced</span>`;
+    }
+    return `<span class="od-sync-chip none">—</span>`;
 }
 
 // ─── Initialize panel (handoff sec. "initialize panel") ──────────────────────
@@ -627,20 +640,20 @@ export function mountOutcomeRow({
         ? `<div class="row-cell-center">${plAvgChip(displayStats)}</div>
            <div>${spreadBar(displayStats)}</div>
            <div class="row-below${belowFlag}">${displayStats.belowThresholdCount}</div>`
-        : `<div class="sync-inline" style="grid-column: 3 / span 3;">
+        : `<div class="sync-inline" style="grid-column: 3 / span 4;">
               <span class="si si-setup">Not set up</span>
-              <button class="btn btn-sm" data-init-action="setup" style="margin-left:6px;">Initialize</button>
+              <button class="btn btn-sm od-init-btn" data-init-action="setup">Initialize</button>
            </div>`;
 
-    const syncSummaryHtml = initialized ? buildSyncSummaryLine(outcome, cache) : '';
+    const syncChipHtml = `<div class="od-sync-cell">${buildSyncChip(outcome, cache, { isSpecial })}</div>`;
 
     row.innerHTML = `
         <div class="od-row-number row-num">${displayNumber}</div>
         <div>
             <div class="row-title">${escapeHtml(outcome.title)}</div>
-            ${syncSummaryHtml}
         </div>
         ${rightSideHtml}
+        ${initialized ? syncChipHtml : ''}
         <div class="row-chevron">${chevron}</div>
     `;
 

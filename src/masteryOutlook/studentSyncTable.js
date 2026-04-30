@@ -200,14 +200,19 @@ function renderOutcomeStudentRow(s, oidStr) {
           }</span>
         </button>` : '';
 
+    const saveMod   = s.status === 'needs' ? 'needs' : 'synced';
+    const saveTitle = s.status === 'needs' ? `Push ${wpDisp} to Canvas` : 'Synced with Canvas';
+    const saveTip   = s.status === 'needs' ? 'Push to Canvas' : 'Up to date';
     const saveHtml = s.pushing
         ? `<span class="os-posting"><span class="spinner"></span> Pushing…</span>`
-        : `<button class="os-save-row-btn" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
-               ${s.status !== 'needs' ? 'disabled' : ''} title="Push ${wpDisp} to Canvas">
+        : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
+               ${s.status !== 'needs' ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
-               <polyline points="2,7 6,3 10,7"/><line x1="6" y1="3" x2="6" y2="11"/>
+               ${saveMod === 'synced'
+                  ? '<polyline points="2.5,6.5 5,9 9.5,3.5"/>'
+                  : '<polyline points="2,7 6,3 10,7"/><line x1="6" y1="3" x2="6" y2="11"/>'}
              </svg>
-             <span class="sr-tip">Push to Canvas</span>
+             <span class="sr-tip">${saveTip}</span>
            </button>`;
 
     return `<tr class="${needsCls}" data-stu="${s.id}" data-oid="${oidStr}">
@@ -238,7 +243,7 @@ function renderOutcomeStudentRow(s, oidStr) {
         </div>
       </td>
       <td class="os-td-comment">
-        <input class="os-comment-input ${s.lock !== 'none' ? 'prompted' : ''}"
+        <input class="os-comment-input${s.lock !== 'none' ? ' override-prompted' : ''}${s.note ? ' has-note' : ''}"
                type="text" value="${escapeHtml(s.note)}"
                placeholder="${s.lock !== 'none' ? 'Reason for override…' : 'Note…'}"
                data-action="os-note" data-stu="${s.id}" data-oid="${oidStr}"
@@ -278,16 +283,16 @@ export function renderOutcomeStudentTable(outcome, cache) {
     const needsCount = needsRows.length;
 
     const toolbarHtml = needsCount > 0
-        ? `<div class="os-post-toolbar">
-             <div class="os-post-toolbar-left">
-               <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} — ready to save
+        ? `<div class="os-status-banner warn">
+             <div class="os-status-banner-left">
+               ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
              </div>
              <button class="btn btn-sm btn-primary" data-action="os-post-all">
                Save grades to Canvas
              </button>
            </div>`
-        : `<div class="os-post-toolbar">
-             <div class="os-post-toolbar-left" style="color:var(--green);">
+        : `<div class="os-status-banner ok">
+             <div class="os-status-banner-left">
                ✓ Canvas gradebook is up to date
              </div>
            </div>`;
@@ -304,19 +309,8 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </span>
         </div>`;
 
-    const sectionDivider = (rows, isNeeds) => {
-        if (!rows.length) return '';
-        const label = isNeeds
-            ? `⬆ ${rows.length} student${rows.length !== 1 ? 's' : ''} need${rows.length === 1 ? 's' : ''} updating`
-            : `✓ Up to date (${rows.length})`;
-        const cls = isNeeds ? 'os-sdiv needs' : 'os-sdiv';
-        return `<tr class="${cls}"><td colspan="7"><div class="sdlabel">${label}</div></td></tr>`;
-    };
-
     const bodyHtml = [
-        sectionDivider(needsRows, true),
         needsRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
-        needsRows.length && syncedRows.length ? sectionDivider(syncedRows, false) : '',
         syncedRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
         neRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
     ].join('');
@@ -515,6 +509,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
     contentEl.addEventListener('input', (e) => {
         const el = e.target.closest('[data-action="os-note"]');
         if (!el) return;
+        el.classList.toggle('has-note', el.value.trim().length > 0);
         handleNoteChanged({
             courseId,
             outcomeId: el.dataset.oid,
