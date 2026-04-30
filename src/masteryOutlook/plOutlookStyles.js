@@ -63,8 +63,8 @@ export const PL_OUTLOOK_CSS = `
   --green-bg:     #EAF3DE;
 
   /* density — comfortable default; .cozy on .mo-shell for roomier rows */
-  --row-py:  0.692em;
-  --cell-py: 0.692em;
+  --row-py:  1.077em;
+  --cell-py: 1.077em;
   --gap:     0.692em;
 }
 
@@ -371,8 +371,8 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .dot-row { display:flex; gap:0.231em; align-items:center; flex-wrap:wrap; position:relative; }
 .dot {
-  width:1.923em; height:1.923em; border-radius:var(--radius-sm);
-  font-size:0.923em; font-weight:600;
+  width:1.692em; height:1.692em; border-radius:var(--radius-sm);
+  font-size:0.846em; font-weight:600;
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; position:relative; flex-shrink:0;
   border:0.5px solid transparent;
@@ -577,7 +577,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-pill-btn:focus-visible { outline:2px solid var(--blue); outline-offset:2px; border-radius:0.769em; }
 .os-pill-btn.faded { opacity:0.55; }
 .os-pill-btn:not(.faded):hover { box-shadow:0 0 0 1.5px var(--border-primary); }
-.os-pill { font-size:0.923em; font-weight:600; padding:0.231em 0.769em; border-radius:0.615em; display:inline-block; min-width:3.538em; text-align:center; white-space:nowrap; line-height:1.4; }
+.os-pill { font-size:0.846em; font-weight:600; padding:0.231em 0.769em; border-radius:0.615em; display:inline-block; min-width:3.538em; text-align:center; white-space:nowrap; line-height:1.4; }
 .os-pill-tip { display:none; position:absolute; bottom:calc(100% + 0.46em); left:50%; transform:translateX(-50%); background:var(--text-primary); color:#fff; padding:0.308em 0.538em; border-radius:var(--radius-sm); font-size:0.769em; font-weight:400; white-space:nowrap; z-index:40; pointer-events:none; }
 .os-pill-tip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:0.308em solid transparent; border-top-color:var(--text-primary); }
 .os-pill-btn:not(.faded):hover .os-pill-tip { display:block; }
@@ -587,7 +587,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .os-wp-outer { display:inline-flex; align-items:center; justify-content:center; }
 .os-wp-box-wrap { position:relative; display:inline-block; cursor:pointer; border-radius:0.615em; }
-.os-wp-box { font-size:0.923em; font-weight:600; font-family:inherit; padding:0.231em 0.769em; min-width:3.538em; text-align:center; border-radius:0.615em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-primary); display:inline-block; line-height:1.4; transition:border-color .12s, background .12s; user-select:none; position:relative; }
+.os-wp-box { font-size:0.846em; font-weight:600; font-family:inherit; padding:0.231em 0.769em; min-width:3.538em; text-align:center; border-radius:0.615em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-primary); display:inline-block; line-height:1.4; transition:border-color .12s, background .12s; user-select:none; position:relative; }
 .os-wp-box-wrap:hover .os-wp-box { border-color:var(--border-primary); background:var(--bg-secondary); }
 .os-wp-box-wrap:focus-visible { outline:2px solid var(--blue); outline-offset:2px; border-radius:0.615em; }
 .os-wp-box-wrap.differs .os-wp-box { border-color:var(--amber-border); background:#FFF8EE; }
@@ -605,7 +605,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-wp-lock:hover .os-lock-tip,.os-wp-lock:focus .os-lock-tip { display:block; }
 
 /* Will Post inline edit input */
-.os-wp-input { font-size:0.923em; font-weight:600; font-family:inherit; padding:0.231em 0.615em; min-width:4em; text-align:center; border-radius:0.615em; border:1.5px solid var(--blue); background:var(--bg-surface); color:var(--text-primary); outline:none; box-shadow:0 0 0 2.5px rgba(24,95,165,.12); line-height:1.4; display:inline-block; }
+.os-wp-input { font-size:0.846em; font-weight:600; font-family:inherit; padding:0.231em 0.615em; min-width:4em; text-align:center; border-radius:0.615em; border:1.5px solid var(--blue); background:var(--bg-surface); color:var(--text-primary); outline:none; box-shadow:0 0 0 2.5px rgba(24,95,165,.12); line-height:1.4; display:inline-block; }
 .os-wp-edit-hint { font-size:0.731em; color:var(--text-tertiary); margin-top:0.231em; white-space:nowrap; display:block; text-align:center; }
 
 /* Will Post width clamp — keeps the inline edit input from spanning the cell.
@@ -613,7 +613,7 @@ tr.os-needs-row td { background:#FFFDF7; }
    would be clipped. The input is already box-sizing:border-box + max-width. */
 .mo-shell .os-wp-box-wrap { width:3.5em; min-width:3.5em; max-width:3.5em; }
 .mo-shell .os-wp-box      { width:100%; min-width:0; }
-.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.923em; }
+.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.846em; }
 
 /* Top-of-table tinted status banner (replaces section divider rows) */
 .os-status-banner { display:flex; align-items:center; justify-content:space-between; gap:0.769em; padding:0.615em 0.923em; margin:0 0 0.615em; border:0.5px solid transparent; border-radius:var(--radius-md); flex-wrap:wrap; font-size:0.923em; font-weight:500; }
@@ -638,7 +638,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 
 /* Override note / comment field */
 .os-td-comment { min-width:12.308em; }
-.os-comment-input { width:100%; font-size:0.923em; font-family:inherit; padding:0.231em 0.538em; border-radius:0.385em; border:0.5px solid var(--border-tertiary); background:transparent; color:var(--text-primary); outline:none; transition:border-color .12s, background .12s; }
+.os-comment-input { width:100%; font-size:0.846em; font-family:inherit; padding:0.231em 0.538em; border-radius:0.385em; border:0.5px solid var(--border-tertiary); background:transparent; color:var(--text-primary); outline:none; transition:border-color .12s, background .12s; }
 .os-comment-input::placeholder { color:var(--text-tertiary); }
 .os-comment-input:focus  { border-color:var(--border-secondary); background:var(--bg-surface); }
 .os-comment-input:hover  { border-color:var(--border-secondary); }
@@ -646,6 +646,9 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-comment-input.override-prompted::placeholder { color:#B08A3A; }
 .os-comment-input.has-note { border-color:var(--amber-border); background:#FFFBF1; }
 .os-comment-input.has-note:focus { border-color:var(--amber); background:var(--bg-surface); }
+
+/* Footer hint under the student sync table */
+.os-table-hint { margin-top:0.615em; padding:0 0.231em; font-size:0.769em; color:var(--text-tertiary); line-height:1.5; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    RESPONSIVE — card stack below 820px

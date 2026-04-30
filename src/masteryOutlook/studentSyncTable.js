@@ -331,6 +331,9 @@ export function renderOutcomeStudentTable(outcome, cache) {
             </tr></thead>
             <tbody>${bodyHtml}</tbody>
           </table>
+        </div>
+        <div class="os-table-hint">
+          Click Canvas / Marzano pills to copy to Will Post · Click Will Post box to type · Padlock locks an override
         </div>`;
 }
 
