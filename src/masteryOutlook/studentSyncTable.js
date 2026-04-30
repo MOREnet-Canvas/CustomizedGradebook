@@ -323,7 +323,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
         <div class="os-block">
           <table>
             <thead><tr>
-              <th style="min-width:130px;">Student</th>
+              <th style="width:1%;min-width:130px;white-space:nowrap;">Student</th>
               <th>Alignments</th>
               <th class="c">Canvas</th>
               <th class="c">Marzano</th>

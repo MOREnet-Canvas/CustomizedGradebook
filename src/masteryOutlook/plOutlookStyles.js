@@ -78,7 +78,7 @@ export const PL_OUTLOOK_CSS = `
 
 .mo-shell {
   font-family: var(--mo-font);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -569,7 +569,7 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
 .os-block tbody tr:last-child td { border-bottom:none; }
 .os-block td.c { text-align:center; }
 /* Tighter centered score columns (Canvas, Marzano, Post, Save) — gives Alignments more room */
-.os-block th.c, .os-block td.c { padding-left:0.308em; padding-right:0.308em; width:1%; white-space:nowrap; }
+.os-block th.c, .os-block td.c { padding-left:0.538em; padding-right:0.538em; width:1%; white-space:nowrap; }
 
 /* Rows needing a sync push */
 tr.os-needs-row td:first-child { border-left:2.5px solid var(--s-dev); }
