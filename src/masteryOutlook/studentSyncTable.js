@@ -129,7 +129,9 @@ function renderDot(dot, oidStr, sidStr, i) {
     const tone       = scoreTone(dot.v);
     const bgStyle    = scoreToneStyle(tone);
     const valStr     = dot.v != null ? dot.v.toFixed(2) : '—';
-    const label      = dot.v != null ? dot.v.toFixed(1) : '?';
+    const label      = dot.v != null
+        ? (dot.v % 1 === 0 ? String(dot.v) : dot.v.toFixed(1))
+        : '?';
     const asgn       = escapeHtml(dot.a || `Alignment ${i + 1}`);
     const dateStr    = escapeHtml(dot.d || '—');
     const asgnId     = escapeHtml(dot.assignmentId || '');
