@@ -260,7 +260,7 @@ function buildExceptionsTable(outcome, cache) {
             <th>Type</th>
             <th class="od-center">Canvas</th>
             <th class="od-center">Marzano</th>
-            <th class="od-center">Will Post</th>
+            <th class="od-center">Post</th>
             <th>Note</th>
             <th>Date</th>
         </tr></thead>

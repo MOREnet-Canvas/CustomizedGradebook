@@ -372,7 +372,7 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
 .dot-row { display:flex; gap:0.231em; align-items:center; flex-wrap:wrap; position:relative; }
 .dot {
   width:1.692em; height:1.692em; border-radius:var(--radius-sm);
-  font-size:0.846em; font-weight:600;
+  font-size:0.846em; font-weight:400; line-height:1;
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; position:relative; flex-shrink:0;
   border:0.5px solid transparent;
@@ -566,6 +566,8 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
 .os-block td { padding:var(--cell-py) 0.769em; border-bottom:0.5px solid var(--border-tertiary); vertical-align:middle; overflow:visible; }
 .os-block tbody tr:last-child td { border-bottom:none; }
 .os-block td.c { text-align:center; }
+/* Tighter centered score columns (Canvas, Marzano, Post, Save) — gives Alignments more room */
+.os-block th.c, .os-block td.c { padding-left:0.308em; padding-right:0.308em; width:1%; white-space:nowrap; }
 
 /* Rows needing a sync push */
 tr.os-needs-row td:first-child { border-left:2.5px solid var(--s-dev); }
