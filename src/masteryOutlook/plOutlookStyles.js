@@ -598,14 +598,14 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-wp-box-wrap.differs .os-wp-box::before { content:''; position:absolute; left:0; top:0.231em; bottom:0.231em; width:2.5px; background:var(--amber-border); border-radius:0.154em 0 0 0.154em; }
 
 /* Padlock badge — three states: none / unlocked (grey) / locked (amber) */
-.os-wp-lock { position:absolute; bottom:-0.385em; right:-0.385em; width:1.154em; height:1.154em; border-radius:50%; background:var(--bg-surface); display:flex; align-items:center; justify-content:center; font-size:0.615em; line-height:1; cursor:pointer; z-index:2; transition:transform .08s, border-color .1s, background .1s; }
+.os-wp-lock { position:absolute; bottom:-5px; right:-5px; width:14px; height:14px; border-radius:50%; background:var(--bg-surface); display:flex; align-items:center; justify-content:center; font-size:10px; line-height:1; cursor:pointer; z-index:2; transition:transform .08s, border-color .1s, background .1s; }
 .os-wp-lock:focus-visible { outline:2px solid var(--blue); outline-offset:1px; }
 .os-wp-lock.unlocked { border:1px solid var(--border-secondary); filter:grayscale(1); }
 .os-wp-lock.unlocked:hover { border-color:var(--amber-border); background:#FDF3E3; transform:scale(1.15); filter:grayscale(0); }
 .os-wp-lock.locked  { border:1px solid var(--amber-border); background:var(--bg-surface); }
 .os-wp-lock.locked:hover { background:#FDF3E3; border-color:var(--amber); transform:scale(1.15); }
-.os-lock-tip { display:none; position:absolute; bottom:calc(100% + 0.615em); right:-0.308em; background:var(--text-primary); color:#fff; padding:0.385em 0.615em; border-radius:var(--radius-sm); font-size:0.769em; font-weight:400; z-index:50; pointer-events:none; line-height:1.4; max-width:16.923em; white-space:normal; text-align:left; }
-.os-lock-tip::after { content:''; position:absolute; top:100%; right:0.615em; border:0.308em solid transparent; border-top-color:var(--text-primary); }
+.os-lock-tip { display:none; position:absolute; bottom:calc(100% + 6px); right:-3px; background:var(--text-primary); color:#fff; padding:4px 7px; border-radius:var(--radius-sm); font-size:11px; font-weight:400; z-index:50; pointer-events:none; line-height:1.4; max-width:200px; white-space:normal; text-align:left; }
+.os-lock-tip::after { content:''; position:absolute; top:100%; right:6px; border:4px solid transparent; border-top-color:var(--text-primary); }
 .os-wp-lock:hover .os-lock-tip,.os-wp-lock:focus .os-lock-tip { display:block; }
 
 /* Will Post inline edit input */
