@@ -452,6 +452,9 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
 }
 .dot:hover .dot-preview  { display:block; }
 .dot.active .dot-preview { display:none; }
+.dot.ignored .dot-preview { display:none; }
+.dot.ignored .dp-title,
+.dot.ignored .dp-score { text-decoration:line-through; opacity:0.6; }
 
 /* pinned click popover */
 .dot-popover {
@@ -665,6 +668,11 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-wp-input { font-size:11px; font-weight:600; font-family:inherit; padding:3px 8px; min-width:52px; text-align:center; border-radius:8px; border:1.5px solid var(--blue); background:var(--bg-surface); color:var(--text-primary); outline:none; box-shadow:0 0 0 2.5px rgba(24,95,165,.12); line-height:1.4; display:inline-block; }
 .os-wp-edit-hint { font-size:9.5px; color:var(--text-tertiary); margin-top:3px; white-space:nowrap; display:block; text-align:center; }
 
+/* Will Post width clamp — keeps the inline edit input from spanning the cell */
+.mo-shell .os-wp-box-wrap { width:3.5em; min-width:3.5em; max-width:3.5em; overflow:hidden; }
+.mo-shell .os-wp-box      { width:100%; min-width:0; }
+.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.923em; }
+
 /* Post toolbar above student rows */
 .os-post-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 10px; background:var(--bg-surface); border-bottom:0.5px solid var(--border-tertiary); flex-wrap:wrap; }
 .os-post-toolbar-left   { font-size:11px; color:var(--text-secondary); }
@@ -837,7 +845,13 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-empty-spread { height:16px; border-radius:4px; background:#f0f0f0; width:100%; }
 
 /* --- buildOutcomeDetailPanel --- */
-.mo-shell .od-detail-panel { border:0.5px solid #e0e0e0; border-top:none; border-bottom-left-radius:8px; border-bottom-right-radius:8px; background:#fff; overflow:hidden; }
+.mo-shell .od-detail-panel {
+  border-top:none; border-bottom-left-radius:8px; border-bottom-right-radius:8px;
+  background:#fff; overflow:hidden;
+  box-shadow:
+    0 0 0 1.5px var(--blue),
+    0 0.615em 2.154em rgba(31, 30, 27, 0.10);
+}
 .mo-shell .od-detail-tabs { display:flex; gap:0; border-bottom:0.5px solid #e0e0e0; background:#fafafa; }
 .mo-shell .od-detail-tab { font-family:var(--mo-legacy-font); font-size:13px; padding:8px 16px; cursor:pointer; border:none; }
 .mo-shell .od-detail-content { padding:12px; overflow:visible; }
@@ -917,7 +931,14 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-no-current-score { padding:12px; font-size:13px; color:#888; font-style:italic; margin-bottom:6px; }
 .mo-shell .od-outcome-container { margin-bottom:6px; }
 .mo-shell .od-outcome-row { display:grid; grid-template-columns:20px 1fr 80px 100px 80px 24px; gap:8px; align-items:center; padding:9px 12px; border:0.5px solid #e0e0e0; border-radius:8px; background:#fff; cursor:pointer; }
-.mo-shell .od-outcome-row.expanded { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+.mo-shell .od-outcome-row.expanded {
+  border-bottom-left-radius:0; border-bottom-right-radius:0;
+  box-shadow:
+    0 0 0 1.5px var(--blue),
+    0 0.615em 2.154em rgba(31, 30, 27, 0.10),
+    0 0.154em 0.46em  rgba(31, 30, 27, 0.05);
+}
+.mo-shell .od-outcome-row.expanded .row-title { color:var(--blue); font-weight:600; }
 .mo-shell .od-outcome-row:hover { background:#f5f5f3; }
 .mo-shell .od-outcome-row .row-num { font-size:13px; color:#999; }
 .mo-shell .od-outcome-row .row-title { font-size:15px; font-weight:500; color:#333; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
