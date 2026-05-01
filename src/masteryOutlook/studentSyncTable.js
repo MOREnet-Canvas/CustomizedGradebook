@@ -59,18 +59,10 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     const storedWP = syncEntry?.will_post ?? null;
     const willPost = storedWP ?? marzano;
 
-    let lock;
-    if (syncEntry?.will_post_lock === 'locked') {
-        lock = 'locked';
-    } else if (
-        storedWP !== null &&
-        !scoresMatch(storedWP, canvas) &&
-        !scoresMatch(storedWP, marzano)
-    ) {
-        lock = 'unlocked';
-    } else {
-        lock = 'none';
-    }
+    const wpLock = syncEntry?.will_post_lock;
+    const lock = wpLock === 'locked' ? 'locked'
+              : wpLock === 'unlocked' ? 'unlocked'
+              : 'none';
 
     const note = syncEntry?.will_post_note ?? '';
 
@@ -197,7 +189,7 @@ function renderOutcomeStudentRow(s, oidStr) {
           ${s.lock === 'locked' ? '🔒' : '🔓'}
           <span class="os-lock-tip">${
               s.lock === 'locked'
-                  ? 'Post is locked. Click to revert to Marzano.'
+                  ? 'Post is locked. Click to unlock.'
                   : 'Score differs from Marzano. Click to lock this value.'
           }</span>
         </button>` : '';
@@ -403,9 +395,9 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             );
             try {
                 if (ignored) {
-                    await handleUnignoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, apiClient, onRerender: renderTable });
+                    await handleUnignoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, cache, apiClient, onRerender: renderTable });
                 } else {
-                    await handleIgnoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, apiClient, onRerender: renderTable });
+                    await handleIgnoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, cache, apiClient, onRerender: renderTable });
                 }
             } catch (err) {
                 logger.error('[MasteryOutlook] ignore toggle failed', err);
@@ -418,13 +410,13 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         if (action === 'os-use-canvas') {
             const cv = parseFloat(el.dataset.canvas);
             if (isNaN(cv)) return;
-            await handleCanvasPillClick({ courseId, outcomeId: oId, studentId: stuId, canvasScore: cv, apiClient, onRerender: renderTable });
+            await handleCanvasPillClick({ courseId, outcomeId: oId, studentId: stuId, canvasScore: cv, cache, apiClient, onRerender: renderTable });
             return;
         }
 
         // ── Marzano pill → revert Will Post to auto-track ─────────────────
         if (action === 'os-use-marzano') {
-            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
+            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
             return;
         }
 
@@ -448,7 +440,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
                 const raw = parseFloat(input.value);
                 if (!isNaN(raw)) {
                     const clamped = Math.max(0, Math.min(4, raw));
-                    await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: clamped, apiClient, onRerender: renderTable });
+                    await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: clamped, cache, apiClient, onRerender: renderTable });
                 } else {
                     renderTable();
                 }
@@ -463,12 +455,12 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
 
         // ── Padlock → lock ────────────────────────────────────────────────
         if (action === 'os-lock') {
-            await handleLockWillPost({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
+            await handleLockWillPost({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
             return;
         }
         // ── Padlock → unlock ──────────────────────────────────────────────
         if (action === 'os-unlock') {
-            await handleUnlockWillPost({ courseId, outcomeId: oId, studentId: stuId, apiClient, onRerender: renderTable });
+            await handleUnlockWillPost({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
             return;
         }
 
@@ -520,6 +512,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             outcomeId: el.dataset.oid,
             studentId: el.dataset.stu,
             noteValue: el.value,
+            cache,
             apiClient,
         });
     });

@@ -64,7 +64,7 @@ function getOrInitEntry(syncState, outcomeId, studentId) {
  * @param {Object}  opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleConfirmOverride({ courseId, outcomeId, studentId, note = null, apiClient, onRerender }) {
+export async function handleConfirmOverride({ courseId, outcomeId, studentId, note = null, cache, apiClient, onRerender }) {
     logger.info(`[PLActions] Confirming override: outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -74,6 +74,7 @@ export async function handleConfirmOverride({ courseId, outcomeId, studentId, no
     if (note) entry.will_post_note = note;
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     logger.debug(`[PLActions] manual_override=true written for student ${studentId}`);
 
     onRerender?.();
@@ -97,7 +98,7 @@ export async function handleConfirmOverride({ courseId, outcomeId, studentId, no
  * @param {Object}   opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleDismissOverride({ courseId, outcomeId, studentId, outcomeName, apiClient, onRerender }) {
+export async function handleDismissOverride({ courseId, outcomeId, studentId, outcomeName, cache, apiClient, onRerender }) {
     logger.info(`[PLActions] Dismissing override: outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -109,6 +110,7 @@ export async function handleDismissOverride({ courseId, outcomeId, studentId, ou
     entry.will_post_note    = null;
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
 
     // Re-push PL prediction to Canvas for this student only
     await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId] });
@@ -149,7 +151,7 @@ export async function handleRevertOverride(opts) {
  * @param {Object}  opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleSetWillPost({ courseId, outcomeId, studentId, score, lock = 'unlocked', note = null, apiClient, onRerender }) {
+export async function handleSetWillPost({ courseId, outcomeId, studentId, score, lock = 'unlocked', note = null, cache, apiClient, onRerender }) {
     logger.info(`[PLActions] Set will_post=${score} (lock=${lock}): outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -160,6 +162,7 @@ export async function handleSetWillPost({ courseId, outcomeId, studentId, score,
     if (note !== null) entry.will_post_note = note;
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
@@ -174,7 +177,7 @@ export async function handleSetWillPost({ courseId, outcomeId, studentId, score,
  * @param {Object}   opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleClearWillPost({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+export async function handleClearWillPost({ courseId, outcomeId, studentId, cache, apiClient, onRerender }) {
     logger.info(`[PLActions] Clear will_post: outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -185,6 +188,7 @@ export async function handleClearWillPost({ courseId, outcomeId, studentId, apiC
     entry.will_post_note = null;
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
@@ -201,7 +205,7 @@ export async function handleClearWillPost({ courseId, outcomeId, studentId, apiC
  * @param {Object}   opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, cache, apiClient, onRerender }) {
     logger.debug(`[PLActions] Marzano pill click: outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -212,6 +216,7 @@ export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, a
     // will_post_note intentionally preserved — teacher may have context notes
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
@@ -226,7 +231,7 @@ export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, a
  * @param {Object}  opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleCanvasPillClick({ courseId, outcomeId, studentId, canvasScore, apiClient, onRerender }) {
+export async function handleCanvasPillClick({ courseId, outcomeId, studentId, canvasScore, cache, apiClient, onRerender }) {
     logger.debug(`[PLActions] Canvas pill click (${canvasScore}): outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -236,6 +241,7 @@ export async function handleCanvasPillClick({ courseId, outcomeId, studentId, ca
     entry.will_post_lock = 'unlocked';
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
@@ -251,7 +257,7 @@ export async function handleCanvasPillClick({ courseId, outcomeId, studentId, ca
  * @param {Object}  opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleCustomValueTyped({ courseId, outcomeId, studentId, value, apiClient, onRerender }) {
+export async function handleCustomValueTyped({ courseId, outcomeId, studentId, value, cache, apiClient, onRerender }) {
     logger.debug(`[PLActions] Custom value typed (${value}): outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -262,6 +268,7 @@ export async function handleCustomValueTyped({ courseId, outcomeId, studentId, v
     if (entry.will_post_lock !== 'locked') entry.will_post_lock = 'unlocked';
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
@@ -275,7 +282,7 @@ export async function handleCustomValueTyped({ courseId, outcomeId, studentId, v
  * @param {Object}   opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleLockWillPost({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+export async function handleLockWillPost({ courseId, outcomeId, studentId, cache, apiClient, onRerender }) {
     logger.debug(`[PLActions] Lock will_post: outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
@@ -284,25 +291,26 @@ export async function handleLockWillPost({ courseId, outcomeId, studentId, apiCl
     entry.will_post_lock = 'locked';
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
 /**
- * Event 5 — Teacher clicks the padlock again to unlock / revert.
- * Clears will_post and resets lock to "none".
+ * Event 5 — Teacher clicks the padlock again to downgrade to unlocked.
+ * Preserves will_post; only changes lock state.
  *
  * @param {Object}   opts  - Same as handleLockWillPost
  */
-export async function handleUnlockWillPost({ courseId, outcomeId, studentId, apiClient, onRerender }) {
+export async function handleUnlockWillPost({ courseId, outcomeId, studentId, cache, apiClient, onRerender }) {
     logger.debug(`[PLActions] Unlock will_post: outcome ${outcomeId}, student ${studentId}`);
 
     const syncState = await readSyncState(courseId, apiClient);
     const entry     = getOrInitEntry(syncState, outcomeId, studentId);
 
-    entry.will_post      = null;
-    entry.will_post_lock = 'none';
+    entry.will_post_lock = 'unlocked';
 
     await writeSyncState(courseId, syncState, apiClient);
+    if (cache) cache.sync_state = syncState;
     onRerender?.();
 }
 
@@ -326,7 +334,7 @@ const _noteDebounceTimers = new Map();
  * @param {Object}   opts.apiClient
  * @param {Function} [opts.onRerender]
  */
-export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, apiClient, onRerender }) {
+export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, cache, apiClient, onRerender }) {
     const key = `${outcomeId}:${studentId}`;
     clearTimeout(_noteDebounceTimers.get(key));
 
@@ -338,6 +346,7 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, a
         entry.will_post_note = noteValue.trim() || null;
 
         await writeSyncState(courseId, syncState, apiClient);
+        if (cache) cache.sync_state = syncState;
         onRerender?.();
     }, 600));
 }
@@ -394,7 +403,7 @@ export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, s
  * @param {Function} [opts.onProgress]
  * @param {Function} opts.onRerender
  */
-export async function handleIgnoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, reason = null, apiClient, onProgress, onRerender }) {
+export async function handleIgnoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, reason = null, cache, apiClient, onProgress, onRerender }) {
     logger.info(`[PLActions] Ignore alignment ${alignmentId}: outcome ${outcomeId}, student ${studentId}`);
 
     // Step 1 — write to cache.ignored_alignments
@@ -421,6 +430,7 @@ export async function handleIgnoreAlignment({ courseId, outcomeId, outcomeName, 
         await writeMasteryOutlookCache(courseId, apiClient, rawCache);
         logger.debug(`[PLActions] ignored_alignments updated (${rawCache.ignored_alignments.length} total)`);
     }
+    if (cache) cache.ignored_alignments = rawCache.ignored_alignments;
 
     // Step 2 — runPLSync re-computes PL without this alignment and pushes to Canvas
     // TODO step 4-6: update Current Score + post comment to assignment
@@ -438,7 +448,7 @@ export async function handleIgnoreAlignment({ courseId, outcomeId, outcomeName, 
  *
  * @param {Object}  opts  - Same as handleIgnoreAlignment (reason not applicable)
  */
-export async function handleUnignoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, apiClient, onProgress, onRerender }) {
+export async function handleUnignoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, cache, apiClient, onProgress, onRerender }) {
     logger.info(`[PLActions] Un-ignore alignment ${alignmentId}: outcome ${outcomeId}, student ${studentId}`);
 
     const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
@@ -449,6 +459,7 @@ export async function handleUnignoreAlignment({ courseId, outcomeId, outcomeName
     );
 
     await writeMasteryOutlookCache(courseId, apiClient, rawCache);
+    if (cache) cache.ignored_alignments = rawCache.ignored_alignments;
     logger.debug(`[PLActions] Alignment un-ignored (${rawCache.ignored_alignments.length} remaining)`);
 
     // TODO step 4-6: update Current Score + post comment
