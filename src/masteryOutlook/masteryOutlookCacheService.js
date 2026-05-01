@@ -29,15 +29,30 @@ const FILE_NAME = 'mastery_outlook_cache.json';
 // FOLDER MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════
 
+/** Per-course memoized folder ID — folder structure never changes once created. */
+const _cachedFolderIdByCourse = new Map();
+
+/** Reset the memoized folder ID for a course (e.g. on write failure). */
+function invalidateFolderCache(courseId) {
+    _cachedFolderIdByCourse.delete(String(courseId));
+}
+
 /**
  * Ensure the folder structure exists: MOREnet_CustomizedGradebook/mastery_outlook_cache/
  * Returns the folder ID of the mastery_outlook_cache subfolder.
+ *
+ * Memoized per courseId — first call does 5 roundtrips (root, parent list, parent
+ * lock, subfolder list, subfolder lock); subsequent calls return immediately.
  *
  * @param {string} courseId - Canvas course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
  * @returns {Promise<string>} Folder ID of mastery_outlook_cache subfolder
  */
 export async function ensureFolder(courseId, apiClient) {
+    const cacheKey = String(courseId);
+    const cached = _cachedFolderIdByCourse.get(cacheKey);
+    if (cached) return cached;
+
     try {
         // Step 1: Get root folder ID
         const rootFolder = await apiClient.get(
@@ -55,6 +70,7 @@ export async function ensureFolder(courseId, apiClient) {
         const folderId = await ensureSubfolder(courseId, apiClient, parentFolderId);
 
         logger.info(`[masteryOutlookCacheService] Folder structure ready: ${PARENT_FOLDER_NAME}/${FOLDER_NAME} (id: ${folderId})`);
+        _cachedFolderIdByCourse.set(cacheKey, folderId);
         return folderId;
 
     } catch (error) {
@@ -306,6 +322,8 @@ export async function writeMasteryOutlookCache(courseId, apiClient, cacheData) {
 
     } catch (error) {
         logger.error('[masteryOutlookCacheService] Failed to write cache', error);
+        // Folder ID may be stale (deleted, permissions changed) — force re-discovery on retry
+        invalidateFolderCache(courseId);
         throw new Error(`Could not write outcomes cache: ${error.message}`);
     }
 }
@@ -483,10 +501,13 @@ export async function readSyncState(courseId, apiClient) {
  * @param {string} courseId
  * @param {Object} syncState  - Full sync_state map { outcomeId: { studentId: {...} } }
  * @param {CanvasApiClient} apiClient
+ * @param {Object} [baseCache] - Optional in-memory cache to merge into. When provided,
+ *   skips the read-before-write roundtrip (~600 ms). Caller is responsible for ensuring
+ *   the cache is fresh enough that other fields won't be clobbered.
  * @returns {Promise<Object>} Canvas file object from writeMasteryOutlookCache
  */
-export async function writeSyncState(courseId, syncState, apiClient) {
-    const existing = await readMasteryOutlookCache(courseId, apiClient);
+export async function writeSyncState(courseId, syncState, apiClient, baseCache = null) {
+    const existing = baseCache ?? await readMasteryOutlookCache(courseId, apiClient);
 
     const base = existing || {
         metadata: {

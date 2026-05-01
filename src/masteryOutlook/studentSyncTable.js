@@ -25,6 +25,7 @@ import {
     handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
     handleLockWillPost, handleUnlockWillPost, handleNoteChanged,
     handleIgnoreAlignment, handleUnignoreAlignment,
+    initWriteScheduler,
 } from './plOutlookActions.js';
 
 /**
@@ -352,6 +353,10 @@ export function renderOutcomeStudentTable(outcome, cache) {
 export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable }) {
     const outcomeName = outcome.title || String(outcome.id);
     let activeDotKey = null;
+
+    // Seed the write scheduler's dedupe baseline with the on-disk state so the first
+    // toggle that returns the cache to its loaded form skips the network entirely.
+    initWriteScheduler(cache);
 
     const onDocClick = (e) => {
         if (activeDotKey && !e.target.closest('.dot')) {
