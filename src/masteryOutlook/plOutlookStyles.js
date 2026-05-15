@@ -372,6 +372,10 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
    ALIGNMENT DOTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .dot-row { display:flex; gap:0.231em; align-items:center; flex-wrap:wrap; position:relative; }
+.dot-wrap {
+  position:relative; display:inline-flex;
+  align-items:center; justify-content:center; flex-shrink:0;
+}
 .dot {
   width:1.692em; height:1.692em; border-radius:var(--radius-sm);
   font-size:0.846em; font-weight:500; line-height:1;
@@ -398,12 +402,8 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
   white-space:nowrap; z-index:20; pointer-events:none;
 }
 .dot:hover .dot-preview   { display:none; }
-.dot.ignored .dot-preview { display:none; }
-.dot.ignored .dp-title,
-.dot.ignored .dp-score { text-decoration:line-through; opacity:0.6; }
-.dot.ignored .dot-popover { opacity:1; }
 
-/* hover popover — non-interactive info card */
+/* hover popover — non-interactive info card; sibling of .dot so opacity is independent */
 .dot-popover {
   display:none; position:absolute; bottom:calc(100% + 0.615em); left:50%; transform:translateX(-50%);
   background:var(--bg-surface); color:var(--text-primary);
@@ -412,7 +412,7 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
   box-shadow: 0 0.46em 1.692em rgba(31,30,27,.08), 0 0.154em 0.308em rgba(31,30,27,.04);
   pointer-events:none;
 }
-.dot:hover .dot-popover { display:block; }
+.dot-wrap:hover .dot-popover { display:block; }
 .dot-popover::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:0.385em solid transparent; border-top-color:var(--bg-surface); }
 .dp-hd    { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.46em; }
 .dp-title { font-weight:600; font-size:1em; }

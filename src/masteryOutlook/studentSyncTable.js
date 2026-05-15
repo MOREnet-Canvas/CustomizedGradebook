@@ -132,12 +132,14 @@ function renderDot(dot, oidStr, sidStr, i) {
     const statusStr  = dot.ignored ? 'true' : 'false';
     const statusCol  = dot.ignored ? 'var(--amber)' : 'var(--text-primary)';
 
-    return `<div class="dot ${ignoredCls}" style="${bgStyle}"
-        data-action="dot-ignore-toggle" data-dot-idx="${i}"
-        data-stu="${sidStr}" data-oid="${oidStr}"
-        data-asgn-id="${asgnId}" tabindex="0" role="button" aria-label="${asgn}: ${valStr}">
-      ${label}
-      <div class="dot-preview">${asgn} · ${valStr}</div>
+    return `<div class="dot-wrap">
+      <div class="dot ${ignoredCls}" style="${bgStyle}"
+          data-action="dot-ignore-toggle" data-dot-idx="${i}"
+          data-stu="${sidStr}" data-oid="${oidStr}"
+          data-asgn-id="${asgnId}" tabindex="0" role="button" aria-label="${asgn}: ${valStr}">
+        ${label}
+        <div class="dot-preview">${asgn} · ${valStr}</div>
+      </div>
       <div class="dot-popover">
         <div class="dp-hd">
           <span class="dp-title">${asgn}</span>
