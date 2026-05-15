@@ -17,6 +17,7 @@
 
 import { readSyncState, writeSyncState, readMasteryOutlookCache, writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { runPLSync } from './plOutlookSync.js';
+import { computeStudentOutcome } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -459,6 +460,52 @@ export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, s
     onRerender?.();
 }
 
+// ─── Local PL recompute (ignore/unignore path) ───────────────────────────────
+
+/**
+ * Recompute plPrediction for one student × outcome from their non-ignored attempts.
+ * Mutates cache.students[…].outcomes[…] in place via Object.assign.
+ *
+ * Attempts in the cache are already chronologically sorted (oldest first) per
+ * DATA_STRUCTURES.md, so no sort is needed here.
+ *
+ * After this runs, the next onRerender() will pick up the new plPrediction from
+ * the in-memory cache. buildOutcomeStudentRow derives willPost and row status from
+ * it automatically — row highlights and status badges update with no extra wiring.
+ *
+ * @param {Object} cache      - In-memory cache (mutated)
+ * @param {string} outcomeId
+ * @param {string} studentId
+ */
+function recomputeStudentProjection(cache, outcomeId, studentId) {
+    const oidStr = String(outcomeId);
+    const sidStr = String(studentId);
+
+    const student = (cache.students ?? []).find(s => String(s.id) === sidStr);
+    if (!student) { logger.warn(`[PLActions] recompute: student ${sidStr} not in cache`); return; }
+
+    const outcomeData = (student.outcomes ?? []).find(o => String(o.outcomeId) === oidStr);
+    if (!outcomeData) { logger.warn(`[PLActions] recompute: outcome ${oidStr} not on student ${sidStr}`); return; }
+
+    const activeScores = (outcomeData.attempts ?? [])
+        .filter(a => !(cache.ignored_alignments ?? []).some(ig =>
+            ig.student_id  === sidStr &&
+            ig.outcome_id  === oidStr &&
+            ig.alignment_id === a.assignmentId
+        ))
+        .map(a => a.score)
+        .filter(s => s !== null && s !== undefined);
+
+    const recomputed = computeStudentOutcome(activeScores);
+    Object.assign(outcomeData, recomputed);
+
+    logger.debug(
+        `[PLActions] Recomputed outcome ${oidStr} for student ${sidStr}: ` +
+        `plPrediction=${recomputed.plPrediction}, status=${recomputed.status}, ` +
+        `from ${activeScores.length} active attempt(s)`
+    );
+}
+
 // ─── Alignment ignore / un-ignore (Section 9 automatic chain) ────────────────
 
 /**
@@ -466,97 +513,79 @@ export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, s
  *
  * Automatic chain (spec Section 9):
  *  1. Writes to cache.ignored_alignments
- *  2. runPLSync for this student — pushes re-computed PL to Canvas outcome rollup
- *     and writes last_synced_score + last_synced_at
- *  3. Re-renders student row
+ *  2. Recomputes PL prediction locally from remaining non-ignored attempts
+ *  3. Re-renders student row (dot fades, Marzano pill updates, row highlights if needed)
  *
- * Steps 4-6 (Current Score update + comment posting) require Current Score
- * assignment infrastructure not yet fully wired — those are left as TODOs.
+ * No Canvas API call and no cache file write occur on toggle — this is a pure
+ * in-memory + re-render operation. The teacher can push the new prediction via
+ * the existing "Save grades to Canvas" / per-row save flow.
  *
  * @param {Object}  opts
- * @param {string}  opts.courseId
  * @param {string}  opts.outcomeId
- * @param {string}  opts.outcomeName
  * @param {string}  opts.studentId
  * @param {string}  opts.alignmentId  - e.g. "assignment_3475"
- * @param {string}  [opts.reason]     - Teacher-provided reason text
- * @param {Object}  opts.apiClient
- * @param {Function} [opts.onProgress]
+ * @param {string}  [opts.reason]     - Optional teacher reason (stored in ignored record)
+ * @param {Object}  opts.cache        - In-memory cache (required)
  * @param {Function} opts.onRerender
  */
-export async function handleIgnoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, reason = null, cache, apiClient, onProgress, onRerender }) {
+export function handleIgnoreAlignment({ outcomeId, studentId, alignmentId, reason = null, cache, onRerender }) {
     logger.info(`[PLActions] Ignore alignment ${alignmentId}: outcome ${outcomeId}, student ${studentId}`);
 
-    // Step 1 — mutate ignored_alignments in memory (optimistic) and queue background write
-    const target = cache ?? (await readMasteryOutlookCache(courseId, apiClient) ?? {});
-    target.ignored_alignments = target.ignored_alignments ?? [];
+    if (!cache) { logger.warn('[PLActions] handleIgnoreAlignment called without cache — no-op'); return; }
+
+    cache.ignored_alignments = cache.ignored_alignments ?? [];
 
     // Idempotent — do not add a duplicate entry
-    const alreadyIgnored = target.ignored_alignments.some(
-        ia => ia.student_id   === String(studentId) &&
-              ia.outcome_id   === String(outcomeId)  &&
+    const alreadyIgnored = cache.ignored_alignments.some(
+        ia => ia.student_id  === String(studentId) &&
+              ia.outcome_id  === String(outcomeId)  &&
               ia.alignment_id === alignmentId
     );
 
     if (!alreadyIgnored) {
-        target.ignored_alignments.push({
-            student_id:      String(studentId),
-            outcome_id:      String(outcomeId),
-            alignment_id:    alignmentId,
-            reason:          reason || null,
-            ignored_by:      String(window.ENV?.current_user_id ?? 'unknown'),
-            ignored_at:      new Date().toISOString(),
-            comment_posted:  false,
+        cache.ignored_alignments.push({
+            student_id:     String(studentId),
+            outcome_id:     String(outcomeId),
+            alignment_id:   alignmentId,
+            reason:         reason || null,
+            ignored_by:     String(window.ENV?.current_user_id ?? 'unknown'),
+            ignored_at:     new Date().toISOString(),
+            comment_posted: false,
         });
-        logger.debug(`[PLActions] ignored_alignments updated (${target.ignored_alignments.length} total)`);
+        logger.debug(`[PLActions] ignored_alignments updated (${cache.ignored_alignments.length} total)`);
     }
 
-    if (cache) {
-        onRerender?.();                                 // Optimistic UI
-        scheduleCacheWrite(courseId, cache, apiClient); // Queue debounced write
-        await flushCacheWrite(courseId, cache, apiClient); // Ensure persisted before runPLSync
-    } else if (!alreadyIgnored) {
-        await writeMasteryOutlookCache(courseId, apiClient, target);
-    }
-
-    // Step 2 — runPLSync re-computes PL without this alignment and pushes to Canvas
-    // TODO step 4-6: update Current Score + post comment to assignment
-    await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId], onProgress });
-
+    recomputeStudentProjection(cache, outcomeId, studentId);
     onRerender?.();
 }
 
 /**
  * Un-ignore a previously ignored alignment for one student × outcome.
  *
- * Removes the entry from cache.ignored_alignments and triggers the same
- * automatic chain as handleIgnoreAlignment (runPLSync re-includes the
- * alignment in the PL calculation, then pushes the updated score to Canvas).
+ * Mirror of handleIgnoreAlignment — removes the entry from cache.ignored_alignments,
+ * recomputes PL prediction from the now-larger active set, and re-renders.
+ * No Canvas API call or cache file write.
  *
- * @param {Object}  opts  - Same as handleIgnoreAlignment (reason not applicable)
+ * @param {Object}  opts
+ * @param {string}  opts.outcomeId
+ * @param {string}  opts.studentId
+ * @param {string}  opts.alignmentId
+ * @param {Object}  opts.cache        - In-memory cache (required)
+ * @param {Function} opts.onRerender
  */
-export async function handleUnignoreAlignment({ courseId, outcomeId, outcomeName, studentId, alignmentId, cache, apiClient, onProgress, onRerender }) {
+export function handleUnignoreAlignment({ outcomeId, studentId, alignmentId, cache, onRerender }) {
     logger.info(`[PLActions] Un-ignore alignment ${alignmentId}: outcome ${outcomeId}, student ${studentId}`);
 
-    const target = cache ?? (await readMasteryOutlookCache(courseId, apiClient) ?? {});
-    target.ignored_alignments = (target.ignored_alignments ?? []).filter(
-        ia => !(ia.student_id   === String(studentId) &&
-                ia.outcome_id   === String(outcomeId)  &&
+    if (!cache) { logger.warn('[PLActions] handleUnignoreAlignment called without cache — no-op'); return; }
+
+    cache.ignored_alignments = (cache.ignored_alignments ?? []).filter(
+        ia => !(ia.student_id  === String(studentId) &&
+                ia.outcome_id  === String(outcomeId)  &&
                 ia.alignment_id === alignmentId)
     );
+    logger.debug(`[PLActions] Alignment un-ignored (${cache.ignored_alignments.length} remaining)`);
 
-    if (cache) {
-        onRerender?.();
-        scheduleCacheWrite(courseId, cache, apiClient);
-        await flushCacheWrite(courseId, cache, apiClient);
-    } else {
-        await writeMasteryOutlookCache(courseId, apiClient, target);
-    }
-    logger.debug(`[PLActions] Alignment un-ignored (${target.ignored_alignments.length} remaining)`);
-
-    // TODO step 4-6: update Current Score + post comment
-    await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId], onProgress });
-
+    recomputeStudentProjection(cache, outcomeId, studentId);
     onRerender?.();
 }
 

@@ -76,9 +76,9 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         d: formatDateShort(attempt.timestamp),
         v: attempt.score != null ? Math.max(0, Math.min(4, attempt.score)) : null,
         ignored: ignored.some(ig =>
-            String(ig.studentId)  === sidStr &&
-            String(ig.outcomeId)  === oidStr &&
-            ig.assignmentId       === attempt.assignmentId
+            String(ig.student_id) === sidStr &&
+            String(ig.outcome_id) === oidStr &&
+            ig.alignment_id       === attempt.assignmentId
         )
     }));
 
@@ -396,13 +396,13 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             e.stopPropagation();
             const asgnId  = el.dataset.asgnId;
             const ignored = (cache.ignored_alignments ?? []).some(
-                ia => String(ia.studentId) === stuId && String(ia.outcomeId) === oId && ia.assignmentId === asgnId
+                ia => String(ia.student_id) === stuId && String(ia.outcome_id) === oId && ia.alignment_id === asgnId
             );
             try {
                 if (ignored) {
-                    await handleUnignoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, cache, apiClient, onRerender: renderTable });
+                    handleUnignoreAlignment({ outcomeId: oId, studentId: stuId, alignmentId: asgnId, cache, onRerender: renderTable });
                 } else {
-                    await handleIgnoreAlignment({ courseId, outcomeId: oId, outcomeName, studentId: stuId, alignmentId: asgnId, cache, apiClient, onRerender: renderTable });
+                    handleIgnoreAlignment({ outcomeId: oId, studentId: stuId, alignmentId: asgnId, cache, onRerender: renderTable });
                 }
             } catch (err) {
                 logger.error('[MasteryOutlook] ignore toggle failed', err);

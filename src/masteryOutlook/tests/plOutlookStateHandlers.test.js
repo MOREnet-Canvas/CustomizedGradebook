@@ -1,6 +1,6 @@
 // src/masteryOutlook/plOutlookStateHandlers.test.js
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PLOutlookStateMachine, PL_STATES } from './plOutlookStateMachine.js';
+import { PLOutlookStateMachine, PL_STATES } from '../plOutlookStateMachine.js';
 import {
     handleCheckingSetup,
     handleCheckingStudents,
@@ -10,7 +10,7 @@ import {
     handleVerifying,
     handleComplete,
     handleError
-} from './plOutlookStateHandlers.js';
+} from '../plOutlookStateHandlers.js';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -44,9 +44,9 @@ vi.mock('../config.js', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-import { readMasteryOutlookCache, readPLAssignments, writePLAssignments } from './masteryOutlookCacheService.js';
-import { fetchCourseStudents } from '../services/enrollmentService.js';
-import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
+import { readMasteryOutlookCache, readPLAssignments, writePLAssignments } from '../masteryOutlookCacheService.js';
+import { fetchCourseStudents } from '../../services/enrollmentService.js';
+import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
 
 /** Build a state machine pre-populated with the given context */
 function buildSM(extraContext = {}) {

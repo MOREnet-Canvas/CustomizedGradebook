@@ -1,6 +1,6 @@
 // src/masteryOutlook/plOutlookStateMachine.test.js
 import { describe, test, expect, beforeEach, vi } from 'vitest';
-import { PLOutlookStateMachine, PL_STATES } from './plOutlookStateMachine.js';
+import { PLOutlookStateMachine, PL_STATES } from '../plOutlookStateMachine.js';
 
 // PLOutlookStateMachine uses logger internally — mock it
 vi.mock('../utils/logger.js', () => ({
