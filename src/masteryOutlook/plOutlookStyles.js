@@ -380,7 +380,6 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
   border:0.5px solid transparent;
 }
 .dot:hover       { border-color:var(--border-primary); }
-.dot.active      { box-shadow:0 0 0 1.5px var(--blue); }
 .dot.ignored     { opacity:0.35; }
 .dot.ignored::after {
   content:''; position:absolute; top:50%; left:-0.154em; right:-0.154em; height:1.5px;
@@ -391,28 +390,28 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
   border-radius:50%; background:var(--amber); border:1px solid var(--bg-surface); z-index:2;
 }
 
-/* hover preview tooltip */
+/* hover preview tooltip — hidden in favour of the richer hover popover */
 .dot-preview {
   display:none; position:absolute; bottom:calc(100% + 0.46em); left:50%; transform:translateX(-50%);
   background:var(--text-primary); color:#fff;
   padding:0.308em 0.538em; border-radius:var(--radius-sm); font-size:0.808em; font-weight:500;
   white-space:nowrap; z-index:20; pointer-events:none;
 }
-.dot:hover .dot-preview  { display:block; }
-.dot.active .dot-preview { display:none; }
+.dot:hover .dot-preview   { display:none; }
 .dot.ignored .dot-preview { display:none; }
 .dot.ignored .dp-title,
 .dot.ignored .dp-score { text-decoration:line-through; opacity:0.6; }
 
-/* pinned click popover */
+/* hover popover — non-interactive info card */
 .dot-popover {
   display:none; position:absolute; bottom:calc(100% + 0.615em); left:50%; transform:translateX(-50%);
   background:var(--bg-surface); color:var(--text-primary);
   border:0.5px solid var(--border-secondary); border-radius:var(--radius-md);
   padding:0.769em 0.923em; font-size:0.846em; width:16.923em; z-index:30;
   box-shadow: 0 0.46em 1.692em rgba(31,30,27,.08), 0 0.154em 0.308em rgba(31,30,27,.04);
+  pointer-events:none;
 }
-.dot.active .dot-popover { display:block; }
+.dot:hover .dot-popover { display:block; }
 .dot-popover::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:0.385em solid transparent; border-top-color:var(--bg-surface); }
 .dp-hd    { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.46em; }
 .dp-title { font-weight:600; font-size:0.885em; }
@@ -421,13 +420,6 @@ th.th-pillsA,th.th-pillsW,th.th-pillsM { display:none; }
 .dp-row   { display:flex; justify-content:space-between; gap:0.923em; }
 .dp-row .lbl { color:var(--text-secondary); }
 .dp-row .val { font-weight:500; }
-.dp-divider  { height:0.5px; background:var(--border-tertiary); margin:0.615em -0.308em 0.615em; }
-.dp-toggle   { display:flex; align-items:center; justify-content:space-between; font-size:0.846em; color:var(--text-secondary); }
-.toggle-sw   { position:relative; width:2.154em; height:1.231em; border-radius:0.769em; background:var(--border-secondary); cursor:pointer; transition:background .15s; flex-shrink:0; }
-.toggle-sw::after { content:''; position:absolute; top:0.154em; left:0.154em; width:0.923em; height:0.923em; border-radius:50%; background:#fff; transition:left .15s; }
-.toggle-sw.on       { background:var(--amber); }
-.toggle-sw.on::after{ left:1.077em; }
-.dp-footnote { font-size:0.769em; color:var(--text-tertiary); margin-top:0.46em; line-height:1.35; }
 .dp-comment-wrap    { margin-top:0.615em; padding-top:0.615em; border-top:0.5px dashed var(--border-tertiary); }
 .dp-comment-label   { display:block; font-size:0.769em; text-transform:uppercase; letter-spacing:.04em; color:var(--text-tertiary); font-weight:600; margin-bottom:0.308em; }
 .dp-comment-label .opt { font-weight:400; text-transform:none; letter-spacing:0; }

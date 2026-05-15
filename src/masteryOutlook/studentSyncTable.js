@@ -129,11 +129,11 @@ function renderDot(dot, oidStr, sidStr, i) {
     const dateStr    = escapeHtml(dot.d || '—');
     const asgnId     = escapeHtml(dot.assignmentId || '');
     const ignoredCls = dot.ignored ? 'ignored' : '';
-    const statusStr  = dot.ignored ? 'Ignored' : 'In Marzano';
-    const statusCol  = dot.ignored ? 'var(--amber)' : 'var(--green)';
+    const statusStr  = dot.ignored ? 'true' : 'false';
+    const statusCol  = dot.ignored ? 'var(--amber)' : 'var(--text-primary)';
 
     return `<div class="dot ${ignoredCls}" style="${bgStyle}"
-        data-action="dot-toggle" data-dot-idx="${i}"
+        data-action="dot-ignore-toggle" data-dot-idx="${i}"
         data-stu="${sidStr}" data-oid="${oidStr}"
         data-asgn-id="${asgnId}" tabindex="0" role="button" aria-label="${asgn}: ${valStr}">
       ${label}
@@ -146,17 +146,9 @@ function renderDot(dot, oidStr, sidStr, i) {
         <div class="dp-rows">
           <div class="dp-row"><span class="lbl">Date</span><span class="val">${dateStr}</span></div>
           <div class="dp-row"><span class="lbl">Score</span><span class="val">${valStr}</span></div>
-          <div class="dp-row"><span class="lbl">Status</span>
+          <div class="dp-row"><span class="lbl">Ignored</span>
             <span class="val" style="color:${statusCol};">${statusStr}</span></div>
         </div>
-        <div class="dp-divider"></div>
-        <div class="dp-toggle">
-          <span>Ignore this alignment</span>
-          <div class="toggle-sw ${dot.ignored ? 'on' : ''}"
-               data-action="dot-ignore-toggle" data-dot-idx="${i}"
-               data-stu="${sidStr}" data-oid="${oidStr}" data-asgn-id="${asgnId}"></div>
-        </div>
-        <div class="dp-footnote">Ignored alignments are excluded from the Marzano calculation but remain visible in Canvas.</div>
       </div>
     </div>`;
 }
@@ -352,19 +344,10 @@ export function renderOutcomeStudentTable(outcome, cache) {
  */
 export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable }) {
     const outcomeName = outcome.title || String(outcome.id);
-    let activeDotKey = null;
 
     // Seed the write scheduler's dedupe baseline with the on-disk state so the first
     // toggle that returns the cache to its loaded form skips the network entirely.
     initWriteScheduler(cache);
-
-    const onDocClick = (e) => {
-        if (activeDotKey && !e.target.closest('.dot')) {
-            activeDotKey = null;
-            contentEl.querySelectorAll('.dot.active').forEach(d => d.classList.remove('active'));
-        }
-    };
-    document.addEventListener('click', onDocClick);
 
     contentEl.addEventListener('click', async (e) => {
         const el = e.target.closest('[data-action]');
@@ -373,23 +356,6 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         const action = el.dataset.action;
         const stuId  = el.dataset.stu || el.dataset.studentId;
         const oId    = el.dataset.oid || el.dataset.outcomeId;
-
-        // ── Dot popover toggle ────────────────────────────────────────────
-        if (action === 'dot-toggle') {
-            e.stopPropagation();
-            const dotEl = el.closest('.dot');
-            if (!dotEl) return;
-            const key = `${oId}:${stuId}:${el.dataset.dotIdx}`;
-            if (activeDotKey === key) {
-                activeDotKey = null;
-                dotEl.classList.remove('active');
-            } else {
-                contentEl.querySelectorAll('.dot.active').forEach(d => d.classList.remove('active'));
-                activeDotKey = key;
-                dotEl.classList.add('active');
-            }
-            return;
-        }
 
         // ── Ignore/unignore alignment ─────────────────────────────────────
         if (action === 'dot-ignore-toggle') {
@@ -522,7 +488,5 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         });
     });
 
-    return () => {
-        document.removeEventListener('click', onDocClick);
-    };
+    return () => {};
 }
