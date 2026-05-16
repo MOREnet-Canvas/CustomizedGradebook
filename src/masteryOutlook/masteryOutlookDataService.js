@@ -422,7 +422,9 @@ export function extractAttempts(outcomeResults, alignmentNameMap = {}) {
             score: parseFloat(score),
             timestamp: timestamp,
             assignmentId: assignmentId,
-            assignmentName: alignmentNameMap[assignmentId] ?? null,
+            assignmentName: alignmentNameMap[assignmentId]
+                         ?? alignmentNameMap[`assignment_${assignmentId}`]
+                         ?? null,
             resultId: result.id
         });
     });
