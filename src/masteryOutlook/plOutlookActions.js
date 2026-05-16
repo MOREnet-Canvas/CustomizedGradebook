@@ -445,17 +445,36 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
  * @param {string}   opts.outcomeName
  * @param {string}   opts.studentId
  * @param {Object}   opts.apiClient
+ * @param {Object}   [opts.cache]      - In-memory cache. When provided, canvasScore is
+ *                                       updated in place after a successful sync so the
+ *                                       view re-renders correctly without a full data refresh.
  * @param {Function} [opts.onProgress]
  * @param {Function} opts.onRerender
  */
-export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, onProgress, onRerender }) {
+export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, cache, onProgress, onRerender }) {
     logger.info(`[PLActions] Per-student sync: outcome ${outcomeId}, student ${studentId}`);
 
-    await runPLSync({
+    const result = await runPLSync({
         courseId, outcomeId, outcomeName, apiClient,
         targetUserIds: [studentId],
         onProgress,
     });
+
+    // Mirror the pushed score into the in-memory cache so the next renderTable()
+    // sees the correct canvasScore and clears the amber os-needs-row highlight.
+    // The pushed value follows the same logic as handleCalculatingChanges:
+    //   will_post when set (unlocked override), otherwise plPrediction.
+    // Locked rows are skipped by runPLSync entirely, so we only reach here for
+    // students that were actually synced.
+    if (result.success && cache) {
+        const student = cache.students?.find(s => String(s.id) === String(studentId));
+        const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+        if (od != null) {
+            const entry       = ((cache.sync_state ?? {})[String(outcomeId)] ?? {})[String(studentId)] ?? {};
+            const pushedScore = entry.will_post != null ? entry.will_post : od.plPrediction;
+            od.canvasScore    = pushedScore;
+        }
+    }
 
     onRerender?.();
 }

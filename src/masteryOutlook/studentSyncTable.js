@@ -437,7 +437,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             if (el.disabled) return;
             el.disabled = true;
             try {
-                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable });
+                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, cache, onRerender: renderTable });
             } catch (err) {
                 logger.error('[MasteryOutlook] os-save failed', err);
                 el.disabled = false;
@@ -462,7 +462,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
                 .filter(s => s.status === 'needs');
             for (const s of pending) {
                 try {
-                    await handleSyncOneStudent({ courseId, outcomeId: oidStr, outcomeName, studentId: s.id, apiClient, onRerender: renderTable });
+                    await handleSyncOneStudent({ courseId, outcomeId: oidStr, outcomeName, studentId: s.id, apiClient, cache, onRerender: renderTable });
                 } catch (err) { logger.error(`[MasteryOutlook] os-post-all failed for ${s.id}`, err); }
             }
             renderTable();

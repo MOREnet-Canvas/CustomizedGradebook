@@ -129,12 +129,12 @@ function renderInitPanel(outcome, open) {
         <div class="init-panel${open ? ' open' : ''}" data-init-panel>
             <h4>Set up Power Law sync for ${shortName}</h4>
             <div>This will create a hidden Canvas assignment, fetch submission
-                records for every student, and push Power Law projected scores
-                to Canvas. Takes ~10 seconds.</div>
+                records for every student, and calculate Power Law projected scores.
+                 Takes ~10 seconds.</div>
             <div class="init-steps">
                 <div class="init-step"><span class="stp-num">1</span>Create assignment</div>
                 <div class="init-step"><span class="stp-num">2</span>Fetch submissions</div>
-                <div class="init-step"><span class="stp-num">3</span>Push to Canvas</div>
+                <div class="init-step"><span class="stp-num">3</span>Calculate Marzano Power Law scores</div>
             </div>
             <div class="init-actions">
                 <button class="btn btn-sm btn-primary" data-init-action="run">Initialize now</button>
