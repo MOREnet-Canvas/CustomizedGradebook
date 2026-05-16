@@ -40,13 +40,18 @@ import { logger } from '../utils/logger.js';
  * @param {boolean}  [opts.setupOnly=false] - When true, stops after creating the PL assignment
  *                   infrastructure and does NOT push scores. Use for first-time initialization
  *                   so the teacher can review predictions before pushing.
+ * @param {Object|null} [opts.cachedPLEntry=null] - In-memory pl_assignments entry for this outcome.
+ *                   When provided, CHECKING_SETUP uses it directly and skips the Canvas Files disk
+ *                   read. Prevents a race condition where a freshly written entry hasn't propagated
+ *                   before the next read.
  * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
  */
-export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false }) {
+export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
 
     const sm = new PLOutlookStateMachine({
-        courseId, outcomeId, outcomeName, apiClient, onProgress, targetUserIds, setupOnly
+        courseId, outcomeId, outcomeName, apiClient, onProgress,
+        targetUserIds, setupOnly, cachedPLEntry
     });
 
     // ── Run loop ──

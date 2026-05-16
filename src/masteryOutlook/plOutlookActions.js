@@ -445,18 +445,26 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
  * @param {string}   opts.outcomeName
  * @param {string}   opts.studentId
  * @param {Object}   opts.apiClient
- * @param {Object}   [opts.cache]      - In-memory cache. When provided, canvasScore is
- *                                       updated in place after a successful sync so the
- *                                       view re-renders correctly without a full data refresh.
+ * @param {Object}   [opts.cache]      - In-memory cache. When provided, the pl_assignments
+ *                                       entry is extracted and passed to runPLSync to prevent
+ *                                       the Canvas Files race condition, and canvasScore is
+ *                                       updated in place after a successful sync.
  * @param {Function} [opts.onProgress]
  * @param {Function} opts.onRerender
  */
 export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, cache, onProgress, onRerender }) {
     logger.info(`[PLActions] Per-student sync: outcome ${outcomeId}, student ${studentId}`);
 
+    // Pass in-memory pl_assignments entry so CHECKING_SETUP doesn't need a disk read —
+    // prevents race condition after Initialize writes to Canvas Files.
+    const cachedPLEntry = cache?.pl_assignments?.[outcomeId]
+                       ?? cache?.pl_assignments?.[String(outcomeId)]
+                       ?? null;
+
     const result = await runPLSync({
         courseId, outcomeId, outcomeName, apiClient,
         targetUserIds: [studentId],
+        cachedPLEntry,
         onProgress,
     });
 

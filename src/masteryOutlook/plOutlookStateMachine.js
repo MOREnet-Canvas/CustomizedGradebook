@@ -76,6 +76,7 @@ export class PLOutlookStateMachine {
             onProgress:           null,
             targetUserIds:        null,   // null = all students
             setupOnly:            false,  // When true, stop after CREATING_ASSIGNMENT (no score push)
+            cachedPLEntry:        null,   // In-memory pl_assignments entry — skips disk read in CHECKING_SETUP
 
             // Populated during CHECKING_SETUP
             assignmentId:         null,

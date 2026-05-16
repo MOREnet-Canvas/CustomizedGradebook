@@ -27,15 +27,16 @@ import { scoresMatch } from './plOutlookSyncStatus.js';
  * Only hits Canvas API on the very first run for a given outcome.
  */
 export async function handleCheckingSetup(sm) {
-    const { courseId, outcomeId, outcomeName, apiClient } = sm.getContext();
+    const { courseId, outcomeId, outcomeName, apiClient, cachedPLEntry } = sm.getContext();
     sm.progress('Checking setup...');
     logger.debug(`[PLSync] CHECKING_SETUP for outcome ${outcomeId} (${outcomeName})`);
 
-    const plAssignments = await readPLAssignments(courseId, apiClient);
-    const cached        = plAssignments[outcomeId];
+    // Use in-memory entry if caller provided it — avoids Canvas Files race condition
+    // where a freshly written pl_assignment hasn't propagated before the next read.
+    const cached = cachedPLEntry ?? (await readPLAssignments(courseId, apiClient))[outcomeId];
 
     if (cached?.assignment_id && cached?.criterion_id && cached?.rubric_association_id) {
-        logger.debug(`[PLSync] Setup found in cache for outcome ${outcomeId}`);
+        logger.debug(`[PLSync] Setup found for outcome ${outcomeId}${cachedPLEntry ? ' (in-memory)' : ' (disk)'}`);
         sm.updateContext({
             assignmentId:         cached.assignment_id,
             rubricId:             cached.rubric_id,
@@ -48,7 +49,7 @@ export async function handleCheckingSetup(sm) {
         return PL_STATES.CHECKING_STUDENTS;
     }
 
-    logger.info(`[PLSync] No cached setup for outcome ${outcomeId} — running first-time setup`);
+    logger.info(`[PLSync] No setup found for outcome ${outcomeId} — running first-time setup`);
     return PL_STATES.CREATING_ASSIGNMENT;
 }
 
