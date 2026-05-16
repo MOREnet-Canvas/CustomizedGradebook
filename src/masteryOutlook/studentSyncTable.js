@@ -266,10 +266,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
         })
         .sort((a, b) => a.sortableName.localeCompare(b.sortableName));
 
-    const needsRows  = studentStates.filter(s => s.status === 'needs');
-    const syncedRows = studentStates.filter(s => s.status === 'synced');
-    const neRows     = studentStates.filter(s => s.status === 'ne');
-    const needsCount = needsRows.length;
+    const needsCount = studentStates.filter(s => s.status === 'needs').length;
 
     const toolbarHtml = needsCount > 0
         ? `<div class="os-status-banner warn">
@@ -298,11 +295,9 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </span>
         </div>`;
 
-    const bodyHtml = [
-        needsRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
-        syncedRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
-        neRows.map(s => renderOutcomeStudentRow(s, oidStr)).join(''),
-    ].join('');
+    const bodyHtml = studentStates
+        .map(s => renderOutcomeStudentRow(s, oidStr))
+        .join('');
 
     return `
         ${toolbarHtml}
