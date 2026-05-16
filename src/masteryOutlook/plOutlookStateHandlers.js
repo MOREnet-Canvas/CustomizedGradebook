@@ -298,7 +298,8 @@ export async function handleFetchingSubmissions(sm) {
  */
 export async function handleCalculatingChanges(sm) {
     const { courseId, outcomeId, outcomeName, submissionIdByUserId,
-            rubricAssociationId, rubricCriterionId, effectiveTargetIds, apiClient } = sm.getContext();
+            rubricAssociationId, rubricCriterionId, effectiveTargetIds,
+            plScoreOverrides, apiClient } = sm.getContext();
 
     sm.progress('Calculating changes...');
     logger.debug(`[PLSync] CALCULATING_CHANGES for outcome ${outcomeId}`);
@@ -367,7 +368,8 @@ export async function handleCalculatingChanges(sm) {
         const submissionId = submissionIdByUserId?.get(userId);
         if (!submissionId) { skippedNoSubmission++; logger.warn(`[PLSync] No submission ID for student ${userId} — skipping`); continue; }
 
-        const rawPlScore = plPredictionByUserId.get(userId);
+        // Prefer in-memory override (post-recompute value) over stale disk value
+        const rawPlScore = plScoreOverrides?.[userId] ?? plPredictionByUserId.get(userId);
         if (rawPlScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
 
         // 3b — use teacher-set will_post value when provided (will_post_lock: "unlocked"),

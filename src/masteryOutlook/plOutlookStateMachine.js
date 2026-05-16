@@ -77,6 +77,7 @@ export class PLOutlookStateMachine {
             targetUserIds:        null,   // null = all students
             setupOnly:            false,  // When true, stop after CREATING_ASSIGNMENT (no score push)
             cachedPLEntry:        null,   // In-memory pl_assignments entry — skips disk read in CHECKING_SETUP
+            plScoreOverrides:     null,   // { [userId]: plScore } — in-memory overrides for handleCalculatingChanges
 
             // Populated during CHECKING_SETUP
             assignmentId:         null,

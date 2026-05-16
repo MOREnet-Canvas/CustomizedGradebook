@@ -44,14 +44,18 @@ import { logger } from '../utils/logger.js';
  *                   When provided, CHECKING_SETUP uses it directly and skips the Canvas Files disk
  *                   read. Prevents a race condition where a freshly written entry hasn't propagated
  *                   before the next read.
+ * @param {Object|null} [opts.plScoreOverrides=null] - Map of { [userId]: plScore } for students
+ *                   whose in-memory plPrediction differs from the disk cache (e.g. after an
+ *                   ignore/recompute without a cache write). handleCalculatingChanges uses these
+ *                   values in preference to the stale disk value.
  * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
  */
-export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null }) {
+export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
 
     const sm = new PLOutlookStateMachine({
         courseId, outcomeId, outcomeName, apiClient, onProgress,
-        targetUserIds, setupOnly, cachedPLEntry
+        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides
     });
 
     // ── Run loop ──

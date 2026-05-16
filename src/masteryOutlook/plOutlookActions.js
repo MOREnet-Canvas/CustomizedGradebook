@@ -455,33 +455,40 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
 export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, cache, onProgress, onRerender }) {
     logger.info(`[PLActions] Per-student sync: outcome ${outcomeId}, student ${studentId}`);
 
+    // Resolve in-memory student data upfront — used for both plScoreOverrides
+    // (before runPLSync) and canvasScore update (after).
+    const student = cache?.students?.find(s => String(s.id) === String(studentId));
+    const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+
     // Pass in-memory pl_assignments entry so CHECKING_SETUP doesn't need a disk read —
     // prevents race condition after Initialize writes to Canvas Files.
     const cachedPLEntry = cache?.pl_assignments?.[outcomeId]
                        ?? cache?.pl_assignments?.[String(outcomeId)]
                        ?? null;
 
+    // Pass in-memory plPrediction so handleCalculatingChanges uses the post-recompute
+    // value rather than the stale disk value (e.g. after an ignore/recompute that
+    // hasn't been written to disk yet).
+    const plScoreOverrides = (od?.plPrediction != null)
+        ? { [String(studentId)]: od.plPrediction }
+        : null;
+
     const result = await runPLSync({
         courseId, outcomeId, outcomeName, apiClient,
         targetUserIds: [studentId],
         cachedPLEntry,
+        plScoreOverrides,
         onProgress,
     });
 
     // Mirror the pushed score into the in-memory cache so the next renderTable()
     // sees the correct canvasScore and clears the amber os-needs-row highlight.
-    // The pushed value follows the same logic as handleCalculatingChanges:
-    //   will_post when set (unlocked override), otherwise plPrediction.
-    // Locked rows are skipped by runPLSync entirely, so we only reach here for
-    // students that were actually synced.
-    if (result.success && cache) {
-        const student = cache.students?.find(s => String(s.id) === String(studentId));
-        const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-        if (od != null) {
-            const entry       = ((cache.sync_state ?? {})[String(outcomeId)] ?? {})[String(studentId)] ?? {};
-            const pushedScore = entry.will_post != null ? entry.will_post : od.plPrediction;
-            od.canvasScore    = pushedScore;
-        }
+    // Guard with successCount > 0 — result.success is true even on zeroUpdates
+    // (skippedNoChange), which must NOT update canvasScore to avoid a false
+    // "synced" state when Canvas was never touched.
+    if (result.success && result.successCount > 0 && od != null) {
+        const entry    = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(studentId)] ?? {};
+        od.canvasScore = entry.will_post != null ? entry.will_post : od.plPrediction;
     }
 
     onRerender?.();
