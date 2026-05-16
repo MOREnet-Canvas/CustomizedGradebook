@@ -575,6 +575,7 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
                     outcomeId:   outcome.id,
                     outcomeName: outcome.title || String(outcome.id),
                     apiClient:   ctx.apiClient,
+                    setupOnly:   true,   // Create assignment structure only — teacher pushes scores separately
                     onProgress:  (_state, _name, msg) => {
                         if (progressEl && msg) progressEl.textContent = msg;
                     },

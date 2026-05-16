@@ -241,4 +241,11 @@ describe('PLOutlookStateMachine', () => {
         sm.transition(PL_STATES.COMPLETE);
         expect(sm.getCurrentState()).toBe(PL_STATES.COMPLETE);
     });
+
+    test('setupOnly path: CREATING_ASSIGNMENT → COMPLETE is valid (skips student sync)', () => {
+        sm.transition(PL_STATES.CHECKING_SETUP);
+        sm.transition(PL_STATES.CREATING_ASSIGNMENT);
+        sm.transition(PL_STATES.COMPLETE);   // was invalid before setupOnly flag
+        expect(sm.getCurrentState()).toBe(PL_STATES.COMPLETE);
+    });
 });

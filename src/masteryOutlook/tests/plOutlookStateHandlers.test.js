@@ -560,6 +560,26 @@ describe('handleCreatingAssignment', () => {
         await expect(handleCreatingAssignment(sm)).rejects.toThrow(/Failed to create rubric/);
         expect(writePLAssignments).not.toHaveBeenCalled();
     });
+
+    test('setupOnly=true → writes cache and returns COMPLETE instead of CHECKING_STUDENTS', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeApiClient();
+        const sm = buildSMAtCreating({ apiClient, setupOnly: true });
+
+        const promise = handleCreatingAssignment(sm);
+        await vi.runAllTimersAsync();
+        const next = await promise;
+
+        expect(next).toBe(PL_STATES.COMPLETE);
+        // Setup is still fully written to cache even in setupOnly mode
+        expect(writePLAssignments).toHaveBeenCalledWith(
+            '100',
+            expect.objectContaining({
+                598: expect.objectContaining({ assignment_id: 'asgn-99' })
+            }),
+            apiClient
+        );
+    });
 });
 
 // ── handleSyncing ─────────────────────────────────────────────────────────────

@@ -39,7 +39,7 @@ export const PL_STATES = {
 const VALID_TRANSITIONS = {
     [PL_STATES.IDLE]:                 [PL_STATES.CHECKING_SETUP],
     [PL_STATES.CHECKING_SETUP]:       [PL_STATES.CREATING_ASSIGNMENT, PL_STATES.CHECKING_STUDENTS, PL_STATES.ERROR],
-    [PL_STATES.CREATING_ASSIGNMENT]:  [PL_STATES.CHECKING_STUDENTS, PL_STATES.ERROR],
+    [PL_STATES.CREATING_ASSIGNMENT]:  [PL_STATES.CHECKING_STUDENTS, PL_STATES.COMPLETE, PL_STATES.ERROR],
     [PL_STATES.CHECKING_STUDENTS]:    [PL_STATES.FETCHING_SUBMISSIONS, PL_STATES.CALCULATING_CHANGES, PL_STATES.ERROR],
     [PL_STATES.FETCHING_SUBMISSIONS]: [PL_STATES.CALCULATING_CHANGES, PL_STATES.ERROR],
     [PL_STATES.CALCULATING_CHANGES]:  [PL_STATES.SYNCING, PL_STATES.COMPLETE, PL_STATES.ERROR],
@@ -60,6 +60,8 @@ export class PLOutlookStateMachine {
      * @param {Object}   initialContext.apiClient      - CanvasApiClient instance
      * @param {Function} [initialContext.onProgress]   - (state, outcomeName, message, done, total) => void
      * @param {Array}    [initialContext.targetUserIds] - If set, only sync these students
+     * @param {boolean}  [initialContext.setupOnly=false] - When true, stop after CREATING_ASSIGNMENT
+     *   (no score push). Used by the Initialize flow so the teacher can review before pushing.
      */
     constructor(initialContext = {}) {
         this.currentState   = PL_STATES.IDLE;
@@ -73,6 +75,7 @@ export class PLOutlookStateMachine {
             apiClient:            null,
             onProgress:           null,
             targetUserIds:        null,   // null = all students
+            setupOnly:            false,  // When true, stop after CREATING_ASSIGNMENT (no score push)
 
             // Populated during CHECKING_SETUP
             assignmentId:         null,

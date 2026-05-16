@@ -37,13 +37,16 @@ import { logger } from '../utils/logger.js';
  * @param {Object}   opts.apiClient         - CanvasApiClient instance
  * @param {Function} [opts.onProgress]      - (state, outcomeName, message, done, total) => void
  * @param {string[]} [opts.targetUserIds]   - Limit sync to specific students (null = all)
+ * @param {boolean}  [opts.setupOnly=false] - When true, stops after creating the PL assignment
+ *                   infrastructure and does NOT push scores. Use for first-time initialization
+ *                   so the teacher can review predictions before pushing.
  * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
  */
-export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null }) {
+export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
 
     const sm = new PLOutlookStateMachine({
-        courseId, outcomeId, outcomeName, apiClient, onProgress, targetUserIds
+        courseId, outcomeId, outcomeName, apiClient, onProgress, targetUserIds, setupOnly
     });
 
     // ── Run loop ──

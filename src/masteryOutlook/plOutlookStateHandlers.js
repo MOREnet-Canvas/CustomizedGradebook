@@ -192,6 +192,13 @@ export async function handleCreatingAssignment(sm) {
     logger.info(`[PLSync] Setup cached in mastery_outlook_cache.json for outcome ${outcomeId}`);
 
     sm.updateContext({ assignmentId, rubricId, rubricAssociationId, rubricCriterionId, submissionIdByUserId });
+
+    if (sm.getContext().setupOnly) {
+        sm.progress('Setup complete. Click "Save grades to Canvas" when ready to push scores.');
+        logger.info(`[PLSync] setupOnly=true — stopping after CREATING_ASSIGNMENT for outcome ${outcomeId}`);
+        return PL_STATES.COMPLETE;
+    }
+
     return PL_STATES.CHECKING_STUDENTS;
 }
 
