@@ -21,7 +21,7 @@ import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
 import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import {
-    handleSyncOneStudent, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
+    handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
 } from './plOutlookActions.js';
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
@@ -494,7 +494,8 @@ function buildOutcomeDetailPanel({
             el.disabled = true;
             el.textContent = '…';
             try {
-                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, onRerender: renderTable });
+                await handleSyncStudents({ courseId, outcomeId: oId, outcomeName,
+                    studentIds: [stuId], apiClient, cache, onRerender: renderTable });
             } catch (err) {
                 logger.error('[MasteryOutlook] sync-one failed', err);
                 el.disabled = false; el.textContent = '↑ Sync';

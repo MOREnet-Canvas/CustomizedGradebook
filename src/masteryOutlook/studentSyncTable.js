@@ -21,7 +21,7 @@ import { escapeHtml } from '../utils/html.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
-    handleSyncOneStudent,
+    handleSyncStudents,
     handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
     handleLockWillPost, handleUnlockWillPost, handleNoteChanged,
     handleIgnoreAlignment, handleUnignoreAlignment,
@@ -437,7 +437,8 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             if (el.disabled) return;
             el.disabled = true;
             try {
-                await handleSyncOneStudent({ courseId, outcomeId: oId, outcomeName, studentId: stuId, apiClient, cache, onRerender: renderTable });
+                await handleSyncStudents({ courseId, outcomeId: oId, outcomeName,
+                    studentIds: [stuId], apiClient, cache, onRerender: renderTable });
             } catch (err) {
                 logger.error('[MasteryOutlook] os-save failed', err);
                 el.disabled = false;
@@ -449,21 +450,11 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         if (action === 'os-post-all') {
             if (el.disabled) return;
             el.disabled = true;
-            const syncState   = cache.sync_state ?? {};
-            const outcomeSync = syncState[String(outcome.id)] ?? {};
-            const ignored     = cache.ignored_alignments ?? [];
-            const oidStr      = String(outcome.id);
-            const pending = cache.students
-                .map(student => {
-                    const sId = String(student.id);
-                    const od  = student.outcomes.find(o => String(o.outcomeId) === oidStr);
-                    return buildOutcomeStudentRow(student, od, outcomeSync[sId] ?? {}, ignored, outcome.id);
-                })
-                .filter(s => s.status === 'needs');
-            for (const s of pending) {
-                try {
-                    await handleSyncOneStudent({ courseId, outcomeId: oidStr, outcomeName, studentId: s.id, apiClient, cache, onRerender: renderTable });
-                } catch (err) { logger.error(`[MasteryOutlook] os-post-all failed for ${s.id}`, err); }
+            try {
+                await handleSyncStudents({ courseId, outcomeId: String(outcome.id), outcomeName,
+                    studentIds: null, apiClient, cache, onRerender: renderTable });
+            } catch (err) {
+                logger.error('[MasteryOutlook] os-post-all failed', err);
             }
             renderTable();
             return;

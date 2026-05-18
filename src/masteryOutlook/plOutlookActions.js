@@ -433,65 +433,102 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
     scheduleCacheWrite(courseId, cache, apiClient);
 }
 
-// ─── Per-student sync ─────────────────────────────────────────────────────────
+// ─── Unified student sync ─────────────────────────────────────────────────────
 
 /**
- * Push the PL prediction for one student × outcome to Canvas immediately.
- * Thin wrapper around runPLSync with targetUserIds.
+ * Sync one or more students for a single outcome.
  *
- * @param {Object}   opts
- * @param {string}   opts.courseId
- * @param {string}   opts.outcomeId
- * @param {string}   opts.outcomeName
- * @param {string}   opts.studentId
- * @param {Object}   opts.apiClient
- * @param {Object}   [opts.cache]      - In-memory cache. When provided, the pl_assignments
- *                                       entry is extracted and passed to runPLSync to prevent
- *                                       the Canvas Files race condition, and canvasScore is
- *                                       updated in place after a successful sync.
- * @param {Function} [opts.onProgress]
- * @param {Function} opts.onRerender
+ * Handles all sync modes scoped to one outcome:
+ *   - One student:  handleSyncStudents({ studentIds: [stuId], ... })
+ *   - All students: handleSyncStudents({ studentIds: null, ... })
+ *   - Specific set: handleSyncStudents({ studentIds: ['a','b','c'], ... })
+ *
+ * Post-sync (on success with successCount > 0):
+ *   1. Updates canvasScore in-memory for each synced student
+ *   2. Writes the full cache to disk once (persists ignored_alignments and
+ *      any other pending in-memory mutations)
+ *   3. Calls onRerender
+ *
+ * Guards:
+ *   - cachedPLEntry prevents a Canvas Files race condition after Initialize
+ *   - plScoreOverrides ensures handleCalculatingChanges uses the current
+ *     in-memory plPrediction rather than a stale disk value after ignore/recompute
+ *   - successCount > 0 prevents a false "synced" UI state when Canvas was
+ *     never touched (zeroUpdates path)
+ *
+ * @param {Object}        opts
+ * @param {string}        opts.courseId
+ * @param {string}        opts.outcomeId
+ * @param {string}        opts.outcomeName
+ * @param {string[]|null} opts.studentIds    - null = all students (runPLSync decides)
+ * @param {Object}        opts.apiClient
+ * @param {Object}        opts.cache         - In-memory cache (required)
+ * @param {Function}      [opts.onProgress]
+ * @param {Function}      [opts.onRerender]
+ * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
  */
-export async function handleSyncOneStudent({ courseId, outcomeId, outcomeName, studentId, apiClient, cache, onProgress, onRerender }) {
-    logger.info(`[PLActions] Per-student sync: outcome ${outcomeId}, student ${studentId}`);
+export async function handleSyncStudents({
+    courseId, outcomeId, outcomeName,
+    studentIds, apiClient, cache, onProgress, onRerender
+}) {
+    logger.info(`[PLActions] handleSyncStudents — outcome ${outcomeId}, ` +
+        `students: ${studentIds ? studentIds.join(',') : 'all'}`);
 
-    // Resolve in-memory student data upfront — used for both plScoreOverrides
-    // (before runPLSync) and canvasScore update (after).
-    const student = cache?.students?.find(s => String(s.id) === String(studentId));
-    const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-
-    // Pass in-memory pl_assignments entry so CHECKING_SETUP doesn't need a disk read —
-    // prevents race condition after Initialize writes to Canvas Files.
+    // In-memory pl_assignments entry — prevents Canvas Files race condition
     const cachedPLEntry = cache?.pl_assignments?.[outcomeId]
                        ?? cache?.pl_assignments?.[String(outcomeId)]
                        ?? null;
 
-    // Pass in-memory plPrediction so handleCalculatingChanges uses the post-recompute
-    // value rather than the stale disk value (e.g. after an ignore/recompute that
-    // hasn't been written to disk yet).
-    const plScoreOverrides = (od?.plPrediction != null)
-        ? { [String(studentId)]: od.plPrediction }
-        : null;
+    // Build plScoreOverrides for all target students from in-memory plPrediction.
+    // Handles the case where an ignore/recompute changed plPrediction without a
+    // disk write — ensures handleCalculatingChanges uses the current value.
+    const effectiveIds = studentIds
+        ?? (cache?.students ?? []).map(s => String(s.id));
+
+    const plScoreOverrides = {};
+    for (const sid of effectiveIds) {
+        const student = cache?.students?.find(s => String(s.id) === String(sid));
+        const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+        if (od?.plPrediction != null) {
+            plScoreOverrides[String(sid)] = od.plPrediction;
+        }
+    }
 
     const result = await runPLSync({
-        courseId, outcomeId, outcomeName, apiClient,
-        targetUserIds: [studentId],
+        courseId,
+        outcomeId,
+        outcomeName,
+        apiClient,
+        targetUserIds:    studentIds ?? null,
         cachedPLEntry,
-        plScoreOverrides,
+        plScoreOverrides: Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
         onProgress,
     });
 
-    // Mirror the pushed score into the in-memory cache so the next renderTable()
-    // sees the correct canvasScore and clears the amber os-needs-row highlight.
-    // Guard with successCount > 0 — result.success is true even on zeroUpdates
-    // (skippedNoChange), which must NOT update canvasScore to avoid a false
-    // "synced" state when Canvas was never touched.
-    if (result.success && result.successCount > 0 && od != null) {
-        const entry    = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(studentId)] ?? {};
-        od.canvasScore = entry.will_post != null ? entry.will_post : od.plPrediction;
+    // Update canvasScore in-memory and write cache to disk once after the batch.
+    if (result.success && result.successCount > 0) {
+        const syncState   = cache?.sync_state ?? {};
+        const outcomeSync = syncState[String(outcomeId)] ?? {};
+
+        for (const sid of effectiveIds) {
+            const student = cache?.students?.find(s => String(s.id) === String(sid));
+            const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+            if (od != null) {
+                const entry    = outcomeSync[String(sid)] ?? {};
+                od.canvasScore = entry.will_post != null ? entry.will_post : od.plPrediction;
+            }
+        }
+
+        // Persist the full in-memory cache (ignored_alignments + canvasScore updates)
+        try {
+            await writeMasteryOutlookCache(courseId, apiClient, cache);
+        } catch (err) {
+            logger.error('[PLActions] handleSyncStudents — cache write failed', err);
+        }
     }
 
     onRerender?.();
+    return result;
 }
 
 // ─── Local PL recompute (ignore/unignore path) ───────────────────────────────
