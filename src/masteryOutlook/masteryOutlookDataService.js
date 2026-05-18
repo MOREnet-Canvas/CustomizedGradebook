@@ -252,7 +252,7 @@ function filterOutPLResults(results, plIds) {
  */
 export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssignmentIds, onProgress = () => {}) {
     const baseUrl = `/api/v1/courses/${courseId}/outcome_results`
-        + `?include[]=outcomes.alignments&per_page=100`;
+        + `?include[]=alignments&per_page=100`;
 
     logger.info('[outcomesDataService] Parallel fetch: fetching page 1 for Link header...');
     onProgress('Fetching outcome results (parallel)... page 1');
@@ -324,7 +324,7 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
         const alignmentNameMap = {};
         let page = 1;
         let hasMore = true;
-        let nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=outcomes.alignments&per_page=100`;
+        let nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=alignments&per_page=100`;
 
         while (hasMore) {
             const response = await apiClient.get(
@@ -351,7 +351,7 @@ export async function fetchOutcomeResults(courseId, apiClient, onProgress = () =
             } else {
                 // Continue to next page
                 page++;
-                nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=outcomes.alignments&per_page=100&page=${page}`;
+                nextUrl = `/api/v1/courses/${courseId}/outcome_results?include[]=alignments&per_page=100&page=${page}`;
             }
         }
 
