@@ -19,7 +19,7 @@ import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
 import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides } from './masteryOutlookDataService.js';
-import { writeMasteryOutlookCache, readPLAssignments, readSyncState } from './masteryOutlookCacheService.js';
+import { writeMasteryOutlookCache, readPLAssignments, readSyncState, readIgnoredAlignments } from './masteryOutlookCacheService.js';
 import { stopPolling, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
@@ -159,6 +159,12 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     const existingSyncState = await readSyncState(courseId, apiClient);
     if (existingSyncState && Object.keys(existingSyncState).length > 0) {
         cache.sync_state = existingSyncState;
+    }
+
+    // Step 7b: Preserve ignored_alignments across refresh
+    const existingIgnoredAlignments = await readIgnoredAlignments(courseId, apiClient);
+    if (existingIgnoredAlignments.length > 0) {
+        cache.ignored_alignments = existingIgnoredAlignments;
     }
 
     // Step 8: Detect possible manual Canvas overrides

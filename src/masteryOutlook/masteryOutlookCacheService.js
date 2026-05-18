@@ -491,6 +491,30 @@ export async function readSyncState(courseId, apiClient) {
 }
 
 /**
+ * Read the ignored_alignments array from the mastery outlook cache.
+ *
+ * ignored_alignments stores per-student per-outcome alignment exclusions
+ * set by the teacher. These are preserved across Refresh Data so teacher
+ * decisions survive a full cache rebuild.
+ *
+ * Shape: Array of {
+ *   student_id, outcome_id, alignment_id, reason,
+ *   ignored_by, ignored_at, comment_posted
+ * }
+ *
+ * Returns an empty array (never null) so callers can always safely
+ * filter/find without extra null-guards.
+ *
+ * @param {string} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Array>} ignored_alignments array, or [] if none recorded yet
+ */
+export async function readIgnoredAlignments(courseId, apiClient) {
+    const cache = await readMasteryOutlookCache(courseId, apiClient);
+    return cache?.ignored_alignments ?? [];
+}
+
+/**
  * Write an updated sync_state map back into the mastery outlook cache.
  *
  * Uses a read-before-write merge so that outcomes/students/pl_assignments
