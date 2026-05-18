@@ -736,3 +736,52 @@ export function applyPossibleManualOverrides(cache, syncState, plAssignments) {
 
     return cache;
 }
+
+/**
+ * Recompute plPrediction for every student×outcome that has at least one
+ * ignored alignment, using only the non-ignored attempts.
+ *
+ * Must be called after ignored_alignments is restored in runFullRefresh so
+ * that computeOutcomeStats output (which uses all attempts) is corrected.
+ * Mutates cache.students in place.
+ *
+ * @param {Object} cache - In-memory cache with .students and .ignored_alignments
+ */
+export function reapplyIgnoredAlignments(cache) {
+    const ignored = cache.ignored_alignments ?? [];
+    if (ignored.length === 0) return;
+
+    // Group by student×outcome to avoid recomputing the same pair multiple times
+    const pairs = new Map();
+    for (const ia of ignored) {
+        const key = `${ia.student_id}::${ia.outcome_id}`;
+        if (!pairs.has(key)) pairs.set(key, { studentId: ia.student_id, outcomeId: ia.outcome_id });
+    }
+
+    for (const { studentId, outcomeId } of pairs.values()) {
+        const student = (cache.students ?? []).find(s => String(s.id) === String(studentId));
+        if (!student) continue;
+
+        const od = (student.outcomes ?? []).find(o => String(o.outcomeId) === String(outcomeId));
+        if (!od) continue;
+
+        // Build the set of alignment_ids to exclude for this student×outcome
+        const ignoredIds = new Set(
+            ignored
+                .filter(ia => String(ia.student_id) === String(studentId) &&
+                              String(ia.outcome_id)  === String(outcomeId))
+                .map(ia => ia.alignment_id)
+        );
+
+        const activeScores = (od.attempts ?? [])
+            .filter(a => !ignoredIds.has(a.assignmentId))
+            .map(a => a.score)
+            .filter(s => s != null);
+
+        Object.assign(od, computeStudentOutcome(activeScores));
+        logger.debug(
+            `[DataService] reapplyIgnoredAlignments: recomputed outcome ${outcomeId} ` +
+            `for student ${studentId} — ${activeScores.length} active attempt(s)`
+        );
+    }
+}

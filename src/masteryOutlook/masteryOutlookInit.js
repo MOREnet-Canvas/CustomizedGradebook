@@ -18,7 +18,7 @@ import { isMasteryOutlookPage } from '../utils/pageDetection.js';
 import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
 import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides } from './masteryOutlookDataService.js';
+import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides, reapplyIgnoredAlignments } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache, readPLAssignments, readSyncState, readIgnoredAlignments } from './masteryOutlookCacheService.js';
 import { stopPolling, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { getThreshold } from './thresholdStorage.js';
@@ -166,6 +166,11 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     if (existingIgnoredAlignments.length > 0) {
         cache.ignored_alignments = existingIgnoredAlignments;
     }
+
+    // Step 7c: Recompute plPrediction for students with ignored alignments.
+    // computeOutcomeStats (step above) ran before ignored_alignments was restored,
+    // so it used all attempts. This corrects those plPrediction values in place.
+    reapplyIgnoredAlignments(cache);
 
     // Step 8: Detect possible manual Canvas overrides
     applyPossibleManualOverrides(cache, existingSyncState, existingPLAssignments);
