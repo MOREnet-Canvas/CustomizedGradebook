@@ -186,6 +186,7 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
         students:       cache.students,
         pl_assignments: cache.pl_assignments ?? {},
         sync_state:     cache.sync_state     ?? {},
+        ignored_alignments: cache.ignored_alignments ?? [],
     };
 }
 
