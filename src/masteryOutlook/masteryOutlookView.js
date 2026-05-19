@@ -725,6 +725,7 @@ async function tryLoadCache(courseId, apiClient) {
                 pl_assignments:     cache.pl_assignments     ?? {},
                 sync_state:         cache.sync_state         ?? {},
                 ignored_alignments: cache.ignored_alignments ?? [],
+                avg_assignment:     cache.avg_assignment     ?? null,
             };
             return await enrichCache(cache, courseId, apiClient);
         }
