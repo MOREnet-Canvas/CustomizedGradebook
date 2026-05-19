@@ -26,6 +26,7 @@ import {
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
+import { fetchOutcomeRollupsForOutcome } from './masteryOutlookDataService.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -411,6 +412,42 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
         </table>`;
 }
 
+// ─── Live Canvas score refresh ────────────────────────────────────────────────
+
+/**
+ * Fetch live Canvas rollup scores for one outcome and update canvasScore
+ * in-memory on each student's outcome data.
+ *
+ * Called after an outcome row is expanded so the student table always
+ * shows the current Canvas score, not the potentially stale cached value.
+ * Silent fail — if the fetch fails, cached scores remain unchanged.
+ *
+ * @param {string} outcomeId
+ * @param {Object} cache     - In-memory cache (mutated in place)
+ * @param {Object} ctx       - Contains courseId and apiClient
+ */
+async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
+    const scoreMap = await fetchOutcomeRollupsForOutcome(
+        ctx.courseId, outcomeId, ctx.apiClient
+    );
+    if (scoreMap.size === 0) return;
+
+    let updated = 0;
+    cache.students?.forEach(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+        if (!od) return;
+        const live = scoreMap.get(String(student.id));
+        if (live !== undefined && live !== od.canvasScore) {
+            od.canvasScore = live;
+            updated++;
+        }
+    });
+
+    if (updated > 0) {
+        logger.debug(`[MasteryOutlook] Live rollup: updated canvasScore for ${updated} student(s) on outcome ${outcomeId}`);
+    }
+}
+
 // ─── Detail panel (tabs + content) ───────────────────────────────────────────
 
 function buildOutcomeDetailPanel({
@@ -475,6 +512,13 @@ function buildOutcomeDetailPanel({
         );
     };
     renderTable();
+
+    // Live Canvas score refresh — fetches current rollup scores for this outcome
+    // and re-renders the student table in place once the data arrives.
+    // Fires after the initial render so the teacher sees data immediately.
+    refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then(() => {
+        renderTable();
+    });
 
     // Legacy per-row actions (non-students tabs only) — students tab is owned
     // by wireOutcomeStudentTable below.

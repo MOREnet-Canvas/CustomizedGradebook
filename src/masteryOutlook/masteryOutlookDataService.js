@@ -151,6 +151,55 @@ export async function fetchOutcomeRollups(courseId, apiClient) {
     }
 }
 
+/**
+ * Fetch Canvas rollup scores for a single outcome across all students.
+ *
+ * Used for live score refresh when a teacher expands an outcome row —
+ * cheaper than fetchOutcomeRollups which fetches all outcomes at once.
+ *
+ * Returns a Map of studentId -> canvasScore for the given outcome.
+ * Returns an empty Map on any error (safe fallback — cached scores remain).
+ *
+ * @param {string} courseId
+ * @param {string} outcomeId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Map<string, number>>} Map of studentId -> canvasScore
+ */
+export async function fetchOutcomeRollupsForOutcome(courseId, outcomeId, apiClient) {
+    try {
+        logger.debug(`[outcomesDataService] Fetching live Canvas rollup for outcome ${outcomeId}`);
+
+        const rollupResponse = await apiClient.get(
+            `/api/v1/courses/${courseId}/outcome_rollups`
+                + `?outcome_ids[]=${outcomeId}`
+                + `&include[]=outcomes&include[]=users&per_page=100`,
+            {},
+            'fetchOutcomeRollupsForOutcome'
+        );
+
+        const rollups  = rollupResponse?.rollups ?? [];
+        const scoreMap = new Map();
+
+        rollups.forEach(rollup => {
+            const studentId = rollup.links?.user;
+            if (!studentId) return;
+            rollup.scores?.forEach(scoreObj => {
+                if (String(scoreObj.links?.outcome) === String(outcomeId)
+                        && scoreObj.score != null) {
+                    scoreMap.set(String(studentId), scoreObj.score);
+                }
+            });
+        });
+
+        logger.debug(`[outcomesDataService] Live rollup: ${scoreMap.size} score(s) for outcome ${outcomeId}`);
+        return scoreMap;
+
+    } catch (err) {
+        logger.warn(`[outcomesDataService] Live rollup fetch failed for outcome ${outcomeId} — cached scores remain:`, err.message);
+        return new Map();   // safe fallback
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // FETCH OUTCOME RESULTS (ALL ATTEMPTS)
 // ═══════════════════════════════════════════════════════════════════════
