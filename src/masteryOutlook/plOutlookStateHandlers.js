@@ -16,6 +16,7 @@ import { PL_STATES } from './plOutlookStateMachine.js';
 import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
 import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
+import { fetchRubricAssociationId } from '../services/submissionService.js';
 import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
@@ -84,11 +85,35 @@ export async function handleCreatingAssignment(sm) {
         const rubricId          = asgDetail.rubric_settings?.id
                                ?? asgDetail.rubric?.[0]?.learning_outcome_id
                                ?? null;
-        const rubricAssociation = asgDetail.rubric_association_id ?? null;
 
-        // Fetch submission IDs
+        // rubric_association_id is not present on the Canvas assignment object —
+        // fetch it via the rubrics API using the rubricId we already have.
+        let rubricAssociation = null;
+        if (rubricId) {
+            rubricAssociation = await fetchRubricAssociationId(
+                courseId, String(rubricId), String(existing.id), apiClient
+            );
+        }
+
+        // The assignment is only_visible_to_overrides: true (hidden after creation).
+        // Fetching submissions while hidden returns 0. Temporarily flip visible,
+        // fetch, then flip back — mirroring steps 5-7 of the creation flow.
         sm.progress('Fetching submission records...');
-        const submissions          = await apiClient.getAllPages(`/api/v1/courses/${courseId}/assignments/${existing.id}/submissions`, { per_page: 100 }, 'PLSync:fetchExistingSubmissions');
+        await apiClient.put(
+            `/api/v1/courses/${courseId}/assignments/${existing.id}`,
+            { assignment: { only_visible_to_overrides: false } },
+            {}, 'PLSync:showExistingAssignment'
+        );
+        const submissions = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/assignments/${existing.id}/submissions`,
+            { per_page: 100 },
+            'PLSync:fetchExistingSubmissions'
+        );
+        await apiClient.put(
+            `/api/v1/courses/${courseId}/assignments/${existing.id}`,
+            { assignment: { only_visible_to_overrides: true, points_possible: 0 } },
+            {}, 'PLSync:rehideExistingAssignment'
+        );
         const submissionIdByUserId = new Map();
         submissions.forEach(s => {
             if (s.id && s.user_id) submissionIdByUserId.set(String(s.user_id), String(s.id));
