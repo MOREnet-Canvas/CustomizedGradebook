@@ -99,13 +99,16 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         )
     }));
 
+    const pendingNote       = syncEntry?.will_post_note              ?? null;
+    const lastSubmittedNote = syncEntry?.will_post_note_last_submitted ?? null;
+    const noteIsPending     = pendingNote !== null && pendingNote !== lastSubmittedNote;
+
     let status;
     if (marzano === null) {
         status = 'ne';
     } else if (willPost !== null && canvas !== null && scoresMatch(willPost, canvas)
-            && !syncEntry?.will_post_note) {
-        // synced only when score matches Canvas AND there is no pending note —
-        // a note always requires an explicit teacher push to reach Canvas
+            && !noteIsPending) {
+        // synced only when score matches Canvas AND no unsubmitted note exists
         status = 'synced';
     } else {
         status = 'needs';

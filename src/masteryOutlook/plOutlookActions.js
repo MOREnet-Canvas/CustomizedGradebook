@@ -559,6 +559,7 @@ export async function handleSyncStudents({
             // No score change but notes exist — post comment-only via REST
             postNoteToAvgAssignment({
                 courseId,
+                outcomeId,
                 outcomeName,
                 notes,
                 cache,

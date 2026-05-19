@@ -146,6 +146,19 @@ export async function updateAvgAssignmentForStudents({
 
         // Step 7: Refresh mastery after successful updates
         if (result.successCount > 0) {
+            // Mark notes as submitted in sync_state so the row clears to synced
+            if (Object.keys(notes).length > 0) {
+                const syncState   = cache?.sync_state ?? {};
+                const outcomeSync = syncState[String(outcomeId)] ?? {};
+                for (const [userId, noteText] of Object.entries(notes)) {
+                    const entry = outcomeSync[String(userId)];
+                    if (entry && noteText?.trim()) {
+                        entry.will_post_note_last_submitted = noteText.trim();
+                        logger.debug(`[MOAvgService] Note marked as submitted for student ${userId}`);
+                    }
+                }
+            }
+
             try {
                 await refreshMasteryForAssignment(courseId, assignment_id);
                 logger.info(`[MOAvgService] Mastery refreshed for avg assignment ${assignment_id}`);
@@ -183,7 +196,7 @@ export async function updateAvgAssignmentForStudents({
  * @returns {Promise<boolean>} true if all comments posted, false if any failed
  */
 export async function postNoteToAvgAssignment({
-    courseId, outcomeName, notes, cache, apiClient
+    courseId, outcomeId, outcomeName, notes, cache, apiClient
 }) {
     const noteEntries = Object.entries(notes ?? {}).filter(([, text]) => text?.trim());
     if (!noteEntries.length) return true;
@@ -210,6 +223,14 @@ export async function postNoteToAvgAssignment({
                 'MOAvgService:postNoteComment'
             );
             logger.debug(`[MOAvgService] Note comment posted for student ${userId}`);
+
+            // Mark note as submitted so the row clears to synced
+            const syncState   = cache?.sync_state ?? {};
+            const outcomeSync = syncState[String(outcomeId)] ?? {};
+            const entry       = outcomeSync[String(userId)];
+            if (entry) {
+                entry.will_post_note_last_submitted = noteText.trim();
+            }
         } catch (err) {
             logger.warn(`[MOAvgService] Failed to post note for student ${userId}: ${err.message}`);
             allSucceeded = false;
