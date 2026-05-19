@@ -270,7 +270,9 @@ function getAutoRefreshEnabled(courseId) {
 function wirePollingAndBanner(shell, cache, courseId, apiClient, onRefresh) {
     if (!shell.bannerEl || !shell.bannerRefreshBtn) return;
 
-    let currentComputedAt = cache.meta?.computedAt ?? cache.metadata?.computedAt;
+    let currentComputedAt = cache.meta?.computedAt
+                         ?? cache.metadata?.computedAt
+                         ?? new Date().toISOString();
 
     const showBanner = () => {
         shell.bannerEl.style.display = 'flex';
@@ -310,8 +312,12 @@ function wirePollingAndBanner(shell, cache, courseId, apiClient, onRefresh) {
         showBanner();
     };
 
-    startPolling(courseId, currentComputedAt, onChangesDetected, apiClient);
-    startVisibilityListener(courseId, () => currentComputedAt, onChangesDetected, apiClient);
+    if (currentComputedAt) {
+        startPolling(courseId, currentComputedAt, onChangesDetected, apiClient);
+        startVisibilityListener(courseId, () => currentComputedAt, onChangesDetected, apiClient);
+    } else {
+        logger.warn('[MasteryOutlook] No computedAt timestamp — polling not started');
+    }
 }
 
 // ─── Tweaks panel — auto-refresh toggle (4f) ─────────────────────────────────

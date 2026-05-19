@@ -345,7 +345,6 @@ export async function handleCalculatingChanges(sm) {
     let skippedNoSubmission       = 0;
     let skippedNoPrediction       = 0;
     let skippedManualOverride     = 0;
-    let skippedWillPostLocked     = 0;
 
     for (const userId of effectiveTargetIds) {
         const entry = outcomeSync[userId];
@@ -354,14 +353,6 @@ export async function handleCalculatingChanges(sm) {
         if (entry?.manual_override === true) {
             skippedManualOverride++;
             logger.debug(`[PLSync] Skipping student ${userId} — manual_override is set`);
-            continue;
-        }
-
-        // 3b — skip students where will_post is locked (teacher committed a specific score;
-        // Marzano must never overwrite it — push happens via explicit "Save grades to Canvas")
-        if (entry?.will_post_lock === 'locked') {
-            skippedWillPostLocked++;
-            logger.debug(`[PLSync] Skipping student ${userId} — will_post_lock is locked`);
             continue;
         }
 
@@ -395,8 +386,7 @@ export async function handleCalculatingChanges(sm) {
     logger.info(
         `[PLSync] ${outcomeName}: ${numberOfUpdates} need sync, ` +
         `${skippedNoChange} no change, ${skippedNoPrediction} no prediction, ` +
-        `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped, ` +
-        `${skippedWillPostLocked} will_post_locked skipped`
+        `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped`
     );
 
     sm.updateContext({ studentsToSync, numberOfUpdates, startTime: new Date().toISOString() });
