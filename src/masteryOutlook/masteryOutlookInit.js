@@ -25,6 +25,10 @@ import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
 import { findMasteryDashboardPageUrl } from '../services/pageService.js';
 import { PL_ASSIGNMENT_SUFFIX } from '../config.js';
+import { getRollup, getOutcomeObjectByName } from '../services/outcomeService.js';
+import { getAssignmentObjectFromOutcomeObj } from '../services/assignmentService.js';
+import { getRubricForAssignment } from '../services/rubricService.js';
+import { fetchAllSubmissions, fetchRubricAssociationId } from '../services/submissionService.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -119,6 +123,68 @@ function initMasteryOutlookView() {
  * @param {Function} [onProgress]  - (message: string) => void
  * @returns {Promise<Object>} Cache object ready for the view
  */
+
+/**
+ * Fetch and build the avg_assignment cache entry.
+ * Non-critical — returns null on any failure so Mastery Outlook still works.
+ *
+ * @param {string} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object|null>}
+ */
+async function buildAvgAssignmentSetup(courseId, apiClient) {
+    try {
+        const rollupData = await getRollup(courseId, apiClient);
+        const outcomeObj = getOutcomeObjectByName(rollupData);
+        if (!outcomeObj) {
+            logger.warn('[MasteryOutlookInit] Avg outcome not found — avg_assignment not cached');
+            return null;
+        }
+
+        const assignmentObj = await getAssignmentObjectFromOutcomeObj(courseId, outcomeObj, apiClient);
+        if (!assignmentObj?.id) {
+            logger.warn('[MasteryOutlookInit] Avg assignment not found — avg_assignment not cached');
+            return null;
+        }
+
+        const rubricInfo = await getRubricForAssignment(courseId, String(assignmentObj.id), apiClient);
+        if (!rubricInfo?.criterionId) {
+            logger.warn('[MasteryOutlookInit] Avg rubric not found — avg_assignment not cached');
+            return null;
+        }
+
+        const { submissionIdByUserId, rubricAssociationId: cachedAssocId } =
+            await fetchAllSubmissions(courseId, String(assignmentObj.id), apiClient);
+
+        let rubricAssociationId = cachedAssocId;
+        if (!rubricAssociationId && rubricInfo.rubricId) {
+            rubricAssociationId = await fetchRubricAssociationId(
+                courseId, String(rubricInfo.rubricId), String(assignmentObj.id), apiClient
+            );
+        }
+
+        const submissionIdsObj = {};
+        submissionIdByUserId.forEach((subId, userId) => { submissionIdsObj[userId] = subId; });
+
+        const setup = {
+            assignment_id:         String(assignmentObj.id),
+            rubric_id:             rubricInfo.rubricId ? String(rubricInfo.rubricId) : null,
+            rubric_association_id: rubricAssociationId ? String(rubricAssociationId) : null,
+            criterion_id:          String(rubricInfo.criterionId),
+            avg_outcome_id:        String(outcomeObj.id),
+            submission_ids:        submissionIdsObj,
+            created_at:            new Date().toISOString()
+        };
+
+        logger.info(`[MasteryOutlookInit] avg_assignment setup built: assignment ${setup.assignment_id}`);
+        return setup;
+
+    } catch (err) {
+        logger.warn('[MasteryOutlookInit] Could not build avg_assignment setup (non-critical):', err.message);
+        return null;
+    }
+}
+
 export async function runFullRefresh(courseId, apiClient, onProgress = () => {}) {
     logger.info('[MasteryOutlookInit] runFullRefresh — starting parallel data fetch...');
 
@@ -199,6 +265,14 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     // so it used all attempts. This corrects those plPrediction values in place.
     reapplyIgnoredAlignments(cache);
 
+    // Step 7d: Build/refresh avg_assignment setup for Current Score updates.
+    // Non-critical — Mastery Outlook works without it; avg updates are skipped.
+    onProgress('Locating Current Score assignment...');
+    const avgSetup = await buildAvgAssignmentSetup(courseId, apiClient);
+    if (avgSetup) {
+        cache.avg_assignment = avgSetup;
+    }
+
     // Step 8: Detect possible manual Canvas overrides
     applyPossibleManualOverrides(cache, existingSyncState, existingPLAssignments);
 
@@ -208,12 +282,13 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     logger.info('[MasteryOutlookInit] runFullRefresh complete');
 
     return {
-        meta:           cache.metadata,
-        outcomes:       cache.outcomes,
-        students:       cache.students,
-        pl_assignments: cache.pl_assignments ?? {},
-        sync_state:     cache.sync_state     ?? {},
+        meta:               cache.metadata,
+        outcomes:           cache.outcomes,
+        students:           cache.students,
+        pl_assignments:     cache.pl_assignments     ?? {},
+        sync_state:         cache.sync_state         ?? {},
         ignored_alignments: cache.ignored_alignments ?? [],
+        avg_assignment:     cache.avg_assignment     ?? null,
     };
 }
 

@@ -19,6 +19,7 @@ import { readSyncState, writeSyncState, readMasteryOutlookCache, writeMasteryOut
 import { runPLSync } from './plOutlookSync.js';
 import { computeStudentOutcome } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
+import { updateAvgAssignmentForStudents } from './masteryOutlookAvgService.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -527,6 +528,27 @@ export async function handleSyncStudents({
         } catch (err) {
             logger.error('[PLActions] handleSyncStudents — cache write failed', err);
         }
+
+        // Fire avg assignment update — best-effort, never blocks UI
+        const syncedIds = effectiveIds.filter(Boolean);
+
+        // Collect teacher notes from the already-read syncState/outcomeSync above
+        // Collect teacher notes that were in sync_state at time of push
+        const notes = {};
+        for (const sid of syncedIds) {
+            const entry = outcomeSync[String(sid)] ?? {};
+            if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
+        }
+
+        updateAvgAssignmentForStudents({
+            courseId,
+            outcomeId,
+            outcomeName,
+            studentIds: syncedIds,
+            notes,
+            cache,
+            apiClient,
+        }).catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
     }
 
     onRerender?.();

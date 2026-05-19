@@ -515,6 +515,28 @@ export async function readIgnoredAlignments(courseId, apiClient) {
 }
 
 /**
+ * Read the avg_assignment setup entry from the mastery outlook cache.
+ *
+ * Stores Current Score assignment infrastructure for use by
+ * masteryOutlookAvgService without repeating setup REST calls on every sync.
+ *
+ * Shape: {
+ *   assignment_id, rubric_id, rubric_association_id, criterion_id,
+ *   avg_outcome_id, submission_ids: { [userId]: submissionId }, created_at
+ * }
+ *
+ * Returns null if not yet set up — teacher needs to run Refresh Data.
+ *
+ * @param {string} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object|null>}
+ */
+export async function readAvgAssignment(courseId, apiClient) {
+    const cache = await readMasteryOutlookCache(courseId, apiClient);
+    return cache?.avg_assignment ?? null;
+}
+
+/**
  * Write an updated sync_state map back into the mastery outlook cache.
  *
  * Uses a read-before-write merge so that outcomes/students/pl_assignments
