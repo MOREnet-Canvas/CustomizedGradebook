@@ -458,10 +458,11 @@ export async function handleCalculatingChanges(sm) {
             submissionId,
             rubricAssociationId,
             rubricCriterionId,
-            points: plScore,
-            score:  plScore,
+            points:         plScore,
+            score:          plScore,
             plScore,
-            canvasScore: canvasScore ?? null
+            canvasScore:    canvasScore ?? null,
+            will_post_note: entry?.will_post_note ?? null
         });
     }
 
@@ -493,8 +494,16 @@ export async function handleSyncing(sm) {
     sm.progress(`Syncing ${numberOfUpdates} student(s)...`, 0, numberOfUpdates);
     logger.info(`[PLSync] SYNCING ${numberOfUpdates} student(s)`);
 
+    const timestamp   = new Date().toLocaleString();
+    const batchParams = studentsToSync.map(s => ({
+        ...s,
+        comment: s.will_post_note?.trim()
+            ? `${s.will_post_note.trim()} | Score: ${s.plScore}  Updated: ${timestamp}`
+            : `Score: ${s.plScore}  Updated: ${timestamp}`,
+    }));
+
     const { successCount, errors, retryCounts } = await submitRubricAssessmentBatch(
-        studentsToSync,
+        batchParams,
         apiClient,
         {
             concurrency:  5,
@@ -534,6 +543,12 @@ export async function handleSyncing(sm) {
             update.will_post      = null;
             update.will_post_lock = 'none';
             logger.debug(`[PLSync] Cleared will_post for student ${sId} — score committed to Canvas`);
+        }
+
+        // Clear note once it has been submitted to Canvas so the row stops highlighting
+        if (s.will_post_note) {
+            update.will_post_note = null;
+            logger.debug(`[PLSync] Cleared will_post_note for student ${sId} — note submitted to Canvas`);
         }
 
         syncState[oId][sId] = update;
