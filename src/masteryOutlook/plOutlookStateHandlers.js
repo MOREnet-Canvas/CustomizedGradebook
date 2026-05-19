@@ -18,7 +18,7 @@ import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.j
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { fetchRubricAssociationId } from '../services/submissionService.js';
 import { logger } from '../utils/logger.js';
-import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
+import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX, AVG_ASSIGNMENT_NAME } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { findExistingPLAssignment } from './plOutlookSetup.js';
 
@@ -490,17 +490,20 @@ export async function handleCalculatingChanges(sm) {
  * Uses the existing submitRubricAssessmentBatch — same as handleUpdatingGrades.
  */
 export async function handleSyncing(sm) {
-    const { courseId, outcomeId, studentsToSync, numberOfUpdates, apiClient } = sm.getContext();
+    const { courseId, outcomeId, outcomeName, studentsToSync, numberOfUpdates, apiClient } = sm.getContext();
     sm.progress(`Syncing ${numberOfUpdates} student(s)...`, 0, numberOfUpdates);
     logger.info(`[PLSync] SYNCING ${numberOfUpdates} student(s)`);
 
     const timestamp   = new Date().toLocaleString();
-    const batchParams = studentsToSync.map(s => ({
-        ...s,
-        comment: s.will_post_note?.trim()
-            ? `${s.will_post_note.trim()} | Score: ${s.plScore}  Updated: ${timestamp}`
-            : `Score: ${s.plScore}  Updated: ${timestamp}`,
-    }));
+    const batchParams = studentsToSync.map(s => {
+        const score = Number(s.plScore).toFixed(2);
+        return {
+            ...s,
+            comment: s.will_post_note?.trim()
+                ? `${s.will_post_note.trim()} | Score: ${score}  Updated: ${timestamp}`
+                : `Score: ${score}  Updated: ${timestamp}`,
+        };
+    });
 
     const { successCount, errors, retryCounts } = await submitRubricAssessmentBatch(
         batchParams,
@@ -555,6 +558,46 @@ export async function handleSyncing(sm) {
     }
     await writeSyncState(courseId, syncState, apiClient);
     logger.debug(`[PLSync] sync_state updated for ${successCount} student(s) on outcome ${outcomeId}`);
+
+    // Post teacher notes as comments on the Current Score assignment.
+    // Only students that synced successfully AND had a note are included.
+    // The comment format is: "[Outcome Name]: <note> | Projected: X  Current: Y  Updated: ..."
+    const studentsWithNotes = batchParams.filter(
+        s => !errorUserIds.has(String(s.userId)) && s.will_post_note?.trim()
+    );
+    if (studentsWithNotes.length > 0) {
+        try {
+            sm.progress('Posting notes to Current Score...');
+            const avgAssignments = await apiClient.get(
+                `/api/v1/courses/${courseId}/assignments`,
+                { search_term: AVG_ASSIGNMENT_NAME, per_page: 50 },
+                'PLSync:findAvgAssignment'
+            );
+            const avgAssignment = (avgAssignments ?? []).find(a => a.name === AVG_ASSIGNMENT_NAME);
+
+            if (avgAssignment) {
+                for (const s of studentsWithNotes) {
+                    const projScore    = Number(s.plScore).toFixed(2);
+                    const canvasScore  = s.canvasScore != null ? Number(s.canvasScore).toFixed(2) : '—';
+                    const commentText  = `[${outcomeName}]: ${s.will_post_note.trim()} | Projected: ${projScore}  Current: ${canvasScore}  Updated: ${timestamp}`;
+                    try {
+                        await apiClient.put(
+                            `/api/v1/courses/${courseId}/assignments/${avgAssignment.id}/submissions/${s.userId}`,
+                            { comment: { text_comment: commentText } },
+                            {}, 'PLSync:postNoteComment'
+                        );
+                        logger.debug(`[PLSync] Note posted to Current Score for student ${s.userId}`);
+                    } catch (err) {
+                        logger.warn(`[PLSync] Failed to post note for student ${s.userId}: ${err.message}`);
+                    }
+                }
+            } else {
+                logger.warn(`[PLSync] Current Score assignment "${AVG_ASSIGNMENT_NAME}" not found — notes not posted`);
+            }
+        } catch (err) {
+            logger.warn(`[PLSync] Could not look up Current Score assignment — notes not posted: ${err.message}`);
+        }
+    }
 
     sm.updateContext({ successCount, errors, retryCounts });
     return PL_STATES.VERIFYING;
