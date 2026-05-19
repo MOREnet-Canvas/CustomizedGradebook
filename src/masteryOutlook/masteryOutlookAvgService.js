@@ -76,75 +76,55 @@ export async function updateAvgAssignmentForStudents({
             return false;
         }
 
-        // Step 3: Calculate new averages — only students whose avg changed need
-        // a score update. All synced students always get a comment.
+        // Step 3: Calculate new averages — only students whose avg changed are returned.
+        // Students with no avg change get no call; notes-only handling is a future prompt.
         const averages = await calculateStudentAverages(
             rollupResponse, avg_outcome_id, courseId, apiClient
         );
 
-        // Map of userId → new average for students whose score actually changed
-        const averageByUserId = new Map(averages.map(a => [String(a.userId), a.average]));
-
-        // Map of userId → current avg rollup score for comment-only students
-        const rollupScoreByUserId = new Map();
-        (rollupResponse.rollups ?? []).forEach(rollup => {
-            const userId   = String(rollup.links?.user);
-            const avgScore = (rollup.scores ?? []).find(
-                s => String(s.links?.outcome) === String(avg_outcome_id)
-            );
-            if (avgScore?.score != null) rollupScoreByUserId.set(userId, avgScore.score);
-        });
+        if (!averages.length) {
+            logger.info('[MOAvgService] No avg updates needed');
+            return true;
+        }
 
         // Step 4: Get enrollment IDs (memory-cached after first call)
         const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
 
-        // Step 5: Build batch params for ALL synced students.
-        // Students whose avg changed → rubric score + override + comment.
-        // Students whose avg didn't change → comment only (clearPoints: true keeps existing score).
+        // Step 5: Build batch params — one GraphQL call per student whose avg changed.
+        // Always includes a comment; score + override included because avg changed.
         const timestamp = new Date().toLocaleString();
         const students  = [];
 
-        for (const userId of studentIds.map(String)) {
-            const submissionId = submission_ids?.[userId];
+        for (const { userId, average } of averages) {
+            const submissionId = submission_ids?.[String(userId)];
             if (!submissionId) {
                 logger.warn(`[MOAvgService] No submission ID for student ${userId} — skipping`);
                 continue;
             }
 
-            const newAverage   = averageByUserId.get(userId);   // undefined if unchanged
-            const currentScore = newAverage ?? rollupScoreByUserId.get(userId);
-            const enrollmentId = enrollmentMap.get(userId);
-            const noteText     = notes[userId];
-            const scoreStr     = currentScore != null ? Number(currentScore).toFixed(2) : '—';
+            const enrollmentId = enrollmentMap.get(String(userId));
+            const noteText     = notes[String(userId)];
+            const scoreStr     = Number(average).toFixed(2);
 
             const comment = noteText?.trim()
                 ? `[${outcomeName}] score updated | Note: ${noteText.trim()} | Score: ${scoreStr}  Updated: ${timestamp}`
                 : `[${outcomeName}] score updated | Score: ${scoreStr}  Updated: ${timestamp}`;
 
-            const params = {
+            students.push({
                 submissionId,
                 rubricAssociationId: rubric_association_id,
                 rubricCriterionId:   criterion_id,
+                points:              average,
+                score:               average,
                 comment,
                 userId,
+                ...(enrollmentId ? {
+                    enrollmentId,
+                    overrideScore:    OVERRIDE_SCALE(average),
+                    overrideStatusId: null,
+                } : {}),
                 customStatusId: null,
-            };
-
-            if (newAverage != null) {
-                // Avg changed — include rubric score and grade override
-                params.points = newAverage;
-                params.score  = newAverage;
-                if (enrollmentId) {
-                    params.enrollmentId    = enrollmentId;
-                    params.overrideScore   = OVERRIDE_SCALE(newAverage);
-                    params.overrideStatusId = null;
-                }
-            } else {
-                // Avg unchanged — comment only; clearPoints preserves existing Canvas score
-                params.clearPoints = true;
-            }
-
-            students.push(params);
+            });
         }
 
         if (!students.length) {
