@@ -556,8 +556,10 @@ export async function handleSyncStudents({
                 apiClient,
             }).catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
         } else if (Object.keys(notes).length > 0) {
-            // No score change but notes exist — post comment-only via REST
-            postNoteToAvgAssignment({
+            // No score change but notes exist — post comment-only via REST.
+            // Awaited so onRerender fires after will_post_note_last_submitted
+            // is written to cache, letting buildOutcomeStudentRow clear the row.
+            await postNoteToAvgAssignment({
                 courseId,
                 outcomeId,
                 outcomeName,
@@ -565,6 +567,8 @@ export async function handleSyncStudents({
                 cache,
                 apiClient,
             }).catch(err => logger.warn('[PLActions] Note post failed:', err.message));
+            onRerender?.();
+            return result;
         }
     }
 
