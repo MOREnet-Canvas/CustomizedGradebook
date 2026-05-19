@@ -298,6 +298,23 @@ export async function refreshStudentOutcomeData(courseId, outcomeId, studentId, 
     let changed = false;
 
     if (freshAttempts !== null) {
+        // Preserve assignment names from existing cached attempts before overwriting.
+        // Canvas does not reliably return linked.alignments on filtered outcome_results
+        // requests, so names from the last full Refresh Data are used as fallback.
+        const existingNames = {};
+        (od.attempts ?? []).forEach(a => {
+            if (a.assignmentId && a.assignmentName) {
+                existingNames[a.assignmentId] = a.assignmentName;
+            }
+        });
+
+        // Backfill names on fresh attempts where the live fetch returned null
+        freshAttempts.forEach(a => {
+            if (!a.assignmentName && a.assignmentId && existingNames[a.assignmentId]) {
+                a.assignmentName = existingNames[a.assignmentId];
+            }
+        });
+
         od.attempts = freshAttempts;
         changed = true;
 
