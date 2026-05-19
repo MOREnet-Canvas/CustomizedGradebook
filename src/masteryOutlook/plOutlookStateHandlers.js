@@ -19,6 +19,7 @@ import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
+import { findExistingPLAssignment } from './plOutlookSetup.js';
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -69,6 +70,63 @@ export async function handleCreatingAssignment(sm) {
     const { courseId, outcomeId, outcomeName, apiClient } = sm.getContext();
     sm.progress('Creating PL override assignment...');
     logger.info(`[PLSync] CREATING_ASSIGNMENT for outcome ${outcomeId}`);
+
+    // ── Safeguard: check if assignment already exists in Canvas ──────────────
+    sm.progress('Checking for existing assignment...');
+    const existing = await findExistingPLAssignment(courseId, outcomeName, apiClient);
+
+    if (existing) {
+        logger.info(`[PLSync] Found existing assignment "${existing.name}" (id: ${existing.id}) — adopting instead of creating`);
+
+        // Fetch full assignment detail for rubric info
+        const asgDetail         = await apiClient.get(`/api/v1/courses/${courseId}/assignments/${existing.id}`, {}, 'PLSync:fetchExistingAssignment');
+        const rubricCriterionId = asgDetail.rubric?.[0]?.id ?? null;
+        const rubricId          = asgDetail.rubric_settings?.id
+                               ?? asgDetail.rubric?.[0]?.learning_outcome_id
+                               ?? null;
+        const rubricAssociation = asgDetail.rubric_association_id ?? null;
+
+        // Fetch submission IDs
+        sm.progress('Fetching submission records...');
+        const submissions          = await apiClient.getAllPages(`/api/v1/courses/${courseId}/assignments/${existing.id}/submissions`, { per_page: 100 }, 'PLSync:fetchExistingSubmissions');
+        const submissionIdByUserId = new Map();
+        submissions.forEach(s => {
+            if (s.id && s.user_id) submissionIdByUserId.set(String(s.user_id), String(s.id));
+        });
+        logger.debug(`[PLSync] Adopted ${submissionIdByUserId.size} submission records`);
+
+        // Write to cache — same shape as a fresh creation
+        const submissionIdsObj = {};
+        submissionIdByUserId.forEach((subId, userId) => { submissionIdsObj[userId] = subId; });
+
+        const plAssignments = await readPLAssignments(courseId, apiClient);
+        plAssignments[outcomeId] = {
+            assignment_id:         String(existing.id),
+            rubric_id:             rubricId          ? String(rubricId)          : null,
+            rubric_association_id: rubricAssociation ? String(rubricAssociation) : null,
+            criterion_id:          rubricCriterionId ?? null,
+            submission_ids:        submissionIdsObj,
+            created_at:            existing.created_at ?? new Date().toISOString()
+        };
+        await writePLAssignments(courseId, plAssignments, apiClient);
+        logger.info(`[PLSync] Existing assignment adopted and cached for outcome ${outcomeId}`);
+
+        sm.updateContext({
+            assignmentId:        String(existing.id),
+            rubricId:            rubricId          ? String(rubricId)          : null,
+            rubricAssociationId: rubricAssociation ? String(rubricAssociation) : null,
+            rubricCriterionId,
+            submissionIdByUserId
+        });
+
+        if (sm.getContext().setupOnly) {
+            sm.progress('Setup complete. Click "Save grades to Canvas" when ready to push scores.');
+            logger.info(`[PLSync] setupOnly=true — stopping after adopt for outcome ${outcomeId}`);
+            return PL_STATES.COMPLETE;
+        }
+        return PL_STATES.CHECKING_STUDENTS;
+    }
+    // ── End safeguard — no existing assignment found, proceed with creation ──
 
     // Step 1: Set outcome calculation_method to 'latest'
     await apiClient.put(
