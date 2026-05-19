@@ -20,7 +20,7 @@ import { calculateStudentAverages } from '../services/gradeCalculator.js';
 import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
 import { getAllEnrollmentIds } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
-import { OVERRIDE_SCALE } from '../config.js';
+import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
 
 /**
  * Update the Current Score (avg) assignment for students whose Marzano score
@@ -92,8 +92,17 @@ export async function updateAvgAssignmentForStudents({
 
         // Step 5: Build batch params — one GraphQL call per student whose avg changed.
         // Always includes a comment; score + override included because avg changed.
-        const timestamp = new Date().toLocaleString();
-        const students  = [];
+
+        // Build Marzano plPrediction lookup for the synced outcome — used in comment
+        const plScoreByUserId = new Map();
+        (cache?.students ?? []).forEach(student => {
+            const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+            if (od?.plPrediction != null) {
+                plScoreByUserId.set(String(student.id), od.plPrediction);
+            }
+        });
+
+        const students = [];
 
         for (const { userId, average } of averages) {
             const submissionId = submission_ids?.[String(userId)];
@@ -104,11 +113,13 @@ export async function updateAvgAssignmentForStudents({
 
             const enrollmentId = enrollmentMap.get(String(userId));
             const noteText     = notes[String(userId)];
-            const scoreStr     = Number(average).toFixed(2);
+            const plScore      = plScoreByUserId.get(String(userId));
+            const plScoreStr   = plScore != null ? Number(plScore).toFixed(2) : '—';
+            const avgStr       = Number(average).toFixed(2);
 
             const comment = noteText?.trim()
-                ? `[${outcomeName}] score updated | Note: ${noteText.trim()} | Score: ${scoreStr}  Updated: ${timestamp}`
-                : `[${outcomeName}] score updated | Score: ${scoreStr}  Updated: ${timestamp}`;
+                ? `${outcomeName} Score updated: ${plScoreStr}, Note: ${noteText.trim()} | ${AVG_OUTCOME_NAME} updated: ${avgStr}`
+                : `${outcomeName} Score updated: ${plScoreStr} | ${AVG_OUTCOME_NAME} updated: ${avgStr}`;
 
             students.push({
                 submissionId,
@@ -208,11 +219,15 @@ export async function postNoteToAvgAssignment({
     }
 
     const { assignment_id } = avgSetup;
-    const timestamp = new Date().toLocaleString();
     let allSucceeded = true;
 
     for (const [userId, noteText] of noteEntries) {
-        const comment = `[${outcomeName}] Note: ${noteText.trim()}  Updated: ${timestamp}`;
+        const plScore    = (cache?.students ?? [])
+            .find(s => String(s.id) === String(userId))
+            ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId))
+            ?.plPrediction;
+        const plScoreStr = plScore != null ? Number(plScore).toFixed(2) : '—';
+        const comment    = `${outcomeName} Score updated: ${plScoreStr}, Note: ${noteText.trim()}`;
         try {
             // REST comment endpoint — does not touch rubric score or grade override.
             // See function JSDoc for why REST is used instead of GraphQL here.
