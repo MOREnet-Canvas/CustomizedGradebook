@@ -106,9 +106,10 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     let status;
     if (marzano === null) {
         status = 'ne';
-    } else if (willPost !== null && canvas !== null && scoresMatch(willPost, canvas)
+    } else if (canvas !== null && scoresMatch(willPost ?? marzano, canvas)
             && !noteIsPending) {
-        // synced only when score matches Canvas AND no unsubmitted note exists
+        // synced when score matches Canvas AND no unsubmitted note exists.
+        // willPost ?? marzano: use teacher override if set, else PL prediction.
         status = 'synced';
     } else {
         status = 'needs';
