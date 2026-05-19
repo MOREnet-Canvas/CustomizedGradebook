@@ -539,17 +539,45 @@ function buildOutcomeDetailPanel({
     content.className = 'od-detail-content';
 
     const renderTable = () => {
+        // ── Preserve note textarea focus across re-renders ──────────────────
+        // content.innerHTML replacement destroys all child elements including
+        // any textarea the teacher is actively typing in. Save the focused
+        // element's identity and cursor position before rendering, then
+        // restore focus and selection after.
+        const active      = document.activeElement;
+        const isNoteInput = active?.dataset?.action === 'os-note';
+        const focusedStu  = isNoteInput ? active.dataset.stu    : null;
+        const focusedOid  = isNoteInput ? active.dataset.oid    : null;
+        const selStart    = isNoteInput ? active.selectionStart : null;
+        const selEnd      = isNoteInput ? active.selectionEnd   : null;
+        const savedValue  = isNoteInput ? active.value          : null;
+        // ───────────────────────────────────────────────────────────────────
+
         if (state.activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);
-            return;
-        }
-        if (state.activeTab === 'students') {
+        } else if (state.activeTab === 'students') {
             content.innerHTML = renderOutcomeStudentTable(outcome, cache);
-            return;
+        } else {
+            content.innerHTML = buildStudentTable(
+                outcome, state.activeTab, cache, ctx,
+                isCurrentScoreRow, isRegularOutcome, profColor
+            );
         }
-        content.innerHTML = buildStudentTable(
-            outcome, state.activeTab, cache, ctx, isCurrentScoreRow, isRegularOutcome, profColor
-        );
+
+        // ── Restore note textarea focus ──────────────────────────────────────
+        if (focusedStu && focusedOid) {
+            const restored = content.querySelector(
+                `[data-action="os-note"][data-stu="${focusedStu}"][data-oid="${focusedOid}"]`
+            );
+            if (restored) {
+                if (savedValue !== null) restored.value = savedValue;
+                restored.focus();
+                if (selStart !== null) {
+                    try { restored.setSelectionRange(selStart, selEnd); } catch { /* ignore */ }
+                }
+            }
+        }
+        // ───────────────────────────────────────────────────────────────────
     };
     renderTable();
 
