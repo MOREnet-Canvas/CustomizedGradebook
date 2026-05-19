@@ -102,7 +102,10 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     let status;
     if (marzano === null) {
         status = 'ne';
-    } else if (willPost !== null && canvas !== null && scoresMatch(willPost, canvas)) {
+    } else if (willPost !== null && canvas !== null && scoresMatch(willPost, canvas)
+            && !syncEntry?.will_post_note) {
+        // synced only when score matches Canvas AND there is no pending note —
+        // a note always requires an explicit teacher push to reach Canvas
         status = 'synced';
     } else {
         status = 'needs';
@@ -515,11 +518,12 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         el.classList.toggle('has-note', el.value.trim().length > 0);
         handleNoteChanged({
             courseId,
-            outcomeId: el.dataset.oid,
-            studentId: el.dataset.stu,
-            noteValue: el.value,
+            outcomeId:  el.dataset.oid,
+            studentId:  el.dataset.stu,
+            noteValue:  el.value,
             cache,
             apiClient,
+            onRerender: renderTable,
         });
     });
 

@@ -415,7 +415,7 @@ export async function handleUnlockWillPost({ courseId, outcomeId, studentId, cac
  * @param {Object}   [opts.cache]
  * @param {Object}   opts.apiClient
  */
-export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, cache, apiClient }) {
+export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, cache, apiClient, onRerender }) {
     if (!cache) {
         // Fallback for callers without an in-memory cache: do a direct read-modify-write.
         readSyncState(courseId, apiClient).then(async (syncState) => {
@@ -429,8 +429,10 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
     if (!cache.sync_state) cache.sync_state = {};
     const entry = getOrInitEntry(cache.sync_state, outcomeId, studentId);
     entry.will_post_note = noteValue.trim() || null;
-    // No onRerender — the textarea is the source of truth for its own value.
     scheduleCacheWrite(courseId, cache, apiClient);
+    // Re-render so the amber os-needs-row highlight and save button update
+    // immediately when a note is added, changed, or cleared.
+    onRerender?.();
 }
 
 // ─── Unified student sync ─────────────────────────────────────────────────────
