@@ -27,6 +27,23 @@ import {
     handleIgnoreAlignment, handleUnignoreAlignment,
     initWriteScheduler,
 } from './plOutlookActions.js';
+import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
+import { fetchingStudentIds } from './masteryOutlookState.js';
+
+/**
+ * Build plAssignmentIds Set from in-memory cache for PL result filtering.
+ * Mirrors the same helper in outcomeRow.js — defined locally to avoid
+ * a cross-module dependency between view files.
+ * @param {Object} cache
+ * @returns {Set<string>}
+ */
+function buildPlAssignmentIds(cache) {
+    return new Set(
+        Object.values(cache.pl_assignments ?? {})
+            .map(a => `assignment_${a.assignment_id}`)
+            .filter(Boolean)
+    );
+}
 
 /**
  * Format an ISO date string to a short month-day string, e.g. "Apr 9".
@@ -238,7 +255,14 @@ function renderOutcomeStudentRow(s, oidStr) {
                data-action="os-note" data-stu="${s.id}" data-oid="${oidStr}"
                aria-label="Note for ${escapeHtml(s.name)}">
       </td>
-      <td class="c">${saveHtml}</td>
+      <td class="c">
+        ${saveHtml}
+        <button class="os-refresh-student-btn"
+            data-action="os-refresh-student"
+            data-stu="${s.id}" data-oid="${oidStr}"
+            title="Refresh scores from Canvas"
+            aria-label="Refresh scores for ${escapeHtml(s.name)}">↻</button>
+      </td>
     </tr>`;
 }
 
@@ -442,6 +466,29 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             } catch (err) {
                 logger.error('[MasteryOutlook] os-save failed', err);
                 el.disabled = false;
+            }
+            return;
+        }
+
+        // ── Per-student refresh — fetch fresh attempts + canvas score ─────
+        if (action === 'os-refresh-student') {
+            const key = `${oId}_${stuId}`;
+            if (fetchingStudentIds.has(key)) return;   // already in flight
+            fetchingStudentIds.add(key);
+            el.disabled = true;
+            el.textContent = '…';
+            try {
+                const plAssignmentIds = buildPlAssignmentIds(cache);
+                const changed = await refreshStudentOutcomeData(
+                    courseId, oId, stuId, cache, apiClient, plAssignmentIds
+                );
+                if (changed) renderTable();
+            } catch (err) {
+                logger.error('[MasteryOutlook] os-refresh-student failed', err);
+            } finally {
+                fetchingStudentIds.delete(key);
+                el.disabled = false;
+                el.textContent = '↻';
             }
             return;
         }

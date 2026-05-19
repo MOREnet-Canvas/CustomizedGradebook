@@ -633,6 +633,11 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-save-row-btn:hover .sr-tip { display:block; }
 .os-posting { font-size:0.769em; color:var(--blue-ink); display:inline-flex; align-items:center; gap:0.308em; }
 
+/* Per-student refresh button */
+.os-refresh-student-btn { background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:0.923em; padding:0 0.3em; opacity:0.5; transition:opacity 0.15s; }
+.os-refresh-student-btn:hover { opacity:1; color:var(--text-primary); }
+.os-refresh-student-btn:disabled { opacity:0.25; cursor:default; }
+
 /* Override note / comment field */
 .os-td-comment { width:13em; min-width:11em; max-width:14em; }
 .os-comment-input { width:100%; font-size:0.846em; font-family:inherit; padding:0.231em 0.538em; border-radius:0.385em; border:0.5px solid var(--border-tertiary); background:transparent; color:var(--text-primary); outline:none; transition:border-color .12s, background .12s; }

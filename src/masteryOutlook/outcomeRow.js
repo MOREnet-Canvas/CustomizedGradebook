@@ -26,7 +26,8 @@ import {
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { fetchOutcomeRollupsForOutcome } from './masteryOutlookDataService.js';
+import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData } from './masteryOutlookDataService.js';
+import { fetchingStudentIds } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -412,7 +413,46 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
         </table>`;
 }
 
-// ─── Live Canvas score refresh ────────────────────────────────────────────────
+// ─── Live Canvas score refresh + lazy alignment fetch ────────────────────────
+
+/**
+ * Build plAssignmentIds Set from in-memory cache for PL result filtering.
+ * @param {Object} cache
+ * @returns {Set<string>}
+ */
+function buildPlAssignmentIds(cache) {
+    return new Set(
+        Object.values(cache.pl_assignments ?? {})
+            .map(a => `assignment_${a.assignment_id}`)
+            .filter(Boolean)
+    );
+}
+
+/**
+ * Background fetch of fresh alignment scores for all students in one outcome.
+ * Processes students sequentially to avoid hammering the Canvas API.
+ * Skips any student already being refreshed via per-student refresh.
+ *
+ * @param {string}   outcomeId
+ * @param {Object}   cache
+ * @param {Object}   ctx
+ * @param {Function} onStudentDone  - Called after each student update with (studentId)
+ */
+async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone) {
+    const plAssignmentIds = buildPlAssignmentIds(cache);
+    const students = cache.students ?? [];
+
+    for (const student of students) {
+        const sid = String(student.id);
+        const key = `${outcomeId}_${sid}`;
+        if (fetchingStudentIds.has(key)) continue;   // skip if manual refresh in flight
+
+        const changed = await refreshStudentOutcomeData(
+            ctx.courseId, outcomeId, sid, cache, ctx.apiClient, plAssignmentIds
+        );
+        if (changed) onStudentDone(sid);
+    }
+}
 
 /**
  * Fetch live Canvas rollup scores for one outcome and update canvasScore
@@ -517,6 +557,12 @@ function buildOutcomeDetailPanel({
     // and re-renders the student table in place once the data arrives.
     // Fires after the initial render so the teacher sees data immediately.
     refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then(() => {
+        renderTable();
+    });
+
+    // Lazy alignment fetch — updates dots and plPrediction for each student
+    // sequentially in the background. Re-renders each row as data arrives.
+    lazyFetchOutcomeStudents(outcome.id, cache, ctx, (_studentId) => {
         renderTable();
     });
 

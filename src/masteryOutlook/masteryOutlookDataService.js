@@ -200,6 +200,130 @@ export async function fetchOutcomeRollupsForOutcome(courseId, outcomeId, apiClie
     }
 }
 
+/**
+ * Fetch fresh alignment scores (attempts) for one student × one outcome.
+ *
+ * Used for lazy fetch on outcome expand and per-student refresh. Filters
+ * out PL override assignment results so they don't contaminate the Power
+ * Law calculation.
+ *
+ * Returns an array of attempt objects in the same shape as od.attempts,
+ * sorted chronologically (oldest first). Returns null on error so the
+ * caller can keep existing cached attempts unchanged.
+ *
+ * @param {string}      courseId
+ * @param {string}      outcomeId
+ * @param {string}      studentId
+ * @param {Object}      apiClient
+ * @param {Set<string>} [plAssignmentIds]  - "assignment_NNNN" IDs to exclude
+ * @returns {Promise<Array|null>}
+ */
+export async function fetchStudentOutcomeAttempts(courseId, outcomeId, studentId, apiClient, plAssignmentIds = new Set()) {
+    try {
+        logger.debug(`[outcomesDataService] Fetching attempts for student ${studentId}, outcome ${outcomeId}`);
+
+        const response = await apiClient.get(
+            `/api/v1/courses/${courseId}/outcome_results`
+                + `?user_ids[]=${studentId}`
+                + `&outcome_ids[]=${outcomeId}`
+                + `&include[]=alignments`
+                + `&per_page=100`,
+            {},
+            'fetchStudentOutcomeAttempts'
+        );
+
+        const results = Array.isArray(response)
+            ? response
+            : (response?.outcome_results ?? []);
+
+        if (results.length === 0) {
+            logger.debug(`[outcomesDataService] No results for student ${studentId}, outcome ${outcomeId}`);
+            return [];
+        }
+
+        // Build alignment name map from linked data if available
+        const alignmentNameMap = {};
+        if (response.linked?.alignments) {
+            response.linked.alignments.forEach(a => {
+                if (a.id && a.title) alignmentNameMap[a.id] = a.title;
+            });
+        }
+
+        const filtered = results.filter(r => {
+            const aId = r.links?.assignment || r.links?.alignment;
+            return !aId || !plAssignmentIds.has(aId);
+        });
+
+        const grouped = extractAttempts(filtered, alignmentNameMap);
+        const key = `${studentId}_${outcomeId}`;
+        return grouped[key] ?? [];
+
+    } catch (err) {
+        logger.warn(`[outcomesDataService] Failed to fetch attempts for student ${studentId}: ${err.message}`);
+        return null;   // null = keep existing cached attempts
+    }
+}
+
+/**
+ * Fetch and apply fresh outcome data for one student × one outcome.
+ *
+ * Updates in-memory cache:
+ *   1. od.attempts — fresh rubric criterion scores from Canvas
+ *   2. od.plPrediction — recomputed from fresh attempts (respecting ignored alignments)
+ *   3. od.canvasScore — live rollup score from Canvas
+ *
+ * Returns true if any data changed, false otherwise.
+ * Silent fail on errors — cached data remains unchanged.
+ *
+ * @param {string}      courseId
+ * @param {string}      outcomeId
+ * @param {string}      studentId
+ * @param {Object}      cache         - In-memory cache (mutated in place)
+ * @param {Object}      apiClient
+ * @param {Set<string>} [plAssignmentIds]
+ * @returns {Promise<boolean>} true if cache was updated
+ */
+export async function refreshStudentOutcomeData(courseId, outcomeId, studentId, cache, apiClient, plAssignmentIds = new Set()) {
+    const student = cache.students?.find(s => String(s.id) === String(studentId));
+    if (!student) return false;
+
+    const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+    if (!od) return false;
+
+    const [freshAttempts, scoreMap] = await Promise.all([
+        fetchStudentOutcomeAttempts(courseId, outcomeId, studentId, apiClient, plAssignmentIds),
+        fetchOutcomeRollupsForOutcome(courseId, outcomeId, apiClient)
+    ]);
+
+    let changed = false;
+
+    if (freshAttempts !== null) {
+        od.attempts = freshAttempts;
+        changed = true;
+
+        const ignoredIds = new Set(
+            (cache.ignored_alignments ?? [])
+                .filter(ia => String(ia.student_id) === String(studentId)
+                           && String(ia.outcome_id)  === String(outcomeId))
+                .map(ia => ia.alignment_id)
+        );
+        const activeScores = freshAttempts
+            .filter(a => !ignoredIds.has(a.assignmentId))
+            .map(a => a.score)
+            .filter(s => s != null);
+
+        Object.assign(od, computeStudentOutcome(activeScores));
+    }
+
+    const liveScore = scoreMap.get(String(studentId));
+    if (liveScore !== undefined && liveScore !== od.canvasScore) {
+        od.canvasScore = liveScore;
+        changed = true;
+    }
+
+    return changed;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // FETCH OUTCOME RESULTS (ALL ATTEMPTS)
 // ═══════════════════════════════════════════════════════════════════════
