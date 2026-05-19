@@ -489,9 +489,13 @@ export function extractAttempts(outcomeResults, alignmentNameMap = {}) {
  *                                          for outcome_results (~13 s vs ~60 s sequential).
  *                                          The caller must guarantee that all pages succeed
  *                                          before writing the cache (handled by runFullRefresh).
+ * @param {Set<string>|null} [opts.knownPlAssignmentIds=null]  Additional "assignment_NNNN" IDs
+ *                                          to exclude from outcome results, merged with any IDs
+ *                                          read from the disk cache. Use when the disk cache may
+ *                                          be empty but PL assignments are known to exist in Canvas.
  * @returns {Promise<{outcomes, students, groupedAttempts, canvasRollups, courseId}>}
  */
-export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () => {}, { parallel = false } = {}) {
+export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () => {}, { parallel = false, knownPlAssignmentIds = null } = {}) {
     try {
         logger.info(`[outcomesDataService] Starting complete data fetch (parallel=${parallel})...`);
         onProgress('Starting data fetch...');
@@ -507,11 +511,17 @@ export async function fetchAllOutcomeData(courseId, apiClient, onProgress = () =
         if (students.length === 0) logger.warn('[outcomesDataService] No students found in course');
 
         // Step 2.5: Read PL assignment IDs now — needed by both fetch paths for filtering.
-        // Moving this earlier vs the old Step 5 position is safe (idempotent read).
+        // Merge with any IDs the caller already resolved (e.g. from a Canvas name search
+        // in runFullRefresh) so the filter is complete even when the disk cache is empty.
         const plAssignments    = await readPLAssignments(courseId, apiClient);
-        const plAssignmentIds  = new Set(
-            Object.values(plAssignments || {}).map(a => `assignment_${a.assignment_id}`)
-        );
+        const diskIds          = Object.values(plAssignments || {}).map(a => `assignment_${a.assignment_id}`);
+        const plAssignmentIds  = new Set([
+            ...diskIds,
+            ...(knownPlAssignmentIds ?? [])
+        ]);
+        if (plAssignmentIds.size > 0) {
+            logger.debug(`[outcomesDataService] Filtering ${plAssignmentIds.size} PL assignment ID(s) from outcome results`);
+        }
 
         // Step 3: Fetch ALL outcome results — sequential or parallel.
         // Both paths now return { results, alignmentNameMap } for assignment name resolution in dots.

@@ -24,6 +24,7 @@ import { stopPolling, stopVisibilityListener } from './masteryOutlookPollingServ
 import { getThreshold } from './thresholdStorage.js';
 import { checkAndInjectMasteryOutlookLink } from './sidebarLinkInjection.js';
 import { findMasteryDashboardPageUrl } from '../services/pageService.js';
+import { PL_ASSIGNMENT_SUFFIX } from '../config.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -121,9 +122,35 @@ function initMasteryOutlookView() {
 export async function runFullRefresh(courseId, apiClient, onProgress = () => {}) {
     logger.info('[MasteryOutlookInit] runFullRefresh — starting parallel data fetch...');
 
+    // Pre-step: Search Canvas for all existing PL assignments by suffix.
+    // This ensures the filter passed to fetchAllOutcomeData is complete even
+    // when the disk cache is empty (e.g. after a cache delete + re-initialize).
+    // A single broad search covers all outcomes in one API call.
+    // Safe fallback: returns empty Set on any API error so the refresh still proceeds.
+    onProgress('Checking for existing PL assignments...');
+    let knownPlAssignmentIds = new Set();
+    try {
+        const allAssignments = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/assignments`,
+            { search_term: PL_ASSIGNMENT_SUFFIX, per_page: 50 },
+            'runFullRefresh:searchPLAssignments'
+        );
+        allAssignments
+            .filter(a => a.name?.includes(PL_ASSIGNMENT_SUFFIX))
+            .forEach(a => knownPlAssignmentIds.add(`assignment_${a.id}`));
+        if (knownPlAssignmentIds.size > 0) {
+            logger.info(`[MasteryOutlookInit] Found ${knownPlAssignmentIds.size} existing PL assignment(s) in Canvas — will exclude from Power Law calculation`);
+        }
+    } catch (err) {
+        logger.warn('[MasteryOutlookInit] Could not search for existing PL assignments — filter may be incomplete:', err.message);
+    }
+
     // Fetch all data with the parallel page fetcher (4d).
     // fetchAllOutcomeData throws if any page fails — the cache is never written in that case.
-    const data = await fetchAllOutcomeData(courseId, apiClient, onProgress, { parallel: true });
+    const data = await fetchAllOutcomeData(courseId, apiClient, onProgress, {
+        parallel: true,
+        knownPlAssignmentIds
+    });
 
     // Get current user's threshold setting
     const userId = window.ENV?.current_user_id;
