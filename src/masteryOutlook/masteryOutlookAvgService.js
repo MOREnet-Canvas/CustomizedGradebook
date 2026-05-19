@@ -161,3 +161,60 @@ export async function updateAvgAssignmentForStudents({
         return false;
     }
 }
+
+/**
+ * Post teacher notes as submission comments on the Current Score assignment
+ * for students whose avg score did NOT change but who have a pending note.
+ *
+ * NOTE: Uses the Canvas REST submissions API (PUT /submissions/:userId) rather
+ * than GraphQL. This is intentional — GraphQL rubric assessment mutations
+ * always write criterion data and have no safe comment-only path. The REST
+ * comment endpoint posts a submission comment without touching the rubric
+ * score or grade override, which is exactly what note-only updates require.
+ *
+ * Silent fail — never throws. Comment failures are logged as warnings.
+ *
+ * @param {Object}   opts
+ * @param {string}   opts.courseId
+ * @param {string}   opts.outcomeName  - Used to prefix the comment
+ * @param {Object}   opts.notes        - Map of { [studentId]: noteText }
+ * @param {Object}   opts.cache        - In-memory Mastery Outlook cache
+ * @param {Object}   opts.apiClient
+ * @returns {Promise<boolean>} true if all comments posted, false if any failed
+ */
+export async function postNoteToAvgAssignment({
+    courseId, outcomeName, notes, cache, apiClient
+}) {
+    const noteEntries = Object.entries(notes ?? {}).filter(([, text]) => text?.trim());
+    if (!noteEntries.length) return true;
+
+    const avgSetup = cache?.avg_assignment;
+    if (!avgSetup?.assignment_id) {
+        logger.warn('[MOAvgService] Avg assignment not in cache — note comments not posted');
+        return false;
+    }
+
+    const { assignment_id } = avgSetup;
+    const timestamp = new Date().toLocaleString();
+    let allSucceeded = true;
+
+    for (const [userId, noteText] of noteEntries) {
+        const comment = `[${outcomeName}] Note: ${noteText.trim()}  Updated: ${timestamp}`;
+        try {
+            // REST comment endpoint — does not touch rubric score or grade override.
+            // See function JSDoc for why REST is used instead of GraphQL here.
+            await apiClient.put(
+                `/api/v1/courses/${courseId}/assignments/${assignment_id}/submissions/${userId}`,
+                { comment: { text_comment: comment } },
+                {},
+                'MOAvgService:postNoteComment'
+            );
+            logger.debug(`[MOAvgService] Note comment posted for student ${userId}`);
+        } catch (err) {
+            logger.warn(`[MOAvgService] Failed to post note for student ${userId}: ${err.message}`);
+            allSucceeded = false;
+        }
+    }
+
+    return allSucceeded;
+}

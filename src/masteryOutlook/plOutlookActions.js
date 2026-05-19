@@ -19,7 +19,7 @@ import { readSyncState, writeSyncState, readMasteryOutlookCache, writeMasteryOut
 import { runPLSync } from './plOutlookSync.js';
 import { computeStudentOutcome } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
-import { updateAvgAssignmentForStudents } from './masteryOutlookAvgService.js';
+import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -528,27 +528,43 @@ export async function handleSyncStudents({
         } catch (err) {
             logger.error('[PLActions] handleSyncStudents — cache write failed', err);
         }
+    }
 
-        // Fire avg assignment update — best-effort, never blocks UI
-        const syncedIds = effectiveIds.filter(Boolean);
+    // Avg service calls — best-effort, never block UI, fired regardless of successCount
+    // so note-only pushes (zero score changes) still reach the avg assignment.
+    if (result.success) {
+        const syncedIds   = effectiveIds.filter(Boolean);
+        const syncState   = cache?.sync_state ?? {};
+        const outcomeSync = syncState[String(outcomeId)] ?? {};
 
-        // Collect teacher notes from the already-read syncState/outcomeSync above
-        // Collect teacher notes that were in sync_state at time of push
+        // Collect teacher notes from sync_state at time of push
         const notes = {};
         for (const sid of syncedIds) {
             const entry = outcomeSync[String(sid)] ?? {};
             if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
         }
 
-        updateAvgAssignmentForStudents({
-            courseId,
-            outcomeId,
-            outcomeName,
-            studentIds: syncedIds,
-            notes,
-            cache,
-            apiClient,
-        }).catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
+        if (result.successCount > 0) {
+            // Scores were pushed — update avg score + post comment via GraphQL
+            updateAvgAssignmentForStudents({
+                courseId,
+                outcomeId,
+                outcomeName,
+                studentIds: syncedIds,
+                notes,
+                cache,
+                apiClient,
+            }).catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
+        } else if (Object.keys(notes).length > 0) {
+            // No score change but notes exist — post comment-only via REST
+            postNoteToAvgAssignment({
+                courseId,
+                outcomeName,
+                notes,
+                cache,
+                apiClient,
+            }).catch(err => logger.warn('[PLActions] Note post failed:', err.message));
+        }
     }
 
     onRerender?.();
