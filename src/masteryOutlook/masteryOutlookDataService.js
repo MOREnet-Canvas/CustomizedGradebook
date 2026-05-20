@@ -588,7 +588,7 @@ export function extractAttempts(outcomeResults, alignmentNameMap = {}) {
         const studentId = result.links?.user;
         const outcomeId = result.links?.learning_outcome;
         const score = result.score;
-        const timestamp = result.submitted_or_assessed_at || result.submitted_at;
+        const timestamp = result.submitted_at || result.submitted_or_assessed_at;  // prefer submission date over assessment date
 
 
         const assignmentId = result.links?.assignment || result.links?.alignment;
