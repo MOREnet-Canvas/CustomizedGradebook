@@ -10,7 +10,7 @@
  * This module only runs on student grades pages when ENABLE_STUDENT_GRADE_CUSTOMIZATION is true.
  */
 
-import { REMOVE_ASSIGNMENT_TAB, AVG_OUTCOME_NAME } from '../config.js';
+import { REMOVE_ASSIGNMENT_TAB, AVG_OUTCOME_NAME, PL_ASSIGNMENT_SUFFIX } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { createConditionalObserver, createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
@@ -312,6 +312,23 @@ function startIEPillObserver() {
 }
 
 /**
+ * Hide PL override assignment rows from the Learning Mastery tab.
+ * These are internal scoring assignments not meant to be visible to students.
+ * Canvas renders this tab lazily via React so this must run persistently.
+ *
+ * Targets any <li data-cid="ListItem"> containing an <a> whose text
+ * includes PL_ASSIGNMENT_SUFFIX (e.g. "— Projected Score").
+ */
+function hidePLAssignmentRows() {
+    document.querySelectorAll('li[data-cid="ListItem"]').forEach(li => {
+        const link = li.querySelector('a');
+        if (link?.textContent?.includes(PL_ASSIGNMENT_SUFFIX)) {
+            li.style.display = 'none';
+        }
+    });
+}
+
+/**
  * Apply all customizations to the grades page
  *
  * @param {Object} gradeData - Grade data object
@@ -338,6 +355,17 @@ function applyCustomizations(gradeData) {
     if (gradeData.isInsufficient) {
         startIEPillObserver();
     }
+
+    // 5) Hide PL override assignment rows from Learning Mastery tab
+    // Run immediately and via persistent observer since Canvas re-renders lazily
+    hidePLAssignmentRows();
+    createPersistentObserver(() => {
+        hidePLAssignmentRows();
+    }, {
+        config: OBSERVER_CONFIGS.CHILD_LIST,
+        target: document.body,
+        name: 'PLAssignmentHideObserver'
+    });
 
     processed = true;
     return true;
