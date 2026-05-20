@@ -14,7 +14,7 @@
  * - Teachers: student picker via teacherMasteryView.js
  */
 
-import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
+import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX } from '../config.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { renderTeacherMasteryView } from './teacherMasteryView.js';
 import { renderObserverMasteryView } from './observerMasteryView.js';
@@ -675,7 +675,15 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                                 new Date(b.submitted_or_assessed_at || 0) - new Date(a.submitted_or_assessed_at || 0)
                             );
 
-                            const assignmentListHtml = sortedResults.map(result => {
+                            const assignmentListHtml = sortedResults
+                                .filter(result => {
+                                    const alignmentId = result.links?.alignment;
+                                    const alignment   = lazyAlignmentMap[alignmentId];
+                                    // Exclude PL override assignments — they are internal scoring
+                                    // tools not meant to be visible to students on the Mastery Dashboard.
+                                    return !alignment?.name?.includes(PL_ASSIGNMENT_SUFFIX);
+                                })
+                                .map(result => {
                                 const alignmentId = result.links?.alignment;
                                 const alignment = lazyAlignmentMap[alignmentId];
                                 const assignmentId = alignmentId?.split("_")[1];
