@@ -173,6 +173,13 @@ export async function updateAvgAssignmentForStudents({
                 }
             }
 
+            // Persist last_submitted to disk so it survives page reload
+            try {
+                await writeMasteryOutlookCache(courseId, apiClient, cache);
+            } catch (err) {
+                logger.warn('[MOAvgService] Failed to persist note submitted state:', err.message);
+            }
+
             try {
                 await refreshMasteryForAssignment(courseId, assignment_id);
                 logger.info(`[MOAvgService] Mastery refreshed for avg assignment ${assignment_id}`);
