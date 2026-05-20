@@ -268,9 +268,7 @@ function renderOutcomeStudentRow(s, oidStr) {
               data-stu="${s.id}" data-oid="${oidStr}"
               title="Clear note"
               aria-label="Clear note for ${escapeHtml(s.name)}"
-              style="position:absolute; right:4px; top:50%; transform:translateY(-50%);
-                     background:none; border:none; cursor:pointer; padding:0; line-height:1;
-                     font-size:12px; color:var(--text-tertiary); opacity:0.6;">×</button>` : ''}
+              >×</button>` : ''}
         </div>
       </td>
       <td class="c">

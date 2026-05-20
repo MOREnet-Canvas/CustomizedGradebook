@@ -821,6 +821,10 @@ export function mountOutcomeRow({
         outcomeContainer.dataset.outcomeId = outcome.id;
 
         outcomeContainer.addEventListener('dragstart', (e) => {
+            if (e.target.closest('[data-action="os-note"]') || e.target.closest('.os-note-clear')) {
+                e.preventDefault();
+                return;
+            }
             e.dataTransfer.setData('text/plain', outcome.id);
             outcomeContainer.style.opacity = '0.5';
         });
