@@ -820,8 +820,14 @@ export function mountOutcomeRow({
         outcomeContainer.draggable = true;
         outcomeContainer.dataset.outcomeId = outcome.id;
 
+        let mousedownTarget = null;
+        outcomeContainer.addEventListener('mousedown', (e) => {
+            mousedownTarget = e.target;
+        });
+
         outcomeContainer.addEventListener('dragstart', (e) => {
-            if (e.target.closest('[data-action="os-note"]') || e.target.closest('.os-note-clear')) {
+            if (mousedownTarget?.closest('[data-action="os-note"]') ||
+                mousedownTarget?.closest('.os-note-clear')) {
                 e.preventDefault();
                 return;
             }
