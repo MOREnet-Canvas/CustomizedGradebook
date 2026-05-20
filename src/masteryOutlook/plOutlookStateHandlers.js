@@ -542,16 +542,18 @@ export async function handleSyncing(sm) {
 
         // 3c (write timing event 7) — reset will_post once the committed score has been
         // pushed to Canvas (will_post intent has been fulfilled)
-        if (existing.will_post != null && scoresMatch(s.plScore, existing.will_post)) {
-            update.will_post      = null;
-            update.will_post_lock = 'none';
-            logger.debug(`[PLSync] Cleared will_post for student ${sId} — score committed to Canvas`);
-        }
+
 
         // Clear note once it has been submitted to Canvas so the row stops highlighting
         if (s.will_post_note) {
             update.will_post_note = null;
             logger.debug(`[PLSync] Cleared will_post_note for student ${sId} — note submitted to Canvas`);
+        }
+
+        if (existing.will_post != null && scoresMatch(s.plScore, existing.will_post)) {
+            update.will_post      = null;
+            update.will_post_lock = 'none';
+            logger.debug(`[PLSync] Cleared will_post for student ${sId} — score committed to Canvas`);
         }
 
         syncState[oId][sId] = update;
