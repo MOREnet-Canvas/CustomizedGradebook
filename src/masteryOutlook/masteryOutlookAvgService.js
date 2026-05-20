@@ -230,7 +230,7 @@ export async function postNoteToAvgAssignment({
             ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId))
             ?.plPrediction;
         const plScoreStr = plScore != null ? Number(plScore).toFixed(2) : '—';
-        const comment    = `${outcomeName} Score updated: ${plScoreStr}, Note: ${noteText.trim()}`;
+        const comment    = `${outcomeName} Note: ${noteText.trim()}`;
         try {
             // REST comment endpoint — does not touch rubric score or grade override.
             // See function JSDoc for why REST is used instead of GraphQL here.
