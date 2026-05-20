@@ -648,7 +648,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-comment-input.override-prompted::placeholder { color:#B08A3A; }
 .os-comment-input.has-note { border-color:var(--amber-border); background:#FFFBF1; }
 .os-comment-input.has-note:focus { border-color:var(--amber); background:var(--bg-surface); }
-.os-note-clear { background:none; border:none; cursor:pointer; padding:0; line-height:1; font-size:12px; color:var(--text-tertiary); opacity:0.6; }
+.os-note-clear { position:absolute; right:4px; top:4px; background:none; border:none; cursor:pointer; padding:0; line-height:1; font-size:12px; color:var(--text-tertiary); opacity:0.6; }
 .os-note-clear:hover { opacity:1 !important; color:var(--text-primary) !important; }
 
 /* Footer hint under the student sync table */
