@@ -274,8 +274,19 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
             .filter(s => s != null);
         if (canvasScores.length > 0 && outcome.classStats) {
             const avg = canvasScores.reduce((a, b) => a + b, 0) / canvasScores.length;
-            outcome.classStats.plAvg    = parseFloat(avg.toFixed(4));
+            outcome.classStats.plAvg     = parseFloat(avg.toFixed(4));
             outcome.classStats.classMean = outcome.classStats.plAvg;
+
+            // Recalculate distribution using Canvas scores
+            const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
+            canvasScores.forEach(s => {
+                if      (s < 1.5) distribution['1']++;
+                else if (s < 2.5) distribution['2']++;
+                else if (s < 3.5) distribution['3']++;
+                else              distribution['4']++;
+            });
+            outcome.classStats.distribution = distribution;
+            outcome.classStats.belowThresholdCount = canvasScores.filter(s => s < outcome.classStats.computedThreshold).length;
         }
     });
 

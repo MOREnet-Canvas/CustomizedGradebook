@@ -488,6 +488,28 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
 
     if (updated > 0) {
         logger.debug(`[MasteryOutlook] Live rollup: updated canvasScore for ${updated} student(s) on outcome ${outcomeId}`);
+
+        // Recalculate outcome average and spread from updated Canvas scores
+        const outcomeObj = cache.outcomes?.find(o => String(o.id) === String(outcomeId));
+        if (outcomeObj?.classStats) {
+            const canvasScores = cache.students
+                .map(s => s.outcomes?.find(o => String(o.outcomeId) === String(outcomeId))?.canvasScore)
+                .filter(s => s != null);
+            if (canvasScores.length > 0) {
+                const avg = canvasScores.reduce((a, b) => a + b, 0) / canvasScores.length;
+                outcomeObj.classStats.plAvg     = parseFloat(avg.toFixed(4));
+                outcomeObj.classStats.classMean = outcomeObj.classStats.plAvg;
+                const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
+                canvasScores.forEach(s => {
+                    if      (s < 1.5) distribution['1']++;
+                    else if (s < 2.5) distribution['2']++;
+                    else if (s < 3.5) distribution['3']++;
+                    else              distribution['4']++;
+                });
+                outcomeObj.classStats.distribution        = distribution;
+                outcomeObj.classStats.belowThresholdCount = canvasScores.filter(s => s < outcomeObj.classStats.computedThreshold).length;
+            }
+        }
     }
 }
 
