@@ -21,6 +21,7 @@ import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.j
 import { getAllEnrollmentIds } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
 import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
+import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 
 /**
  * Update the Current Score (avg) assignment for students whose Marzano score
@@ -253,6 +254,15 @@ export async function postNoteToAvgAssignment({
             allSucceeded = false;
         }
     }
+
+    // Write updated last_submitted values to disk
+    try {
+        await writeMasteryOutlookCache(courseId, apiClient, cache);
+    } catch (err) {
+        logger.warn('[MOAvgService] Failed to write cache after note post:', err.message);
+    }
+
+
 
     return allSucceeded;
 }
