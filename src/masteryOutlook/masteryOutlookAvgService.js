@@ -173,6 +173,23 @@ export async function updateAvgAssignmentForStudents({
                 }
             }
 
+            // Post note-only comments for students with notes whose avg didn't change
+            const averageByUserId = new Map(averages.map(a => [String(a.userId), a.average]));
+            const noteOnlyStudents = {};
+            for (const [sid, noteText] of Object.entries(notes)) {
+                if (!averageByUserId.has(sid)) {
+                    noteOnlyStudents[sid] = noteText;
+                }
+            }
+            if (Object.keys(noteOnlyStudents).length > 0) {
+                await postNoteToAvgAssignment({
+                    courseId, outcomeId, outcomeName,
+                    notes: noteOnlyStudents,
+                    cache, apiClient
+                }).catch(err => logger.warn('[MOAvgService] Note-only post failed:', err.message));
+            }
+
+
             // Persist last_submitted to disk so it survives page reload
             try {
                 await writeMasteryOutlookCache(courseId, apiClient, cache);
