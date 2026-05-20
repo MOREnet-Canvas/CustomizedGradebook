@@ -564,6 +564,21 @@ export async function handleSyncStudents({
             // No score change but notes exist — post comment-only via REST.
             // Awaited so onRerender fires after will_post_note_last_submitted
             // is written to cache, letting buildOutcomeStudentRow clear the row.
+            // Post note to PL (Projected Score) assignment submissions
+            const plSetup = cache?.pl_assignments?.[String(outcomeId)];
+            if (plSetup?.assignment_id && plSetup?.submission_ids) {
+                for (const [sid, noteText] of Object.entries(notes)) {
+                    const submissionId = plSetup.submission_ids?.[String(sid)];
+                    if (!submissionId) continue;
+                    await apiClient.put(
+                        `/api/v1/courses/${courseId}/assignments/${plSetup.assignment_id}/submissions/${submissionId}`,
+                        { comment: { text_comment: `${outcomeName} Note: ${noteText.trim()}` } },
+                        {},
+                        'PLActions:postNoteComment'
+                    ).catch(err => logger.warn(`[PLActions] PL note post failed for ${sid}:`, err.message));
+                }
+            }
+            // Post note to Current Score assignment
             await postNoteToAvgAssignment({
                 courseId,
                 outcomeId,
