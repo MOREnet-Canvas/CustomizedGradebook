@@ -191,9 +191,9 @@ function countGrowingStudents(outcome, cache) {
 function countExceptionStudents(outcome, cache) {
     const outcomeSync = (cache.sync_state ?? {})[String(outcome.id)] ?? {};
     const ignored     = (cache.ignored_alignments ?? []).filter(
-        ia => String(ia.outcomeId) === String(outcome.id)
+        ia => String(ia.outcome_id) === String(outcome.id)
     );
-    const ignoredIds = new Set(ignored.map(ia => String(ia.studentId)));
+    const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
     return cache.students.filter(student => {
         const sId   = String(student.id);
@@ -211,9 +211,9 @@ function countExceptionStudents(outcome, cache) {
 function buildExceptionsTable(outcome, cache) {
     const outcomeSync = (cache.sync_state ?? {})[String(outcome.id)] ?? {};
     const ignored     = (cache.ignored_alignments ?? []).filter(
-        ia => String(ia.outcomeId) === String(outcome.id)
+        ia => String(ia.outcome_id) === String(outcome.id)
     );
-    const ignoredIds = new Set(ignored.map(ia => String(ia.studentId)));
+    const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
     const exceptionStudents = cache.students.filter(student => {
         const sId   = String(student.id);
@@ -295,7 +295,8 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
     else if (filter === 'declining')  students = students.filter(s => s.slope !== null && s.slope < -0.05);
     else if (filter === 'growing')    students = students.filter(s => s.slope !== null && s.slope > 0.05);
 
-    if (filter === 'students') {
+    if (filter === 'students' || filter === 'all') {
+        // Both Manage Students and All Students sort alphabetically by name
         students.sort((a, b) => {
             const nameA = (a.sortableName || a.name || '').toLowerCase();
             const nameB = (b.sortableName || b.name || '').toLowerCase();
@@ -334,29 +335,19 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             else if (s.slope < -0.1) { trendIcon = '▼'; trendColor = '#A32D2D'; }
         }
 
+        // Score history — colored chips sorted oldest→newest
         const scoreHistory = (s.attempts || [])
-            .map(a => `<span class="od-score-history-attempt">${a.score}</span>`).join(' ');
+            .slice()
+            .sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
+            .map(a => {
+                if (a.score === null || a.score === undefined) return '';
+                const ch = profColor(a.score);
+                return `<span class="od-score-history-score" style="color:${ch.tx}; background:${ch.bg}; border-radius:3px; padding:1px 4px; font-size:0.8em; white-space:nowrap;">${Number(a.score).toFixed(1)}</span>`;
+            })
+            .filter(Boolean)
+            .join(' ');
 
         const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
-
-        const syncInfo = getSyncStatus(s.id, outcome.id, s.plPrediction, s.canvasScore, plConfig);
-        const oIdStr   = String(outcome.id);
-        const sIdStr   = String(s.id);
-        const syncBadgeHtml = `<span class="sync-badge ${syncInfo.cssClass}">${syncInfo.label}</span>`;
-        let syncActionsHtml = '';
-        if (syncInfo.status === 'needs_sync') {
-            syncActionsHtml = `<button class="btn btn-sm btn-ghost od-sync-action-btn"
-                data-action="sync-one" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">↑ Sync</button>`;
-        } else if (syncInfo.status === 'possible_override') {
-            syncActionsHtml = `
-                <button class="btn btn-sm btn-danger od-sync-action-btn compact"
-                    data-action="confirm-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Keep Canvas</button>
-                <button class="btn btn-sm btn-ghost od-sync-action-btn compact"
-                    data-action="dismiss-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Use PL</button>`;
-        } else if (syncInfo.status === 'manual_override') {
-            syncActionsHtml = `<button class="btn btn-sm btn-warn od-sync-action-btn compact"
-                data-action="revert-override" data-student-id="${sIdStr}" data-outcome-id="${oIdStr}">Revert to PL</button>`;
-        }
 
         const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
 
@@ -374,12 +365,6 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
                           style="background:${c.bg}; color:${c.tx};">${plDisplay}</span>
                 </td>
                 <td class="od-center">${canvasScoreDisplay}</td>
-                <td class="od-sync-cell">
-                    <div class="od-sync-actions">
-                        ${syncBadgeHtml}
-                        ${syncActionsHtml}
-                    </div>
-                </td>
                 <td class="od-center">${decayingAvgDisplay}</td>
                 <td class="od-center">${meanDisplay}</td>
                 <td class="od-center">${recentDisplay}</td>
@@ -399,7 +384,6 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
                     <th>Student</th>
                     <th class="od-center">${plColumnHeader}</th>
                     <th class="od-center">Canvas Score</th>
-                    <th class="od-center">Sync Status</th>
                     <th class="od-center">Decaying Avg</th>
                     <th class="od-center">Mean</th>
                     <th class="od-center">Recent</th>
@@ -505,14 +489,16 @@ function buildOutcomeDetailPanel({
     const growingCount     = countGrowingStudents(outcome, cache);
     const exceptionsCount  = countExceptionStudents(outcome, cache);
 
+    const allStudentsCount = cache.students.length;
     const tabs = [
-        { id: 'students',   label: `All Students (${cache.students.length})` },
+        { id: 'students',   label: `Manage Students (${allStudentsCount})` },
         { id: 'struggling', label: `Struggling (${strugglingCount})` },
         { id: 'declining',  label: `Declining (${decliningCount})` },
         { id: 'growing',    label: `Growing (${growingCount})` },
         ...(exceptionsCount > 0
             ? [{ id: 'exceptions', label: `Exceptions (${exceptionsCount})` }]
             : []),
+        { id: 'all',        label: `All Students (${allStudentsCount})` },
     ];
 
     tabs.forEach(tab => {
