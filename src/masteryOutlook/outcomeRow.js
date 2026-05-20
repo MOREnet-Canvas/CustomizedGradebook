@@ -621,8 +621,9 @@ function buildOutcomeDetailPanel({
     refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then(() => {
         renderTable();
         // Update the outcome header chip and spread bar with fresh classStats
+        const outcomeContainer = content.closest('.od-outcome-container');
         const chipEl = outcomeContainer.querySelector('.od-pl-chip');
-        const barEl  = outcomeContainer.querySelector('.od-spread-bar');
+        const barEl = outcomeContainer?.querySelector('.od-spread-bar');
         if (chipEl && outcome.classStats?.plAvg != null) {
             const { profColor } = makeRenderers(ctx);
             const c = profColor(outcome.classStats.plAvg);
