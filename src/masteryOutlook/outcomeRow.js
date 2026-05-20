@@ -828,14 +828,14 @@ export function mountOutcomeRow({
         });
 
         outcomeContainer.addEventListener('dragstart', (e) => {
-            if (mousedownTarget?.closest('[data-action="os-note"]') ||
-                mousedownTarget?.closest('.os-note-clear')) {
+            if (outcomeContainer.querySelector('.od-outcome-row.expanded')) {
                 e.preventDefault();
                 return;
             }
             e.dataTransfer.setData('text/plain', outcome.id);
             outcomeContainer.style.opacity = '0.5';
         });
+
         outcomeContainer.addEventListener('dragend', () => {
             outcomeContainer.style.opacity = '1';
             onReorderCommit?.({ outcomeContainerEl: outcomeContainer });
