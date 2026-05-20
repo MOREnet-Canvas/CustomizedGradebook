@@ -570,6 +570,7 @@ export async function handleSyncStudents({
                 for (const [sid, noteText] of Object.entries(notes)) {
                     const submissionId = plSetup.submission_ids?.[String(sid)];
                     if (!submissionId) continue;
+                    console.log('[DEBUG] PL note - sid:', sid, 'submissionId:', submissionId, 'assignmentId:', plSetup.assignment_id);
                     await apiClient.put(
                         `/api/v1/courses/${courseId}/assignments/${plSetup.assignment_id}/submissions/${submissionId}`,
                         { comment: { text_comment: `${outcomeName} Note: ${noteText.trim()}` } },
