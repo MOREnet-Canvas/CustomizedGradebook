@@ -265,6 +265,20 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     // so it used all attempts. This corrects those plPrediction values in place.
     reapplyIgnoredAlignments(cache);
 
+    // Step 7c.1: Recalculate plAvg using Canvas outcome rollup scores
+    // (canvasScore) rather than Power Law predictions. This makes the
+    // displayed average directly comparable to what teachers see in Canvas.
+    cache.outcomes.forEach(outcome => {
+        const canvasScores = cache.students
+            .map(student => student.outcomes?.find(o => o.outcomeId === outcome.id)?.canvasScore)
+            .filter(s => s != null);
+        if (canvasScores.length > 0 && outcome.classStats) {
+            const avg = canvasScores.reduce((a, b) => a + b, 0) / canvasScores.length;
+            outcome.classStats.plAvg    = parseFloat(avg.toFixed(4));
+            outcome.classStats.classMean = outcome.classStats.plAvg;
+        }
+    });
+
     // Step 7d: Build/refresh avg_assignment setup for Current Score updates.
     // Non-critical — Mastery Outlook works without it; avg updates are skipped.
     onProgress('Locating Current Score assignment...');
