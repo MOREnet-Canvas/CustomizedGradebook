@@ -378,7 +378,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
  * @param {Function} options.renderTable      - re-render callback
  * @returns {Function} teardown — remove the document-level listener
  */
-export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable }) {
+export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable, onChipUpdate }) {
     const outcomeName = outcome.title || String(outcome.id);
 
     // Seed the write scheduler's dedupe baseline with the on-disk state so the first
@@ -478,6 +478,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             try {
                 await handleSyncStudents({ courseId, outcomeId: oId, outcomeName,
                     studentIds: [stuId], apiClient, cache, onRerender: renderTable });
+                onChipUpdate?.();
             } catch (err) {
                 logger.error('[MasteryOutlook] os-save failed', err);
                 el.disabled = false;
@@ -515,6 +516,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             try {
                 await handleSyncStudents({ courseId, outcomeId: String(outcome.id), outcomeName,
                     studentIds: null, apiClient, cache, onRerender: renderTable });
+                onChipUpdate?.();
             } catch (err) {
                 logger.error('[MasteryOutlook] os-post-all failed', err);
             }

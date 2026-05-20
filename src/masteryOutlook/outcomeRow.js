@@ -690,6 +690,27 @@ function buildOutcomeDetailPanel({
         courseId:  ctx.courseId,
         apiClient: ctx.apiClient,
         renderTable,
+        onChipUpdate: () => {
+            const container = content.closest('.od-outcome-container');
+            const chipEl    = container?.querySelector('.od-pl-chip');
+            const barEl     = container?.querySelector('.od-spread-bar');
+            if (chipEl && outcome.classStats?.plAvg != null) {
+                const c = profColor(outcome.classStats.plAvg);
+                chipEl.style.background = c.bg;
+                chipEl.style.color      = c.tx;
+                chipEl.textContent      = outcome.classStats.plAvg.toFixed(2);
+            }
+            if (barEl && outcome.classStats?.distribution) {
+                const d     = outcome.classStats.distribution;
+                const total = Object.values(d).reduce((a, b) => a + b, 0) || 1;
+                barEl.innerHTML = [
+                    [d['4'] / total * 100, profColor(4.0).bg],
+                    [d['3'] / total * 100, profColor(3.0).bg],
+                    [d['2'] / total * 100, profColor(2.0).bg],
+                    [d['1'] / total * 100, profColor(1.0).bg],
+                ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
+            }
+        },
     });
 
     panel.appendChild(content);
