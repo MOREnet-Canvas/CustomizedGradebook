@@ -563,7 +563,9 @@ export async function handleSyncStudents({
                 notes,
                 cache,
                 apiClient,
-            }).catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
+            })
+                .then(() => onRerender?.())
+                .catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
         } else if (Object.keys(notes).length > 0) {
             // No score change but notes exist — post comment-only via REST.
             // Awaited so onRerender fires after will_post_note_last_submitted
