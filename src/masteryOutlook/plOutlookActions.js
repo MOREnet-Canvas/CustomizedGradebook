@@ -506,6 +506,13 @@ export async function handleSyncStudents({
         }
     }
 
+    // Capture notes BEFORE runPLSync clears will_post_note from sync_state
+    const notes = {};
+    for (const sid of effectiveIds) {
+        const entry = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(sid)] ?? {};
+        if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
+    }
+
     const result = await runPLSync({
         courseId,
         outcomeId,
@@ -526,12 +533,10 @@ export async function handleSyncStudents({
             const student = cache?.students?.find(s => String(s.id) === String(sid));
             const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
             if (od != null) {
-                const entry    = outcomeSync[String(sid)] ?? {};
                 od.canvasScore = pushedScores[String(sid)] ?? od.plPrediction;
             }
         }
 
-        // Persist the full in-memory cache (ignored_alignments + canvasScore updates)
         try {
             await writeMasteryOutlookCache(courseId, apiClient, cache);
         } catch (err) {
@@ -539,23 +544,8 @@ export async function handleSyncStudents({
         }
     }
 
-    // Avg service calls — best-effort, never block UI, fired regardless of successCount
-    // so note-only pushes (zero score changes) still reach the avg assignment.
     if (result.success) {
-        const syncedIds   = effectiveIds.filter(Boolean);
-        const syncState   = cache?.sync_state ?? {};
-        const outcomeSync = syncState[String(outcomeId)] ?? {};
-
-        // Collect teacher notes from sync_state at time of push
-        const notes = {};
-        for (const sid of syncedIds) {
-            const entry = outcomeSync[String(sid)] ?? {};
-            if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
-        }
-        console.log('[DEBUG] notes snapshot:', JSON.stringify(notes));
-        console.log('[DEBUG] live sync_state notes:', JSON.stringify(
-            Object.fromEntries(syncedIds.map(sid => [sid, (outcomeSync[String(sid)] ?? {}).will_post_note]))
-        ));
+        const syncedIds = effectiveIds.filter(Boolean);
 
         if (result.successCount > 0) {
             // Scores were pushed — update avg score + post comment via GraphQL
