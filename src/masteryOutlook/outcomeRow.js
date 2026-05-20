@@ -582,9 +582,11 @@ function buildOutcomeDetailPanel({
                 }
             }
         }
-        // Prevent note textarea mousedown from triggering outcome row drag
-        content.querySelectorAll('[data-action="os-note"]').forEach(textarea => {
-            textarea.addEventListener('mousedown', e => e.stopPropagation());
+        // Prevent note inputs from being draggable
+        content.querySelectorAll('[data-action="os-note"]').forEach(input => {
+            input.draggable = false;
+            input.addEventListener('mousedown', (e) => e.stopPropagation());
+            input.addEventListener('dragstart', (e) => e.preventDefault());
         });
 
         // ───────────────────────────────────────────────────────────────────

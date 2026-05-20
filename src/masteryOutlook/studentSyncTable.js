@@ -262,7 +262,9 @@ function renderOutcomeStudentRow(s, oidStr) {
                  placeholder="${s.lock !== 'none' ? 'Reason for override…' : 'Note…'}"
                  data-action="os-note" data-stu="${s.id}" data-oid="${oidStr}"
                  aria-label="Note for ${escapeHtml(s.name)}"
-                 style="${s.note ? 'padding-right:18px;' : ''}">
+                 style="${s.note ? 'padding-right:18px;' : ''}"
+                 draggable="false"
+                 type="text">
           ${s.note ? `<button class="os-note-clear"
               data-action="os-note-clear"
               data-stu="${s.id}" data-oid="${oidStr}"
