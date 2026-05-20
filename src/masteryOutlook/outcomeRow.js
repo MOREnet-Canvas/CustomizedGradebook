@@ -620,6 +620,27 @@ function buildOutcomeDetailPanel({
     // Fires after the initial render so the teacher sees data immediately.
     refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then(() => {
         renderTable();
+        // Update the outcome header chip and spread bar with fresh classStats
+        const chipEl = outcomeContainer.querySelector('.od-pl-chip');
+        const barEl  = outcomeContainer.querySelector('.od-spread-bar');
+        if (chipEl && outcome.classStats?.plAvg != null) {
+            const { profColor } = makeRenderers(ctx);
+            const c = profColor(outcome.classStats.plAvg);
+            chipEl.style.background = c.bg;
+            chipEl.style.color = c.tx;
+            chipEl.textContent = outcome.classStats.plAvg.toFixed(2);
+        }
+        if (barEl && outcome.classStats?.distribution) {
+            const d = outcome.classStats.distribution;
+            const total = Object.values(d).reduce((a, b) => a + b, 0) || 1;
+            const { profColor } = makeRenderers(ctx);
+            barEl.innerHTML = [
+                [d['4'] / total * 100, profColor(4.0).bg],
+                [d['3'] / total * 100, profColor(3.0).bg],
+                [d['2'] / total * 100, profColor(2.0).bg],
+                [d['1'] / total * 100, profColor(1.0).bg],
+            ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
+        }
     });
 
     // Lazy alignment fetch — updates dots and plPrediction for each student
