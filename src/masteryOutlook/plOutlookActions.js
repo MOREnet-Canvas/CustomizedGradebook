@@ -552,6 +552,10 @@ export async function handleSyncStudents({
             const entry = outcomeSync[String(sid)] ?? {};
             if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
         }
+        console.log('[DEBUG] notes snapshot:', JSON.stringify(notes));
+        console.log('[DEBUG] live sync_state notes:', JSON.stringify(
+            Object.fromEntries(syncedIds.map(sid => [sid, (outcomeSync[String(sid)] ?? {}).will_post_note]))
+        ));
 
         if (result.successCount > 0) {
             // Scores were pushed — update avg score + post comment via GraphQL
