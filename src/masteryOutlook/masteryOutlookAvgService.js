@@ -113,8 +113,10 @@ export async function updateAvgAssignmentForStudents({
 
             const enrollmentId = enrollmentMap.get(String(userId));
             const noteText     = notes[String(userId)];
-            const plScore      = plScoreByUserId.get(String(userId));
-            const plScoreStr   = plScore != null ? Number(plScore).toFixed(2) : '—';
+            // Use will_post if set (teacher override) otherwise fall back to plPrediction
+            const syncEntry  = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(userId)] ?? {};
+            const plScore    = syncEntry.will_post ?? plScoreByUserId.get(userId);
+            const plScoreStr = plScore != null ? Number(plScore).toFixed(2) : '—';
             const avgStr       = Number(average).toFixed(2);
 
             const comment = noteText?.trim()
