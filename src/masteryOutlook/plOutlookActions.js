@@ -488,6 +488,15 @@ export async function handleSyncStudents({
     const effectiveIds = studentIds
         ?? (cache?.students ?? []).map(s => String(s.id));
 
+    // Capture will_post values BEFORE runPLSync clears them from sync_state
+    const pushedScores = {};
+    for (const sid of effectiveIds) {
+        const entry = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(sid)] ?? {};
+        const od    = cache?.students?.find(s => String(s.id) === String(sid))
+            ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+        pushedScores[String(sid)] = entry.will_post ?? od?.plPrediction;
+    }
+
     const plScoreOverrides = {};
     for (const sid of effectiveIds) {
         const student = cache?.students?.find(s => String(s.id) === String(sid));
@@ -518,7 +527,7 @@ export async function handleSyncStudents({
             const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
             if (od != null) {
                 const entry    = outcomeSync[String(sid)] ?? {};
-                od.canvasScore = entry.will_post != null ? entry.will_post : od.plPrediction;
+                od.canvasScore = pushedScores[String(sid)] ?? od.plPrediction;
             }
         }
 
