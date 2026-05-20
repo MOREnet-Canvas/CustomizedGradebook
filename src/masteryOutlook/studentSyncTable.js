@@ -256,11 +256,22 @@ function renderOutcomeStudentRow(s, oidStr) {
         </div>
       </td>
       <td class="os-td-comment">
-        <input class="os-comment-input${s.lock !== 'none' ? ' override-prompted' : ''}${s.note ? ' has-note' : ''}"
-               type="text" value="${escapeHtml(s.note)}"
-               placeholder="${s.lock !== 'none' ? 'Reason for override…' : 'Note…'}"
-               data-action="os-note" data-stu="${s.id}" data-oid="${oidStr}"
-               aria-label="Note for ${escapeHtml(s.name)}">
+        <div class="os-note-wrap" style="position:relative; display:flex; align-items:center;">
+          <input class="os-comment-input${s.lock !== 'none' ? ' override-prompted' : ''}${s.note ? ' has-note' : ''}"
+                 type="text" value="${escapeHtml(s.note)}"
+                 placeholder="${s.lock !== 'none' ? 'Reason for override…' : 'Note…'}"
+                 data-action="os-note" data-stu="${s.id}" data-oid="${oidStr}"
+                 aria-label="Note for ${escapeHtml(s.name)}"
+                 style="${s.note ? 'padding-right:18px;' : ''}">
+          ${s.note ? `<button class="os-note-clear"
+              data-action="os-note-clear"
+              data-stu="${s.id}" data-oid="${oidStr}"
+              title="Clear note"
+              aria-label="Clear note for ${escapeHtml(s.name)}"
+              style="position:absolute; right:4px; top:50%; transform:translateY(-50%);
+                     background:none; border:none; cursor:pointer; padding:0; line-height:1;
+                     font-size:12px; color:var(--text-tertiary); opacity:0.6;">×</button>` : ''}
+        </div>
       </td>
       <td class="c">
         ${saveHtml}
@@ -512,6 +523,26 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         }
     });
 
+    // Note clear button — × clears the input and triggers a note update
+    contentEl.addEventListener('click', (e) => {
+        const el = e.target.closest('[data-action="os-note-clear"]');
+        if (!el) return;
+        const wrap  = el.closest('.os-note-wrap');
+        const input = wrap?.querySelector('[data-action="os-note"]');
+        if (!input) return;
+        input.value = '';
+        input.classList.remove('has-note');
+        handleNoteChanged({
+            courseId,
+            outcomeId:  el.dataset.oid,
+            studentId:  el.dataset.stu,
+            noteValue:  '',
+            cache,
+            apiClient,
+            onRerender: renderTable,
+        });
+    });
+
     // Note input — debounced (separate listener since it's an input event)
     contentEl.addEventListener('input', (e) => {
         const el = e.target.closest('[data-action="os-note"]');
@@ -526,6 +557,14 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             apiClient,
             onRerender: renderTable,
         });
+    });
+
+    // Prevent note input mousedown from propagating to the draggable outcome row,
+    // which would trigger row reordering instead of text selection.
+    contentEl.addEventListener('mousedown', (e) => {
+        const el = e.target.closest('[data-action="os-note"]');
+        if (!el) return;
+        e.stopPropagation();
     });
 
     return () => {};

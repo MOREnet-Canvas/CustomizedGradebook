@@ -494,14 +494,14 @@ export async function handleSyncing(sm) {
     sm.progress(`Syncing ${numberOfUpdates} student(s)...`, 0, numberOfUpdates);
     logger.info(`[PLSync] SYNCING ${numberOfUpdates} student(s)`);
 
-    const timestamp   = new Date().toLocaleString();
+    // No timestamp — Canvas shows date/time/author automatically in comment metadata
     const batchParams = studentsToSync.map(s => {
         const score = Number(s.plScore).toFixed(2);
         return {
             ...s,
             comment: s.will_post_note?.trim()
-                ? `${s.will_post_note.trim()} | Score: ${score}  Updated: ${timestamp}`
-                : `Score: ${score}  Updated: ${timestamp}`,
+                ? `${s.will_post_note.trim()} | Score: ${score}`
+                : `Score: ${score}`,
         };
     });
 
