@@ -314,17 +314,14 @@ export function renderOutcomeStudentTable(outcome, cache) {
              </div>
            </div>`;
 
-    const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
-    const legendHtml = `
-        <div class="os-legend">
-          <span style="font-size:10px;color:var(--text-tertiary);font-weight:600;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;">Score</span>
-          ${tones.map(([t, lbl]) =>
-              `<span class="os-leg"><span class="os-leg-sw" style="${scoreToneStyle(t)}"></span><span>${lbl}</span></span>`
-          ).join('')}
-          <span class="os-leg" style="margin-left:auto;color:var(--text-tertiary);">
-            <span style="text-decoration:line-through;">2.5</span><span>Ignored alignment</span>
-          </span>
-        </div>`;
+    // Legend commented out — color coding is self-evident from the dot colors
+    // const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
+    // const legendHtml = `
+    //     <div class="os-legend">
+    //       <span style="...">Score</span>
+    //       ${tones.map(([t, lbl]) => `...`).join('')}
+    //       <span class="os-leg" style="..."><span style="text-decoration:line-through;">2.5</span><span>Ignored alignment</span></span>
+    //     </div>`;
 
     const bodyHtml = studentStates
         .map(s => renderOutcomeStudentRow(s, oidStr))
@@ -332,7 +329,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
 
     return `
         ${toolbarHtml}
-        ${legendHtml}
+        ${''/* legend removed */}
         <div class="os-block">
           <table>
             <thead><tr>

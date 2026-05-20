@@ -110,8 +110,27 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     };
     const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
 
-    if (counts.needsSync > 0) {
-        return `<span class="od-sync-chip needs">↑ ${counts.needsSync} need</span>`;
+    // Count students whose row would be amber in the Manage Students tab —
+    // matches buildOutcomeStudentRow status logic exactly so the badge stays
+    // in sync with what the teacher actually sees as needing action.
+    const needsCount = (cache.students || []).filter(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        if (!od) return false;
+        const syncEntry     = ((cache.sync_state ?? {})[String(outcome.id)] ?? {})[String(student.id)] ?? {};
+        const willPost      = syncEntry.will_post ?? null;
+        const canvas        = od.canvasScore;
+        const marzano       = od.plPrediction;
+        const pendingNote   = syncEntry.will_post_note ?? null;
+        const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
+        const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
+        if (marzano === null) return false;
+        if (canvas === null)  return false;
+        const matched = Math.abs((willPost ?? marzano) - canvas) < 0.01;
+        return !matched || noteIsPending;
+    }).length;
+
+    if (needsCount > 0) {
+        return `<span class="od-sync-chip needs">↑ ${needsCount} need</span>`;
     }
     if (counts.possibleOverride > 0 || counts.manualOverride > 0) {
         const n = counts.possibleOverride + counts.manualOverride;
