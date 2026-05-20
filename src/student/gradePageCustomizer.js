@@ -316,13 +316,26 @@ function startIEPillObserver() {
  * These are internal scoring assignments not meant to be visible to students.
  * Canvas renders this tab lazily via React so this must run persistently.
  *
- * Targets any <li data-cid="ListItem"> containing an <a> whose text
- * includes PL_ASSIGNMENT_SUFFIX (e.g. "— Projected Score").
+ * Targets leaf-level <li data-cid="ListItem"> elements (no nested li children)
+ * whose anchor direct text content includes PL_ASSIGNMENT_SUFFIX.
  */
 function hidePLAssignmentRows() {
     document.querySelectorAll('li[data-cid="ListItem"]').forEach(li => {
+        // Only target leaf-level list items (no nested li children)
+        // to avoid hiding outcome group containers
+        if (li.querySelectorAll('li[data-cid="ListItem"]').length > 0) return;
+
         const link = li.querySelector('a');
-        if (link?.textContent?.includes(PL_ASSIGNMENT_SUFFIX)) {
+        if (!link) return;
+
+        // Check only the direct text content of the <a>, not child elements.
+        // textContent includes icon SVG text — use childNodes to get only text nodes.
+        const linkText = Array.from(link.childNodes)
+            .filter(n => n.nodeType === Node.TEXT_NODE)
+            .map(n => n.textContent.trim())
+            .join('');
+
+        if (linkText.includes(PL_ASSIGNMENT_SUFFIX)) {
             li.style.display = 'none';
         }
     });
