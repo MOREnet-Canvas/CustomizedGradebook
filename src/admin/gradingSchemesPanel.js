@@ -231,23 +231,6 @@ async function createGradingStandard(accountId, gradingSchemeData) {
 }
 
 /**
- * Parse Link header for pagination
- *
- * @param {string} linkHeader - Link header value
- * @returns {Object} Object with rel types as keys and URLs as values
- */
-function parseLinkHeader(linkHeader) {
-    if (!linkHeader) return {};
-    const parts = linkHeader.split(",").map(s => s.trim());
-    const links = {};
-    for (const p of parts) {
-        const m = p.match(/^<([^>]+)>\s*;\s*rel="([^"]+)"$/);
-        if (m) links[m[2]] = m[1];
-    }
-    return links;
-}
-
-/**
  * Fetch all grading schemes with pagination
  *
  * @param {string} accountId - Account ID
@@ -256,34 +239,16 @@ function parseLinkHeader(linkHeader) {
 export async function fetchGradingSchemes(accountId) {
     console.log(`📘 Capturing grading schemes for account: ${accountId}`);
 
-    let url = `/api/v1/accounts/${accountId}/grading_standards?per_page=100`;
-    const schemes = [];
-
-    while (url) {
-        try {
-            const res = await fetch(url, {
-                method: "GET",
-                credentials: "same-origin",
-                headers: { Accept: "application/json" }
-            });
-
-            const ct = res.headers.get("content-type") || "";
-            if (!ct.includes("application/json")) {
-                const text = await res.text();
-                console.error("❌ Expected JSON but got:", ct);
-                console.error("Response preview:", text.slice(0, 300));
-                break;
-            }
-
-            const data = await res.json();
-            schemes.push(...data);
-
-            const links = parseLinkHeader(res.headers.get("link"));
-            url = links.next || null;
-        } catch (err) {
-            console.error("❌ Error fetching grading schemes:", err);
-            break;
-        }
+    let schemes = [];
+    try {
+        const apiClient = new CanvasApiClient();
+        schemes = await apiClient.getAllPages(
+            `/api/v1/accounts/${accountId}/grading_standards`,
+            {},
+            'fetchGradingSchemes'
+        );
+    } catch (err) {
+        console.error("❌ Error fetching grading schemes:", err);
     }
 
     console.log(`✅ Captured ${schemes.length} grading scheme(s).`);

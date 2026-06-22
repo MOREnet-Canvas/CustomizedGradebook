@@ -20,6 +20,7 @@ import { createElement } from './domHelpers.js';
 import { createCollapsiblePanel, createCheckbox } from './canvasFormHelpers.js';
 import { triggerConfigChangeNotification } from './loaderGeneratorPanel.js';
 import { getAccountId } from './pageDetection.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 const CACHE_KEY = 'cg_admin_accounts_cache';
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
@@ -31,24 +32,9 @@ const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
  */
 async function fetchAllPages(url) {
     logger.trace('[AccountFilter] fetchAllPages called with URL:', url);
-    const out = [];
-    let next = url;
-    let pageCount = 0;
-    while (next) {
-        pageCount++;
-        logger.trace(`[AccountFilter] Fetching page ${pageCount}: ${next}`);
-        const res = await fetch(next, { credentials: "include" });
-        if (!res.ok) {
-            logger.error(`[AccountFilter] HTTP ${res.status} for ${next}`);
-            throw new Error(`HTTP ${res.status} for ${next}`);
-        }
-        const data = await res.json();
-        logger.trace(`[AccountFilter] Page ${pageCount} returned ${data.length} items`);
-        out.push(...data);
-        const link = res.headers.get("Link");
-        next = link?.match(/<([^>]+)>;\s*rel="next"/)?.[1] ?? null;
-    }
-    logger.trace(`[AccountFilter] fetchAllPages complete: ${out.length} total items from ${pageCount} pages`);
+    const api = new CanvasApiClient();
+    const out = await api.getAllPages(url, {}, 'AccountFilter:fetchAllPages');
+    logger.trace(`[AccountFilter] fetchAllPages complete: ${out.length} total items`);
     return out;
 }
 

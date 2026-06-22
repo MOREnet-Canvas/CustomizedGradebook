@@ -204,11 +204,11 @@ function renderOutcomeStudentRow(s, oidStr) {
         <button class="os-wp-lock ${s.lock}"
                 data-action="${s.lock === 'locked' ? 'os-unlock' : 'os-lock'}"
                 data-stu="${s.id}" data-oid="${oidStr}"
-                aria-label="${s.lock === 'locked' ? 'Unlock Post' : 'Lock Post'}">
+                aria-label="${s.lock === 'locked' ? 'Unlock Override' : 'Lock Override'}">
           ${s.lock === 'locked' ? '🔒' : '🔓'}
           <span class="os-lock-tip">${
               s.lock === 'locked'
-                  ? 'Post is locked. Click to unlock.'
+                  ? 'Override is locked. Click to unlock.'
                   : 'Score differs from Marzano. Click to lock this value.'
           }</span>
         </button>` : '';
@@ -235,21 +235,21 @@ function renderOutcomeStudentRow(s, oidStr) {
         <button class="os-pill-btn ${canvasFaded}" data-action="os-use-canvas"
                 data-stu="${s.id}" data-oid="${oidStr}" data-canvas="${s.canvas ?? ''}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
-          <span class="os-pill-tip">Set Post = ${canvasDisp}</span>
+          <span class="os-pill-tip">Set Override = ${canvasDisp}</span>
         </button>
       </td>
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
                 data-stu="${s.id}" data-oid="${oidStr}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
-          <span class="os-pill-tip">Set Post = ${marzDisp} (Marzano)</span>
+          <span class="os-pill-tip">Set Override = ${marzDisp} (Marzano)</span>
         </button>
       </td>
       <td class="c">
         <div class="os-wp-outer">
           <div class="os-wp-box-wrap ${differsCls}" data-action="os-wp-click"
                data-stu="${s.id}" data-oid="${oidStr}" tabindex="0" role="button"
-               aria-label="Post: ${wpDisp}">
+               aria-label="Override: ${wpDisp}">
             <div class="os-wp-box">${wpDisp}</div>
             ${lockHtml}
           </div>
@@ -348,7 +348,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
               <th>Alignments</th>
               <th class="c">Canvas</th>
               <th class="c">Marzano</th>
-              <th class="c">Post</th>
+              <th class="c">Override</th>
               <th>Note</th>
               <th class="c">Save</th>
             </tr></thead>
@@ -356,7 +356,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </table>
         </div>
         <div class="os-table-hint">
-          Click Canvas / Marzano pills to copy to Post · Click Post box to type · Padlock locks an override
+          Click Canvas / Marzano pills to copy to Override · Click Override box to type · Padlock locks an override
         </div>`;
 }
 

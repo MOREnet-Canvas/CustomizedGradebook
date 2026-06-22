@@ -54,24 +54,8 @@ async function fetchFinalGradeOverrideStatus(accountId) {
     const url = `/api/v1/accounts/${accountId}/features/flags/final_grades_override`;
 
     try {
-        const res = await fetch(url, {
-            method: "GET",
-            credentials: "same-origin",
-            headers: { Accept: "application/json" }
-        });
-
-        const ct = res.headers.get("content-type") || "";
-        if (!ct.includes("application/json")) {
-            logger.warn('[LoaderGeneratorPanel] Expected JSON but got:', ct);
-            return null;
-        }
-
-        if (!res.ok) {
-            logger.warn(`[LoaderGeneratorPanel] HTTP ${res.status}: ${res.statusText}`);
-            return null;
-        }
-
-        const data = await res.json();
+        const apiClient = new CanvasApiClient();
+        const data = await apiClient.get(url, {}, 'fetchFinalGradeOverrideStatus');
         logger.debug('[LoaderGeneratorPanel] Feature flag data:', data);
 
         return data;

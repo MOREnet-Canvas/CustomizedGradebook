@@ -16,6 +16,7 @@
 import { logger } from '../utils/logger.js';
 import { createElement, escapeHtml } from './domHelpers.js';
 import { createCollapsiblePanel } from './canvasFormHelpers.js';
+import { CanvasApiClient } from '../utils/canvasApiClient.js';
 
 /**
  * Fetch final grade override feature flag status
@@ -29,28 +30,8 @@ async function fetchFinalGradeOverrideStatus(accountId) {
     const url = `/api/v1/accounts/${accountId}/features/flags/final_grades_override`;
 
     try {
-        const res = await fetch(url, {
-            method: "GET",
-            credentials: "same-origin",
-            headers: { Accept: "application/json" }
-        });
-
-        const ct = res.headers.get("content-type") || "";
-        if (!ct.includes("application/json")) {
-            const text = await res.text();
-            console.error("❌ Expected JSON but got:", ct);
-            console.error("Response preview:", text.slice(0, 300));
-            return null;
-        }
-
-        if (!res.ok) {
-            console.error(`❌ HTTP ${res.status}: ${res.statusText}`);
-            const errorData = await res.json();
-            console.error("Error data:", errorData);
-            return null;
-        }
-
-        const data = await res.json();
+        const api = new CanvasApiClient();
+        const data = await api.get(url, {}, 'fetchFinalGradeOverrideStatus');
         console.log("✅ Feature flag data:", data);
 
         // Store for debugging

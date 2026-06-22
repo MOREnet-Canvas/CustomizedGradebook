@@ -352,6 +352,10 @@ async function applyCustomizations() {
         return;
     }
 
+    // Claim the work synchronously before any async call so a concurrent
+    // observer-triggered invocation can't pass the guard and run in parallel.
+    processed = true;
+
     try {
         logger.info('Applying all-grades page customizations...');
 
@@ -360,6 +364,7 @@ async function applyCustomizations() {
 
         if (courses.length === 0) {
             logger.warn('No courses found, skipping customization');
+            processed = false; // Nothing to customize yet — allow a later retry
             return;
         }
 
@@ -371,14 +376,12 @@ async function applyCustomizations() {
         const traditionalCount = courses.length - standardsBasedCount;
         logger.info(`All-grades customization complete: ${courses.length} courses (${standardsBasedCount} SBG, ${traditionalCount} traditional)`);
 
-        processed = true;
-
         document.body.classList.remove('cg_processing_grades');
 
 
     } catch (error) {
         logger.error('Failed to apply all-grades customizations:', error);
-        // Don't set processed = true so it can retry
+        processed = false; // Reset so it can retry
         document.body.classList.remove('cg_processing_grades');
 
     }

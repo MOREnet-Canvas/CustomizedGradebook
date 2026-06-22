@@ -5,6 +5,7 @@ import {
     getInstalledThemeCssUrl
 } from "./pageDetection.js";
 import {logger} from "../utils/logger.js";
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
 
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
@@ -434,12 +435,8 @@ function getAccountsCacheMap() {
 
 async function fetchAccountName(accountId) {
     try {
-        const r = await fetch(`/api/v1/accounts/${accountId}`, {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" }
-        });
-        if (!r.ok) return null;
-        const acct = await r.json();
+        const api = new CanvasApiClient();
+        const acct = await api.get(`/api/v1/accounts/${accountId}`, {}, "fetchAccountName");
         return acct?.name || null;
     } catch {
         return null;
