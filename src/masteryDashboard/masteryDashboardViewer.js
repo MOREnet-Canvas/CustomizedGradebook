@@ -20,6 +20,8 @@ import { renderTeacherMasteryView } from './teacherMasteryView.js';
 import { renderObserverMasteryView } from './observerMasteryView.js';
 import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
+import { injectStyles } from '../ui/styles.js';
+import { MASTERY_DASHBOARD_CSS } from './masteryDashboardStyles.js';
 
 /**
  * Rating scale for calculating letter grades
@@ -69,6 +71,8 @@ function ensureHost(courseName = "Mastery Dashboard") {
     const root = document.getElementById("mastery-dashboard-root");
     if (!root) return null;
 
+    injectStyles(MASTERY_DASHBOARD_CSS, 'pm-dashboard-styles');
+
     // Inject course name as a page-level heading before the root div (once only).
     // This works for all existing pages regardless of whether they have the <h2> in their body.
     let heading = document.getElementById('pm-course-heading');
@@ -84,30 +88,29 @@ function ensureHost(courseName = "Mastery Dashboard") {
     root.style.maxWidth = "100%";
     root.style.boxSizing = "border-box";
 
-    const F = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
     root.innerHTML = `
-      <div style="border:1px solid #ddd; border-radius:10px; padding:16px; margin:12px 0;">
-        <div style="margin-bottom:12px;">
-          <div id="pm-student-name" style="${F} font-size:1.1rem; font-weight:700; color:#333; margin-bottom:2px; line-height:1.4; -webkit-font-smoothing:antialiased;"></div>
-          <div id="pm-subtitle" style="${F} font-size:0.8rem; color:#666; line-height:1.4; -webkit-font-smoothing:antialiased;"></div>
+      <div class="pm-card">
+        <div class="pm-header-block">
+          <div id="pm-student-name"></div>
+          <div id="pm-subtitle"></div>
         </div>
-        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
-          <div style="flex:1; min-width:130px; background:#f5f6f7; border-radius:8px; padding:10px 12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; -webkit-font-smoothing:antialiased;">Score</div>
+        <div class="pm-stats-row">
+          <div class="pm-stat-box">
+            <div class="pm-stat-box-head">
+              <div class="pm-stat-caption">Score</div>
               <div id="pm-comment-toggle-slot"></div>
             </div>
-            <div id="pm-stat-score" style="${F} font-size:2.2rem; font-weight:700; line-height:1; margin-bottom:4px; -webkit-font-smoothing:antialiased;">—</div>
-            <div id="pm-stat-score-label" style="${F} font-size:0.78rem; color:#555; -webkit-font-smoothing:antialiased;"></div>
+            <div id="pm-stat-score">—</div>
+            <div id="pm-stat-score-label"></div>
           </div>
-          <div style="flex:1; min-width:130px; background:#f5f6f7; border-radius:8px; padding:10px 12px;">
-            <div style="${F} font-size:0.72rem; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; -webkit-font-smoothing:antialiased;">Mastered</div>
-            <div id="pm-stat-mastered" style="${F} font-size:2.2rem; font-weight:700; line-height:1; margin-bottom:4px; color:#333; -webkit-font-smoothing:antialiased;">—</div>
-            <div id="pm-stat-mastered-label" style="${F} font-size:0.78rem; color:#555; -webkit-font-smoothing:antialiased;"></div>
+          <div class="pm-stat-box">
+            <div class="pm-stat-caption pm-stat-caption--mastered">Mastered</div>
+            <div id="pm-stat-mastered">—</div>
+            <div id="pm-stat-mastered-label"></div>
           </div>
         </div>
         <div id="pm-comment-panel-container"></div>
-        <div id="pm-missing-banner" style="display:none; background:#FFF8E1; border:1px solid #FAB901; border-left:4px solid #FAB901; border-radius:6px; padding:10px 14px; margin-bottom:12px;"></div>
+        <div id="pm-missing-banner"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -513,8 +516,6 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
 
     debugLog(`Mastery count: ${masteredCount} of ${totalCount}`);
 
-    const HFONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
-
     // Subtitle — updated date
     const subtitleEl = document.getElementById('pm-subtitle');
     if (subtitleEl) subtitleEl.textContent = avgUpdatedDate ? `Updated ${avgUpdatedDate}` : '';
@@ -529,7 +530,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
     const masteredStatEl = document.getElementById('pm-stat-mastered');
     const masteredLabelEl = document.getElementById('pm-stat-mastered-label');
     if (masteredStatEl) {
-        masteredStatEl.innerHTML = `<span style="font-size:2.2rem; font-weight:700;">${masteredCount}</span><span style="font-size:1rem; font-weight:400; color:#555;"> of ${totalCount}</span>`;
+        masteredStatEl.innerHTML = `<span class="pm-mastered-count">${masteredCount}</span><span class="pm-mastered-total"> of ${totalCount}</span>`;
     }
     if (masteredLabelEl) masteredLabelEl.textContent = getMasteryEncouragement(masteredCount, totalCount);
 
@@ -545,19 +546,18 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         const bannerRows = missingList.map(a => {
             const affectedOutcomes = assignmentOutcomeMap[a.assignmentId] ?? [];
             return `
-                <div style="padding:5px 0; border-bottom:1px solid rgba(250,185,1,0.3);">
-                    <a href="${a.url}" target="_blank"
-                       style="${HFONT} font-size:0.85rem; color:#C62828; text-decoration:underline; font-weight:600; line-height:1.5;">
+                <div class="pm-banner-row">
+                    <a href="${a.url}" target="_blank" class="pm-banner-link">
                         ${escapeHtml(a.name)}
                     </a>
                     ${affectedOutcomes.length > 0
-                        ? `<div style="${HFONT} font-size:0.75rem; color:#555; margin-top:2px; line-height:1.4;">Affects: ${affectedOutcomes.map(escapeHtml).join(', ')}</div>`
+                        ? `<div class="pm-banner-affects">Affects: ${affectedOutcomes.map(escapeHtml).join(', ')}</div>`
                         : ''}
                 </div>
             `;
         }).join('');
         bannerEl.innerHTML = `
-            <div style="${HFONT} font-size:0.75rem; font-weight:600; color:#795500; margin-bottom:6px; -webkit-font-smoothing:antialiased;">⚠ Missing Assignments</div>
+            <div class="pm-banner-title">⚠ Missing Assignments</div>
             ${bannerRows}
         `;
         bannerEl.style.display = 'block';
@@ -603,24 +603,23 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                  tabindex="0"
                  role="button"
                  aria-expanded="false"
-                 style="border:1px solid #ddd; border-left:4px solid ${masteryColor}; border-radius:8px; padding:10px; margin:8px 0; background:#fff; cursor:pointer;"
-                 onfocus="this.style.outline='2px solid rgb(147, 154, 160)'; this.style.outlineOffset='2px';"
-                 onblur="this.style.outline='none';">
-                <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:4px;">
-                    <span class="expand-arrow" style="font-size:0.8rem; transition:transform 0.2s; margin-top:2px;">▶</span>
-                    <div style="flex:1;">
-                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcomeName)}</div>
+                 class="pm-outcome-card"
+                 style="border-left-color:${masteryColor};">
+                <div class="pm-outcome-card-row">
+                    <span class="expand-arrow">▶</span>
+                    <div class="pm-outcome-main">
+                        <div class="pm-outcome-name">${escapeHtml(outcomeName)}</div>
                     </div>
-                    <div style="text-align:right;">
-                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryFontColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
+                    <div class="pm-outcome-right">
+                        <div class="pm-outcome-score" style="color:${masteryFontColor};">
                             ${score}
                         </div>
-                        ${letterGrade ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; font-weight:600; color:#333; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
-                        ${latestDate ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.875rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${latestDate}</div>` : ""}
+                        ${letterGrade ? `<div class="pm-outcome-grade"><span class="pm-outcome-grade-bullet" style="color:${masteryColor};">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
+                        ${latestDate ? `<div class="pm-outcome-date">${latestDate}</div>` : ""}
                     </div>
                 </div>
-                <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #c8c8c8; margin-left:20px;">
-                    <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:0.9rem; margin-bottom:8px; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">Loading assignments...</div>
+                <div class="assignment-details" style="display:none;">
+                    <div class="pm-details-title">Loading assignments...</div>
                 </div>
             </div>
         `);
@@ -628,7 +627,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
 
     // Render outcome cards
     cardsEl.innerHTML = regularCards.length > 0 ? `
-        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; font-weight:600; color:#666; margin-bottom:8px; margin-top:8px; line-height:1.5; -webkit-font-smoothing:antialiased;">Learning Outcomes</div>
+        <div class="pm-outcome-heading">Learning Outcomes</div>
         ${regularCards.join("")}
     ` : "";
 
@@ -705,25 +704,25 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                                 // Build status indicator from submission map (late/excused/missing)
                                 let statusIndicator = "";
                                 if (submission?.excused) {
-                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="#EE0612" stroke="none"/><path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:600; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Excused</span></span>`;
+                                    statusIndicator = `<span class="pm-status"><svg width="16" height="16" viewBox="0 0 16 16" class="pm-status-svg"><circle cx="8" cy="8" r="6.5" fill="#EE0612" stroke="none"/><path d="M 5 8 L 7 10 L 11 6" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="pm-status-label">Excused</span></span>`;
                                 } else if (submission?.late_policy_status === 'late') {
-                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="8" y2="4.5" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="11" y2="8" stroke="#FC5E13" stroke-width="1.5"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:600; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Late</span></span>`;
+                                    statusIndicator = `<span class="pm-status"><svg width="16" height="16" viewBox="0 0 16 16" class="pm-status-svg"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="8" y2="4.5" stroke="#FC5E13" stroke-width="1.5"/><line x1="8" y1="8" x2="11" y2="8" stroke="#FC5E13" stroke-width="1.5"/></svg><span class="pm-status-label">Late</span></span>`;
                                 } else if (submission?.late_policy_status === 'missing') {
-                                    statusIndicator = `<span style="display:inline-block; margin-left:6px; white-space:nowrap;"><svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle; margin-right:4px;"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#EE0612" stroke-width="2"/><line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="#EE0612" stroke-width="2"/></svg><span style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; color:#333; font-weight:700; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">Missing</span></span>`;
+                                    statusIndicator = `<span class="pm-status"><svg width="16" height="16" viewBox="0 0 16 16" class="pm-status-svg"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#EE0612" stroke-width="2"/><line x1="3.5" y1="3.5" x2="12.5" y2="12.5" stroke="#EE0612" stroke-width="2"/></svg><span class="pm-status-label pm-status-label--missing">Missing</span></span>`;
                                 }
 
                                 const assignmentName = alignment?.name ?? "Unnamed Assignment";
                                 const assignmentUrl = alignment?.html_url ?? "#";
 
                                 return `
-                                    <div style="padding:8px 0; border-bottom:1px solid #c8c8c8;">
-                                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:400; font-size:1rem; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                                            <a href="${assignmentUrl}" target="_blank" style="color:#0374B5; text-decoration:none;">
+                                    <div class="pm-assign-row">
+                                        <div class="pm-assign-name">
+                                            <a href="${assignmentUrl}" target="_blank" class="pm-assign-link">
                                                 ${escapeHtml(assignmentName)}
                                             </a>${statusIndicator}
                                         </div>
-                                        <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.875rem; color:#333; margin-top:2px; line-height:1.5; -webkit-font-smoothing:antialiased;">
-                                            <span style="color:${assignmentMasteryColor}; font-size:1.1em; line-height:1;">●</span>
+                                        <div class="pm-assign-meta">
+                                            <span class="pm-assign-bullet" style="color:${assignmentMasteryColor};">●</span>
                                             ${assignmentScore} (${escapeHtml(letterGrade)})${date ? ` – ${date}` : ""}
                                         </div>
                                     </div>
@@ -731,17 +730,17 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                             }).join("");
 
                             details.innerHTML = `
-                                <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:0.9rem; margin-bottom:8px; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">Assignments for this outcome:</div>
+                                <div class="pm-details-title">Assignments for this outcome:</div>
                                 ${assignmentListHtml}
                             `;
                         } else {
-                            details.innerHTML = '<div style="font-family:LatoWeb,\'Lato Extended\',Lato,\'Helvetica Neue\',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#555; line-height:1.5; -webkit-font-smoothing:antialiased;">No assignment data available.</div>';
+                            details.innerHTML = '<div class="pm-empty-note">No assignment data available.</div>';
                         }
 
                         card.dataset.loaded = 'true';
                     } catch (err) {
                         console.error('[MasteryDashboard] Failed to load assignments:', err);
-                        details.innerHTML = '<div style="font-family:LatoWeb,\'Lato Extended\',Lato,\'Helvetica Neue\',Helvetica,Arial,sans-serif; font-size:0.9rem; color:#c62828; line-height:1.5; -webkit-font-smoothing:antialiased;">Failed to load assignments.</div>';
+                        details.innerHTML = '<div class="pm-error-note">Failed to load assignments.</div>';
                     }
                 }
 
