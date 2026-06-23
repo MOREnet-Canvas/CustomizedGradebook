@@ -60,7 +60,7 @@ export const MASTERY_DASHBOARD_CSS = `
 .pm-outcome-card     { border: 1px solid #ddd; border-left: 4px solid #ddd; border-radius: 8px; padding: 10px; margin: 8px 0; background: #fff; cursor: pointer; }
 .pm-outcome-card:focus { outline: 2px solid rgb(147, 154, 160); outline-offset: 2px; }
 .pm-outcome-card-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
-.expand-arrow        { font-size: 0.8rem; transition: transform 0.2s; margin-top: 2px; }
+.pm-expand-arrow        { font-size: 0.8rem; transition: transform 0.2s; margin-top: 2px; }
 .pm-outcome-main     { flex: 1; }
 .pm-outcome-name     { font-weight: 600; font-size: 1rem; color: #333; line-height: 1.5; }
 .pm-outcome-right    { text-align: right; }
@@ -73,7 +73,7 @@ export const MASTERY_DASHBOARD_CSS = `
 
 /* Assignment details (lazy-loaded; initial display:none stays inline so the
    toggle's 'details.style.display === none' check keeps working) */
-.assignment-details { margin-top: 12px; padding-top: 12px; border-top: 1px solid #c8c8c8; margin-left: 20px; }
+.pm-assignment-details { margin-top: 12px; padding-top: 12px; border-top: 1px solid #c8c8c8; margin-left: 20px; }
 .pm-details-title   { font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; color: #333; line-height: 1.5; }
 .pm-assign-row      { padding: 8px 0; border-bottom: 1px solid #c8c8c8; }
 .pm-assign-name     { font-weight: 400; font-size: 1rem; line-height: 1.5; }

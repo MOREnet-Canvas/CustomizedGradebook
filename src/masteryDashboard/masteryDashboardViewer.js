@@ -606,7 +606,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                  class="pm-outcome-card"
                  style="border-left-color:${masteryColor};">
                 <div class="pm-outcome-card-row">
-                    <span class="expand-arrow">▶</span>
+                    <span class="pm-expand-arrow">▶</span>
                     <div class="pm-outcome-main">
                         <div class="pm-outcome-name">${escapeHtml(outcomeName)}</div>
                     </div>
@@ -618,7 +618,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                         ${latestDate ? `<div class="pm-outcome-date">${latestDate}</div>` : ""}
                     </div>
                 </div>
-                <div class="assignment-details" style="display:none;">
+                <div class="pm-assignment-details" style="display:none;">
                     <div class="pm-details-title">Loading assignments...</div>
                 </div>
             </div>
@@ -640,8 +640,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             // Don't toggle if clicking on a link
             if (e.target.tagName === 'A') return;
 
-            const details = card.querySelector('.assignment-details');
-            const arrow = card.querySelector('.expand-arrow');
+            const details = card.querySelector('.pm-assignment-details');
+            const arrow = card.querySelector('.pm-expand-arrow');
             const outcomeId = card.dataset.outcomeId;
 
             if (details.style.display === 'none') {
