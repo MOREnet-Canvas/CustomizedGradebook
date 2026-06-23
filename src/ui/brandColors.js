@@ -8,9 +8,8 @@
  *
  * Always reads live so theme overrides applied after page load are picked up.
  *
- * Existing inline call sites (src/ui/banner.js, src/ui/buttons.js,
- * src/masteryDashboardCreation/buttonInjection.js, src/gradebook/ui/buttonInjection.js)
- * are intentionally left as-is for now; new code should prefer these helpers.
+ * All canvas-api call sites use these helpers; do not add new inline getPropertyValue
+ * calls for brand variables — import from this module instead.
  */
 
 const FALLBACK_BRAND = '#0c7d9d';

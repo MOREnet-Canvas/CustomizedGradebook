@@ -13,7 +13,7 @@ import { makeButton } from '../ui/buttons.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { createPage, getPage } from '../services/pageService.js';
-import { isCourseSettingsPage } from '../utils/pageDetection.js';
+import { isCourseSettingsPage, waitForSettingsSidebar } from '../utils/pageDetection.js';
 import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -157,32 +157,5 @@ export function injectMasteryOutlookButton() {
         sidebar.appendChild(container);
 
         logger.info('[MasteryOutlook] Button injected successfully');
-    });
-}
-
-/**
- * Wait for Course Settings sidebar to be ready
- * @param {Function} callback - Callback to execute when sidebar is found
- */
-function waitForSettingsSidebar(callback) {
-    let attempts = 0;
-    const maxAttempts = 33; // ~10 seconds
-    const intervalMs = 300;
-
-    const intervalId = setInterval(() => {
-        const onSettingsPage = isCourseSettingsPage();
-        const documentReady = document.readyState === 'complete';
-        const sidebar = document.querySelector('#right-side') ||
-                        document.querySelector('#right-side-wrapper') ||
-                        document.querySelector('aside[id="right-side"]');
-
-        if (onSettingsPage && documentReady && sidebar) {
-            clearInterval(intervalId);
-            logger.debug('[MasteryOutlook] Settings sidebar found');
-            callback(sidebar);
-        } else if (attempts++ >= maxAttempts) {
-            clearInterval(intervalId);
-            logger.warn('[MasteryOutlook] Settings sidebar not found after 10 seconds');
-        }
-    }, intervalMs);
+    }, 'MasteryOutlook');
 }
