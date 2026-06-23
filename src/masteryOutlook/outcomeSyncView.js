@@ -309,7 +309,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
                 const od         = student.outcomes?.find(o => String(o.outcomeId) === outcomeId);
                 const typeParts  = [];
                 if (entry.manual_override)              typeParts.push('Override');
-                if (entry.will_post_lock === 'locked')  typeParts.push('Locked WP');
+                if (entry.will_post_lock === 'locked')  typeParts.push('Locked Override');
 
                 rows.push({
                     outcomeName: outcome.title,

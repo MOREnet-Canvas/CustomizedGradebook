@@ -261,7 +261,7 @@ function buildExceptionsTable(outcome, cache) {
 
         const types = [];
         if (entry.manual_override)             types.push('<span class="od-ex-pill override">Override</span>');
-        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked WP</span>');
+        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked Override</span>');
         if (ignoredIds.has(sId))               types.push('<span class="od-ex-pill ignored">Ignored</span>');
 
         return `<tr>
