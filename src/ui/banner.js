@@ -1,11 +1,7 @@
 // src/ui/banner.js
 import { getCourseId } from "../utils/canvas.js";
 import { k } from "../utils/keys.js";
-
-const BRAND_COLOR =
-    getComputedStyle(document.documentElement)
-        .getPropertyValue("--ic-brand-primary")
-        .trim() || "#0c7d9d";
+import { brandPrimary } from "./brandColors.js";
 
 export function showFloatingBanner({
                                 text = "",
@@ -13,7 +9,7 @@ export function showFloatingBanner({
                                 top = "20px",
                                 right = "20px",
                                 center = false,
-                                backgroundColor = BRAND_COLOR,
+                                backgroundColor = brandPrimary(),
                                 textColor = "#ffffff",
                                 allowMultiple = false,         // keep existing banners?
                                 ariaLive = "polite"            // "polite" | "assertive" | "off"

@@ -14,6 +14,7 @@ import { logger } from "../../utils/logger.js";
 import { startUpdateFlow } from "../updateFlowOrchestrator.js";
 import { renderLastUpdateNotice } from "../../utils/uiHelpers.js";
 import { isGradebookPage, isLMGBPage } from "../../utils/pageDetection.js";
+import { brandButtonPrimaryBg } from "../../ui/brandColors.js";
 
 /**
  * Inject the "Update Average" button into Canvas gradebook toolbar
@@ -74,9 +75,7 @@ export function resetButtonToNormal(button) {
     button.style.opacity = '1'; // Ensure full opacity
 
     // Restore the original primary button color from Canvas theme
-    const rootStyles = getComputedStyle(document.documentElement);
-    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
-    button.style.backgroundColor = primaryButtonColor;
+    button.style.backgroundColor = brandButtonPrimaryBg();
 
     logger.debug('Button reset to normal state');
 }

@@ -1,7 +1,11 @@
 //TODO: Button moves to center after verifying and the last time completed doesn't stay
 import { inheritFontStylesFrom } from "../utils/dom.js";
-
-const BRAND_COLOR_FALLBACK = "#0c7d9d";
+import {
+    brandButtonPrimaryBg,
+    brandButtonPrimaryText,
+    brandButtonSecondaryBg,
+    brandButtonSecondaryText,
+} from "./brandColors.js";
 
 export function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
     const button = document.createElement("button");
@@ -27,15 +31,10 @@ export function makeButton({ label, id = null, onClick = null, type = "primary",
     button.style.cursor = "pointer";
     button.style.transition = "background 0.3s, color 0.3s";
 
-    const rootStyles = getComputedStyle(document.documentElement);
-    const primaryButtonColor =
-        rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || BRAND_COLOR_FALLBACK;
-    const textColor =
-        rootStyles.getPropertyValue("--ic-brand-button--primary-text").trim() || "#ffffff";
-    const secondaryButtonColor =
-        rootStyles.getPropertyValue("--ic-brand-button--secondary-bgd").trim() || "#e0e0e0";
-    const secondaryTextColor =
-        rootStyles.getPropertyValue("--ic-brand-button--secondary-text").trim() || "#ffffff";
+    const primaryButtonColor   = brandButtonPrimaryBg();
+    const textColor            = brandButtonPrimaryText();
+    const secondaryButtonColor = brandButtonSecondaryBg();
+    const secondaryTextColor   = brandButtonSecondaryText();
 
     if (type === "primary") {
         button.style.background = primaryButtonColor;
