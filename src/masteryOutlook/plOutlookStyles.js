@@ -610,9 +610,17 @@ tr.os-needs-row td { background:#FFFDF7; }
    would be clipped. The input is already box-sizing:border-box + max-width. */
 .mo-shell .os-wp-box-wrap { width:3.5em; min-width:3.5em; max-width:3.5em; }
 .mo-shell .os-wp-box      { width:100%; min-width:0; }
-.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.846em; }
+.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.923em; }
 
 /* Top-of-table tinted status banner (replaces section divider rows) */
+/* Mastery Outlook creation button container (settings sidebar) */
+.cg-mastery-outlook-creator {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
 .os-status-banner { display:flex; align-items:center; justify-content:space-between; gap:0.769em; padding:0.615em 0.923em; margin:0 0 0.615em; border:0.5px solid transparent; border-radius:var(--radius-md); flex-wrap:wrap; font-size:0.923em; font-weight:500; }
 .os-status-banner-left   { display:flex; align-items:center; gap:0.385em; }
 .os-status-banner-left b { font-weight:700; }

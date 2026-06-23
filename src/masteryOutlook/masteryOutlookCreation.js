@@ -143,7 +143,6 @@ export function injectMasteryOutlookButton() {
         // Create button container
         const container = document.createElement('div');
         container.className = INJECTION_MARKER;
-        container.style.cssText = 'margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: 4px;';
 
         // Create button using existing makeButton utility
         const button = makeButton({

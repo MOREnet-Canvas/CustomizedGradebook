@@ -437,9 +437,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             input.className = 'os-wp-input';
             input.type = 'text'; input.inputMode = 'decimal';
             input.value = (curVal !== 'NE' && curVal !== '—') ? curVal : '';
-            input.style.cssText =
-                'width:3.5em;max-width:3.5em;min-width:0;box-sizing:border-box;' +
-                'font-size:0.923em;text-align:center;';
+
             boxEl?.replaceWith(input);
             input.select();
 

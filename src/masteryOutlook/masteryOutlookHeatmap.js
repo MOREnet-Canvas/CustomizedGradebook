@@ -9,8 +9,8 @@
 import { logger } from '../utils/logger.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 import { getMasteryColor, NE_HEATMAP_COLOR } from '../ui/masteryColors.js';
-
-const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
+import { injectStyles } from '../ui/styles.js';
+import { HEATMAP_CSS } from './masteryOutlookHeatmapStyles.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -146,6 +146,7 @@ export function buildHeatmapGrid(cache, options = {}) {
         onFullScreen = null
     } = options;
 
+    injectStyles(HEATMAP_CSS, 'mo-heatmap-styles');
     logger.debug('[Heatmap] Building grid');
 
     // Filter outcomes (exclude AVG and excluded keywords)
@@ -162,33 +163,26 @@ export function buildHeatmapGrid(cache, options = {}) {
     // Container
     const container = document.createElement('div');
     container.className = 'heatmap-container';
-    container.style.cssText = `${FONT}`;
 
     // Header (details toggle + full screen link)
     const header = document.createElement('div');
-    header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;';
+    header.className = 'hm-header';
 
     // Details toggle
     const toggleLabel = document.createElement('label');
-    toggleLabel.style.cssText = 'font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px;';
+    toggleLabel.className = 'hm-toggle-label';
     const toggleCheckbox = document.createElement('input');
     toggleCheckbox.type = 'checkbox';
     toggleCheckbox.id = 'heatmap-details-toggle';
-    toggleCheckbox.style.cursor = 'pointer';
+    toggleCheckbox.className = 'hm-toggle-checkbox';
     toggleLabel.appendChild(toggleCheckbox);
     toggleLabel.appendChild(document.createTextNode('Show details'));
 
-    // Full screen link
+    // Full screen link (hover handled by .hm-fullscreen-link:hover in CSS)
     const fullScreenLink = document.createElement('a');
     fullScreenLink.href = '#';
     fullScreenLink.textContent = 'Open full screen ↗';
-    fullScreenLink.style.cssText = 'font-size:12px; color:#0374B5; text-decoration:none;';
-    fullScreenLink.addEventListener('mouseenter', () => {
-        fullScreenLink.style.textDecoration = 'underline';
-    });
-    fullScreenLink.addEventListener('mouseleave', () => {
-        fullScreenLink.style.textDecoration = 'none';
-    });
+    fullScreenLink.className = 'hm-fullscreen-link';
     fullScreenLink.addEventListener('click', (e) => {
         e.preventDefault();
         if (onFullScreen) {
@@ -202,11 +196,11 @@ export function buildHeatmapGrid(cache, options = {}) {
 
     // Grid wrapper (for horizontal scroll)
     const gridWrapper = document.createElement('div');
-    gridWrapper.style.cssText = 'overflow-x:auto; border:1px solid #e0e0e0; border-radius:8px;';
+    gridWrapper.className = 'hm-grid-wrapper';
 
     // Table
     const table = document.createElement('table');
-    table.style.cssText = 'border-collapse:collapse; background:#fff;';
+    table.className = 'hm-table';
 
     // Function to render grid
     const renderGrid = () => {
@@ -215,22 +209,18 @@ export function buildHeatmapGrid(cache, options = {}) {
         // Thead
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        headerRow.style.borderBottom = '2px solid #e0e0e0';
+        headerRow.className = 'hm-header-row';
 
-        // Name column header
+        // Name column header (static layout via class; sort-active color/border inline)
         const nameHeader = document.createElement('th');
-        nameHeader.style.cssText = `
-            width:80px; padding:8px; text-align:left; cursor:pointer;
-            background:#f9f9f9; font-size:12px; font-weight:600;
-            color:${sortState.column === 'name' ? '#333' : '#666'};
-            border-bottom:${sortState.column === 'name' ? '2px solid #0374B5' : '2px solid #e0e0e0'};
-            position:sticky; left:0; z-index:2;
-        `;
+        nameHeader.className = 'hm-sort-header hm-sort-header--name';
+        nameHeader.style.color = sortState.column === 'name' ? '#333' : '#666';
+        nameHeader.style.borderBottom = sortState.column === 'name' ? '2px solid #0374B5' : '2px solid #e0e0e0';
         nameHeader.textContent = 'Name ';
         if (sortState.column === 'name') {
             const indicator = document.createElement('span');
             indicator.textContent = sortState.direction === 'asc' ? '▲' : '▼';
-            indicator.style.fontSize = '10px';
+            indicator.className = 'hm-sort-indicator';
             nameHeader.appendChild(indicator);
         }
         nameHeader.addEventListener('click', () => {
@@ -247,22 +237,14 @@ export function buildHeatmapGrid(cache, options = {}) {
         // Outcome column headers
         heatmapOutcomes.forEach(outcome => {
             const outcomeHeader = document.createElement('th');
-            outcomeHeader.style.cssText = `
-                width:${cellWidth}px; padding:4px; cursor:pointer;
-                background:#f9f9f9; font-size:11px; font-weight:500;
-                color:${sortState.column === String(outcome.id) ? '#333' : '#666'};
-                border-bottom:${sortState.column === String(outcome.id) ? '2px solid #0374B5' : '2px solid #e0e0e0'};
-                position:relative; height:100px; vertical-align:bottom;
-            `;
+            outcomeHeader.className = 'hm-sort-header hm-sort-header--outcome';
+            outcomeHeader.style.width = `${cellWidth}px`;
+            outcomeHeader.style.color = sortState.column === String(outcome.id) ? '#333' : '#666';
+            outcomeHeader.style.borderBottom = sortState.column === String(outcome.id) ? '2px solid #0374B5' : '2px solid #e0e0e0';
 
             // Rotated label container
             const labelContainer = document.createElement('div');
-            labelContainer.style.cssText = `
-                position:absolute; bottom:8px; left:50%;
-                transform:translateX(-50%) rotate(-45deg); transform-origin:left bottom;
-                white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-                max-width:120px; font-size:11px;
-            `;
+            labelContainer.className = 'hm-label-container';
             labelContainer.textContent = outcome.title.length > 30
                 ? outcome.title.substring(0, 30) + '...'
                 : outcome.title;
@@ -274,7 +256,7 @@ export function buildHeatmapGrid(cache, options = {}) {
             if (sortState.column === String(outcome.id)) {
                 const indicator = document.createElement('span');
                 indicator.textContent = sortState.direction === 'asc' ? '▲' : '▼';
-                indicator.style.cssText = 'position:absolute; top:4px; right:4px; font-size:10px;';
+                indicator.className = 'hm-sort-indicator-corner';
                 outcomeHeader.appendChild(indicator);
             }
 
@@ -302,15 +284,11 @@ export function buildHeatmapGrid(cache, options = {}) {
 
         sortedStudents.forEach((student, rowIndex) => {
             const row = document.createElement('tr');
-            row.style.borderBottom = '1px solid #f0f0f0';
+            row.className = 'hm-data-row';
 
             // Name cell with link to individual mastery dashboard
             const nameCell = document.createElement('td');
-            nameCell.style.cssText = `
-                width:80px; padding:6px 8px; font-size:12px; font-weight:500;
-                background:#fff; border-right:1px solid #e0e0e0;
-                position:sticky; left:0; z-index:1;
-            `;
+            nameCell.className = 'hm-name-cell';
 
             // Use cached masteryDashboardUrl or fallback to default
             const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
@@ -323,15 +301,7 @@ export function buildHeatmapGrid(cache, options = {}) {
             link.href = `/courses/${cache.meta.courseId}/pages/${masteryDashboardUrl}?cg_web=1&student_id=${student.id}`;
             link.textContent = formatStudentName(student);
             link.title = `View ${student.name || student.sortableName}'s individual mastery dashboard`;
-            link.style.cssText = 'color:#333; text-decoration:none; font-weight:500;';
-            link.addEventListener('mouseenter', () => {
-                link.style.textDecoration = 'underline';
-                link.style.color = '#0374B5';
-            });
-            link.addEventListener('mouseleave', () => {
-                link.style.textDecoration = 'none';
-                link.style.color = '#333';
-            });
+            link.className = 'hm-name-link';
 
             nameCell.appendChild(link);
             row.appendChild(nameCell);
@@ -347,13 +317,11 @@ export function buildHeatmapGrid(cache, options = {}) {
                 const tooltip = buildTooltip(student, outcome, outcomeData);
 
                 const cell = document.createElement('td');
-                cell.style.cssText = `
-                    width:${cellWidth}px; height:${cellHeight}px;
-                    text-align:center; vertical-align:middle;
-                    font-size:12px; font-weight:600;
-                    background:${colors.bg}; color:${colors.text};
-                    border:1px solid #fff; cursor:default;
-                `;
+                cell.className = 'hm-cell';
+                cell.style.width = `${cellWidth}px`;
+                cell.style.height = `${cellHeight}px`;
+                cell.style.background = colors.bg;
+                cell.style.color = colors.text;
                 cell.textContent = content;
                 cell.title = tooltip;
 
