@@ -183,6 +183,41 @@ export function isCourseSettingsPage() {
 }
 
 /**
+ * Poll until the Course Settings sidebar is ready, then invoke a callback.
+ *
+ * Checks every 300 ms for up to ~10 seconds. The poll exits early as soon as
+ * all three conditions are true:
+ *  - `isCourseSettingsPage()` — still on the settings URL
+ *  - `document.readyState === 'complete'`
+ *  - the sidebar element exists in the DOM
+ *
+ * @param {Function} callback - Called with the sidebar HTMLElement when found
+ * @param {string} [tag='Settings'] - Log prefix for diagnostics (e.g. 'MasteryOutlook')
+ */
+export function waitForSettingsSidebar(callback, tag = 'Settings') {
+    let attempts = 0;
+    const maxAttempts = 33; // ~10 seconds at 300 ms intervals
+    const intervalMs = 300;
+
+    const intervalId = setInterval(() => {
+        const onSettingsPage = isCourseSettingsPage();
+        const documentReady = document.readyState === 'complete';
+        const sidebar = document.querySelector('#right-side') ||
+                        document.querySelector('#right-side-wrapper') ||
+                        document.querySelector('aside[id="right-side"]');
+
+        if (onSettingsPage && documentReady && sidebar) {
+            clearInterval(intervalId);
+            logger.debug(`[${tag}] Settings sidebar found`);
+            callback(sidebar);
+        } else if (attempts++ >= maxAttempts) {
+            clearInterval(intervalId);
+            logger.warn(`[${tag}] Settings sidebar not found after 10 seconds`);
+        }
+    }, intervalMs);
+}
+
+/**
  * Extract student ID from teacher viewing student grades page
  *
  * @returns {string|null} Student ID or null if not on teacher viewing student grades page
