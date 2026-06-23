@@ -394,7 +394,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             </tr>`;
     }).join('');
 
-    const plColumnHeader = isCurrentScoreRow ? 'PL Avg' : 'PL Pred.';
+    const plColumnHeader = isCurrentScoreRow ? 'PL Avg' : 'Marzano';
 
     return `
         <table class="od-stu-table">
