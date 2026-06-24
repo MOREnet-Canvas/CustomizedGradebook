@@ -545,7 +545,7 @@ function buildOutcomeDetailPanel({
 
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
-        const isActive = (state.activeTabs?.[outcome.id] ?? 'students') === tab.id;
+        const isActive = (state.activeTabs[outcome.id] ?? 'students') === tab.id;
         tabBtn.className = 'od-detail-tab';
         tabBtn.style.cssText = `
             color:${isActive ? '#185FA5' : '#666'};
@@ -581,7 +581,7 @@ function buildOutcomeDetailPanel({
         const savedValue  = isNoteInput ? active.value          : null;
         // ───────────────────────────────────────────────────────────────────
 
-        const activeTab = state.activeTabs?.[outcome.id] ?? 'students';
+        const activeTab = state.activeTabs[outcome.id] ?? 'students';
         if (activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);
         } else if (activeTab === 'students') {
@@ -862,6 +862,7 @@ export function mountOutcomeRow({
         if (e.target.closest('[data-init-action]')) return;
         if (state.expandedOutcomeIds.has(outcome.id)) {
             state.expandedOutcomeIds.delete(outcome.id);
+            delete state.activeTabs[outcome.id]; // cleanup stale tab state
         } else {
             state.expandedOutcomeIds.add(outcome.id);
             state.activeTabs[outcome.id] = 'students'; // reset tab on fresh expand

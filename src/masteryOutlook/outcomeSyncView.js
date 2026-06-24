@@ -10,7 +10,7 @@
  * Conforms to the view-registry contract:
  *   mount(shell, cache, ctx) → { teardown, refresh }
  *
- * Per-mount state (expandedOutcomeId, activeTab, rowControllers) lives in a
+ * Per-mount state (expandedOutcomeIds, activeTabs, rowControllers) lives in a
  * closure created inside mountOutcomeSyncView so the host can teardown and
  * re-mount cleanly. rowControllers tracks per-row teardowns so document-level
  * listeners owned by detail panels are released on every rebuild.

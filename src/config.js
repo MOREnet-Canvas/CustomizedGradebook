@@ -100,6 +100,9 @@ if (typeof window !== 'undefined' && typeof console !== 'undefined') {
     if (ENABLE_GRADE_CUSTOM_STATUS && !window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY) {
         console.log('[CG Config] USE_UNIFIED_GRAPHQL_ONLY auto-enabled due to ENABLE_GRADE_CUSTOM_STATUS=true');
     }
+    if (PL_GRADING_TYPE && !['pass_fail', 'percent', 'letter_grade', 'gpa_scale', 'points', 'not_graded'].includes(PL_GRADING_TYPE)) {
+        console.warn(`[CG Config] Invalid PL_GRADING_TYPE: "${PL_GRADING_TYPE}". Canvas API may return 400 error.`);
+    }
 }
 
 // Grade scaling function (0-4 scale to 0-100 scale)
@@ -132,7 +135,7 @@ export const PL_RUBRIC_SUFFIX = window.CG_CONFIG?.PL_RUBRIC_SUFFIX ?? 'Projected
 //   Default: 'gpa_scale' — uses the Canvas GPA scale so students see labels (e.g. "Target")
 //   instead of raw numbers.
 // PL_GRADING_SCHEME_ID: Canvas grading standard ID to attach to PL assignments.
-//   Required when PL_GRADING_TYPE is 'gpa_scale' or 'letter_grade' so Canvas knows
+//   Recommended when PL_GRADING_TYPE is 'gpa_scale' or 'letter_grade' so Canvas knows
 //   which scheme's labels to show. Set to null (default) to let Canvas use the
 //   course-level default scheme.
 export const PL_GRADING_TYPE = window.CG_CONFIG?.PL_GRADING_TYPE ?? 'gpa_scale';

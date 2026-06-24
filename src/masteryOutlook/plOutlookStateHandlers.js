@@ -121,7 +121,11 @@ export async function handleCreatingAssignment(sm) {
         });
         logger.debug(`[PLSync] Adopted ${submissionIdByUserId.size} submission records`);
 
-        // Write to cache — same shape as a fresh creation
+        // Write to cache — same shape as a fresh creation.
+        // NOTE: We do NOT patch grading_type or grading_standard_id here for pre-existing
+        // assignments as Canvas does not allow changing the grading type of an assignment
+        // that already has submissions. Only newly created PL assignments use the
+        // configurable PL_GRADING_TYPE.
         const submissionIdsObj = {};
         submissionIdByUserId.forEach((subId, userId) => { submissionIdsObj[userId] = subId; });
 
