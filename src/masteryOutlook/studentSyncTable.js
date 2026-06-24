@@ -70,6 +70,7 @@ function formatDateShort(iso) {
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
  * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, syncPhase}}
+ *   status: 'ne' | 'synced' | 'verify_failed' | 'needs'
  */
 function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
     const canvas  = outcomeData?.canvasScore  ?? null;
@@ -112,6 +113,10 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         // synced when score matches Canvas AND no unsubmitted note exists.
         // willPost ?? marzano: use teacher override if set, else PL prediction.
         status = 'synced';
+    } else if (syncEntry?.verify_mismatch === true) {
+        // Score was pushed but Canvas rollup didn't confirm after all retries.
+        // Persisted so the "partial update" state is visible after navigation/reload.
+        status = 'verify_failed';
     } else {
         status = 'needs';
     }
@@ -192,8 +197,9 @@ function renderDot(dot, oidStr, sidStr, i) {
  * @returns {string} HTML <tr>
  */
 function renderOutcomeStudentRow(s, oidStr) {
-    const needsCls   = s.status === 'needs' ? 'os-needs-row' : '';
-    const differsCls = s.lock !== 'none'    ? 'differs'     : '';
+    const needsSync  = s.status === 'needs' || s.status === 'verify_failed';
+    const needsCls   = needsSync          ? 'os-needs-row' : '';
+    const differsCls = s.lock !== 'none' ? 'differs'      : '';
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
     const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
@@ -218,13 +224,17 @@ function renderOutcomeStudentRow(s, oidStr) {
           }</span>
         </button>` : '';
 
-    const saveMod   = s.status === 'needs' ? 'needs' : 'synced';
-    const saveTitle = s.status === 'needs' ? `Push ${wpDisp} to Canvas` : 'Synced with Canvas';
-    const saveTip   = s.status === 'needs' ? 'Push to Canvas' : 'Up to date';
+    const saveMod   = needsSync ? 'needs' : 'synced';
+    const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
+                    : needsSync                    ? `Push ${wpDisp} to Canvas`
+                    :                               'Synced with Canvas';
+    const saveTip   = s.status === 'verify_failed' ? 'Verify failed — re-sync'
+                    : needsSync                    ? 'Push to Canvas'
+                    :                               'Up to date';
     const saveHtml = s.syncPhase
         ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
-               ${s.status !== 'needs' ? 'disabled' : ''} title="${saveTitle}">
+               ${!needsSync ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
                ${saveMod === 'synced'
                   ? '<polyline points="2.5,6.5 5,9 9.5,3.5"/>'

@@ -545,6 +545,9 @@ export async function handleSyncing(sm) {
             ...existing,
             last_synced_score: s.plScore,
             last_synced_at:    now,
+            // Optimistically clear any previous verify failure — handleVerifying will
+            // set it back to true if the rollup still doesn't match after retries.
+            verify_mismatch:   false,
         };
 
         // 3c (write timing event 7) — reset will_post once the committed score has been
@@ -638,6 +641,31 @@ export async function handleVerifying(sm) {
     }
 
     sm.updateContext({ verifyMismatches: mismatches });
+
+    // Persist per-student verify outcome so accurate status survives navigation/reload.
+    // verify_mismatch: true  → score didn't confirm after all retries (partial update).
+    // verify_mismatch: false → score confirmed; clears any stale flag from a prior sync.
+    // Wrapped in try/catch so a disk-write failure doesn't block the rest of the sync flow.
+    const mismatchIds = new Set(mismatches.map(m => String(m.userId)));
+    const verifyAt    = new Date().toISOString();
+    try {
+        const syncState = await readSyncState(courseId, apiClient);
+        const oId       = String(outcomeId);
+        if (!syncState[oId]) syncState[oId] = {};
+        for (const s of studentsToSync) {
+            const sId = String(s.userId);
+            syncState[oId][sId] = {
+                ...(syncState[oId][sId] ?? {}),
+                last_verify_at:  verifyAt,
+                verify_mismatch: mismatchIds.has(sId),
+            };
+        }
+        await writeSyncState(courseId, syncState, apiClient);
+        logger.debug(`[PLSync] verify results persisted for ${studentsToSync.length} student(s) on outcome ${outcomeId}`);
+    } catch (err) {
+        logger.warn('[PLSync] handleVerifying — could not persist verify results:', err.message);
+    }
+
     return PL_STATES.COMPLETE;
 }
 
