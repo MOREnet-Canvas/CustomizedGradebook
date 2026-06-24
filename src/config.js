@@ -126,6 +126,18 @@ export const AVG_RUBRIC_NAME = window.CG_CONFIG?.AVG_RUBRIC_NAME ?? "Current Sco
 export const PL_ASSIGNMENT_SUFFIX = window.CG_CONFIG?.PL_ASSIGNMENT_SUFFIX ?? 'Projected Score';
 export const PL_RUBRIC_SUFFIX = window.CG_CONFIG?.PL_RUBRIC_SUFFIX ?? 'Projected Score Rubric';
 
+// PL assignment grading configuration
+// PL_GRADING_TYPE: grading type used for PL override assignments.
+//   Supported: pass_fail, percent, letter_grade, gpa_scale, points, not_graded
+//   Default: 'gpa_scale' — uses the Canvas GPA scale so students see labels (e.g. "Target")
+//   instead of raw numbers.
+// PL_GRADING_SCHEME_ID: Canvas grading standard ID to attach to PL assignments.
+//   Required when PL_GRADING_TYPE is 'gpa_scale' or 'letter_grade' so Canvas knows
+//   which scheme's labels to show. Set to null (default) to let Canvas use the
+//   course-level default scheme.
+export const PL_GRADING_TYPE = window.CG_CONFIG?.PL_GRADING_TYPE ?? 'gpa_scale';
+export const PL_GRADING_SCHEME_ID = window.CG_CONFIG?.PL_GRADING_SCHEME_ID ?? null;
+
 // Outcome configuration
 export const DEFAULT_MAX_POINTS = window.CG_CONFIG?.DEFAULT_MAX_POINTS ?? 4;
 export const DEFAULT_MASTERY_THRESHOLD = window.CG_CONFIG?.DEFAULT_MASTERY_THRESHOLD ?? 3;

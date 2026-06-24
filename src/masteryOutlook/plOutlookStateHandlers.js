@@ -18,7 +18,7 @@ import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.j
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { fetchRubricAssociationId } from '../services/submissionService.js';
 import { logger } from '../utils/logger.js';
-import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
+import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX, PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { findExistingPLAssignment } from './plOutlookSetup.js';
 import { roundToHalf } from './powerLaw.js';
@@ -176,10 +176,11 @@ export async function handleCreatingAssignment(sm) {
                 points_possible:           0,
                 published:                 true,
                 only_visible_to_overrides: false,
-                grading_type:              'points',
+                grading_type:              PL_GRADING_TYPE,
                 submission_types:          ['none'],
-                omit_from_final_grade:     true
+                omit_from_final_grade:     true,
                 // post_manually is NOT set — grades auto-post so students see projected scores
+                ...(PL_GRADING_SCHEME_ID != null ? { grading_standard_id: PL_GRADING_SCHEME_ID } : {})
             }
         },
         {}, 'PLSync:createAssignment'

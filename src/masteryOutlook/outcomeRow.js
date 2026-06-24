@@ -545,7 +545,7 @@ function buildOutcomeDetailPanel({
 
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
-        const isActive = state.activeTab === tab.id;
+        const isActive = (state.activeTabs?.[outcome.id] ?? 'students') === tab.id;
         tabBtn.className = 'od-detail-tab';
         tabBtn.style.cssText = `
             color:${isActive ? '#185FA5' : '#666'};
@@ -555,7 +555,7 @@ function buildOutcomeDetailPanel({
         tabBtn.textContent = tab.label;
         tabBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            state.activeTab = tab.id;
+            state.activeTabs[outcome.id] = tab.id;
             rerender();
         });
         tabBar.appendChild(tabBtn);
@@ -581,13 +581,14 @@ function buildOutcomeDetailPanel({
         const savedValue  = isNoteInput ? active.value          : null;
         // ───────────────────────────────────────────────────────────────────
 
-        if (state.activeTab === 'exceptions') {
+        const activeTab = state.activeTabs?.[outcome.id] ?? 'students';
+        if (activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);
-        } else if (state.activeTab === 'students') {
+        } else if (activeTab === 'students') {
             content.innerHTML = renderOutcomeStudentTable(outcome, cache);
         } else {
             content.innerHTML = buildStudentTable(
-                outcome, state.activeTab, cache, ctx,
+                outcome, activeTab, cache, ctx,
                 isCurrentScoreRow, isRegularOutcome, profColor
             );
         }
@@ -802,7 +803,7 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
  * @param {Object}   args.cache
  * @param {import('./viewRegistry.js').ViewContext} args.ctx
  * @param {Object}   args.state                 - shared per-mount state
- *                                                ({ expandedOutcomeId, activeTab })
+ *                                                ({ expandedOutcomeIds, activeTabs })
  * @param {Object}   args.displayStats          - precomputed classStats (Current
  *                                                Score uses a derived object)
  * @param {string|number} args.displayNumber    - row number (blank for special)
@@ -823,7 +824,7 @@ export function mountOutcomeRow({
     const { profColor, plAvgChip, spreadBar } = makeRenderers(ctx);
 
     const initialized = isOutcomeInitialized(outcome, cache, { isSpecial });
-    const isExpanded  = state.expandedOutcomeId === outcome.id;
+    const isExpanded  = state.expandedOutcomeIds.has(outcome.id);
 
     const outcomeContainer = document.createElement('div');
     outcomeContainer.className = 'od-outcome-container';
@@ -859,8 +860,12 @@ export function mountOutcomeRow({
         // Init-panel buttons live outside the row but the Initialize button is
         // inside the row's right column — guard so its click doesn't toggle.
         if (e.target.closest('[data-init-action]')) return;
-        state.expandedOutcomeId = (state.expandedOutcomeId === outcome.id) ? null : outcome.id;
-        state.activeTab = 'students';
+        if (state.expandedOutcomeIds.has(outcome.id)) {
+            state.expandedOutcomeIds.delete(outcome.id);
+        } else {
+            state.expandedOutcomeIds.add(outcome.id);
+            state.activeTabs[outcome.id] = 'students'; // reset tab on fresh expand
+        }
         rerender();
     });
 
