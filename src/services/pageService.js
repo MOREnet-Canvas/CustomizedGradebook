@@ -117,7 +117,7 @@ export async function findMasteryDashboardPageUrl(courseId, apiClient) {
                 (p.title === 'Mastery View' || p.title === 'Mastery Dashboard') &&
                 p.workflow_state !== 'deleted' &&
                 p.url &&
-                p.url.startsWith('mastery-')
+                p.url.startsWith('mastery-dashboard')
             );
 
             if (masteryPage) {

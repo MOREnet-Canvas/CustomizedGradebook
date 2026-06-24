@@ -341,7 +341,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
     }
 
     const rowsHTML = students.map(s => {
-        const c = s.plPrediction !== null ? profColor(s.plPrediction) : { bg: '#f5f5f3', tx: '#999' };
+        const c = s.plPrediction !== null ? profColor(roundToHalf(s.plPrediction)) : { bg: '#f5f5f3', tx: '#999' };
         const plDisplay = s.plPrediction !== null ? roundToHalf(s.plPrediction).toFixed(2) : 'NE';
         const canvasScoreDisplay = s.canvasScore !== null && s.canvasScore !== undefined
             ? s.canvasScore.toFixed(2) : '—';

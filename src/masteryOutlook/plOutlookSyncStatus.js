@@ -8,6 +8,8 @@
  *   - plOutlookSync.js       → checkSyncNeeded counts
  *   - plOutlookActions.js    → deciding what chain step to run next
  */
+import { roundToHalf } from './powerLaw.js';
+
 
 /**
  * Compare two PL scores treating them as equal when they round to the same
@@ -86,7 +88,8 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
     }
 
     // 5. needs_sync — never pushed (no lastSyncedScore) OR prediction has drifted
-    if (lastSyncedScore === null || !scoresMatch(plPrediction, canvasScore)) {
+    const targetScore = state?.will_post ?? roundToHalf(plPrediction);
+    if (lastSyncedScore === null || !scoresMatch(targetScore, canvasScore)) {
         return {
             status:   'needs_sync',
             label:    '↑ Needs sync',

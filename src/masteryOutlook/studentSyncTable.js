@@ -76,7 +76,7 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     const marzano = outcomeData?.plPrediction ?? null;
 
     const storedWP = syncEntry?.will_post ?? null;
-    const willPost = storedWP ?? marzano;
+    const willPost = storedWP ?? (marzano !== null ? roundToHalf(marzano) : null);
 
     const wpLock = syncEntry?.will_post_lock;
     const lock = wpLock === 'locked' ? 'locked'
@@ -242,7 +242,7 @@ function renderOutcomeStudentRow(s, oidStr) {
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
                 data-stu="${s.id}" data-oid="${oidStr}">
-          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
+          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano !== null ? roundToHalf(s.marzano) : null))}">${marzDisp}</span>
           <span class="os-pill-tip">Set Override = ${marzDisp} (Marzano)</span>
         </button>
       </td>
