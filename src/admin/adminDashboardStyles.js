@@ -287,6 +287,36 @@ const ADMIN_DASHBOARD_CSS = `
     font-weight: 600;
     color: #2d3b45;
 }
+
+/* ========================================
+   Theme CSS Editor Panel
+   ======================================== */
+
+.cg-theme-url-display {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 6px;
+}
+.cg-theme-url-text {
+    margin-top: 4px;
+    word-break: break-all;
+    font-family: monospace;
+    font-size: 12px;
+}
+.cg-theme-load-status {
+    margin-bottom: 10px;
+}
+#theme-css-textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background: #fafafa;
+}
+.cg-theme-cors-hint {
+    color: #666;
+    font-size: 13px;
+}
 `;
 
 export function injectAdminDashboardStyles() {

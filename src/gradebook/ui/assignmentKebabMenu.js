@@ -317,12 +317,7 @@ function createInlineSpinner() {
     svg.setAttribute('viewBox', '0 0 16 16');
     svg.setAttribute('role', 'status');
     svg.setAttribute('aria-label', 'Loading');
-    svg.style.cssText = `
-        display: inline-block;
-        vertical-align: middle;
-        margin-left: 6px;
-        animation: cg-spinner-rotate 0.8s linear infinite;
-    `;
+    svg.setAttribute('class', 'cg-spinner');
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', '8');
@@ -536,6 +531,14 @@ function injectStyles() {
             outline: 2px solid rgba(255, 255, 255, 0.5);
             outline-offset: 2px;
             border-radius: 50%;
+        }
+
+        /* Spinner element */
+        .cg-spinner {
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 6px;
+            animation: cg-spinner-rotate 0.8s linear infinite;
         }
 
         /* Spinner rotation animation */
