@@ -19,6 +19,7 @@
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
+import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
     handleSyncStudents,
@@ -191,7 +192,7 @@ function renderOutcomeStudentRow(s, oidStr) {
     const differsCls = s.lock !== 'none'    ? 'differs'     : '';
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
-    const marzDisp    = s.marzano != null ? s.marzano.toFixed(2) : 'NE';
+    const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
     const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
     const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
     const marzFaded   = scoresMatch(s.marzano, s.willPost) ? '' : 'faded';
