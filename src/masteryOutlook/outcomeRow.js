@@ -126,7 +126,7 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
         if (marzano === null) return false;
         if (canvas === null)  return false;
-        const matched = Math.abs((willPost ?? marzano) - canvas) < 0.01;
+        const matched = Math.abs((willPost ?? roundToHalf(marzano)) - canvas) < 0.01;
         return !matched || noteIsPending;
     }).length;
 

@@ -195,7 +195,7 @@ function renderOutcomeStudentRow(s, oidStr) {
     const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
     const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
     const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
-    const marzFaded   = scoresMatch(s.marzano, s.willPost) ? '' : 'faded';
+    const marzFaded   = scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
 
     const dotsHtml = s.dots.length
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
