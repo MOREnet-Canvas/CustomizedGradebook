@@ -18,7 +18,7 @@
 import { readSyncState, writeSyncState, readMasteryOutlookCache, writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { runPLSync } from './plOutlookSync.js';
 import { PL_STATES } from './plOutlookStateMachine.js';
-import { computeStudentOutcome } from './powerLaw.js';
+import { computeStudentOutcome, roundToHalf } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
 import { syncingStudentIds, syncStudentPhase } from './masteryOutlookState.js';
@@ -490,13 +490,19 @@ export async function handleSyncStudents({
     const effectiveIds = studentIds
         ?? (cache?.students ?? []).map(s => String(s.id));
 
-    // Capture will_post values BEFORE runPLSync clears them from sync_state
+    // Capture the score that will actually be pushed to Canvas for each student.
+    // BEFORE runPLSync clears will_post from sync_state.
+    // Mirrors handleCalculatingChanges: use will_post when set, otherwise
+    // roundToHalf(plPrediction) — the value Canvas actually receives.
+    // Using the raw plPrediction here would cause canvasScore to be written
+    // with an unrounded value, making the chip/row show "needs sync" forever.
     const pushedScores = {};
     for (const sid of effectiveIds) {
         const entry = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(sid)] ?? {};
         const od    = cache?.students?.find(s => String(s.id) === String(sid))
             ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-        pushedScores[String(sid)] = entry.will_post ?? od?.plPrediction;
+        pushedScores[String(sid)] = entry.will_post
+            ?? (od?.plPrediction != null ? roundToHalf(od.plPrediction) : null);
     }
 
     const plScoreOverrides = {};
@@ -550,6 +556,26 @@ export async function handleSyncStudents({
         }
     };
 
+    // After CALCULATING_CHANGES resolves the final sync list:
+    //   1. Trim syncingStudentIds to only students actually being pushed, so
+    //      skipped rows (no-change, no submission, manual_override) immediately
+    //      lose their spinners and don't show misleading "Pushing…" state.
+    //   2. Capture the resolved IDs for the post-sync canvasScore update below —
+    //      we must only update students who were actually synced, not all effectiveIds.
+    let resolvedStudentIds = null;
+    const onStudentsResolved = (resolvedUserIds) => {
+        resolvedStudentIds = new Set(resolvedUserIds);
+        const resolvedKeys = new Set(resolvedUserIds.map(id => `${outcomeId}_${id}`));
+        for (const k of syncKeys) {
+            if (!resolvedKeys.has(k)) {
+                syncingStudentIds.delete(k);
+                syncStudentPhase.delete(k);
+            }
+        }
+        onRerender?.();
+    };
+
+
     let result;
     try {
         result = await runPLSync({
@@ -559,8 +585,9 @@ export async function handleSyncStudents({
             apiClient,
             targetUserIds:    studentIds ?? null,
             cachedPLEntry,
-            plScoreOverrides: Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
-            onProgress:       phaseProgress,
+            plScoreOverrides:   Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
+            onProgress:         phaseProgress,
+            onStudentsResolved,
         });
     } catch (err) {
         // On a thrown error there's no cache write below, so repaint here to
@@ -580,7 +607,17 @@ export async function handleSyncStudents({
         const syncState   = cache?.sync_state ?? {};
         const outcomeSync = syncState[String(outcomeId)] ?? {};
 
-        for (const sid of effectiveIds) {
+        // Only update students that were actually resolved by handleCalculatingChanges
+        // (i.e. had a real score delta). Students skipped for no-change, no submission,
+        // no prediction, or manual_override are NOT in resolvedStudentIds and must not
+        // have their canvasScore overwritten.
+        // Also exclude students whose push failed (present in result.errors).
+        const failedIds = new Set((result.errors ?? []).map(e => String(e.userId)));
+        const idsToUpdate = resolvedStudentIds
+            ? [...resolvedStudentIds].filter(id => !failedIds.has(String(id)))
+            : effectiveIds.filter(id => !failedIds.has(String(id)));
+
+        for (const sid of idsToUpdate) {
             const student = cache?.students?.find(s => String(s.id) === String(sid));
             const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
             if (od != null) {

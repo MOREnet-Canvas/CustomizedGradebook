@@ -442,7 +442,15 @@ function buildPlAssignmentIds(cache) {
  * @param {Object}   ctx
  * @param {Function} onStudentDone  - Called after each student update with (studentId)
  */
-async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone) {
+/**
+ * @param {string}   outcomeId
+ * @param {Object}   cache
+ * @param {Object}   ctx
+ * @param {Function} onStudentDone       - Called after each student update with (studentId)
+ * @param {Map|null} [preloadedScoreMap] - Rollup scoreMap already fetched by the caller;
+ *                                         when provided, per-student rollup calls are skipped.
+ */
+async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone, preloadedScoreMap = null) {
     const plAssignmentIds = buildPlAssignmentIds(cache);
     const students = cache.students ?? [];
 
@@ -452,7 +460,7 @@ async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone) {
         if (fetchingStudentIds.has(key)) continue;   // skip if manual refresh in flight
 
         const changed = await refreshStudentOutcomeData(
-            ctx.courseId, outcomeId, sid, cache, ctx.apiClient, plAssignmentIds
+            ctx.courseId, outcomeId, sid, cache, ctx.apiClient, plAssignmentIds, preloadedScoreMap
         );
         if (changed) onStudentDone(sid);
     }
@@ -470,11 +478,15 @@ async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone) {
  * @param {Object} cache     - In-memory cache (mutated in place)
  * @param {Object} ctx       - Contains courseId and apiClient
  */
+/**
+ * @returns {Promise<Map<string, number>>} The fetched scoreMap (may be empty on failure).
+ *   Always resolves — errors are caught silently so callers can chain unconditionally.
+ */
 async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
     const scoreMap = await fetchOutcomeRollupsForOutcome(
         ctx.courseId, outcomeId, ctx.apiClient
     );
-    if (scoreMap.size === 0) return;
+    if (scoreMap.size === 0) return scoreMap;
 
     let updated = 0;
     cache.students?.forEach(student => {
@@ -512,6 +524,8 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
             }
         }
     }
+
+    return scoreMap;
 }
 
 // ─── Detail panel (tabs + content) ───────────────────────────────────────────
@@ -617,10 +631,23 @@ function buildOutcomeDetailPanel({
     };
     renderTable();
 
-    // Live Canvas score refresh — fetches current rollup scores for this outcome
-    // and re-renders the student table in place once the data arrives.
-    // Fires after the initial render so the teacher sees data immediately.
-    refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then(() => {
+    // Debounced renderTable for lazy-fetch updates — collapses rapid per-student
+    // repaints into a single animation frame so the DOM isn't thrashed once per
+    // student as the sequential background fetch processes the class roster.
+    let pendingLazyRender = null;
+    const debouncedRenderTable = () => {
+        if (pendingLazyRender != null) cancelAnimationFrame(pendingLazyRender);
+        pendingLazyRender = requestAnimationFrame(() => {
+            pendingLazyRender = null;
+            renderTable();
+        });
+    };
+
+    // Live Canvas score refresh — fetches the outcome rollup once, re-renders the
+    // table with live scores, then immediately starts the lazy alignment fetch
+    // with the preloaded scoreMap so per-student refreshes skip the redundant
+    // class-wide rollup call (N+1 → 1 total rollup API call per expand).
+    refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then((scoreMap) => {
         renderTable();
         // Update the outcome header chip and spread bar with fresh classStats
         const outcomeContainer = content.closest('.od-outcome-container');
@@ -644,12 +671,12 @@ function buildOutcomeDetailPanel({
                 [d['1'] / total * 100, profColor(1.0).bg],
             ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
         }
-    });
 
-    // Lazy alignment fetch — updates dots and plPrediction for each student
-    // sequentially in the background. Re-renders each row as data arrives.
-    lazyFetchOutcomeStudents(outcome.id, cache, ctx, (_studentId) => {
-        renderTable();
+        // Lazy alignment fetch — runs sequentially per student in the background.
+        // Pass the scoreMap from the rollup fetch above so each student's refresh
+        // doesn't re-issue a class-wide rollup call. Re-renders are debounced so
+        // rapid successive updates coalesce into a single DOM repaint.
+        lazyFetchOutcomeStudents(outcome.id, cache, ctx, debouncedRenderTable, scoreMap);
     });
 
     // Legacy per-row actions (non-students tabs only) — students tab is owned
