@@ -19,6 +19,8 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { injectStyles } from '../ui/styles.js';
+import { ALL_GRADES_CSS } from './allGradesStyles.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { formatGradeDisplay } from '../utils/gradeFormatting.js';
 import { createPersistentObserver, OBSERVER_CONFIGS } from '../utils/observerHelpers.js';
@@ -236,16 +238,17 @@ async function fetchCourseGrades() {
  * @returns {HTMLElement} Table element
  */
 function createGradesTable(courses) {
+    injectStyles(ALL_GRADES_CSS, 'cg-all-grades-styles');
+
     const table = document.createElement('table');
     table.className = 'ic-Table ic-Table--hover-row ic-Table--striped customized-grades-table';
-    table.style.cssText = 'width: 100%; margin-top: 1rem;';
 
     // Create table header (removed Type column per requirements)
     const thead = document.createElement('thead');
     thead.innerHTML = `
         <tr>
-            <th class="ic-Table-header" style="text-align: left; padding: 0.75rem;">Course</th>
-            <th class="ic-Table-header" style="text-align: right; padding: 0.75rem;">Grade</th>
+            <th class="ic-Table-header ic-Table-header--course">Course</th>
+            <th class="ic-Table-header ic-Table-header--grade">Grade</th>
         </tr>
     `;
     table.appendChild(thead);
@@ -260,25 +263,17 @@ function createGradesTable(courses) {
         // Course name cell
         const nameCell = document.createElement('td');
         nameCell.className = 'ic-Table-cell';
-        nameCell.style.padding = '0.75rem';
 
         const courseLink = document.createElement('a');
         courseLink.href = course.courseUrl;
         courseLink.textContent = course.courseName;
-        courseLink.style.cssText = 'color: #0374B5; text-decoration: none;';
-        courseLink.addEventListener('mouseenter', () => {
-            courseLink.style.textDecoration = 'underline';
-        });
-        courseLink.addEventListener('mouseleave', () => {
-            courseLink.style.textDecoration = 'none';
-        });
+        courseLink.className = 'cg-grades-course-link';
 
         nameCell.appendChild(courseLink);
 
         // Grade cell
         const gradeCell = document.createElement('td');
-        gradeCell.className = 'ic-Table-cell';
-        gradeCell.style.cssText = 'text-align: right; padding: 0.75rem; font-weight: bold;';
+        gradeCell.className = 'ic-Table-cell ic-Table-cell--grade';
 
         if (course.displayScore !== null) {
             if (course.displayType === 'points') {
