@@ -29,7 +29,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingStudentIds, syncStudentPhase } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -69,7 +69,7 @@ function formatDateShort(iso) {
  * @param {Object}   syncEntry           - sync_state[outcomeId][studentId] (may be {})
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
- * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, pushing}}
+ * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, syncPhase}}
  */
 function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
     const canvas  = outcomeData?.canvasScore  ?? null;
@@ -127,7 +127,11 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         note,
         dots,
         status,
-        pushing: false
+        // Live sync phase for this row ('pushing' | 'verifying' | null) — driven
+        // by syncingStudentIds/syncStudentPhase while a push is in flight.
+        syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
+            ? (syncStudentPhase.get(`${oidStr}_${sidStr}`) ?? 'pushing')
+            : null
     };
 }
 
@@ -217,8 +221,8 @@ function renderOutcomeStudentRow(s, oidStr) {
     const saveMod   = s.status === 'needs' ? 'needs' : 'synced';
     const saveTitle = s.status === 'needs' ? `Push ${wpDisp} to Canvas` : 'Synced with Canvas';
     const saveTip   = s.status === 'needs' ? 'Push to Canvas' : 'Up to date';
-    const saveHtml = s.pushing
-        ? `<span class="os-posting"><span class="spinner"></span> Pushing…</span>`
+    const saveHtml = s.syncPhase
+        ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
                ${s.status !== 'needs' ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">

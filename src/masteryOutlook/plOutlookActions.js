@@ -17,9 +17,11 @@
 
 import { readSyncState, writeSyncState, readMasteryOutlookCache, writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { runPLSync } from './plOutlookSync.js';
+import { PL_STATES } from './plOutlookStateMachine.js';
 import { computeStudentOutcome } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
+import { syncingStudentIds, syncStudentPhase } from './masteryOutlookState.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -513,16 +515,65 @@ export async function handleSyncStudents({
         if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
     }
 
-    const result = await runPLSync({
-        courseId,
-        outcomeId,
-        outcomeName,
-        apiClient,
-        targetUserIds:    studentIds ?? null,
-        cachedPLEntry,
-        plScoreOverrides: Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
-        onProgress,
-    });
+    // Mark the targeted rows as in-flight so each row shows a live spinner.
+    // Phase advances pushing → verifying as the state machine progresses; the
+    // finally below guarantees the set is cleared so a row can't get stuck.
+    const syncKeys = effectiveIds.map(sid => `${outcomeId}_${String(sid)}`);
+    for (const k of syncKeys) {
+        syncingStudentIds.add(k);
+        syncStudentPhase.set(k, 'pushing');
+    }
+    onRerender?.();
+
+    // Wrap onProgress to flip the row phase when the state machine enters
+    // SYNCING (pushing) and VERIFYING (verifying), re-rendering only on change.
+    const phaseProgress = (state, oName, message, done, total) => {
+        const phase = state === PL_STATES.SYNCING   ? 'pushing'
+                    : state === PL_STATES.VERIFYING ? 'verifying'
+                    : null;
+        if (phase) {
+            let changed = false;
+            for (const k of syncKeys) {
+                if (syncStudentPhase.get(k) !== phase) { syncStudentPhase.set(k, phase); changed = true; }
+            }
+            if (changed) onRerender?.();
+        }
+        onProgress?.(state, oName, message, done, total);
+    };
+
+    // Clear in-flight markers for every targeted row. Defined as a helper so the
+    // error path and the normal path share identical cleanup.
+    const clearSyncKeys = () => {
+        for (const k of syncKeys) {
+            syncingStudentIds.delete(k);
+            syncStudentPhase.delete(k);
+        }
+    };
+
+    let result;
+    try {
+        result = await runPLSync({
+            courseId,
+            outcomeId,
+            outcomeName,
+            apiClient,
+            targetUserIds:    studentIds ?? null,
+            cachedPLEntry,
+            plScoreOverrides: Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
+            onProgress:       phaseProgress,
+        });
+    } catch (err) {
+        // On a thrown error there's no cache write below, so repaint here to
+        // clear the spinners and avoid a row stuck showing "Pushing…".
+        clearSyncKeys();
+        onRerender?.();
+        throw err;
+    }
+
+    // Normal path: clear the in-flight markers but defer the re-render until
+    // after the cache write below, so the row repaints straight to its new
+    // canvasScore instead of flickering through the stale value first.
+    clearSyncKeys();
 
     // Update canvasScore in-memory and write cache to disk once after the batch.
     if (result.success && result.successCount > 0) {
@@ -570,7 +621,6 @@ export async function handleSyncStudents({
                 for (const [sid, noteText] of Object.entries(notes)) {
                     const submissionId = plSetup.submission_ids?.[String(sid)];
                     if (!submissionId) continue;
-                    console.log('[DEBUG] PL note - sid:', sid, 'submissionId:', submissionId, 'assignmentId:', plSetup.assignment_id);
                     await apiClient.put(
                         `/api/v1/courses/${courseId}/assignments/${plSetup.assignment_id}/submissions/${submissionId}`,
                         { comment: { text_comment: `${outcomeName} Note: ${noteText.trim()}` } },
