@@ -38,12 +38,12 @@ export const ALL_GRADES_CSS = `
     font-weight: bold;
 }
 
-/* Course link */
-.cg-grades-course-link {
+/* Course link (scoped under the custom table to match the old inline-style specificity) */
+.customized-grades-table .cg-grades-course-link {
     color: #0374B5;
     text-decoration: none;
 }
-.cg-grades-course-link:hover {
+.customized-grades-table .cg-grades-course-link:hover {
     text-decoration: underline;
 }
 `;

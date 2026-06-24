@@ -317,7 +317,7 @@ function createInlineSpinner() {
     svg.setAttribute('viewBox', '0 0 16 16');
     svg.setAttribute('role', 'status');
     svg.setAttribute('aria-label', 'Loading');
-    svg.className = 'cg-spinner';
+    svg.setAttribute('class', 'cg-spinner');
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', '8');
