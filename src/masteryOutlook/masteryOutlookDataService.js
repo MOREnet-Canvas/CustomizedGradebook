@@ -283,16 +283,22 @@ export async function fetchStudentOutcomeAttempts(courseId, outcomeId, studentId
  * @param {Set<string>} [plAssignmentIds]
  * @returns {Promise<boolean>} true if cache was updated
  */
-export async function refreshStudentOutcomeData(courseId, outcomeId, studentId, cache, apiClient, plAssignmentIds = new Set()) {
+export async function refreshStudentOutcomeData(courseId, outcomeId, studentId, cache, apiClient, plAssignmentIds = new Set(), preloadedScoreMap = null) {
     const student = cache.students?.find(s => String(s.id) === String(studentId));
     if (!student) return false;
 
     const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
     if (!od) return false;
 
+    // When a preloaded scoreMap is provided (e.g. from a preceding outcome-level
+    // rollup fetch), reuse it instead of issuing a redundant per-student rollup call.
+    // This eliminates the N+1 pattern when lazyFetchOutcomeStudents processes all
+    // students after the initial refreshCanvasScoresForOutcome call.
     const [freshAttempts, scoreMap] = await Promise.all([
         fetchStudentOutcomeAttempts(courseId, outcomeId, studentId, apiClient, plAssignmentIds),
-        fetchOutcomeRollupsForOutcome(courseId, outcomeId, apiClient)
+        preloadedScoreMap != null
+            ? Promise.resolve(preloadedScoreMap)
+            : fetchOutcomeRollupsForOutcome(courseId, outcomeId, apiClient)
     ]);
 
     let changed = false;
