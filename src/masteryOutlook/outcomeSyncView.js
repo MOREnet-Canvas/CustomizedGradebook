@@ -10,7 +10,7 @@
  * Conforms to the view-registry contract:
  *   mount(shell, cache, ctx) → { teardown, refresh }
  *
- * Per-mount state (expandedOutcomeId, activeTab, rowControllers) lives in a
+ * Per-mount state (expandedOutcomeIds, activeTabs, rowControllers) lives in a
  * closure created inside mountOutcomeSyncView so the host can teardown and
  * re-mount cleanly. rowControllers tracks per-row teardowns so document-level
  * listeners owned by detail panels are released on every rebuild.
@@ -395,13 +395,15 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
 export function mountOutcomeSyncView(shell, cache, ctx) {
     // Per-mount state. Module-level scope is intentionally avoided so the
     // host can teardown + remount cleanly without leaking selection.
-    // expandedOutcomeId / activeTab are mutated by the row module's click
+    // expandedOutcomeIds / activeTabs are mutated by the row module's click
     // handlers; rowControllers tracks per-row teardowns so document-level
     // listeners owned by detail panels are released on every rebuild.
+    // Multiple outcomes can be expanded simultaneously — each outcome's active
+    // tab is tracked independently in activeTabs keyed by outcome ID.
     const state = {
-        expandedOutcomeId: null,
-        activeTab:         'students',
-        rowControllers:    [],
+        expandedOutcomeIds: new Set(),
+        activeTabs:         {},
+        rowControllers:     [],
     };
 
     function renderRows() {
