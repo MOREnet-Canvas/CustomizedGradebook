@@ -67,7 +67,7 @@ function getMasteryEncouragement(mastered, total) {
  * @param {string} courseName - The name of the course to display
  * @returns {HTMLElement|null} The root element, or null if not found
  */
-function ensureHost(courseName = "Mastery Dashboard") {
+function ensureHost(courseName = "Mastery View") {
     const root = document.getElementById("mastery-dashboard-root");
     if (!root) return null;
 
@@ -127,10 +127,10 @@ function ensureHost(courseName = "Mastery Dashboard") {
 async function fetchCourseName(courseId, apiClient) {
     try {
         const course = await apiClient.get(`/api/v1/courses/${courseId}`, {}, 'fetchCourseName');
-        return course.name || "Mastery Dashboard";
+        return course.name || "Mastery View";
     } catch (error) {
         debugLog(`Error fetching course name: ${error.message}`);
-        return "Mastery Dashboard";
+        return "Mastery View";
     }
 }
 
@@ -294,7 +294,7 @@ export async function renderMasteryDashboard() {
 
             // Unknown role
             const roleTypes = courseEnrollments.map(e => e.type).join(", ");
-            statusEl.textContent = `Mastery Dashboard is not available for your role. Role(s): ${roleTypes || "none"}`;
+            statusEl.textContent = `Mastery View is not available for your role. Role(s): ${roleTypes || "none"}`;
             debugLog(`ERROR: No supported enrollment found. Roles: ${roleTypes}`);
             return;
         }

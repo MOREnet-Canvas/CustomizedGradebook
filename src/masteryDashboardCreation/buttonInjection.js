@@ -17,7 +17,7 @@ import { waitForSettingsSidebar } from '../utils/pageDetection.js';
 import { brandButtonPrimaryBg, brandButtonPrimaryText } from '../ui/brandColors.js';
 
 const INJECTION_MARKER = 'cg-mastery-dashboard-creator';
-const MASTERY_PAGE_TITLE = 'Mastery Dashboard';
+const MASTERY_PAGE_TITLE = 'Mastery View';
 const MASTERY_PAGE_URL = 'mastery-dashboard';
 const MASTERY_PAGE_BODY = '<div id="mastery-dashboard-root"></div>';
 

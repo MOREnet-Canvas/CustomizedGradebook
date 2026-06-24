@@ -17,6 +17,18 @@ export const MIN_SCORE = 1;
 export const DECAYING_AVG_WEIGHT = 0.65;
 
 /**
+ * Round a PL prediction to the nearest 0.5.
+ * Applied at the presentation and sync layers only — powerLaw calculations
+ * themselves remain at full precision.
+ *
+ * @param {number} val
+ * @returns {number}
+ */
+export function roundToHalf(val) {
+    return Math.round(val * 2) / 2;
+}
+
+/**
  * Clamp a value between min and max
  */
 function clamp(value, min, max) {

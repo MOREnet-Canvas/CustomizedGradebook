@@ -19,6 +19,7 @@
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
+import { roundToHalf } from './powerLaw.js';
 import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import {
     handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
@@ -125,7 +126,7 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
         if (marzano === null) return false;
         if (canvas === null)  return false;
-        const matched = Math.abs((willPost ?? marzano) - canvas) < 0.01;
+        const matched = Math.abs((willPost ?? roundToHalf(marzano)) - canvas) < 0.01;
         return !matched || noteIsPending;
     }).length;
 
@@ -253,7 +254,7 @@ function buildExceptionsTable(outcome, cache) {
         const entry     = outcomeSync[sId] ?? {};
         const od        = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
-        const marzDisp   = od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE';
+        const marzDisp   = od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE';
         const wpDisp     = entry.will_post != null ? entry.will_post.toFixed(2) : '—';
         const note       = escapeHtml(entry.will_post_note ?? '');
         const dateRaw    = entry.override_at ?? entry.last_synced_at ?? '';
@@ -340,8 +341,8 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
     }
 
     const rowsHTML = students.map(s => {
-        const c = s.plPrediction !== null ? profColor(s.plPrediction) : { bg: '#f5f5f3', tx: '#999' };
-        const plDisplay = s.plPrediction !== null ? s.plPrediction.toFixed(2) : 'NE';
+        const c = s.plPrediction !== null ? profColor(roundToHalf(s.plPrediction)) : { bg: '#f5f5f3', tx: '#999' };
+        const plDisplay = s.plPrediction !== null ? roundToHalf(s.plPrediction).toFixed(2) : 'NE';
         const canvasScoreDisplay = s.canvasScore !== null && s.canvasScore !== undefined
             ? s.canvasScore.toFixed(2) : '—';
         const decayingAvgDisplay = s.decayingAvg !== null ? s.decayingAvg.toFixed(2) : '—';

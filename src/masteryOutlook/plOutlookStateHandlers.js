@@ -21,6 +21,7 @@ import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { findExistingPLAssignment } from './plOutlookSetup.js';
+import { roundToHalf } from './powerLaw.js';
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -447,8 +448,9 @@ export async function handleCalculatingChanges(sm) {
         if (rawPlScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
 
         // 3b — use teacher-set will_post value when provided (will_post_lock: "unlocked"),
-        // otherwise fall back to the Power Law prediction
-        const plScore = (entry?.will_post != null) ? entry.will_post : rawPlScore;
+        // otherwise fall back to the Power Law prediction rounded to nearest 0.5.
+        // Teacher-set will_post values are NOT rounded — they are intentional.
+        const plScore = (entry?.will_post != null) ? entry.will_post : roundToHalf(rawPlScore);
 
         const canvasScore = canvasScoreByUserId.get(userId);
         if (canvasScore !== undefined && scoresMatch(plScore, canvasScore)) { skippedNoChange++; continue; }

@@ -19,6 +19,7 @@
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
+import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
     handleSyncStudents,
@@ -75,7 +76,7 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     const marzano = outcomeData?.plPrediction ?? null;
 
     const storedWP = syncEntry?.will_post ?? null;
-    const willPost = storedWP ?? marzano;
+    const willPost = storedWP ?? (marzano !== null ? roundToHalf(marzano) : null);
 
     const wpLock = syncEntry?.will_post_lock;
     const lock = wpLock === 'locked' ? 'locked'
@@ -191,10 +192,10 @@ function renderOutcomeStudentRow(s, oidStr) {
     const differsCls = s.lock !== 'none'    ? 'differs'     : '';
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
-    const marzDisp    = s.marzano != null ? s.marzano.toFixed(2) : 'NE';
+    const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
     const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
     const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
-    const marzFaded   = scoresMatch(s.marzano, s.willPost) ? '' : 'faded';
+    const marzFaded   = scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
 
     const dotsHtml = s.dots.length
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
@@ -241,7 +242,7 @@ function renderOutcomeStudentRow(s, oidStr) {
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
                 data-stu="${s.id}" data-oid="${oidStr}">
-          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
+          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano !== null ? roundToHalf(s.marzano) : null))}">${marzDisp}</span>
           <span class="os-pill-tip">Set Override = ${marzDisp} (Marzano)</span>
         </button>
       </td>

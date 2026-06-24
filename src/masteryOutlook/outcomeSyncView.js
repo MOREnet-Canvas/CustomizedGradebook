@@ -21,6 +21,7 @@
 
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
+import { roundToHalf } from './powerLaw.js';
 import { mountOutcomeRow, isOutcomeInitialized } from './outcomeRow.js';
 import { aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import { fetchOutcomeNames } from './masteryOutlookDataService.js';
@@ -317,7 +318,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
                     type:        typeParts.join(' + '),
                     typeClass:   'override',
                     canvas:      od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—',
-                    marzano:     od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE',
+                    marzano:     od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE',
                     willPost:    entry.will_post != null ? entry.will_post.toFixed(2) : '—',
                     note:        entry.will_post_note ?? '',
                     date:        entry.override_at ?? entry.last_synced_at ?? '',
