@@ -482,6 +482,12 @@ export async function handleCalculatingChanges(sm) {
 
     sm.updateContext({ studentsToSync, numberOfUpdates, startTime: new Date().toISOString() });
 
+    // Notify the UI so it can trim spinners to only the students actually being synced.
+    // Students in effectiveTargetIds that aren't in studentsToSync (skipped for no-change,
+    // no submission, no prediction, or manual_override) should have their spinners cleared.
+    const { onStudentsResolved } = sm.getContext();
+    onStudentsResolved?.(studentsToSync.map(s => String(s.userId)));
+
     if (numberOfUpdates === 0) {
         sm.updateContext({ zeroUpdates: true });
         return PL_STATES.COMPLETE;

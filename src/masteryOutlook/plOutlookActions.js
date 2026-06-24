@@ -550,6 +550,21 @@ export async function handleSyncStudents({
         }
     };
 
+    // After CALCULATING_CHANGES resolves the final sync list, trim syncingStudentIds
+    // to only the students that actually need updating. Students skipped for no-change,
+    // no submission, no prediction, or manual_override have their spinners cleared here
+    // so the UI accurately reflects which rows are being pushed.
+    const onStudentsResolved = (resolvedUserIds) => {
+        const resolvedKeys = new Set(resolvedUserIds.map(id => `${outcomeId}_${id}`));
+        for (const k of syncKeys) {
+            if (!resolvedKeys.has(k)) {
+                syncingStudentIds.delete(k);
+                syncStudentPhase.delete(k);
+            }
+        }
+        onRerender?.();
+    };
+
     let result;
     try {
         result = await runPLSync({
@@ -557,10 +572,11 @@ export async function handleSyncStudents({
             outcomeId,
             outcomeName,
             apiClient,
-            targetUserIds:    studentIds ?? null,
+            targetUserIds:      studentIds ?? null,
             cachedPLEntry,
-            plScoreOverrides: Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
-            onProgress:       phaseProgress,
+            plScoreOverrides:   Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
+            onProgress:         phaseProgress,
+            onStudentsResolved,
         });
     } catch (err) {
         // On a thrown error there's no cache write below, so repaint here to
