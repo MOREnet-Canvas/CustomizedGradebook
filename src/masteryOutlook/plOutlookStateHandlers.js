@@ -635,12 +635,24 @@ export async function handleVerifying(sm) {
         logger.debug(`[PLSync] Poll ${attempt}: ${rollups.length} total rollups fetched`);
 
         const actualScores = new Map();
+        let rollupUserMatches = 0;
         rollups.forEach(rollup => {
             const userId = String(rollup.links?.user);
             if (!userIds.includes(userId)) return;
+            rollupUserMatches++;
             const score = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
             if (score !== undefined) actualScores.set(userId, score);
         });
+
+        logger.debug(`[PLSync] Poll ${attempt}: ${rollupUserMatches} rollups matched a target user, ${actualScores.size} had a score for outcome ${outcomeId}`);
+
+        // If no scores found at all, log a sample rollup to expose outcome IDs and structure
+        if (attempt === 1 && actualScores.size === 0 && rollups.length > 0) {
+            const sample = rollups.find(r => userIds.includes(String(r.links?.user))) ?? rollups[0];
+            const sampleUser = String(sample.links?.user);
+            const sampleOutcomeIds = (sample.scores ?? []).map(s => s.links?.outcome);
+            logger.debug(`[PLSync] Sample rollup — user: ${sampleUser}, in userIds: ${userIds.includes(sampleUser)}, outcomeIds in scores: [${sampleOutcomeIds.join(', ')}], looking for: ${outcomeId}`);
+        }
 
         mismatches = studentsToSync.filter(s => {
             const actual = actualScores.get(s.userId);
