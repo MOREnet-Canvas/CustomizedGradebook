@@ -78,6 +78,7 @@ export class PLOutlookStateMachine {
             setupOnly:            false,  // When true, stop after CREATING_ASSIGNMENT (no score push)
             cachedPLEntry:        null,   // In-memory pl_assignments entry — skips disk read in CHECKING_SETUP
             plScoreOverrides:     null,   // { [userId]: plScore } — in-memory overrides for handleCalculatingChanges
+            canvasScoreOverrides: null,   // { [userId]: canvasScore } — in-memory rollups; skips the rollup re-fetch in CALCULATING_CHANGES (#54)
 
             // Populated during CHECKING_SETUP
             assignmentId:         null,

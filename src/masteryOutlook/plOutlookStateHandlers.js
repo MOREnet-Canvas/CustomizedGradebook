@@ -388,7 +388,7 @@ export async function handleFetchingSubmissions(sm) {
 export async function handleCalculatingChanges(sm) {
     const { courseId, outcomeId, outcomeName, submissionIdByUserId,
             rubricAssociationId, rubricCriterionId, effectiveTargetIds,
-            plScoreOverrides, apiClient } = sm.getContext();
+            plScoreOverrides, canvasScoreOverrides, apiClient } = sm.getContext();
 
     sm.progress('Calculating changes...');
     logger.debug(`[PLSync] CALCULATING_CHANGES for outcome ${outcomeId}`);
@@ -409,20 +409,33 @@ export async function handleCalculatingChanges(sm) {
     });
     logger.debug(`[PLSync] ${plPredictionByUserId.size} student(s) have PL predictions for outcome ${outcomeId}`);
 
-    // Fetch current Canvas outcome rollup scores
-    // Note: Canvas returns { rollups: [...], linked: {...} } — not a plain array
-    const rollupResponse = await apiClient.get(
-        `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
-        {}, 'PLSync:fetchRollups'
-    );
-    const rollups = rollupResponse.rollups || [];
-
+    // Resolve current Canvas rollup scores. Fast-path (#54): when the caller
+    // supplies in-memory canvasScore values (kept current by outcome expansion +
+    // load refresh), reuse them and skip the /outcome_rollups re-fetch. The
+    // post-push VERIFYING phase still re-fetches rollups, so any one-cycle drift
+    // is corrected there. Falls back to the network fetch when no overrides are
+    // provided.
     const canvasScoreByUserId = new Map();
-    rollups.forEach(rollup => {
-        const userId = String(rollup.links?.user);
-        const score  = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
-        if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
-    });
+    if (canvasScoreOverrides && Object.keys(canvasScoreOverrides).length > 0) {
+        for (const [userId, score] of Object.entries(canvasScoreOverrides)) {
+            if (score !== undefined && score !== null) canvasScoreByUserId.set(String(userId), score);
+        }
+        logger.debug(`[PLSync] CALCULATING_CHANGES fast-path — reused ${canvasScoreByUserId.size} in-memory canvasScore(s), skipped rollup fetch`);
+    } else {
+        // Fetch current Canvas outcome rollup scores
+        // Note: Canvas returns { rollups: [...], linked: {...} } — not a plain array
+        const rollupResponse = await apiClient.get(
+            `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
+            {}, 'PLSync:fetchRollups'
+        );
+        const rollups = rollupResponse.rollups || [];
+
+        rollups.forEach(rollup => {
+            const userId = String(rollup.links?.user);
+            const score  = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
+            if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
+        });
+    }
 
     // Read sync_state so we can honour manual_override flags (2d)
     const syncState  = await readSyncState(courseId, apiClient);
