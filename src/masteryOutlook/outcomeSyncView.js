@@ -445,7 +445,12 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
     // before the fetch completes (e.g. the teacher navigates away).
     let bgRefreshAborted = false;
 
-    function renderRows() {
+    function renderRows(options = {}) {
+        if (options.stripOnly) {
+            renderCourseSyncStrip(cache);
+            return;
+        }
+
         // Tear down listeners owned by previous rows before their DOM is dropped,
         // so document-level handlers don't accumulate across renders.
         (state.rowControllers || []).forEach(c => {

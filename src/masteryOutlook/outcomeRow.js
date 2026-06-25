@@ -565,6 +565,7 @@ function buildOutcomeDetailPanel({
 
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
+        tabBtn.dataset.tabId = tab.id;
         const isActive = (state.activeTabs[outcome.id] ?? 'students') === tab.id;
         tabBtn.className = 'od-detail-tab';
         tabBtn.style.cssText = `
@@ -576,7 +577,17 @@ function buildOutcomeDetailPanel({
         tabBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             state.activeTabs[outcome.id] = tab.id;
-            rerender();
+
+            // Local refresh instead of global rerender
+            tabBar.querySelectorAll('.od-detail-tab').forEach(btn => {
+                const isNowActive = btn.dataset.tabId === tab.id;
+                btn.style.cssText = `
+                    color:${isNowActive ? '#185FA5' : '#666'};
+                    border-bottom:2px solid ${isNowActive ? '#185FA5' : 'transparent'};
+                    background:${isNowActive ? '#fff' : 'transparent'};
+                    font-weight:${isNowActive ? '500' : '400'};`;
+            });
+            renderTable();
         });
         tabBar.appendChild(tabBtn);
     });
@@ -754,6 +765,9 @@ function buildOutcomeDetailPanel({
             // F1 — refresh the sync chip to reflect canvasScore updates after a push
             const syncCellEl = container?.querySelector('.od-sync-cell');
             if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+
+            // F5 — refresh the course-wide sync strip (unified counting)
+            rerender({ stripOnly: true });
         },
     });
 
@@ -865,6 +879,8 @@ export function mountOutcomeRow({
 }) {
     const { profColor, plAvgChip, spreadBar } = makeRenderers(ctx);
 
+    let detailTeardown = null;
+
     const initialized = isOutcomeInitialized(outcome, cache, { isSpecial });
     const isExpanded  = state.expandedOutcomeIds.has(outcome.id);
 
@@ -898,6 +914,32 @@ export function mountOutcomeRow({
         <div class="row-chevron">${chevron}</div>
     `;
 
+    /**
+     * Local expand/collapse toggle. Avoids a full view re-render by manipulating
+     * only this row's DOM and detail panel.
+     */
+    function refreshExpansion() {
+        const isExpanded = state.expandedOutcomeIds.has(outcome.id);
+        row.classList.toggle('expanded', isExpanded);
+        const chevronEl = row.querySelector('.row-chevron');
+        if (chevronEl) chevronEl.textContent = isExpanded ? '▼' : '›';
+
+        if (detailTeardown) {
+            try { detailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
+            detailTeardown = null;
+        }
+        outcomeContainer.querySelector('.od-detail-panel')?.remove();
+
+        if (isExpanded && initialized) {
+            const built = buildOutcomeDetailPanel({
+                outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
+                profColor, rerender, isSpecial,
+            });
+            outcomeContainer.appendChild(built.panel);
+            detailTeardown = built.detailTeardown;
+        }
+    }
+
     row.addEventListener('click', (e) => {
         // Init-panel buttons live outside the row but the Initialize button is
         // inside the row's right column — guard so its click doesn't toggle.
@@ -909,7 +951,7 @@ export function mountOutcomeRow({
             state.expandedOutcomeIds.add(outcome.id);
             state.activeTabs[outcome.id] = 'students'; // reset tab on fresh expand
         }
-        rerender();
+        refreshExpansion();
     });
 
     outcomeContainer.appendChild(row);
@@ -922,15 +964,8 @@ export function mountOutcomeRow({
         wireInitFlow(outcomeContainer, outcome, cache, ctx, rerender);
     }
 
-    let detailTeardown = null;
-    if (isExpanded && initialized) {
-        const built = buildOutcomeDetailPanel({
-            outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-            profColor, rerender, isSpecial,
-        });
-        outcomeContainer.appendChild(built.panel);
-        detailTeardown = built.detailTeardown;
-    }
+    // Mount-time expansion
+    refreshExpansion();
 
     if (!isSpecial) {
         outcomeContainer.draggable = true;
