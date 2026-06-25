@@ -514,7 +514,7 @@ export async function handleSyncStudents({
         }
     }
 
-    // F7 (#54) fast-path: feed CALCULATING_CHANGES the canvasScore values already
+    // #54 fast-path: feed CALCULATING_CHANGES the canvasScore values already
     // held in memory (refreshed on outcome expansion + load) so it can skip the
     // redundant /outcome_rollups re-fetch. Only the in-memory cache is used — the
     // file cache is NOT authoritative for canvasScore (expansion doesn't persist
@@ -587,8 +587,11 @@ export async function handleSyncStudents({
         // dropped syncingOutcomeIds now, buildSyncChip would briefly fall back to
         // "N need" (canvasScore hasn't been updated until the push completes).
         // Cleared in clearSyncKeys on completion/error, so the chip then jumps
-        // straight to "✓ Synced".
-        syncingOutcomePhase.set(String(outcomeId), 'syncing');
+        // straight to "✓ Synced". Guard on a non-empty resolved set so the
+        // zero-updates path (COMPLETE without SYNCING) doesn't flash "Syncing…".
+        if (resolvedUserIds.length > 0) {
+            syncingOutcomePhase.set(String(outcomeId), 'syncing');
+        }
         for (const k of syncKeys) {
             if (resolvedKeys.has(k)) {
                 syncingStudentIds.add(k);

@@ -543,6 +543,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
                 await onRefreshOutcome?.();
             } catch (err) {
                 logger.error('[MasteryOutlook] os-refresh-outcome failed', err);
+            } finally {
                 el.disabled = false;
                 el.classList.remove('spinning');
             }
