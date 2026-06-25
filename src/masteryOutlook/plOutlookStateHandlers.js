@@ -608,10 +608,7 @@ export async function handleVerifying(sm) {
     sm.progress('Verifying scores...');
     logger.debug('[PLSync] VERIFYING');
 
-    // noProgressLimit kept small — with outcome calculation_method=latest, Canvas
-    // propagates the new rubric score quickly (1–3 polls). 10 polls (50s) is enough
-    // headroom for any transient delay without blocking the UI for minutes.
-    const noProgressLimit   = 10;
+    const noProgressLimit   = 50;
     const retryDelayMs      = 5000;
     const userIds           = studentsToSync.map(s => s.userId);
     let mismatches          = [];
