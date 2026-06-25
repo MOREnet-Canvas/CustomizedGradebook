@@ -641,6 +641,7 @@ export async function handleVerifying(sm) {
         }
 
         if (mismatches.length < lastMismatchCount) {
+            logger.info(`[PLSync] Still verifying ${mismatches.length} student(s)...`);
             lastMismatchCount = mismatches.length;
             noProgressCount   = 0;
         } else {
