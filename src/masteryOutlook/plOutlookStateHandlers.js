@@ -422,19 +422,22 @@ export async function handleCalculatingChanges(sm) {
         }
         logger.debug(`[PLSync] CALCULATING_CHANGES fast-path — reused ${canvasScoreByUserId.size} in-memory canvasScore(s), skipped rollup fetch`);
     } else {
-        // Fetch current Canvas outcome rollup scores
-        // Note: Canvas returns { rollups: [...], linked: {...} } — not a plain array
-        const rollupResponse = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
-            {}, 'PLSync:fetchRollups'
-        );
-        const rollups = rollupResponse.rollups || [];
-
-        rollups.forEach(rollup => {
-            const userId = String(rollup.links?.user);
-            const score  = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
-            if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
-        });
+        // Fetch current Canvas outcome rollup scores (all pages via Link-header pagination).
+        // NOTE: outcome_rollups does NOT support ?page=N — must follow Link: rel="next" cursor.
+        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`;
+        while (rollupUrl) {
+            const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:fetchRollups');
+            const data     = await response.json();
+            (data?.rollups ?? []).forEach(rollup => {
+                const userId = String(rollup.links?.user);
+                const score  = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
+                if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
+            });
+            const link = response.headers.get('Link');
+            const next = link?.match(/<([^>]+)>;\s*rel="next"/);
+            rollupUrl  = next ? next[1] : null;
+        }
+        logger.debug(`[PLSync] CALCULATING_CHANGES — fetched ${canvasScoreByUserId.size} rollup score(s) for outcome ${outcomeId}`);
     }
 
     // Read sync_state so we can honour manual_override flags (2d)
@@ -635,17 +638,35 @@ export async function handleVerifying(sm) {
         logger.debug(`[PLSync] Poll ${attempt}: ${rollups.length} total rollups fetched`);
 
         const actualScores = new Map();
+        let rollupUserMatches = 0;
         rollups.forEach(rollup => {
             const userId = String(rollup.links?.user);
             if (!userIds.includes(userId)) return;
+            rollupUserMatches++;
             const score = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
             if (score !== undefined) actualScores.set(userId, score);
         });
+
+        logger.debug(`[PLSync] Poll ${attempt}: ${rollupUserMatches} rollups matched a target user, ${actualScores.size} had a score for outcome ${outcomeId}`);
+
+        // If no scores found at all, log a sample rollup to expose outcome IDs and structure
+        if (attempt === 1 && actualScores.size === 0 && rollups.length > 0) {
+            const sample = rollups.find(r => userIds.includes(String(r.links?.user))) ?? rollups[0];
+            const sampleUser = String(sample.links?.user);
+            const sampleOutcomeIds = (sample.scores ?? []).map(s => s.links?.outcome);
+            logger.debug(`[PLSync] Sample rollup — user: ${sampleUser}, in userIds: ${userIds.includes(sampleUser)}, outcomeIds in scores: [${sampleOutcomeIds.join(', ')}], looking for: ${outcomeId}`);
+        }
 
         mismatches = studentsToSync.filter(s => {
             const actual = actualScores.get(s.userId);
             return actual === undefined || !scoresMatch(actual, s.plScore);
         });
+
+        if (attempt === 1 && mismatches.length > 0) {
+            const first  = mismatches[0];
+            const actual = actualScores.get(first.userId);
+            logger.debug(`[PLSync] First mismatch — user: ${first.userId}, actual rollup: ${actual}, plScore: ${first.plScore}, actualScores total: ${actualScores.size}`);
+        }
 
         if (mismatches.length === 0) {
             logger.info(`[PLSync] All scores verified on poll ${attempt}`);
