@@ -63,11 +63,11 @@ export async function updateAvgAssignmentForStudents({
             return false;
         }
 
-        // Step 2: Fetch fresh rollup for only the affected students
-        const userIdParams   = studentIds.map(id => `user_ids[]=${id}`).join('&');
+        // Step 2: Fetch fresh rollup for all students — outcome_rollups does not support
+        // user_ids[] filtering (returns 400); JS filtering against studentIds below.
         const rollupResponse = await apiClient.get(
             `/api/v1/courses/${courseId}/outcome_rollups`
-                + `?include[]=outcomes&include[]=users&per_page=100&${userIdParams}`,
+                + `?include[]=outcomes&include[]=users&per_page=100`,
             {},
             'MOAvgService:fetchRollup'
         );
@@ -210,7 +210,6 @@ export async function updateAvgAssignmentForStudents({
                 const noProgressLimit = 50;
                 const retryDelayMs    = 5000;
                 const verifyUserIds   = averages.map(a => String(a.userId));
-                const userIdParams    = verifyUserIds.map(id => `user_ids[]=${id}`).join('&');
                 const expectedByUser  = new Map(averages.map(a => [String(a.userId), a.average]));
 
                 let avgMismatches    = [];
@@ -220,18 +219,15 @@ export async function updateAvgAssignmentForStudents({
 
                 while (true) {
                     logger.debug(`[MOAvgService] Step 8 avg verify poll ${attempt} (noProgressCount=${noProgressCount})`);
+                    // outcome_rollups does not support user_ids[] (400) — fetch all, filter in JS.
                     const verifyResponse = await apiClient.get(
                         `/api/v1/courses/${courseId}/outcome_rollups`
                             + `?outcome_ids[]=${avg_outcome_id}&include[]=outcomes&include[]=users`
-                            + `&per_page=100&${userIdParams}`,
+                            + `&per_page=100`,
                         {},
                         'MOAvgService:verifyAvgRollup'
                     );
                     const verifyRollups = verifyResponse?.rollups || [];
-                    // DEBUG #4: check whether combined outcome_ids[]+user_ids[] filter returns empty rollups
-                    if (verifyRollups.length === 0) {
-                        logger.debug(`[MOAvgService] Step 8 poll ${attempt} — rollups array is EMPTY (possible Canvas filter bug with combined outcome_ids[]+user_ids[])`);
-                    }
 
                     const actualAvg = new Map();
                     verifyRollups.forEach(rollup => {
