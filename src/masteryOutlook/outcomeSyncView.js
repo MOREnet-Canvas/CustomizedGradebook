@@ -23,8 +23,9 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { roundToHalf } from './powerLaw.js';
 import { mountOutcomeRow, isOutcomeInitialized } from './outcomeRow.js';
-import { aggregateSyncStatus } from './plOutlookSyncStatus.js';
-import { fetchOutcomeNames } from './masteryOutlookDataService.js';
+import { scoresMatch } from './plOutlookSyncStatus.js';
+import { fetchOutcomeNames, fetchOutcomeRollups } from './masteryOutlookDataService.js';
+import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
 import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 
@@ -143,20 +144,54 @@ function renderCourseSyncStrip(cache) {
     const stripEl = document.getElementById('od-course-sync');
     if (!stripEl) return;
 
-    const plConfig = {
-        pl_assignments: cache.pl_assignments ?? {},
-        sync_state:     cache.sync_state     ?? {},
-    };
-
+    const syncState   = cache.sync_state ?? {};
     const regular     = (cache.outcomes || []).filter(o => isRegularOutcome(o));
     const initialized = regular.filter(o => isOutcomeInitialized(o, cache));
 
+    // Use the same scoresMatch-based logic as the per-outcome sync chip so
+    // these strip totals always agree with what each chip displays.
+    // (aggregateSyncStatus requires last_synced_score != null to classify
+    // a student as 'synced', which diverges from the chip's needsCount logic.)
     const totals = { synced: 0, needsSync: 0, override: 0 };
     for (const o of initialized) {
-        const c = aggregateSyncStatus(cache.students || [], o.id, plConfig);
-        totals.synced    += c.synced;
-        totals.needsSync += c.needsSync;
-        totals.override  += c.possibleOverride + c.manualOverride;
+        const oId = String(o.id);
+        let needsCount = 0, overrideCount = 0, activeCount = 0;
+
+        for (const student of cache.students || []) {
+            const od = student.outcomes?.find(s => String(s.outcomeId) === oId);
+            if (!od) continue;
+
+            const syncEntry       = (syncState[oId] ?? {})[String(student.id)] ?? {};
+            const marzano         = od.plPrediction;
+            const canvas          = od.canvasScore;
+
+            // Override priority (mirrors getSyncStatus order)
+            if (syncEntry.manual_override) { overrideCount++; continue; }
+            const lastSyncedScore = syncEntry.last_synced_score ?? null;
+            if (lastSyncedScore !== null && canvas !== null
+                && !scoresMatch(canvas, lastSyncedScore)) {
+                overrideCount++;
+                continue;
+            }
+
+            // Skip NE students and those without a Canvas score
+            if (marzano === null || marzano === undefined) continue;
+            if (canvas  === null) continue;
+
+            activeCount++;
+            const willPost      = syncEntry.will_post ?? null;
+            const pendingNote   = syncEntry.will_post_note ?? null;
+            const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
+            const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
+
+            if (!scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending) {
+                needsCount++;
+            }
+        }
+
+        totals.needsSync += needsCount;
+        totals.override  += overrideCount;
+        totals.synced    += (activeCount - needsCount);  // active students that match
     }
 
     const setupX = initialized.length;
@@ -406,6 +441,10 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
         rowControllers:     [],
     };
 
+    // Aborts the background canvas-score refresh if the view is torn down
+    // before the fetch completes (e.g. the teacher navigates away).
+    let bgRefreshAborted = false;
+
     function renderRows() {
         // Tear down listeners owned by previous rows before their DOM is dropped,
         // so document-level handlers don't accumulate across renders.
@@ -527,6 +566,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
     }
 
     function teardown() {
+        bgRefreshAborted = true;
         (state.rowControllers || []).forEach(c => {
             try { c.teardown(); } catch (err) { logger.warn('[MasteryOutlook] row teardown failed', err); }
         });
@@ -534,6 +574,54 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
     }
 
     renderRows();
+
+    // Background canvas score refresh — fires once on mount after the initial
+    // render. Fetches live rollup scores for all outcomes in one API call,
+    // updates canvasScore in memory, refreshes sync chips + strip, and persists
+    // the cache so the next page load starts with correct values.
+    (async () => {
+        const stripEl = document.getElementById('od-course-sync');
+        const loadingHint = document.createElement('span');
+        loadingHint.style.cssText = 'font-size:.8em;color:#888;margin-left:.75em;';
+        loadingHint.textContent = '⟳ Refreshing scores…';
+        stripEl?.appendChild(loadingHint);
+
+        try {
+            const scoreMap = await fetchOutcomeRollups(ctx.courseId, ctx.apiClient);
+            if (bgRefreshAborted) return;
+
+            let updated = 0;
+            for (const student of cache.students ?? []) {
+                for (const od of student.outcomes ?? []) {
+                    const key  = `${student.id}_${od.outcomeId}`;
+                    const live = scoreMap[key];
+                    if (live !== undefined && live !== od.canvasScore) {
+                        od.canvasScore = live;
+                        updated++;
+                    }
+                }
+            }
+
+            if (bgRefreshAborted) return;
+
+            if (updated > 0) {
+                logger.debug(`[MasteryOutlook] Background rollup: updated ${updated} canvasScore(s)`);
+                // Refresh chips in-place (avoids full re-render) then strip
+                for (const controller of state.rowControllers) {
+                    controller.refreshChip?.();
+                }
+                renderCourseSyncStrip(cache);
+                // Persist so the next page load skips this refresh step
+                writeMasteryOutlookCache(ctx.courseId, ctx.apiClient, cache).catch(err => {
+                    logger.warn('[MasteryOutlook] Background cache persist failed', err);
+                });
+            }
+        } catch (err) {
+            logger.warn('[MasteryOutlook] Background rollup refresh failed', err);
+        } finally {
+            loadingHint.remove();
+        }
+    })();
 
     return { teardown, refresh: renderRows };
 }

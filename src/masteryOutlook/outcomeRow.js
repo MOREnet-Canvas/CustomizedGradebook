@@ -996,5 +996,14 @@ export function mountOutcomeRow({
         }
     }
 
-    return { rootEl: outcomeContainer, teardown };
+    /**
+     * Refresh the sync chip in-place without a full row re-render.
+     * Called by the background canvas score refresh in outcomeSyncView.js.
+     */
+    function refreshChip() {
+        const syncCellEl = outcomeContainer.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+    }
+
+    return { rootEl: outcomeContainer, teardown, refreshChip };
 }
