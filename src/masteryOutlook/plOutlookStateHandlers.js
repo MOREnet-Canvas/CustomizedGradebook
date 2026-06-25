@@ -616,11 +616,20 @@ export async function handleVerifying(sm) {
     while (true) {
         sm.progress(`Verifying... (poll ${attempt}, ${mismatches.length || '?'} remaining)`);
 
-        const rollupResponse = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100`,
-            {}, 'PLSync:verifyRollups'
-        );
-        const rollups = rollupResponse.rollups || [];
+        // outcome_rollups returns { rollups: [], linked: {} } — not a flat array —
+        // so apiClient.getAllPages() exits after page 1. Manual Link-header pagination
+        // required. NOTE: this endpoint does NOT support ?page=N (returns the same
+        // first page on every request); must follow the Link: rel="next" cursor instead.
+        const rollups = [];
+        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100`;
+        while (rollupUrl) {
+            const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:verifyRollups');
+            const data     = await response.json();
+            rollups.push(...(data?.rollups ?? []));
+            const link     = response.headers.get('Link');
+            const next     = link?.match(/<([^>]+)>;\s*rel="next"/);
+            rollupUrl      = next ? next[1] : null;
+        }
 
         const actualScores = new Map();
         rollups.forEach(rollup => {
