@@ -136,7 +136,16 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const n = counts.possibleOverride + counts.manualOverride;
         return `<span class="od-sync-chip override">⚑ ${n}</span>`;
     }
-    if (counts.synced > 0) {
+    // Use needsCount (scoresMatch-based) as the source of truth for synced status.
+    // counts.synced from aggregateSyncStatus requires last_synced_score to be set,
+    // so it returns 0 for students whose scores match but were never explicitly tracked —
+    // causing "—" even when every row is up to date. If needsCount === 0 and at least
+    // one student has both a prediction and a Canvas score, all of them are synced.
+    const hasActiveStu = (cache.students || []).some(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        return od?.plPrediction != null && od?.canvasScore != null;
+    });
+    if (hasActiveStu) {
         return `<span class="od-sync-chip synced">✓ Synced</span>`;
     }
     return `<span class="od-sync-chip none">—</span>`;
