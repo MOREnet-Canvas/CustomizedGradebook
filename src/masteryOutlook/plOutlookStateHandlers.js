@@ -605,15 +605,16 @@ export async function handleVerifying(sm) {
     sm.progress('Verifying scores...');
     logger.debug('[PLSync] VERIFYING');
 
-    const maxRetries          = 3;
-    const retryDelayMs        = 2000;
-    const userIds             = studentsToSync.map(s => s.userId);
-    let mismatches            = [];
-    let previousMismatchCount = Infinity;
-    let attempt               = 1;
+    const noProgressLimit   = 10;
+    const retryDelayMs      = 2000;
+    const userIds           = studentsToSync.map(s => s.userId);
+    let mismatches          = [];
+    let lastMismatchCount   = Infinity;
+    let noProgressCount     = 0;
+    let attempt             = 1;
 
-    while (attempt <= maxRetries) {
-        sm.progress(`Verifying... (attempt ${attempt}/${maxRetries})`);
+    while (true) {
+        sm.progress(`Verifying... (poll ${attempt}, ${mismatches.length || '?'} remaining)`);
 
         const rollupResponse = await apiClient.get(
             `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100`,
@@ -635,28 +636,24 @@ export async function handleVerifying(sm) {
         });
 
         if (mismatches.length === 0) {
-            logger.info(`[PLSync] All scores verified on attempt ${attempt}`);
+            logger.info(`[PLSync] All scores verified on poll ${attempt}`);
             break;
         }
 
-        if (mismatches.length < previousMismatchCount) {
-            logger.info(`[PLSync] Mismatches reduced to ${mismatches.length}, resetting retry counter`);
-            previousMismatchCount = mismatches.length;
-            attempt = 1;
-            await new Promise(r => setTimeout(r, retryDelayMs));
-            continue;
-        }
-
-        previousMismatchCount = mismatches.length;
-
-        if (attempt < maxRetries) {
-            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) on attempt ${attempt}, retrying...`);
-            attempt++;
-            await new Promise(r => setTimeout(r, retryDelayMs));
+        if (mismatches.length < lastMismatchCount) {
+            lastMismatchCount = mismatches.length;
+            noProgressCount   = 0;
         } else {
-            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) after ${maxRetries} attempts`);
+            noProgressCount++;
+        }
+
+        if (noProgressCount >= noProgressLimit) {
+            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — no progress for ${noProgressLimit} polls, giving up`);
             break;
         }
+
+        attempt++;
+        await new Promise(r => setTimeout(r, retryDelayMs));
     }
 
     sm.updateContext({ verifyMismatches: mismatches });
@@ -703,6 +700,9 @@ export async function handleComplete(sm) {
     const errorCount    = errors?.length || 0;
 
     if (mismatchCount > 0 || errorCount > 0) {
+        if (mismatchCount > 0) {
+            alert('There was an issue verifying all grades were updated. Try checking back in a few minutes — if grades show as synced, run the Current Score (avg) update from the Learning Mastery Gradebook to ensure averages are updated. If students still show as not synced after 15+ minutes, re-run the Mastery Outlook sync.');
+        }
         sm.progress(`Done — ${successCount} updated, ${errorCount} error(s), ${mismatchCount} verify mismatch(es)`);
     } else {
         sm.progress(`Done — ${successCount} student(s) synced`);
