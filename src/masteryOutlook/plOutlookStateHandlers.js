@@ -616,11 +616,23 @@ export async function handleVerifying(sm) {
     while (true) {
         sm.progress(`Verifying... (poll ${attempt}, ${mismatches.length || '?'} remaining)`);
 
-        const rollupResponse = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100`,
-            {}, 'PLSync:verifyRollups'
-        );
-        const rollups = rollupResponse.rollups || [];
+        // outcome_rollups returns { rollups: [], linked: {} } — not a flat array —
+        // so apiClient.getAllPages() returns after page 1. Manual pagination required.
+        // Without this, courses with >100 students miss page 2+ and those students
+        // are permanently "undefined" in actualScores → permanent mismatches.
+        const rollups = [];
+        let rollupPage = 1;
+        let rollupHasMore = true;
+        while (rollupHasMore) {
+            const rollupResponse = await apiClient.get(
+                `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100&page=${rollupPage}`,
+                {}, `PLSync:verifyRollups:page${rollupPage}`
+            );
+            const pageRollups = rollupResponse?.rollups ?? [];
+            rollups.push(...pageRollups);
+            rollupHasMore = pageRollups.length === 100;
+            rollupPage++;
+        }
 
         const actualScores = new Map();
         rollups.forEach(rollup => {
