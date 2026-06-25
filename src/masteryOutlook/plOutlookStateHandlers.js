@@ -615,6 +615,7 @@ export async function handleVerifying(sm) {
 
     while (true) {
         sm.progress(`Verifying... (poll ${attempt}, ${mismatches.length || '?'} remaining)`);
+        logger.debug(`[PLSync] Verification poll ${attempt} — fetching rollups...`);
 
         // outcome_rollups returns { rollups: [], linked: {} } — not a flat array —
         // so apiClient.getAllPages() exits after page 1. Manual Link-header pagination
@@ -625,11 +626,13 @@ export async function handleVerifying(sm) {
         while (rollupUrl) {
             const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:verifyRollups');
             const data     = await response.json();
+            logger.debug(`[PLSync] Rollup page fetched: ${data?.rollups?.length ?? 0} rollups, hasNext=${!!response.headers.get('Link')?.includes('rel="next"')}`);
             rollups.push(...(data?.rollups ?? []));
             const link     = response.headers.get('Link');
             const next     = link?.match(/<([^>]+)>;\s*rel="next"/);
             rollupUrl      = next ? next[1] : null;
         }
+        logger.debug(`[PLSync] Poll ${attempt}: ${rollups.length} total rollups fetched`);
 
         const actualScores = new Map();
         rollups.forEach(rollup => {
