@@ -626,6 +626,13 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-status-banner-left b { font-weight:700; }
 .os-status-banner.warn { background:var(--amber-bg); border-color:#E5C892; color:var(--amber); }
 .os-status-banner.ok   { background:#E8F2EC; border-color:#BCD9C5; color:#276749; }
+.os-status-banner-actions { display:flex; align-items:center; gap:0.538em; }
+
+/* Per-outcome refresh button (#54 manual rollup re-pull) */
+.os-refresh-outcome-btn { background:none; border:none; color:inherit; cursor:pointer; font-size:1.077em; line-height:1; padding:0 0.2em; opacity:0.65; transition:opacity 0.15s; }
+.os-refresh-outcome-btn:hover { opacity:1; }
+.os-refresh-outcome-btn:disabled { opacity:0.35; cursor:default; }
+.os-refresh-outcome-btn.spinning { display:inline-block; animation:mo-spin .8s linear infinite; }
 
 /* Per-row save button */
 .os-save-row-btn { width:1.692em; height:1.692em; border-radius:0.385em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-tertiary); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:background .1s, border-color .1s, color .1s; flex-shrink:0; position:relative; }

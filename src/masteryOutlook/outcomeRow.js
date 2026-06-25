@@ -28,7 +28,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -106,7 +106,12 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     }
 
     if (syncingOutcomeIds.has(String(outcome.id))) {
-        return `<span class="od-sync-chip checking"><span class="spinner"></span> Checking…</span>`;
+        // #55: hold an active state for the whole run so the chip never flashes
+        // back to "N need" between calculation and completion.
+        const label = syncingOutcomePhase.get(String(outcome.id)) === 'syncing'
+            ? 'Syncing…'
+            : 'Checking…';
+        return `<span class="od-sync-chip checking"><span class="spinner"></span> ${label}</span>`;
     }
 
     const plConfig = {
@@ -751,6 +756,12 @@ function buildOutcomeDetailPanel({
         courseId:  ctx.courseId,
         apiClient: ctx.apiClient,
         renderTable,
+        onRefreshOutcome: async () => {
+            // #54 manual safety valve — re-pull live rollups for this outcome,
+            // update in-memory canvasScore, then repaint the table + chip.
+            await refreshCanvasScoresForOutcome(outcome.id, cache, ctx);
+            renderTable();
+        },
         onChipUpdate: () => {
             const container = content.closest('.od-outcome-container');
             const chipEl    = container?.querySelector('.od-pl-chip');

@@ -21,7 +21,7 @@ import { PL_STATES } from './plOutlookStateMachine.js';
 import { computeStudentOutcome, roundToHalf } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
-import { syncingStudentIds, syncStudentPhase, syncingOutcomeIds } from './masteryOutlookState.js';
+import { syncingStudentIds, syncStudentPhase, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -514,6 +514,22 @@ export async function handleSyncStudents({
         }
     }
 
+    // F7 (#54) fast-path: feed CALCULATING_CHANGES the canvasScore values already
+    // held in memory (refreshed on outcome expansion + load) so it can skip the
+    // redundant /outcome_rollups re-fetch. Only the in-memory cache is used — the
+    // file cache is NOT authoritative for canvasScore (expansion doesn't persist
+    // it). Students without an in-memory canvasScore are omitted so the engine
+    // treats them as needing a push, exactly as the network path would for a
+    // missing rollup. VERIFYING re-fetches rollups post-push as the backstop.
+    const canvasScoreOverrides = {};
+    for (const sid of effectiveIds) {
+        const student = cache?.students?.find(s => String(s.id) === String(sid));
+        const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+        if (od?.canvasScore != null) {
+            canvasScoreOverrides[String(sid)] = od.canvasScore;
+        }
+    }
+
     // Capture notes BEFORE runPLSync clears will_post_note from sync_state
     const notes = {};
     for (const sid of effectiveIds) {
@@ -526,6 +542,7 @@ export async function handleSyncStudents({
     // resolves which rows actually need a push.
     const syncKeys = effectiveIds.map(sid => `${outcomeId}_${String(sid)}`);
     syncingOutcomeIds.add(String(outcomeId));
+    syncingOutcomePhase.set(String(outcomeId), 'checking');
     onRerender?.();
 
     // Wrap onProgress to flip the row phase when the state machine enters
@@ -548,6 +565,7 @@ export async function handleSyncStudents({
     // error path and the normal path share identical cleanup.
     const clearSyncKeys = () => {
         syncingOutcomeIds.delete(String(outcomeId));
+        syncingOutcomePhase.delete(String(outcomeId));
         for (const k of syncKeys) {
             syncingStudentIds.delete(k);
             syncStudentPhase.delete(k);
@@ -555,8 +573,8 @@ export async function handleSyncStudents({
     };
 
     // After CALCULATING_CHANGES resolves the final sync list:
-    //   1. Clear the outcome-level "Checking..." indicator and flip to per-row
-    //      spinners ONLY for students actually being pushed.
+    //   1. Advance the outcome chip from "Checking…" to "Syncing…" (#55) and add
+    //      per-row spinners ONLY for students actually being pushed.
     //   2. Capture the resolved IDs for the post-sync canvasScore update below —
     //      we must only update students who were actually synced, not all effectiveIds.
     let resolvedStudentIds = null;
@@ -564,7 +582,13 @@ export async function handleSyncStudents({
         resolvedStudentIds = new Set(resolvedUserIds);
         const resolvedKeys = new Set(resolvedUserIds.map(id => `${outcomeId}_${id}`));
 
-        syncingOutcomeIds.delete(String(outcomeId));
+        // #55: keep the outcome in an active state for the whole run. Advance the
+        // chip from "Checking…" to "Syncing…" instead of clearing it here — if we
+        // dropped syncingOutcomeIds now, buildSyncChip would briefly fall back to
+        // "N need" (canvasScore hasn't been updated until the push completes).
+        // Cleared in clearSyncKeys on completion/error, so the chip then jumps
+        // straight to "✓ Synced".
+        syncingOutcomePhase.set(String(outcomeId), 'syncing');
         for (const k of syncKeys) {
             if (resolvedKeys.has(k)) {
                 syncingStudentIds.add(k);
@@ -583,7 +607,8 @@ export async function handleSyncStudents({
             apiClient,
             targetUserIds:    studentIds ?? null,
             cachedPLEntry,
-            plScoreOverrides:   Object.keys(plScoreOverrides).length > 0 ? plScoreOverrides : null,
+            plScoreOverrides:     Object.keys(plScoreOverrides).length     > 0 ? plScoreOverrides     : null,
+            canvasScoreOverrides: Object.keys(canvasScoreOverrides).length > 0 ? canvasScoreOverrides : null,
             onProgress:         phaseProgress,
             onStudentsResolved,
         });

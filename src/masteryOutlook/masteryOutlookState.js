@@ -42,3 +42,11 @@ export const syncStudentPhase = new Map();
  */
 export const syncingOutcomeIds = new Set();
 
+/**
+ * Map of outcomeId → current outcome-level phase ('checking' | 'syncing') for
+ * outcomes present in syncingOutcomeIds. Held for the ENTIRE run so the chip
+ * reads "Checking…" → "Syncing…" → "✓ Synced" instead of flashing "N need"
+ * between calculation and completion. Cleared alongside syncingOutcomeIds.
+ */
+export const syncingOutcomePhase = new Map();
+

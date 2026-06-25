@@ -325,19 +325,28 @@ export function renderOutcomeStudentTable(outcome, cache) {
 
     const needsCount = studentStates.filter(s => s.status === 'needs').length;
 
+    const refreshOutcomeBtn =
+        `<button class="os-refresh-outcome-btn" data-action="os-refresh-outcome"
+            title="Refresh scores from Canvas"
+            aria-label="Refresh scores from Canvas">↻</button>`;
+
     const toolbarHtml = needsCount > 0
         ? `<div class="os-status-banner warn">
              <div class="os-status-banner-left">
                ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
              </div>
-             <button class="btn btn-sm btn-primary" data-action="os-post-all">
-               Save grades to Canvas
-             </button>
+             <div class="os-status-banner-actions">
+               ${refreshOutcomeBtn}
+               <button class="btn btn-sm btn-primary" data-action="os-post-all">
+                 Save grades to Canvas
+               </button>
+             </div>
            </div>`
         : `<div class="os-status-banner ok">
              <div class="os-status-banner-left">
                ✓ Canvas gradebook is up to date
              </div>
+             ${refreshOutcomeBtn}
            </div>`;
 
     // Legend commented out — color coding is self-evident from the dot colors
@@ -381,8 +390,9 @@ export function renderOutcomeStudentTable(outcome, cache) {
  * Attach all event listeners for the student sync table.
  *
  * Owns: os-use-canvas, os-use-marzano, os-wp-click (inline edit), os-lock,
- * os-unlock, os-save, os-post-all, dot-toggle, dot-ignore-toggle, os-note input,
- * and a document-level "click outside dot to close popover" listener.
+ * os-unlock, os-save, os-post-all, os-refresh-outcome, dot-toggle,
+ * dot-ignore-toggle, os-note input, and a document-level "click outside dot to
+ * close popover" listener.
  *
  * @param {Object} options
  * @param {HTMLElement} options.contentEl     - the .od-detail-content node
@@ -391,9 +401,11 @@ export function renderOutcomeStudentTable(outcome, cache) {
  * @param {string|number} options.courseId
  * @param {Object} options.apiClient
  * @param {Function} options.renderTable      - re-render callback
+ * @param {Function} [options.onRefreshOutcome] - re-pull live rollups for this outcome
+ * @param {Function} [options.onChipUpdate]   - refresh the outcome-level chip/strip
  * @returns {Function} teardown — remove the document-level listener
  */
-export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable, onChipUpdate }) {
+export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable, onRefreshOutcome, onChipUpdate }) {
     const outcomeName = outcome.title || String(outcome.id);
 
     // Seed the write scheduler's dedupe baseline with the on-disk state so the first
@@ -518,6 +530,21 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
                 fetchingStudentIds.delete(key);
                 el.disabled = false;
                 el.textContent = '↻';
+            }
+            return;
+        }
+
+        // ── Refresh outcome — re-pull live rollups for this outcome ───────
+        if (action === 'os-refresh-outcome') {
+            if (el.disabled) return;
+            el.disabled = true;
+            el.classList.add('spinning');
+            try {
+                await onRefreshOutcome?.();
+            } catch (err) {
+                logger.error('[MasteryOutlook] os-refresh-outcome failed', err);
+                el.disabled = false;
+                el.classList.remove('spinning');
             }
             return;
         }
