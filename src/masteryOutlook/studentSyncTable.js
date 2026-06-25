@@ -29,7 +29,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingStudentIds, syncStudentPhase } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingStudentIds, syncStudentPhase, syncingOutcomeIds } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -330,18 +330,31 @@ export function renderOutcomeStudentTable(outcome, cache) {
             title="Refresh scores from Canvas"
             aria-label="Refresh scores from Canvas">↻</button>`;
 
+    const isSyncing = syncingOutcomeIds.has(oidStr);
     const toolbarHtml = needsCount > 0
-        ? `<div class="os-status-banner warn">
-             <div class="os-status-banner-left">
-               ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-             </div>
-             <div class="os-status-banner-actions">
-               ${refreshOutcomeBtn}
-               <button class="btn btn-sm btn-primary" data-action="os-post-all">
-                 Save grades to Canvas
-               </button>
-             </div>
-           </div>`
+        ? isSyncing
+            ? `<div class="os-status-banner syncing">
+                 <div class="os-status-banner-left">
+                   <span class="spinner"></span> <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
+                 </div>
+                 <div class="os-status-banner-actions">
+                   ${refreshOutcomeBtn}
+                   <button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>
+                     Save grades to Canvas
+                   </button>
+                 </div>
+               </div>`
+            : `<div class="os-status-banner warn">
+                 <div class="os-status-banner-left">
+                   ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
+                 </div>
+                 <div class="os-status-banner-actions">
+                   ${refreshOutcomeBtn}
+                   <button class="btn btn-sm btn-primary" data-action="os-post-all">
+                     Save grades to Canvas
+                   </button>
+                 </div>
+               </div>`
         : `<div class="os-status-banner ok">
              <div class="os-status-banner-left">
                ✓ Canvas gradebook is up to date

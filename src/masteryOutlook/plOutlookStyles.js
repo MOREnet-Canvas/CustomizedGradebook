@@ -624,8 +624,9 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-status-banner { display:flex; align-items:center; justify-content:space-between; gap:0.769em; padding:0.615em 0.923em; margin:0 0 0.615em; border:0.5px solid transparent; border-radius:var(--radius-md); flex-wrap:wrap; font-size:0.923em; font-weight:500; }
 .os-status-banner-left   { display:flex; align-items:center; gap:0.385em; }
 .os-status-banner-left b { font-weight:700; }
-.os-status-banner.warn { background:var(--amber-bg); border-color:#E5C892; color:var(--amber); }
-.os-status-banner.ok   { background:#E8F2EC; border-color:#BCD9C5; color:#276749; }
+.os-status-banner.warn    { background:var(--amber-bg); border-color:#E5C892; color:var(--amber); }
+.os-status-banner.ok      { background:#E8F2EC; border-color:#BCD9C5; color:#276749; }
+.os-status-banner.syncing { background:var(--bg-secondary); border-color:var(--border-tertiary); color:var(--text-tertiary); }
 .os-status-banner-actions { display:flex; align-items:center; gap:0.538em; }
 
 /* Per-outcome refresh button (#54 manual rollup re-pull) */
