@@ -575,7 +575,6 @@ export async function handleSyncStudents({
         onRerender?.();
     };
 
-
     let result;
     try {
         result = await runPLSync({

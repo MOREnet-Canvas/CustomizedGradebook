@@ -477,10 +477,8 @@ async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone, pr
  * @param {string} outcomeId
  * @param {Object} cache     - In-memory cache (mutated in place)
  * @param {Object} ctx       - Contains courseId and apiClient
- */
-/**
  * @returns {Promise<Map<string, number>>} The fetched scoreMap (may be empty on failure).
- *   Always resolves — errors are caught silently so callers can chain unconditionally.
+ *   Always resolves so callers can chain unconditionally.
  */
 async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
     const scoreMap = await fetchOutcomeRollupsForOutcome(
