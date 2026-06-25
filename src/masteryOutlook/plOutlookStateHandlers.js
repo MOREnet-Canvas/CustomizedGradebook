@@ -605,8 +605,7 @@ export async function handleVerifying(sm) {
     sm.progress('Verifying scores...');
     logger.debug('[PLSync] VERIFYING');
 
-    const maxPolls          = 50;   // hard ceiling — loop cannot exceed this
-    const noProgressLimit   = 10;   // consecutive polls with no improvement → give up early
+    const noProgressLimit   = 50;
     const retryDelayMs      = 5000;
     const userIds           = studentsToSync.map(s => s.userId);
     let mismatches          = [];
@@ -662,12 +661,7 @@ export async function handleVerifying(sm) {
         }
 
         if (noProgressCount >= noProgressLimit) {
-            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — no progress for ${noProgressLimit} consecutive polls, giving up`);
-            break;
-        }
-
-        if (attempt >= maxPolls) {
-            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — reached max ${maxPolls} polls, giving up`);
+            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — no progress for ${noProgressLimit} polls, giving up`);
             break;
         }
 
