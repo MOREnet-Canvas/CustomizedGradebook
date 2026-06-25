@@ -207,8 +207,8 @@ export async function updateAvgAssignmentForStudents({
             // Step 8: Verify avg scores were accepted by Canvas — no-progress-in-10-polls loop.
             // Never throws; a failure here does not block COMPLETE.
             try {
-                const noProgressLimit = 10;
-                const retryDelayMs    = 2000;
+                const noProgressLimit = 50;
+                const retryDelayMs    = 5000;
                 const verifyUserIds   = averages.map(a => String(a.userId));
                 const userIdParams    = verifyUserIds.map(id => `user_ids[]=${id}`).join('&');
                 const expectedByUser  = new Map(averages.map(a => [String(a.userId), a.average]));
@@ -228,6 +228,10 @@ export async function updateAvgAssignmentForStudents({
                         'MOAvgService:verifyAvgRollup'
                     );
                     const verifyRollups = verifyResponse?.rollups || [];
+                    // DEBUG #4: check whether combined outcome_ids[]+user_ids[] filter returns empty rollups
+                    if (verifyRollups.length === 0) {
+                        logger.debug(`[MOAvgService] Step 8 poll ${attempt} — rollups array is EMPTY (possible Canvas filter bug with combined outcome_ids[]+user_ids[])`);
+                    }
 
                     const actualAvg = new Map();
                     verifyRollups.forEach(rollup => {

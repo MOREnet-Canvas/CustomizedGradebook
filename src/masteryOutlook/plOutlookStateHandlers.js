@@ -605,8 +605,8 @@ export async function handleVerifying(sm) {
     sm.progress('Verifying scores...');
     logger.debug('[PLSync] VERIFYING');
 
-    const noProgressLimit   = 10;
-    const retryDelayMs      = 2000;
+    const noProgressLimit   = 50;
+    const retryDelayMs      = 5000;
     const userIds           = studentsToSync.map(s => s.userId);
     let mismatches          = [];
     let lastMismatchCount   = Infinity;
