@@ -28,7 +28,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -103,6 +103,10 @@ function makeRenderers(ctx) {
 function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     if (!isOutcomeInitialized(outcome, cache, { isSpecial })) {
         return `<span class="od-sync-chip setup">⚙ Setup</span>`;
+    }
+
+    if (syncingOutcomeIds.has(String(outcome.id))) {
+        return `<span class="od-sync-chip checking"><span class="spinner"></span> Checking…</span>`;
     }
 
     const plConfig = {
@@ -643,6 +647,11 @@ function buildOutcomeDetailPanel({
             input.addEventListener('mousedown', (e) => e.stopPropagation());
             input.addEventListener('dragstart', (e) => e.preventDefault());
         });
+
+        // Refresh the outcome-level sync chip (e.g., to show "Checking...")
+        const container = content.closest('.od-outcome-container');
+        const syncCellEl = container?.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
 
         // ───────────────────────────────────────────────────────────────────
     };

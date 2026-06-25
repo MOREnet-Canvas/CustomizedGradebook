@@ -34,3 +34,11 @@ export const syncingStudentIds = new Set();
  * row can distinguish the push from the Canvas verification step.
  */
 export const syncStudentPhase = new Map();
+
+/**
+ * Set of in-flight sync keys for entire outcomes in format "outcomeId".
+ * Used to show an outcome-level "Checking..." indicator before specific
+ * students are marked as pushing.
+ */
+export const syncingOutcomeIds = new Set();
+

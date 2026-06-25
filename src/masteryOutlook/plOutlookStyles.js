@@ -905,6 +905,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-sync-chip.needs   { background:var(--amber-bg); color:var(--amber); }
 .mo-shell .od-sync-chip.override{ background:#FCEBEB; color:#791F1F; }
 .mo-shell .od-sync-chip.setup   { background:var(--blue-bg); color:var(--blue-ink); }
+.mo-shell .od-sync-chip.checking{ background:var(--blue-bg); color:var(--blue-ink); }
 .mo-shell .od-sync-chip.none    { background:transparent; color:var(--text-tertiary); font-weight:500; }
 .mo-shell .od-sync-cell { text-align:center; }
 

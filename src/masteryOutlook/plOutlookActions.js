@@ -21,7 +21,7 @@ import { PL_STATES } from './plOutlookStateMachine.js';
 import { computeStudentOutcome, roundToHalf } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
-import { syncingStudentIds, syncStudentPhase } from './masteryOutlookState.js';
+import { syncingStudentIds, syncStudentPhase, syncingOutcomeIds } from './masteryOutlookState.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -521,14 +521,11 @@ export async function handleSyncStudents({
         if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
     }
 
-    // Mark the targeted rows as in-flight so each row shows a live spinner.
-    // Phase advances pushing → verifying as the state machine progresses; the
-    // finally below guarantees the set is cleared so a row can't get stuck.
+    // F6 Option 2: Mark the outcome as "Checking..." instead of spinning all rows
+    // up front. Students will only show spinners after CALCULATING_CHANGES
+    // resolves which rows actually need a push.
     const syncKeys = effectiveIds.map(sid => `${outcomeId}_${String(sid)}`);
-    for (const k of syncKeys) {
-        syncingStudentIds.add(k);
-        syncStudentPhase.set(k, 'pushing');
-    }
+    syncingOutcomeIds.add(String(outcomeId));
     onRerender?.();
 
     // Wrap onProgress to flip the row phase when the state machine enters
@@ -550,6 +547,7 @@ export async function handleSyncStudents({
     // Clear in-flight markers for every targeted row. Defined as a helper so the
     // error path and the normal path share identical cleanup.
     const clearSyncKeys = () => {
+        syncingOutcomeIds.delete(String(outcomeId));
         for (const k of syncKeys) {
             syncingStudentIds.delete(k);
             syncStudentPhase.delete(k);
@@ -557,19 +555,20 @@ export async function handleSyncStudents({
     };
 
     // After CALCULATING_CHANGES resolves the final sync list:
-    //   1. Trim syncingStudentIds to only students actually being pushed, so
-    //      skipped rows (no-change, no submission, manual_override) immediately
-    //      lose their spinners and don't show misleading "Pushing…" state.
+    //   1. Clear the outcome-level "Checking..." indicator and flip to per-row
+    //      spinners ONLY for students actually being pushed.
     //   2. Capture the resolved IDs for the post-sync canvasScore update below —
     //      we must only update students who were actually synced, not all effectiveIds.
     let resolvedStudentIds = null;
     const onStudentsResolved = (resolvedUserIds) => {
         resolvedStudentIds = new Set(resolvedUserIds);
         const resolvedKeys = new Set(resolvedUserIds.map(id => `${outcomeId}_${id}`));
+
+        syncingOutcomeIds.delete(String(outcomeId));
         for (const k of syncKeys) {
-            if (!resolvedKeys.has(k)) {
-                syncingStudentIds.delete(k);
-                syncStudentPhase.delete(k);
+            if (resolvedKeys.has(k)) {
+                syncingStudentIds.add(k);
+                syncStudentPhase.set(k, 'pushing');
             }
         }
         onRerender?.();
