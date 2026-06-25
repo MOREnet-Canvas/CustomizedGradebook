@@ -265,6 +265,52 @@ export async function fetchStudentOutcomeAttempts(courseId, outcomeId, studentId
 }
 
 /**
+ * Fetch all outcome results for one outcome (all students) in a single paginated
+ * sequence, then group by student using extractAttempts.
+ *
+ * Replaces the per-student sequential approach in lazyFetchOutcomeStudents:
+ * one paginated call sequence (1–N pages) vs N sequential per-student calls.
+ *
+ * Returns null on any fetch error so callers can skip gracefully.
+ *
+ * @param {string}      courseId
+ * @param {string}      outcomeId
+ * @param {Object}      apiClient
+ * @param {Set<string>} [plAssignmentIds] - "assignment_NNNN" IDs to exclude
+ * @returns {Promise<{grouped: Object, alignmentNameMap: Object}|null>}
+ */
+export async function bulkFetchOutcomeResults(courseId, outcomeId, apiClient, plAssignmentIds = new Set()) {
+    try {
+        const baseUrl = `/api/v1/courses/${courseId}/outcome_results`
+            + `?outcome_ids[]=${outcomeId}&include[]=alignments&per_page=100`;
+
+        let allResults     = [];
+        const alignmentNameMap = {};
+        let page    = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            const url      = page === 1 ? baseUrl : `${baseUrl}&page=${page}`;
+            const response = await apiClient.get(url, {}, `bulkFetchOutcomeResults:page${page}`);
+            const pageResults = response?.outcome_results ?? [];
+            allResults = allResults.concat(pageResults);
+            Object.assign(alignmentNameMap, buildAlignmentNameMap(response?.linked?.alignments ?? []));
+            hasMore = pageResults.length === 100;
+            page++;
+        }
+
+        logger.debug(`[outcomesDataService] bulkFetchOutcomeResults: ${allResults.length} raw result(s) for outcome ${outcomeId}`);
+        const filtered = filterOutPLResults(allResults, plAssignmentIds);
+        const grouped  = extractAttempts(filtered, alignmentNameMap);
+        return { grouped, alignmentNameMap };
+
+    } catch (err) {
+        logger.warn(`[outcomesDataService] bulkFetchOutcomeResults failed for outcome ${outcomeId}: ${err.message}`);
+        return null;
+    }
+}
+
+/**
  * Fetch and apply fresh outcome data for one student × one outcome.
  *
  * Updates in-memory cache:
@@ -281,21 +327,24 @@ export async function fetchStudentOutcomeAttempts(courseId, outcomeId, studentId
  * @param {Object}      cache         - In-memory cache (mutated in place)
  * @param {Object}      apiClient
  * @param {Set<string>} [plAssignmentIds]
+ * @param {Map|null}    [preloadedScoreMap]    - Reuse an already-fetched rollup map; skips rollup call.
+ * @param {Array|null}  [preloadedAttempts]    - Pre-fetched attempts array; skips per-student fetch.
+ *                                               Pass [] when the bulk fetch confirmed no results exist.
  * @returns {Promise<boolean>} true if cache was updated
  */
-export async function refreshStudentOutcomeData(courseId, outcomeId, studentId, cache, apiClient, plAssignmentIds = new Set(), preloadedScoreMap = null) {
+export async function refreshStudentOutcomeData(courseId, outcomeId, studentId, cache, apiClient, plAssignmentIds = new Set(), preloadedScoreMap = null, preloadedAttempts = null) {
     const student = cache.students?.find(s => String(s.id) === String(studentId));
     if (!student) return false;
 
     const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
     if (!od) return false;
 
-    // When a preloaded scoreMap is provided (e.g. from a preceding outcome-level
-    // rollup fetch), reuse it instead of issuing a redundant per-student rollup call.
-    // This eliminates the N+1 pattern when lazyFetchOutcomeStudents processes all
-    // students after the initial refreshCanvasScoresForOutcome call.
+    // When preloaded data is provided (from a preceding bulk/outcome-level fetch),
+    // reuse it instead of issuing redundant per-student API calls.
     const [freshAttempts, scoreMap] = await Promise.all([
-        fetchStudentOutcomeAttempts(courseId, outcomeId, studentId, apiClient, plAssignmentIds),
+        preloadedAttempts != null
+            ? Promise.resolve(preloadedAttempts)
+            : fetchStudentOutcomeAttempts(courseId, outcomeId, studentId, apiClient, plAssignmentIds),
         preloadedScoreMap != null
             ? Promise.resolve(preloadedScoreMap)
             : fetchOutcomeRollupsForOutcome(courseId, outcomeId, apiClient)
@@ -651,7 +700,7 @@ export function extractAttempts(outcomeResults, alignmentNameMap = {}) {
     const totalGroups = Object.keys(grouped).length;
     const totalAttempts = Object.values(grouped).reduce((sum, arr) => sum + arr.length, 0);
 
-    logger.info(`[outcomesDataService] Grouped into ${totalGroups} student+outcome pairs (${totalAttempts} attempts total)`);
+    logger.debug(`[outcomesDataService] Grouped into ${totalGroups} student+outcome pairs (${totalAttempts} attempts total)`);
 
     return grouped;
 }

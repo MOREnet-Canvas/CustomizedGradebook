@@ -27,7 +27,7 @@ import {
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData } from './masteryOutlookDataService.js';
+import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
 import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
@@ -460,6 +460,13 @@ function buildPlAssignmentIds(cache) {
  * @param {Function} onStudentDone  - Called after each student update with (studentId)
  */
 /**
+ * Fetch all outcome results for the given outcome in one paginated sequence,
+ * then iterate students in-memory — no per-student API calls.
+ *
+ * Replaces the previous sequential per-student loop (~40–80 s for 200 students)
+ * with a single bulk fetch (~1–4 s), grouped by student in JS.
+ * Falls back gracefully (skips refresh) if the bulk fetch fails.
+ *
  * @param {string}   outcomeId
  * @param {Object}   cache
  * @param {Object}   ctx
@@ -467,17 +474,27 @@ function buildPlAssignmentIds(cache) {
  * @param {Map|null} [preloadedScoreMap] - Rollup scoreMap already fetched by the caller;
  *                                         when provided, per-student rollup calls are skipped.
  */
-async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone, preloadedScoreMap = null) {
+async function bulkRefreshOutcomeStudents(outcomeId, cache, ctx, onStudentDone, preloadedScoreMap = null) {
     const plAssignmentIds = buildPlAssignmentIds(cache);
-    const students = cache.students ?? [];
+    const students        = cache.students ?? [];
+
+    const bulkData = await bulkFetchOutcomeResults(ctx.courseId, outcomeId, ctx.apiClient, plAssignmentIds);
+    if (!bulkData) {
+        logger.warn(`[MasteryOutlook] bulkFetchOutcomeResults failed for outcome ${outcomeId} — skipping lazy refresh`);
+        return;
+    }
+
+    const { grouped } = bulkData;
 
     for (const student of students) {
         const sid = String(student.id);
-        const key = `${outcomeId}_${sid}`;
-        if (fetchingStudentIds.has(key)) continue;   // skip if manual refresh in flight
+        if (fetchingStudentIds.has(`${outcomeId}_${sid}`)) continue;   // skip if manual refresh in flight
 
+        // Look up pre-fetched attempts for this student; [] means confirmed no results.
+        const preloadedAttempts = grouped[`${sid}_${outcomeId}`] ?? [];
         const changed = await refreshStudentOutcomeData(
-            ctx.courseId, outcomeId, sid, cache, ctx.apiClient, plAssignmentIds, preloadedScoreMap
+            ctx.courseId, outcomeId, sid, cache, ctx.apiClient,
+            plAssignmentIds, preloadedScoreMap, preloadedAttempts
         );
         if (changed) onStudentDone(sid);
     }
@@ -709,11 +726,11 @@ function buildOutcomeDetailPanel({
         const syncCellEl = outcomeContainer?.querySelector('.od-sync-cell');
         if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
 
-        // Lazy alignment fetch — runs sequentially per student in the background.
-        // Pass the scoreMap from the rollup fetch above so each student's refresh
-        // doesn't re-issue a class-wide rollup call. Re-renders are debounced so
-        // rapid successive updates coalesce into a single DOM repaint.
-        lazyFetchOutcomeStudents(outcome.id, cache, ctx, debouncedRenderTable, scoreMap);
+        // Bulk alignment fetch — one paginated call for the whole outcome, then
+        // in-memory per-student grouping. Replaces the sequential per-student loop.
+        // Pass the scoreMap so each student's refresh skips a redundant rollup call.
+        // Re-renders are debounced so rapid successive updates coalesce into one repaint.
+        bulkRefreshOutcomeStudents(outcome.id, cache, ctx, debouncedRenderTable, scoreMap);
     });
 
     // Legacy per-row actions (non-students tabs only) — students tab is owned
