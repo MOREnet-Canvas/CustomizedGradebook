@@ -422,19 +422,22 @@ export async function handleCalculatingChanges(sm) {
         }
         logger.debug(`[PLSync] CALCULATING_CHANGES fast-path — reused ${canvasScoreByUserId.size} in-memory canvasScore(s), skipped rollup fetch`);
     } else {
-        // Fetch current Canvas outcome rollup scores
-        // Note: Canvas returns { rollups: [...], linked: {...} } — not a plain array
-        const rollupResponse = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`,
-            {}, 'PLSync:fetchRollups'
-        );
-        const rollups = rollupResponse.rollups || [];
-
-        rollups.forEach(rollup => {
-            const userId = String(rollup.links?.user);
-            const score  = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
-            if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
-        });
+        // Fetch current Canvas outcome rollup scores (all pages via Link-header pagination).
+        // NOTE: outcome_rollups does NOT support ?page=N — must follow Link: rel="next" cursor.
+        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`;
+        while (rollupUrl) {
+            const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:fetchRollups');
+            const data     = await response.json();
+            (data?.rollups ?? []).forEach(rollup => {
+                const userId = String(rollup.links?.user);
+                const score  = rollup.scores?.find(s => String(s.links?.outcome) === String(outcomeId))?.score;
+                if (score !== undefined && score !== null) canvasScoreByUserId.set(userId, score);
+            });
+            const link = response.headers.get('Link');
+            const next = link?.match(/<([^>]+)>;\s*rel="next"/);
+            rollupUrl  = next ? next[1] : null;
+        }
+        logger.debug(`[PLSync] CALCULATING_CHANGES — fetched ${canvasScoreByUserId.size} rollup score(s) for outcome ${outcomeId}`);
     }
 
     // Read sync_state so we can honour manual_override flags (2d)
@@ -658,6 +661,12 @@ export async function handleVerifying(sm) {
             const actual = actualScores.get(s.userId);
             return actual === undefined || !scoresMatch(actual, s.plScore);
         });
+
+        if (attempt === 1 && mismatches.length > 0) {
+            const first  = mismatches[0];
+            const actual = actualScores.get(first.userId);
+            logger.debug(`[PLSync] First mismatch — user: ${first.userId}, actual rollup: ${actual}, plScore: ${first.plScore}, actualScores total: ${actualScores.size}`);
+        }
 
         if (mismatches.length === 0) {
             logger.info(`[PLSync] All scores verified on poll ${attempt}`);
