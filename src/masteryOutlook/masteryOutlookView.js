@@ -59,7 +59,7 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
     loadingEl.className = 'od-initial-loading';
     loadingEl.style.cssText =
         'display:flex; align-items:center; justify-content:center; gap:8px; ' +
-        'padding:32px 16px; color:#185FA5; font-size:13px;';
+        'padding:32px 16px; color:var(--blue); font-size:13px;';
     loadingEl.innerHTML = '<span class="spinner"></span> Loading outcomes…';
     containerEl.querySelector('#od-outcomes-col')?.prepend(loadingEl);
 
