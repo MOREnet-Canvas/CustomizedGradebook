@@ -219,6 +219,7 @@ export async function updateAvgAssignmentForStudents({
                 let attempt          = 1;
 
                 while (true) {
+                    logger.debug(`[MOAvgService] Step 8 avg verify poll ${attempt} (noProgressCount=${noProgressCount})`);
                     const verifyResponse = await apiClient.get(
                         `/api/v1/courses/${courseId}/outcome_rollups`
                             + `?outcome_ids[]=${avg_outcome_id}&include[]=outcomes&include[]=users`
