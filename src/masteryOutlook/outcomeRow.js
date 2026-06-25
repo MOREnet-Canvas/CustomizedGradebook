@@ -20,7 +20,7 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
 import { roundToHalf } from './powerLaw.js';
-import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
+import { getSyncStatus, aggregateSyncStatus, scoresMatch } from './plOutlookSyncStatus.js';
 import {
     handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
 } from './plOutlookActions.js';
@@ -126,8 +126,7 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
         if (marzano === null) return false;
         if (canvas === null)  return false;
-        const matched = Math.abs((willPost ?? roundToHalf(marzano)) - canvas) < 0.01;
-        return !matched || noteIsPending;
+        return !scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending;
     }).length;
 
     if (needsCount > 0) {
@@ -137,7 +136,16 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const n = counts.possibleOverride + counts.manualOverride;
         return `<span class="od-sync-chip override">⚑ ${n}</span>`;
     }
-    if (counts.synced > 0) {
+    // Use needsCount (scoresMatch-based) as the source of truth for synced status.
+    // counts.synced from aggregateSyncStatus requires last_synced_score to be set,
+    // so it returns 0 for students whose scores match but were never explicitly tracked —
+    // causing "—" even when every row is up to date. If needsCount === 0 and at least
+    // one student has both a prediction and a Canvas score, all of them are synced.
+    const hasActiveStu = (cache.students || []).some(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        return od?.plPrediction != null && od?.canvasScore != null;
+    });
+    if (hasActiveStu) {
         return `<span class="od-sync-chip synced">✓ Synced</span>`;
     }
     return `<span class="od-sync-chip none">—</span>`;
@@ -530,7 +538,7 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
 
 function buildOutcomeDetailPanel({
     outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-    profColor, rerender,
+    profColor, rerender, isSpecial,
 }) {
     const panel = document.createElement('div');
     panel.className = 'od-detail-panel';
@@ -647,9 +655,9 @@ function buildOutcomeDetailPanel({
     // class-wide rollup call (N+1 → 1 total rollup API call per expand).
     refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then((scoreMap) => {
         renderTable();
-        // Update the outcome header chip and spread bar with fresh classStats
+        // Update the outcome header chip, sync chip, and spread bar with fresh data
         const outcomeContainer = content.closest('.od-outcome-container');
-        const chipEl = outcomeContainer.querySelector('.od-pl-chip');
+        const chipEl = outcomeContainer?.querySelector('.od-pl-chip');
         const barEl = outcomeContainer?.querySelector('.od-spread-bar');
         if (chipEl && outcome.classStats?.plAvg != null) {
             const { profColor } = makeRenderers(ctx);
@@ -669,6 +677,12 @@ function buildOutcomeDetailPanel({
                 [d['1'] / total * 100, profColor(1.0).bg],
             ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
         }
+
+        // F1 — refresh the sync chip so it reflects the freshly fetched Canvas scores.
+        // buildSyncChip re-reads canvasScore from the in-memory cache, which
+        // refreshCanvasScoresForOutcome() has already updated above.
+        const syncCellEl = outcomeContainer?.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
 
         // Lazy alignment fetch — runs sequentially per student in the background.
         // Pass the scoreMap from the rollup fetch above so each student's refresh
@@ -737,6 +751,9 @@ function buildOutcomeDetailPanel({
                     [d['1'] / total * 100, profColor(1.0).bg],
                 ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
             }
+            // F1 — refresh the sync chip to reflect canvasScore updates after a push
+            const syncCellEl = container?.querySelector('.od-sync-cell');
+            if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
         },
     });
 
@@ -909,7 +926,7 @@ export function mountOutcomeRow({
     if (isExpanded && initialized) {
         const built = buildOutcomeDetailPanel({
             outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-            profColor, rerender,
+            profColor, rerender, isSpecial,
         });
         outcomeContainer.appendChild(built.panel);
         detailTeardown = built.detailTeardown;
