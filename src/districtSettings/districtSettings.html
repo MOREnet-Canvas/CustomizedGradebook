@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>District Settings</title>
+  <!--
+    ============================================================================
+    District Settings — standalone Canvas wiki deliverable
+    Inline CSS + inline JS, zero external dependencies.
+
+    CSS CLASS / ID CONTRACT FOR BUILDER B
+    ------------------------------------------------------------------
+    Layout shell .................. .cg-shell
+    Sidebar ....................... .cg-sidebar, .cg-logo, .cg-logo-title,
+                                    .cg-logo-sub, #cg-nav (nav container)
+    Nav item ...................... .cg-nav-item (+ .is-active when selected),
+                                    .cg-nav-icon, .cg-nav-label
+    Main column ................... .cg-main
+    Topbar ........................ .cg-topbar, .cg-topbar-left,
+                                    .cg-topbar-title, .cg-district-name,
+                                    #cg-save-btn (.cg-save-btn .Button--primary)
+    Feedback area ................. #cg-feedback (apply a .cg-status-* class)
+    Content root .................. #cg-district-settings-root (.cg-content)
+    Summary ....................... .cg-summary (2x2 grid), .cg-metric-card,
+                                    .cg-metric-label, .cg-metric-value
+    Panel ......................... .cg-panel, .cg-panel-header, .cg-panel-title,
+                                    .cg-panel-chevron, .cg-panel-body
+                                    (add .cg-collapsed on .cg-panel to hide body)
+    Toggle row .................... .cg-toggle-row, .cg-toggle-info,
+                                    .cg-toggle-label, .cg-toggle-hint,
+                                    .cg-toggle (+ .on when enabled), .cg-toggle-thumb
+    Fields ........................ .cg-field, .cg-field-label, .cg-field-hint,
+                                    .cg-input, .cg-select, .cg-field-row
+                                    (two-column side-by-side layout)
+    Canvas loader ................. .cg-code-badge, .cg-code-block, .cg-copy-btn,
+                                    .cg-divider, .cg-steps, .cg-step, .cg-step-num
+    Status helpers ................ .cg-status-success, .cg-status-warning,
+                                    .cg-status-error, .cg-status-info
+    ============================================================================
+  -->
+  <style>
+    /* ---- Design tokens ---- */
+    :root {
+      --cg-primary: #185FA5;
+      --cg-success: #0F6E56;
+      --cg-text: #2D3B45;
+      --cg-text-secondary: #6b7785;
+      --cg-text-tertiary: #9aa5b0;
+      --cg-border: #C7CDD1;
+      --cg-page-bg: #f5f5f5;
+      --cg-surface: #ffffff;
+      --cg-secondary-bg: #F5F5F5;
+      --cg-font: system-ui, -apple-system, sans-serif;
+      --cg-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* ---- Base ---- */
+    .cg-shell, .cg-shell * { box-sizing: border-box; }
+    .cg-shell {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 100vh;
+      font-family: var(--cg-font);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--cg-text);
+      background: var(--cg-page-bg);
+    }
+
+    /* ---- Sidebar ---- */
+    .cg-sidebar {
+      background: var(--cg-surface);
+      border-right: 0.5px solid var(--cg-border);
+      padding: 0;
+    }
+    .cg-logo {
+      padding: 20px 16px 16px;
+      border-bottom: 0.5px solid var(--cg-border);
+    }
+    .cg-logo-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--cg-text);
+    }
+    .cg-logo-sub {
+      font-size: 11px;
+      color: var(--cg-text-tertiary);
+      margin-top: 2px;
+    }
+    #cg-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px;
+    }
+    .cg-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+      padding: 7px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--cg-text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .cg-nav-item:hover { background: var(--cg-secondary-bg); }
+    .cg-nav-item.is-active {
+      background: var(--cg-surface);
+      color: var(--cg-primary);
+      font-weight: 500;
+    }
+    .cg-nav-item.is-active:hover { background: var(--cg-surface); }
+    .cg-nav-icon { width: 16px; text-align: center; font-size: 13px; }
+    .cg-nav-label { flex: 1; }
+
+    /* ---- Main column ---- */
+    .cg-main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .cg-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 0.5px solid var(--cg-border);
+      background: var(--cg-surface);
+    }
+    .cg-topbar-left { display: flex; flex-direction: column; }
+    .cg-topbar-title { font-size: 15px; font-weight: 600; color: var(--cg-text); }
+    .cg-district-name { font-size: 11px; color: var(--cg-text-secondary); margin-top: 2px; }
+
+    /* ---- Save button ---- */
+    .cg-save-btn, .Button--primary {
+      background: var(--cg-primary);
+      color: #fff;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--cg-font);
+      cursor: pointer;
+    }
+    .cg-save-btn:disabled { opacity: 0.7; cursor: default; }
+
+    /* ---- Feedback area ---- */
+    #cg-feedback { padding: 0 20px; }
+    #cg-feedback:empty { display: none; }
+    #cg-feedback .cg-feedback-msg {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 0.5px solid var(--cg-border);
+    }
+
+    /* ---- Status helpers ---- */
+    .cg-status-success { background: #F6FFED; border-color: #B7EB8F; }
+    .cg-status-warning { background: #FFF7E6; border-color: #F3D19E; }
+    .cg-status-error   { background: #FFF1F0; border-color: #FFA39E; }
+    .cg-status-info    { background: #F0F7FF; border-color: #0374B5; }
+
+    /* ---- Content area ---- */
+    .cg-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ---- Summary ---- */
+    .cg-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .cg-metric-card {
+      background: var(--cg-secondary-bg);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .cg-metric-label {
+      font-size: 11px;
+      color: var(--cg-text-secondary);
+    }
+    .cg-metric-value {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--cg-text);
+      margin-top: 2px;
+    }
+
+    /* ---- Panels ---- */
+    .cg-panel {
+      border: 0.5px solid var(--cg-border);
+      border-radius: 12px;
+      background: var(--cg-surface);
+      overflow: hidden;
+    }
+    .cg-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .cg-panel-header:hover { background: var(--cg-secondary-bg); }
+    .cg-panel-title { display: flex; align-items: center; gap: 8px; }
+    .cg-panel-chevron { color: var(--cg-text-tertiary); font-size: 11px; }
+    .cg-panel-body {
+      padding: 16px;
+      border-top: 0.5px solid var(--cg-border);
+    }
+    .cg-panel.cg-collapsed .cg-panel-body { display: none; }
+
+    /* ---- Toggle rows ---- */
+    .cg-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 0;
+      border-bottom: 0.5px solid var(--cg-border);
+    }
+    .cg-toggle-row:last-child { border-bottom: none; }
+    .cg-toggle-info { min-width: 0; }
+    .cg-toggle-label { font-size: 13px; color: var(--cg-text); }
+    .cg-toggle-hint { font-size: 11px; color: var(--cg-text-tertiary); margin-top: 2px; }
+
+    /* ---- Toggle switch ---- */
+    .cg-toggle {
+      position: relative;
+      flex: none;
+      width: 32px;
+      height: 18px;
+      border-radius: 99px;
+      background: var(--cg-text-tertiary);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .cg-toggle.on { background: var(--cg-primary); }
+    .cg-toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      transition: left 0.15s ease;
+    }
+    .cg-toggle.on .cg-toggle-thumb { left: 17px; }
+
+    /* ---- Fields ---- */
+    .cg-field { display: flex; flex-direction: column; margin-bottom: 12px; }
+    .cg-field:last-child { margin-bottom: 0; }
+    .cg-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    /* Reset per-field bottom margin inside a side-by-side row; the grid gap owns spacing. */
+    .cg-field-row .cg-field { margin-bottom: 0; }
+    .cg-field-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--cg-text-secondary);
+      margin-bottom: 4px;
+    }
+    .cg-field-hint { font-size: 11px; color: var(--cg-text-tertiary); margin-top: 4px; }
+    .cg-input, .cg-select {
+      width: 100%;
+      font-size: 12px;
+      font-family: var(--cg-font);
+      padding: 6px 8px;
+      border: 0.5px solid var(--cg-border);
+      border-radius: 6px;
+      color: var(--cg-text);
+      background: var(--cg-surface);
+    }
+    .cg-input:focus, .cg-select:focus {
+      outline: none;
+      border-color: var(--cg-primary);
+      box-shadow: 0 0 0 2px rgba(24, 95, 165, 0.15);
+    }
+
+    /* ---- Canvas loader ---- */
+    .cg-code-badge {
+      display: inline-block;
+      font-family: var(--cg-mono);
+      font-size: 12px;
+      background: var(--cg-secondary-bg);
+      border: 0.5px solid var(--cg-border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      color: var(--cg-text);
+    }
+    .cg-code-block {
+      position: relative;
+      background: var(--cg-secondary-bg);
+      border: 0.5px solid var(--cg-border);
+      border-radius: 6px;
+      padding: 14px;
+      font-family: var(--cg-mono);
+      font-size: 12px;
+      line-height: 1.8;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .cg-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 11px;
+      font-family: var(--cg-font);
+      padding: 3px 8px;
+      border: 0.5px solid var(--cg-border);
+      border-radius: 6px;
+      background: var(--cg-surface);
+      color: var(--cg-text-secondary);
+      cursor: pointer;
+    }
+    .cg-divider {
+      height: 0.5px;
+      background: var(--cg-border);
+      margin: 14px 0;
+      border: none;
+    }
+    .cg-steps { display: flex; flex-direction: column; gap: 6px; }
+    .cg-step {
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--cg-text-secondary);
+    }
+    .cg-step-num { color: var(--cg-text-tertiary); min-width: 14px; }
+  </style>
+</head>
+<body>
+  <!-- ============================== LAYOUT ============================== -->
+  <div class="cg-shell">
+    <!-- Sidebar -->
+    <aside class="cg-sidebar">
+      <div class="cg-logo">
+        <div class="cg-logo-title">Customized Gradebook</div>
+        <div class="cg-logo-sub">District Settings</div>
+      </div>
+      <nav id="cg-nav"><!-- nav items rendered by renderSidebar() --></nav>
+    </aside>
+
+    <!-- Main column -->
+    <main class="cg-main">
+      <div class="cg-topbar">
+        <div class="cg-topbar-left">
+          <div class="cg-topbar-title">District Settings</div>
+          <div class="cg-district-name">District configuration</div>
+        </div>
+        <button id="cg-save-btn" class="cg-save-btn Button--primary" type="button">Save</button>
+      </div>
+
+      <!-- Inline error / feedback area -->
+      <div id="cg-feedback"></div>
+
+      <!-- Scrollable content area populated by JS rendering -->
+      <div id="cg-district-settings-root" class="cg-content"></div>
+    </main>
+  </div>
+
+  <!-- Hidden config div for local testing (empty by default) -->
+  <div id="cg-district-config" style="display:none"></div>
+
+  <!-- ============================== SCRIPT ============================== -->
+  <script>
+  (function () {
+    'use strict';
+
+    // ========================================================================
+    // DEFAULTS — every config key and its default value
+    // ========================================================================
+    var DEFAULTS = {
+      // Feature flags
+      ENABLE_STUDENT_GRADE_CUSTOMIZATION: true,
+      ENABLE_GRADE_OVERRIDE: true,
+      ENFORCE_COURSE_OVERRIDE: false,
+      ENFORCE_COURSE_GRADING_SCHEME: false,
+      ENABLE_GRADE_CUSTOM_STATUS: false,
+      ENABLE_NEGATIVE_ZERO_COUNT: false,
+      // UI labels
+      UPDATE_AVG_BUTTON_LABEL: 'Update Current Score',
+      AVG_OUTCOME_NAME: 'Current Score',
+      AVG_ASSIGNMENT_NAME: 'Current Score Assignment',
+      AVG_RUBRIC_NAME: 'Current Score Rubric',
+      // Outcome config
+      DEFAULT_MAX_POINTS: 4,
+      DEFAULT_MASTERY_THRESHOLD: 3,
+      EXCLUDED_OUTCOME_KEYWORDS: [],
+      // Grading
+      DEFAULT_GRADING_TYPE: 'letter_grade',
+      DEFAULT_GRADING_SCHEME_ID: null,
+      // Account filter
+      ENABLE_ACCOUNT_FILTER: false,
+      ALLOWED_ACCOUNT_IDS: [],
+      // Custom status
+      DEFAULT_CUSTOM_STATUS_ID: null
+    };
+
+    // ========================================================================
+    // Runtime state
+    // ========================================================================
+    var state = {
+      courseId: 'COURSE_ID',
+      csrfToken: '',
+      config: deepCopy(DEFAULTS)
+    };
+
+    function deepCopy(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    // ========================================================================
+    // Environment helpers
+    // ========================================================================
+    function getCourseId() {
+      var match = (window.location.pathname || '').match(/\/courses\/(\d+)/);
+      state.courseId = match ? match[1] : 'COURSE_ID';
+      return state.courseId;
+    }
+
+    function getCsrfToken() {
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      if (meta && meta.content) {
+        state.csrfToken = meta.content;
+        return state.csrfToken;
+      }
+      var cookieMatch = (document.cookie || '').match(/_csrf_token=([^;]+)/);
+      state.csrfToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
+      return state.csrfToken;
+    }
+
+    // ========================================================================
+    // Data layer — load / save
+    // ========================================================================
+    async function loadConfig() {
+      try {
+        var res = await fetch(
+          '/api/v1/courses/' + state.courseId + '/pages/district-config',
+          { credentials: 'same-origin' }
+        );
+        if (!res.ok) { return; }
+        var page = await res.json();
+        var body = page && page.body ? page.body : '';
+        if (!body) { return; }
+        var doc = new DOMParser().parseFromString(body, 'text/html');
+        var div = doc.querySelector('#cg-district-config');
+        if (!div) { return; }
+        var raw = (div.textContent || '').trim();
+        if (!raw) { return; }
+        var parsed = JSON.parse(raw);
+        var merged = deepCopy(DEFAULTS);
+        Object.keys(parsed).forEach(function (key) {
+          merged[key] = parsed[key];
+        });
+        state.config = merged;
+      } catch (err) {
+        // Keep defaults silently on any failure or 404.
+      }
+    }
+
+    function toArray(value) {
+      if (Array.isArray(value)) { return value; }
+      if (typeof value === 'string') {
+        return value.split(',').map(function (s) { return s.trim(); })
+          .filter(function (s) { return s.length > 0; });
+      }
+      return [];
+    }
+
+    function applySaveTransforms() {
+      var c = state.config;
+      c.EXCLUDED_OUTCOME_KEYWORDS = toArray(c.EXCLUDED_OUTCOME_KEYWORDS);
+      c.ALLOWED_ACCOUNT_IDS = toArray(c.ALLOWED_ACCOUNT_IDS);
+      if (c.DEFAULT_GRADING_SCHEME_ID === '' || c.DEFAULT_GRADING_SCHEME_ID === undefined) {
+        c.DEFAULT_GRADING_SCHEME_ID = null;
+      }
+      if (c.DEFAULT_CUSTOM_STATUS_ID === '' || c.DEFAULT_CUSTOM_STATUS_ID === undefined) {
+        c.DEFAULT_CUSTOM_STATUS_ID = null;
+      }
+    }
+
+    async function saveConfig() {
+      applySaveTransforms();
+      try {
+        var res = await fetch(
+          '/api/v1/courses/' + state.courseId + '/pages/district-config',
+          {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': state.csrfToken
+            },
+            body: JSON.stringify({
+              wiki_page: {
+                body: '<div id="cg-district-config" style="display:none">' +
+                  JSON.stringify(state.config) + '</div>'
+              }
+            })
+          }
+        );
+        return res.ok;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    // ========================================================================
+    // Inline feedback (no alert() anywhere)
+    // ========================================================================
+    function showFeedback(message, type) {
+      var el = document.getElementById('cg-feedback');
+      if (!el) { return; }
+      if (!message) { el.innerHTML = ''; return; }
+      var statusClass = 'cg-status-info';
+      if (type === 'success') { statusClass = 'cg-status-success'; }
+      else if (type === 'warning') { statusClass = 'cg-status-warning'; }
+      else if (type === 'error') { statusClass = 'cg-status-error'; }
+      var msg = document.createElement('div');
+      msg.className = 'cg-feedback-msg ' + statusClass;
+      msg.textContent = message;
+      el.innerHTML = '';
+      el.appendChild(msg);
+    }
+
+    // ========================================================================
+    // Section registry (drives sidebar nav + collapse order)
+    // ========================================================================
+    var SECTIONS = [
+      { id: 'cg-section-summary', label: 'Summary',         icon: '▦' },
+      { id: 'cg-section-flags',   label: 'Feature flags',   icon: '⚑' },
+      { id: 'cg-section-labels',  label: 'Labels',          icon: '✎' },
+      { id: 'cg-section-outcome', label: 'Outcome config',  icon: '◎' },
+      { id: 'cg-section-grading', label: 'Grading',         icon: '★' },
+      { id: 'cg-section-account', label: 'Account filter',  icon: '☰' },
+      { id: 'cg-section-custom',  label: 'Custom status',   icon: '◆' },
+      { id: 'cg-section-loader',  label: 'Canvas loader',   icon: '↧' }
+    ];
+
+    // ========================================================================
+    // DOM helpers
+    // ========================================================================
+    function el(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) { node.className = className; }
+      if (text != null) { node.textContent = text; }
+      return node;
+    }
+
+    function getRoot() {
+      return document.getElementById('cg-district-settings-root');
+    }
+
+    function makePanel(id, title) {
+      var panel = el('div', 'cg-panel');
+      panel.id = id;
+      var header = el('div', 'cg-panel-header');
+      header.appendChild(el('span', 'cg-panel-title', title));
+      header.appendChild(el('span', 'cg-panel-chevron', '▼'));
+      var body = el('div', 'cg-panel-body');
+      panel.appendChild(header);
+      panel.appendChild(body);
+      return { panel: panel, body: body };
+    }
+
+    function setPanelCollapsed(panel, collapsed) {
+      if (!panel) { return; }
+      if (collapsed) { panel.classList.add('cg-collapsed'); }
+      else { panel.classList.remove('cg-collapsed'); }
+      var chevron = panel.querySelector('.cg-panel-chevron');
+      if (chevron) { chevron.textContent = collapsed ? '▶' : '▼'; }
+    }
+
+    function makeField(labelText, inputEl, hintText) {
+      var field = el('div', 'cg-field');
+      field.appendChild(el('label', 'cg-field-label', labelText));
+      field.appendChild(inputEl);
+      if (hintText) { field.appendChild(el('div', 'cg-field-hint', hintText)); }
+      return field;
+    }
+
+    function makeTextInput(key) {
+      var input = el('input', 'cg-input');
+      input.type = 'text';
+      var v = state.config[key];
+      input.value = (v == null) ? '' : v;
+      input.addEventListener('input', function () {
+        state.config[key] = input.value;
+      });
+      return input;
+    }
+
+    function makeNumberInput(key, min) {
+      var input = el('input', 'cg-input');
+      input.type = 'number';
+      if (min != null) { input.min = String(min); }
+      var v = state.config[key];
+      input.value = (v == null) ? '' : v;
+      input.addEventListener('input', function () {
+        var raw = input.value;
+        var parsed = Number(raw);
+        // Coerce empty or non-numeric input back to the default rather than
+        // storing an empty string or NaN in state.
+        state.config[key] = (raw === '' || isNaN(parsed)) ? DEFAULTS[key] : parsed;
+      });
+      return input;
+    }
+
+    function makeCsvInput(key) {
+      var input = el('input', 'cg-input');
+      input.type = 'text';
+      var v = state.config[key];
+      input.value = Array.isArray(v) ? v.join(', ') : (v == null ? '' : v);
+      input.addEventListener('input', function () {
+        state.config[key] = input.value;
+      });
+      return input;
+    }
+
+    function makeSelect(key, options) {
+      var sel = el('select', 'cg-select');
+      options.forEach(function (opt) {
+        var o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        if (state.config[key] === opt) { o.selected = true; }
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function () {
+        state.config[key] = sel.value;
+      });
+      return sel;
+    }
+
+    function makeToggleRow(key, label, hint, onChange) {
+      var row = el('div', 'cg-toggle-row');
+      var info = el('div', 'cg-toggle-info');
+      info.appendChild(el('div', 'cg-toggle-label', label));
+      info.appendChild(el('div', 'cg-toggle-hint', hint));
+      var toggle = el('div', 'cg-toggle');
+      toggle.appendChild(el('span', 'cg-toggle-thumb'));
+      if (state.config[key]) { toggle.classList.add('on'); }
+      toggle.addEventListener('click', function () {
+        var now = !state.config[key];
+        state.config[key] = now;
+        if (now) { toggle.classList.add('on'); }
+        else { toggle.classList.remove('on'); }
+        if (typeof onChange === 'function') { onChange(now); }
+      });
+      row.appendChild(info);
+      row.appendChild(toggle);
+      return row;
+    }
+
+    // ========================================================================
+    // Clipboard helper (with execCommand fallback)
+    // ========================================================================
+    function fallbackCopy(text) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) { /* ignore */ }
+    }
+
+    function copyToClipboard(text, btn) {
+      var original = '⎘ Copy';
+      function done() {
+        btn.textContent = '✓';
+        setTimeout(function () { btn.textContent = original; }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {
+          fallbackCopy(text);
+          done();
+        });
+      } else {
+        fallbackCopy(text);
+        done();
+      }
+    }
+
+    // ========================================================================
+    // Section renderers
+    // ========================================================================
+    function renderSummary() {
+      var root = getRoot();
+      if (!root) { return; }
+      var panel = document.getElementById('cg-section-summary');
+      var body;
+      if (!panel) {
+        var made = makePanel('cg-section-summary', 'Summary');
+        panel = made.panel;
+        body = made.body;
+        root.appendChild(panel);
+      } else {
+        body = panel.querySelector('.cg-panel-body');
+        body.innerHTML = '';
+      }
+      var c = state.config;
+      var accountIds = toArray(c.ALLOWED_ACCOUNT_IDS);
+      var accountVal = (c.ENABLE_ACCOUNT_FILTER && accountIds.length)
+        ? String(accountIds.length) : 'off';
+      var customVal = (c.DEFAULT_CUSTOM_STATUS_ID != null && c.DEFAULT_CUSTOM_STATUS_ID !== '')
+        ? String(c.DEFAULT_CUSTOM_STATUS_ID) : 'none';
+      var cards = [
+        ['Active version', 'district config'],
+        ['Grade override', c.ENABLE_GRADE_OVERRIDE ? 'enabled' : 'disabled'],
+        ['Account filter', accountVal],
+        ['Custom status', customVal]
+      ];
+      var grid = el('div', 'cg-summary');
+      cards.forEach(function (card) {
+        var cd = el('div', 'cg-metric-card');
+        cd.appendChild(el('div', 'cg-metric-label', card[0]));
+        cd.appendChild(el('div', 'cg-metric-value', card[1]));
+        grid.appendChild(cd);
+      });
+      body.appendChild(grid);
+    }
+
+    function renderFeatureFlags() {
+      var made = makePanel('cg-section-flags', 'Feature flags');
+      var flags = [
+        ['ENABLE_STUDENT_GRADE_CUSTOMIZATION', 'Student grade customization', 'Allows per-student grade overrides in the gradebook'],
+        ['ENABLE_GRADE_OVERRIDE', 'Grade override', 'Requires final grade override feature flag on the Canvas account'],
+        ['ENFORCE_COURSE_OVERRIDE', 'Enforce course override', 'Sets course override via API on every sync'],
+        ['ENFORCE_COURSE_GRADING_SCHEME', 'Enforce grading scheme', 'Sets grading scheme via API on every sync'],
+        ['ENABLE_GRADE_CUSTOM_STATUS', 'Custom grade statuses', 'Apply custom status labels when outcomes lack evidence'],
+        ['ENABLE_NEGATIVE_ZERO_COUNT', 'Zero grade penalty', 'Each zero subtracts 1 from the score']
+      ];
+      flags.forEach(function (f) {
+        made.body.appendChild(makeToggleRow(f[0], f[1], f[2]));
+      });
+      getRoot().appendChild(made.panel);
+    }
+
+    function renderLabels() {
+      var made = makePanel('cg-section-labels', 'Labels');
+      made.body.appendChild(makeField('Update average button label', makeTextInput('UPDATE_AVG_BUTTON_LABEL')));
+      made.body.appendChild(makeField('Average outcome name', makeTextInput('AVG_OUTCOME_NAME')));
+      made.body.appendChild(makeField('Average assignment name', makeTextInput('AVG_ASSIGNMENT_NAME')));
+      made.body.appendChild(makeField('Average rubric name', makeTextInput('AVG_RUBRIC_NAME')));
+      getRoot().appendChild(made.panel);
+    }
+
+    function renderOutcomeConfig() {
+      var made = makePanel('cg-section-outcome', 'Outcome config');
+      var row = el('div', 'cg-field-row');
+      row.appendChild(makeField('Default max points', makeNumberInput('DEFAULT_MAX_POINTS', 1)));
+      row.appendChild(makeField('Mastery threshold', makeNumberInput('DEFAULT_MASTERY_THRESHOLD', 1)));
+      made.body.appendChild(row);
+      made.body.appendChild(makeField(
+        'Excluded outcome keywords',
+        makeCsvInput('EXCLUDED_OUTCOME_KEYWORDS'),
+        'Comma-separated list of keywords'
+      ));
+      getRoot().appendChild(made.panel);
+    }
+
+    function renderGrading() {
+      var made = makePanel('cg-section-grading', 'Grading');
+      var row = el('div', 'cg-field-row');
+      row.appendChild(makeField('Default grading type',
+        makeSelect('DEFAULT_GRADING_TYPE', ['letter_grade', 'gpa_scale', 'points'])));
+      row.appendChild(makeField('Default grading scheme ID',
+        makeNumberInput('DEFAULT_GRADING_SCHEME_ID')));
+      made.body.appendChild(row);
+      getRoot().appendChild(made.panel);
+    }
+
+    function renderAccountFilter() {
+      var made = makePanel('cg-section-account', 'Account filter');
+      var csvField = makeField(
+        'Allowed account IDs',
+        makeCsvInput('ALLOWED_ACCOUNT_IDS'),
+        'Comma-separated list of Canvas account IDs'
+      );
+      function syncVisibility() {
+        csvField.style.display = state.config.ENABLE_ACCOUNT_FILTER ? '' : 'none';
+      }
+      made.body.appendChild(makeToggleRow(
+        'ENABLE_ACCOUNT_FILTER',
+        'Enable account filter',
+        'Restrict sync to specific Canvas sub-accounts',
+        syncVisibility
+      ));
+      made.body.appendChild(csvField);
+      syncVisibility();
+      getRoot().appendChild(made.panel);
+    }
+
+    function renderCustomStatus() {
+      var made = makePanel('cg-section-custom', 'Custom status');
+      made.body.appendChild(makeField('Default custom status ID', makeTextInput('DEFAULT_CUSTOM_STATUS_ID')));
+      getRoot().appendChild(made.panel);
+    }
+
+    function renderCanvasLoader() {
+      var made = makePanel('cg-section-loader', 'Canvas loader');
+      var body = made.body;
+      body.appendChild(el('div', 'cg-field-hint',
+        'Add this snippet to your Canvas theme JavaScript so teachers automatically load the gradebook with district settings.'));
+
+      var badgeField = el('div', 'cg-field');
+      badgeField.appendChild(el('label', 'cg-field-label', 'Course ID'));
+      badgeField.appendChild(el('span', 'cg-code-badge', state.courseId));
+      body.appendChild(badgeField);
+
+      var lines = [
+        "var CG_DISTRICT_COURSE = '" + state.courseId + "';",
+        "var CG_BASE = 'https://cdn.morenet.net/cg/';",
+        "var s = document.createElement('script');",
+        "s.src = CG_BASE + 'dist/main.js';",
+        "document.head.appendChild(s);"
+      ];
+      var snippet = lines.join('\n');
+      var codeBlock = el('div', 'cg-code-block');
+      codeBlock.textContent = snippet;
+      var copyBtn = el('button', 'cg-copy-btn', '⎘ Copy');
+      copyBtn.type = 'button';
+      copyBtn.addEventListener('click', function () {
+        copyToClipboard(snippet, copyBtn);
+      });
+      codeBlock.appendChild(copyBtn);
+      body.appendChild(codeBlock);
+
+      body.appendChild(el('hr', 'cg-divider'));
+
+      var steps = el('div', 'cg-steps');
+      var stepTexts = [
+        'Copy the snippet above',
+        'In Canvas go to Admin → Themes → Edit theme → JavaScript file',
+        'Paste and save — teachers will pick up district settings automatically'
+      ];
+      stepTexts.forEach(function (t, i) {
+        var step = el('div', 'cg-step');
+        step.appendChild(el('span', 'cg-step-num', (i + 1) + '.'));
+        step.appendChild(el('span', null, t));
+        steps.appendChild(step);
+      });
+      body.appendChild(steps);
+
+      getRoot().appendChild(made.panel);
+    }
+
+    // ========================================================================
+    // Sidebar nav
+    // ========================================================================
+    function renderSidebar() {
+      var nav = document.getElementById('cg-nav');
+      if (!nav) { return; }
+      nav.innerHTML = '';
+      SECTIONS.forEach(function (sec, idx) {
+        var item = el('div', 'cg-nav-item');
+        item.appendChild(el('span', 'cg-nav-icon', sec.icon));
+        item.appendChild(el('span', 'cg-nav-label', sec.label));
+        if (idx === 0) { item.classList.add('is-active'); }
+        item.addEventListener('click', function () {
+          var items = nav.querySelectorAll('.cg-nav-item');
+          Array.prototype.forEach.call(items, function (n) { n.classList.remove('is-active'); });
+          item.classList.add('is-active');
+          var root = getRoot();
+          if (root) {
+            var panels = root.querySelectorAll('.cg-panel');
+            Array.prototype.forEach.call(panels, function (p) {
+              setPanelCollapsed(p, p.id !== sec.id);
+            });
+          }
+          var target = document.getElementById(sec.id);
+          if (target && target.scrollIntoView) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+        nav.appendChild(item);
+      });
+    }
+
+    // ========================================================================
+    // Render everything
+    // ========================================================================
+    function renderAll() {
+      var root = getRoot();
+      if (!root) { return; }
+      root.innerHTML = '';
+      renderSummary();
+      renderFeatureFlags();
+      renderLabels();
+      renderOutcomeConfig();
+      renderGrading();
+      renderAccountFilter();
+      renderCustomStatus();
+      renderCanvasLoader();
+      // Only the Summary section is expanded by default.
+      var panels = root.querySelectorAll('.cg-panel');
+      Array.prototype.forEach.call(panels, function (p) {
+        setPanelCollapsed(p, p.id !== 'cg-section-summary');
+      });
+      renderSidebar();
+    }
+
+    // ========================================================================
+    // Interaction wiring
+    // ========================================================================
+    function bindInteractions() {
+      var root = getRoot();
+      if (!root) { return; }
+      // Toggle a panel's collapse state when its header is clicked.
+      // When a panel is expanded this way, sync the sidebar nav's is-active indicator.
+      root.addEventListener('click', function (e) {
+        var header = e.target.closest ? e.target.closest('.cg-panel-header') : null;
+        if (!header) { return; }
+        var panel = e.target.closest('.cg-panel');
+        if (!panel) { return; }
+        var isCollapsed = panel.classList.contains('cg-collapsed');
+        setPanelCollapsed(panel, !isCollapsed);
+        // If the panel is being expanded, mark its nav item active.
+        if (isCollapsed) {
+          var nav = document.getElementById('cg-nav');
+          if (nav) {
+            var items = nav.querySelectorAll('.cg-nav-item');
+            Array.prototype.forEach.call(items, function (item, idx) {
+              var matches = SECTIONS[idx] && SECTIONS[idx].id === panel.id;
+              if (matches) { item.classList.add('is-active'); }
+              else { item.classList.remove('is-active'); }
+            });
+          }
+        }
+      });
+    }
+
+    // ========================================================================
+    // Save handler (minimal; Builder B refines button states + summary refresh)
+    // ========================================================================
+    async function handleSave() {
+      var btn = document.getElementById('cg-save-btn');
+      var original = 'Save';
+      showFeedback('', null);
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+      var ok = await saveConfig();
+      if (ok) {
+        // Refresh summary cards immediately to reflect saved values.
+        renderSummary();
+        if (btn) {
+          btn.textContent = '✓ Saved';
+          btn.style.background = 'var(--cg-success)';
+          setTimeout(function () {
+            btn.textContent = original;
+            btn.style.background = '';
+            btn.disabled = false;
+          }, 1500);
+        }
+      } else {
+        if (btn) { btn.disabled = false; btn.textContent = original; }
+        showFeedback('Could not save settings. Please try again.', 'error');
+      }
+    }
+
+    // ========================================================================
+    // Init
+    // ========================================================================
+    async function init() {
+      getCourseId();
+      getCsrfToken();
+      await loadConfig();
+      renderAll();
+      bindInteractions();
+      var btn = document.getElementById('cg-save-btn');
+      if (btn) { btn.addEventListener('click', handleSave); }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  })();
+  </script>
+</body>
+</html>
