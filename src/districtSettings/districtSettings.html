@@ -44,15 +44,18 @@
     :root {
       --cg-primary: #185FA5;
       --cg-success: #0F6E56;
-      --cg-text: #2D3B45;
-      --cg-text-secondary: #6b7785;
-      --cg-text-tertiary: #9aa5b0;
-      --cg-border: #C7CDD1;
-      --cg-page-bg: #f5f5f5;
+      --cg-text: #111827;
+      --cg-text-secondary: #4b5563;
+      --cg-text-tertiary: #9ca3af;
+      --cg-border: #e5e7eb;
+      --cg-border-light: #f3f4f6;
+      --cg-page-bg: #f3f4f6;
       --cg-surface: #ffffff;
-      --cg-secondary-bg: #F5F5F5;
-      --cg-font: system-ui, -apple-system, sans-serif;
+      --cg-secondary-bg: #f9fafb;
+      --cg-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       --cg-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --cg-radius-md: 6px;
+      --cg-radius-lg: 12px;
     }
 
     /* ---- Base ---- */
@@ -65,55 +68,64 @@
       font-size: 14px;
       line-height: 1.5;
       color: var(--cg-text);
-      background: var(--cg-page-bg);
+      background: var(--cg-surface);
     }
 
     /* ---- Sidebar ---- */
     .cg-sidebar {
-      background: var(--cg-surface);
+      background: var(--cg-secondary-bg);
       border-right: 0.5px solid var(--cg-border);
       padding: 0;
+      display: flex;
+      flex-direction: column;
     }
     .cg-logo {
       padding: 20px 16px 16px;
       border-bottom: 0.5px solid var(--cg-border);
     }
     .cg-logo-title {
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 500;
       color: var(--cg-text);
+      letter-spacing: -0.2px;
     }
     .cg-logo-sub {
       font-size: 11px;
       color: var(--cg-text-tertiary);
       margin-top: 2px;
     }
+    .cg-nav-section-label {
+      font-size: 10px;
+      color: var(--cg-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 12px 16px 4px;
+    }
     #cg-nav {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      padding: 8px;
+      padding: 4px 8px;
     }
     .cg-nav-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      height: 36px;
       padding: 7px 8px;
-      border-radius: 6px;
+      border-radius: var(--cg-radius-md);
       font-size: 13px;
       color: var(--cg-text-secondary);
       cursor: pointer;
+      transition: background 0.1s;
       user-select: none;
     }
-    .cg-nav-item:hover { background: var(--cg-secondary-bg); }
+    .cg-nav-item:hover { background: var(--cg-surface); color: var(--cg-text); }
     .cg-nav-item.is-active {
       background: var(--cg-surface);
-      color: var(--cg-primary);
+      color: var(--cg-text);
       font-weight: 500;
     }
-    .cg-nav-item.is-active:hover { background: var(--cg-surface); }
-    .cg-nav-icon { width: 16px; text-align: center; font-size: 13px; }
+    .cg-nav-icon { width: 16px; text-align: center; font-size: 15px; color: var(--cg-text-tertiary); }
     .cg-nav-label { flex: 1; }
 
     /* ---- Main column ---- */
@@ -121,6 +133,8 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
+      background: var(--cg-page-bg);
+      overflow-y: auto;
     }
     .cg-topbar {
       position: sticky;
@@ -132,21 +146,26 @@
       padding: 14px 20px;
       border-bottom: 0.5px solid var(--cg-border);
       background: var(--cg-surface);
+      flex-shrink: 0;
     }
     .cg-topbar-left { display: flex; flex-direction: column; }
-    .cg-topbar-title { font-size: 15px; font-weight: 600; color: var(--cg-text); }
-    .cg-district-name { font-size: 11px; color: var(--cg-text-secondary); margin-top: 2px; }
+    .cg-topbar-title { font-size: 15px; font-weight: 500; color: var(--cg-text); }
+    .cg-district-name { font-size: 12px; color: var(--cg-text-tertiary); margin-top: 1px; }
 
     /* ---- Save button ---- */
     .cg-save-btn, .Button--primary {
       background: var(--cg-primary);
       color: #fff;
-      border: none;
-      padding: 6px 16px;
-      border-radius: 6px;
-      font-size: 13px;
+      border: 0.5px solid var(--cg-primary);
+      padding: 5px 12px;
+      border-radius: var(--cg-radius-md);
+      font-size: 12px;
       font-family: var(--cg-font);
+      font-weight: 500;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
     .cg-save-btn:disabled { opacity: 0.7; cursor: default; }
 
@@ -156,16 +175,16 @@
     #cg-feedback .cg-feedback-msg {
       margin-top: 12px;
       padding: 8px 12px;
-      border-radius: 6px;
+      border-radius: var(--cg-radius-md);
       font-size: 12px;
       border: 0.5px solid var(--cg-border);
     }
 
     /* ---- Status helpers ---- */
-    .cg-status-success { background: #F6FFED; border-color: #B7EB8F; }
-    .cg-status-warning { background: #FFF7E6; border-color: #F3D19E; }
-    .cg-status-error   { background: #FFF1F0; border-color: #FFA39E; }
-    .cg-status-info    { background: #F0F7FF; border-color: #0374B5; }
+    .cg-status-success { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+    .cg-status-warning { background: #fffbeb; border-color: #fef3c7; color: #a16207; }
+    .cg-status-error   { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+    .cg-status-info    { background: #eff6ff; border-color: #dbeafe; color: #1d4ed8; }
 
     /* ---- Content area ---- */
     .cg-content {
@@ -173,34 +192,39 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+      max-width: 900px;
     }
 
     /* ---- Summary ---- */
     .cg-summary {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(4, 1fr);
       gap: 10px;
     }
     .cg-metric-card {
       background: var(--cg-secondary-bg);
-      border-radius: 8px;
+      border-radius: var(--cg-radius-md);
       padding: 12px 14px;
+      border: 0.5px solid var(--cg-border-light);
     }
     .cg-metric-label {
       font-size: 11px;
-      color: var(--cg-text-secondary);
+      color: var(--cg-text-tertiary);
+      margin-bottom: 4px;
     }
     .cg-metric-value {
       font-size: 18px;
       font-weight: 500;
       color: var(--cg-text);
-      margin-top: 2px;
     }
+    .cg-metric-value.blue { color: var(--cg-primary); }
+    .cg-metric-value.green { color: var(--cg-success); }
+    .cg-metric-value.amber { color: #854F0B; }
 
     /* ---- Panels ---- */
     .cg-panel {
       border: 0.5px solid var(--cg-border);
-      border-radius: 12px;
+      border-radius: var(--cg-radius-lg);
       background: var(--cg-surface);
       overflow: hidden;
     }
@@ -209,18 +233,20 @@
       align-items: center;
       justify-content: space-between;
       padding: 12px 16px;
-      font-size: 13px;
-      font-weight: 500;
       cursor: pointer;
+      user-select: none;
+      transition: background 0.1s;
     }
     .cg-panel-header:hover { background: var(--cg-secondary-bg); }
-    .cg-panel-title { display: flex; align-items: center; gap: 8px; }
-    .cg-panel-chevron { color: var(--cg-text-tertiary); font-size: 11px; }
+    .cg-panel-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+    .cg-panel-title i { font-size: 15px; color: var(--cg-text-tertiary); }
+    .cg-panel-chevron { color: var(--cg-text-tertiary); font-size: 14px; }
     .cg-panel-body {
       padding: 16px;
       border-top: 0.5px solid var(--cg-border);
     }
     .cg-panel.cg-collapsed .cg-panel-body { display: none; }
+    .cg-panel.cg-collapsed { border-color: var(--cg-border-light); }
 
     /* ---- Toggle rows ---- */
     .cg-toggle-row {
@@ -229,7 +255,7 @@
       justify-content: space-between;
       gap: 16px;
       padding: 8px 0;
-      border-bottom: 0.5px solid var(--cg-border);
+      border-bottom: 0.5px solid var(--cg-border-light);
     }
     .cg-toggle-row:last-child { border-bottom: none; }
     .cg-toggle-info { min-width: 0; }
@@ -243,102 +269,81 @@
       width: 32px;
       height: 18px;
       border-radius: 99px;
-      background: var(--cg-text-tertiary);
+      background: var(--cg-secondary-bg);
+      border: 0.5px solid var(--cg-border);
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: all 0.15s ease;
     }
-    .cg-toggle.on { background: var(--cg-primary); }
+    .cg-toggle.on { background: var(--cg-primary); border-color: var(--cg-primary); }
     .cg-toggle-thumb {
       position: absolute;
-      top: 3px;
-      left: 3px;
+      top: 2px;
+      left: 2px;
       width: 12px;
       height: 12px;
       border-radius: 50%;
       background: #fff;
       transition: left 0.15s ease;
     }
-    .cg-toggle.on .cg-toggle-thumb { left: 17px; }
+    .cg-toggle.on .cg-toggle-thumb { left: 16px; }
 
     /* ---- Fields ---- */
-    .cg-field { display: flex; flex-direction: column; margin-bottom: 12px; }
+    .cg-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
     .cg-field:last-child { margin-bottom: 0; }
     .cg-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    /* Reset per-field bottom margin inside a side-by-side row; the grid gap owns spacing. */
     .cg-field-row .cg-field { margin-bottom: 0; }
     .cg-field-label {
       font-size: 11px;
       font-weight: 500;
       color: var(--cg-text-secondary);
-      margin-bottom: 4px;
     }
-    .cg-field-hint { font-size: 11px; color: var(--cg-text-tertiary); margin-top: 4px; }
+    .cg-field-hint { font-size: 11px; color: var(--cg-text-tertiary); margin-top: 2px; }
     .cg-input, .cg-select {
       width: 100%;
       font-size: 12px;
       font-family: var(--cg-font);
       padding: 6px 8px;
       border: 0.5px solid var(--cg-border);
-      border-radius: 6px;
+      border-radius: var(--cg-radius-md);
       color: var(--cg-text);
       background: var(--cg-surface);
     }
     .cg-input:focus, .cg-select:focus {
       outline: none;
       border-color: var(--cg-primary);
-      box-shadow: 0 0 0 2px rgba(24, 95, 165, 0.15);
+      box-shadow: 0 0 0 2px rgba(24, 95, 165, 0.1);
     }
 
-    /* ---- Canvas loader ---- */
-    .cg-code-badge {
-      display: inline-block;
-      font-family: var(--cg-mono);
-      font-size: 12px;
-      background: var(--cg-secondary-bg);
-      border: 0.5px solid var(--cg-border);
-      border-radius: 6px;
-      padding: 2px 8px;
-      color: var(--cg-text);
+    /* ---- Simplified Loader ---- */
+    .cg-loader-course-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .cg-loader-course-label { font-size: 12px; color: var(--cg-text-secondary); }
+    .cg-loader-course-value {
+      font-family: var(--cg-mono); font-size: 14px; font-weight: 500;
+      background: var(--cg-secondary-bg); border: 0.5px solid var(--cg-border);
+      border-radius: var(--cg-radius-md); padding: 5px 10px;
     }
-    .cg-code-block {
-      position: relative;
-      background: var(--cg-secondary-bg);
-      border: 0.5px solid var(--cg-border);
-      border-radius: 6px;
-      padding: 14px;
-      font-family: var(--cg-mono);
-      font-size: 12px;
-      line-height: 1.8;
-      white-space: pre;
-      overflow-x: auto;
+    .cg-loader-hint { font-size: 12px; color: var(--cg-text-tertiary); }
+    .cg-loader-code-wrap { position: relative; margin: 10px 0; }
+    .cg-loader-code {
+      background: var(--cg-secondary-bg); border: 0.5px solid var(--cg-border);
+      border-radius: var(--cg-radius-md); padding: 14px;
+      font-family: var(--cg-mono); font-size: 12px; line-height: 1.8;
+      color: var(--cg-text-secondary); overflow-x: auto;
     }
-    .cg-copy-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      font-size: 11px;
-      font-family: var(--cg-font);
-      padding: 3px 8px;
-      border: 0.5px solid var(--cg-border);
-      border-radius: 6px;
-      background: var(--cg-surface);
-      color: var(--cg-text-secondary);
-      cursor: pointer;
+    .cg-loader-kw { color: var(--cg-primary); font-weight: 500; }
+    .cg-loader-str { color: var(--cg-success); }
+    .cg-loader-copy-btn {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 11px; padding: 4px 10px; border-radius: var(--cg-radius-md);
+      border: 0.5px solid var(--cg-border); background: var(--cg-surface);
+      color: var(--cg-text-secondary); cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
     }
-    .cg-divider {
-      height: 0.5px;
-      background: var(--cg-border);
-      margin: 14px 0;
-      border: none;
-    }
-    .cg-steps { display: flex; flex-direction: column; gap: 6px; }
-    .cg-step {
-      display: flex;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--cg-text-secondary);
-    }
-    .cg-step-num { color: var(--cg-text-tertiary); min-width: 14px; }
+    .cg-loader-copy-btn.copied { color: var(--cg-success); border-color: var(--cg-success); }
+    .cg-loader-divider { height: 0.5px; background: var(--cg-border); margin: 16px 0; }
+    .cg-loader-steps { display: flex; flex-direction: column; gap: 6px; }
+    .cg-loader-step { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--cg-text-secondary); }
+    .cg-loader-step-num { font-size: 11px; font-weight: 500; color: var(--cg-text-tertiary); min-width: 14px; }
   </style>
 </head>
 <body>
@@ -360,7 +365,7 @@
           <div class="cg-topbar-title">District Settings</div>
           <div class="cg-district-name">District configuration</div>
         </div>
-        <button id="cg-save-btn" class="cg-save-btn Button--primary" type="button">Save</button>
+        <button id="cg-save-btn" class="cg-save-btn Button--primary" type="button">💾 Save</button>
       </div>
 
       <!-- Inline error / feedback area -->
@@ -539,16 +544,37 @@
     // ========================================================================
     // Section registry (drives sidebar nav + collapse order)
     // ========================================================================
-    var SECTIONS = [
-      { id: 'cg-section-summary', label: 'Summary',         icon: '▦' },
-      { id: 'cg-section-flags',   label: 'Feature flags',   icon: '⚑' },
-      { id: 'cg-section-labels',  label: 'Labels',          icon: '✎' },
-      { id: 'cg-section-outcome', label: 'Outcome config',  icon: '◎' },
-      { id: 'cg-section-grading', label: 'Grading',         icon: '★' },
-      { id: 'cg-section-account', label: 'Account filter',  icon: '☰' },
-      { id: 'cg-section-custom',  label: 'Custom status',   icon: '◆' },
-      { id: 'cg-section-loader',  label: 'Canvas loader',   icon: '↧' }
+    var NAV_GROUPS = [
+      {
+        label: 'Overview',
+        items: [
+          { id: 'cg-section-summary', label: 'Summary', icon: '▦' }
+        ]
+      },
+      {
+        label: 'Configuration',
+        items: [
+          { id: 'cg-section-flags',   label: 'Feature flags',   icon: '⚑' },
+          { id: 'cg-section-labels',  label: 'Labels',          icon: '✎' },
+          { id: 'cg-section-outcome', label: 'Outcome config',  icon: '◎' },
+          { id: 'cg-section-grading', label: 'Grading',         icon: '★' },
+          { id: 'cg-section-account', label: 'Account filter',  icon: '☰' },
+          { id: 'cg-section-custom',  label: 'Custom status',   icon: '◆' }
+        ]
+      },
+      {
+        label: 'Deploy',
+        items: [
+          { id: 'cg-section-loader',  label: 'Canvas loader',   icon: '↧' }
+        ]
+      }
     ];
+
+    // Flat list for easy lookup
+    var SECTIONS = [];
+    NAV_GROUPS.forEach(function(g) {
+      g.items.forEach(function(i) { SECTIONS.push(i); });
+    });
 
     // ========================================================================
     // DOM helpers
@@ -567,8 +593,18 @@
     function makePanel(id, title) {
       var panel = el('div', 'cg-panel');
       panel.id = id;
+      var iconText = '';
+      for (var i = 0; i < SECTIONS.length; i++) {
+        if (SECTIONS[i].id === id) { iconText = SECTIONS[i].icon; break; }
+      }
       var header = el('div', 'cg-panel-header');
-      header.appendChild(el('span', 'cg-panel-title', title));
+      var titleEl = el('span', 'cg-panel-title');
+      if (iconText) {
+        var iconEl = el('i', null, iconText);
+        titleEl.appendChild(iconEl);
+      }
+      titleEl.appendChild(document.createTextNode(' ' + title));
+      header.appendChild(titleEl);
       header.appendChild(el('span', 'cg-panel-chevron', '▼'));
       var body = el('div', 'cg-panel-body');
       panel.appendChild(header);
@@ -723,16 +759,18 @@
       var customVal = (c.DEFAULT_CUSTOM_STATUS_ID != null && c.DEFAULT_CUSTOM_STATUS_ID !== '')
         ? String(c.DEFAULT_CUSTOM_STATUS_ID) : 'none';
       var cards = [
-        ['Active version', 'district config'],
-        ['Grade override', c.ENABLE_GRADE_OVERRIDE ? 'enabled' : 'disabled'],
-        ['Account filter', accountVal],
-        ['Custom status', customVal]
+        { label: 'Active version', value: 'district config', color: 'blue' },
+        { label: 'Grade override', value: c.ENABLE_GRADE_OVERRIDE ? 'enabled' : 'disabled', color: c.ENABLE_GRADE_OVERRIDE ? 'green' : '' },
+        { label: 'Account filter', value: accountVal, color: (accountVal !== 'off') ? 'amber' : '' },
+        { label: 'Custom status', value: customVal, color: (customVal !== 'none') ? 'blue' : '' }
       ];
       var grid = el('div', 'cg-summary');
       cards.forEach(function (card) {
         var cd = el('div', 'cg-metric-card');
-        cd.appendChild(el('div', 'cg-metric-label', card[0]));
-        cd.appendChild(el('div', 'cg-metric-value', card[1]));
+        cd.appendChild(el('div', 'cg-metric-label', card.label));
+        var val = el('div', 'cg-metric-value', card.value);
+        if (card.color) { val.classList.add(card.color); }
+        cd.appendChild(val);
         grid.appendChild(cd);
       });
       body.appendChild(grid);
@@ -818,44 +856,69 @@
     function renderCanvasLoader() {
       var made = makePanel('cg-section-loader', 'Canvas loader');
       var body = made.body;
-      body.appendChild(el('div', 'cg-field-hint',
-        'Add this snippet to your Canvas theme JavaScript so teachers automatically load the gradebook with district settings.'));
 
-      var badgeField = el('div', 'cg-field');
-      badgeField.appendChild(el('label', 'cg-field-label', 'Course ID'));
-      badgeField.appendChild(el('span', 'cg-code-badge', state.courseId));
-      body.appendChild(badgeField);
+      var courseRow = el('div', 'cg-loader-course-row');
+      courseRow.appendChild(el('span', 'cg-loader-course-label', 'District config course ID'));
+      courseRow.appendChild(el('span', 'cg-loader-course-value', state.courseId));
+      courseRow.appendChild(el('span', 'cg-loader-hint', 'detected from this page\'s URL'));
+      body.appendChild(courseRow);
 
-      var lines = [
-        "var CG_DISTRICT_COURSE = '" + state.courseId + "';",
-        "var CG_BASE = 'https://cdn.morenet.net/cg/';",
-        "var s = document.createElement('script');",
-        "s.src = CG_BASE + 'dist/main.js';",
-        "document.head.appendChild(s);"
-      ];
-      var snippet = lines.join('\n');
-      var codeBlock = el('div', 'cg-code-block');
-      codeBlock.textContent = snippet;
-      var copyBtn = el('button', 'cg-copy-btn', '⎘ Copy');
+      body.appendChild(el('div', 'cg-loader-divider'));
+
+      var hint = el('div');
+      hint.style.fontSize = '12px';
+      hint.style.color = 'var(--cg-text-secondary)';
+      hint.style.marginBottom = '10px';
+      hint.innerHTML = 'Paste this into your Canvas Theme Editor under <strong>JavaScript file</strong>:';
+      body.appendChild(hint);
+
+      var codeWrap = el('div', 'cg-loader-code-wrap');
+      var codeBlock = el('div', 'cg-loader-code');
+
+      // Build syntax highlighted snippet
+      codeBlock.innerHTML =
+        '<span class="cg-loader-kw">var</span> CG_DISTRICT_COURSE = <span class="cg-loader-str">\'' + state.courseId + '\'</span>;<br>' +
+        '<span class="cg-loader-kw">var</span> CG_BASE = <span class="cg-loader-str">\'https://cdn.morenet.net/cg/\'</span>;<br>' +
+        '<span class="cg-loader-kw">var</span> s = document.createElement(<span class="cg-loader-str">\'script\'</span>);<br>' +
+        's.src = CG_BASE + <span class="cg-loader-str">\'dist/main.js\'</span>;<br>' +
+        'document.head.appendChild(s);';
+
+      var plainText = "var CG_DISTRICT_COURSE = '" + state.courseId + "';\n" +
+        "var CG_BASE = 'https://cdn.morenet.net/cg/';\n" +
+        "var s = document.createElement('script');\n" +
+        "s.src = CG_BASE + 'dist/main.js';\n" +
+        "document.head.appendChild(s);";
+
+      var copyBtn = el('button', 'cg-loader-copy-btn', '⎘ Copy');
       copyBtn.type = 'button';
       copyBtn.addEventListener('click', function () {
-        copyToClipboard(snippet, copyBtn);
+        copyToClipboard(plainText, copyBtn);
+        copyBtn.classList.add('copied');
+        copyBtn.textContent = '✓ Copied';
+        setTimeout(function() {
+          copyBtn.classList.remove('copied');
+          copyBtn.textContent = '⎘ Copy';
+        }, 2000);
       });
-      codeBlock.appendChild(copyBtn);
-      body.appendChild(codeBlock);
 
-      body.appendChild(el('hr', 'cg-divider'));
+      codeWrap.appendChild(codeBlock);
+      codeWrap.appendChild(copyBtn);
+      body.appendChild(codeWrap);
 
-      var steps = el('div', 'cg-steps');
+      body.appendChild(el('div', 'cg-loader-divider'));
+
+      var steps = el('div', 'cg-loader-steps');
       var stepTexts = [
         'Copy the snippet above',
-        'In Canvas go to Admin → Themes → Edit theme → JavaScript file',
+        'In Canvas, go to <strong>Admin → Themes → Edit theme → JavaScript file</strong>',
         'Paste and save — teachers will pick up district settings automatically'
       ];
       stepTexts.forEach(function (t, i) {
-        var step = el('div', 'cg-step');
-        step.appendChild(el('span', 'cg-step-num', (i + 1) + '.'));
-        step.appendChild(el('span', null, t));
+        var step = el('div', 'cg-loader-step');
+        step.appendChild(el('span', 'cg-loader-step-num', (i + 1)));
+        var span = el('span');
+        span.innerHTML = t;
+        step.appendChild(span);
         steps.appendChild(step);
       });
       body.appendChild(steps);
@@ -870,28 +933,39 @@
       var nav = document.getElementById('cg-nav');
       if (!nav) { return; }
       nav.innerHTML = '';
-      SECTIONS.forEach(function (sec, idx) {
-        var item = el('div', 'cg-nav-item');
-        item.appendChild(el('span', 'cg-nav-icon', sec.icon));
-        item.appendChild(el('span', 'cg-nav-label', sec.label));
-        if (idx === 0) { item.classList.add('is-active'); }
-        item.addEventListener('click', function () {
-          var items = nav.querySelectorAll('.cg-nav-item');
-          Array.prototype.forEach.call(items, function (n) { n.classList.remove('is-active'); });
-          item.classList.add('is-active');
-          var root = getRoot();
-          if (root) {
-            var panels = root.querySelectorAll('.cg-panel');
-            Array.prototype.forEach.call(panels, function (p) {
-              setPanelCollapsed(p, p.id !== sec.id);
-            });
-          }
-          var target = document.getElementById(sec.id);
-          if (target && target.scrollIntoView) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
+
+      NAV_GROUPS.forEach(function (group) {
+        nav.appendChild(el('div', 'cg-nav-section-label', group.label));
+
+        group.items.forEach(function (sec) {
+          var item = el('div', 'cg-nav-item');
+          item.id = 'nav-' + sec.id;
+          item.appendChild(el('span', 'cg-nav-icon', sec.icon));
+          item.appendChild(el('span', 'cg-nav-label', sec.label));
+
+          // Default active state for the first item in the first group
+          if (sec.id === 'cg-section-summary') { item.classList.add('is-active'); }
+
+          item.addEventListener('click', function () {
+            var items = nav.querySelectorAll('.cg-nav-item');
+            Array.prototype.forEach.call(items, function (n) { n.classList.remove('is-active'); });
+            item.classList.add('is-active');
+
+            var root = getRoot();
+            if (root) {
+              var panels = root.querySelectorAll('.cg-panel');
+              Array.prototype.forEach.call(panels, function (p) {
+                setPanelCollapsed(p, p.id !== sec.id);
+              });
+            }
+
+            var target = document.getElementById(sec.id);
+            if (target && target.scrollIntoView) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          });
+          nav.appendChild(item);
         });
-        nav.appendChild(item);
       });
     }
 
@@ -938,9 +1012,8 @@
           var nav = document.getElementById('cg-nav');
           if (nav) {
             var items = nav.querySelectorAll('.cg-nav-item');
-            Array.prototype.forEach.call(items, function (item, idx) {
-              var matches = SECTIONS[idx] && SECTIONS[idx].id === panel.id;
-              if (matches) { item.classList.add('is-active'); }
+            Array.prototype.forEach.call(items, function (item) {
+              if (item.id === 'nav-' + panel.id) { item.classList.add('is-active'); }
               else { item.classList.remove('is-active'); }
             });
           }
@@ -953,7 +1026,7 @@
     // ========================================================================
     async function handleSave() {
       var btn = document.getElementById('cg-save-btn');
-      var original = 'Save';
+      var original = '💾 Save';
       showFeedback('', null);
       if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
       var ok = await saveConfig();
@@ -963,9 +1036,11 @@
         if (btn) {
           btn.textContent = '✓ Saved';
           btn.style.background = 'var(--cg-success)';
+          btn.style.borderColor = 'var(--cg-success)';
           setTimeout(function () {
             btn.textContent = original;
             btn.style.background = '';
+            btn.style.borderColor = '';
             btn.disabled = false;
           }, 1500);
         }
