@@ -19,7 +19,7 @@ old_code/
 dist/
 
 # Generated documentation (built by MkDocs)
-/docs
+
 /.claude/worktrees/eager-shaw-721ae9/
 
 /documents/outcome_rollup.json
