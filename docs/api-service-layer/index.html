@@ -1,0 +1,2353 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Developer documentation for the Customized Gradebook Canvas extension">
+      
+      
+      
+        <link rel="canonical" href="https://morenet-canvas.github.io/CustomizedGradebook/docs/api-service-layer/">
+      
+      
+        <link rel="prev" href="../data-layer/">
+      
+      
+        <link rel="next" href="../page-detection/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>API Service Layer - Customized Gradebook Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-service-layer" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Customized Gradebook Docs" class="md-header__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Customized Gradebook Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Service Layer
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../dev-tools/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Debug Tooling
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../build-pipeline/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Build Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../state-machine/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  State Machine
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../sync-modules/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Sync Modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../data-layer/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Service Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../page-detection/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Page Detection
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../power-law/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Power Law Algorithm
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../canvas-api-gotchas/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Canvas API Gotchas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../walkthroughs/mastery-outlook/" class="md-tabs__link">
+          
+  
+  
+  Feature Walkthroughs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../admin-dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Admin Dashboard
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../account-filtering/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Account Filtering
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mobile/overview/" class="md-tabs__link">
+          
+  
+  
+  Mobile Module
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../development/workflows/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Customized Gradebook Docs" class="md-nav__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Customized Gradebook Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug Tooling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state-machine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sync-modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Service Layer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Service Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canvasapiclient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CanvasApiClient
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CanvasApiClient">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enrollmentservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        enrollmentService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="enrollmentService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fetchallenrollmentsapiclient-options-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchAllEnrollments(apiClient, options?) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchsingleenrollmentcourseid-apiclient-promiseobjectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchSingleEnrollment(courseId, apiClient) → Promise&lt;Object|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchcoursestudentscourseid-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchCourseStudents(courseId, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchobservedstudentscourseid-observerenrollments-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchObservedStudents(courseId, observerEnrollments, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchcoursesectionscourseid-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchCourseSections(courseId, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parseenrollmentgradeenrollmentdata-score-lettergrade-customgradestatusid-overridescore-null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parseEnrollmentGrade(enrollmentData) → { score, letterGrade, customGradeStatusId, overrideScore } | null
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extractenrollmentdataenrollments-mapstring-percentage-lettergrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extractEnrollmentData(enrollments) → Map&lt;string, { percentage, letterGrade }&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gradeoverridejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gradeOverride.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="gradeOverride.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#getallenrollmentidscourseid-apiclient-promisemapstring-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getAllEnrollmentIds(courseId, apiClient) → Promise&lt;Map&lt;string, string&gt;&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getenrollmentidforusercourseid-userid-apiclient-promisestringnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getEnrollmentIdForUser(courseId, userId, apiClient) → Promise&lt;string|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setoverridescoregqlenrollmentid-overridescore-apiclient-promisenumbernull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) → Promise&lt;number|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queueoverridecourseid-userid-average-apiclient-promisevoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        queueOverride(courseId, userId, average, apiClient) → Promise&lt;void&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcomeservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        outcomeService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="outcomeService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#getrollupcourseid-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getRollup(courseId, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getoutcomeobjectbynamedata-objectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getOutcomeObjectByName(data) → Object|null
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createoutcomecourseid-apiclient-promisevoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        createOutcome(courseId, apiClient) → Promise&lt;void&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setoutcomeorderwithavgfirstcourseid-avgoutcomeid-apiclient-rollupdata-promisevoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setOutcomeOrderWithAvgFirst(courseId, avgOutcomeId, apiClient, rollupData?) → Promise&lt;void&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gradecalculatorjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gradeCalculator.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="gradeCalculator.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calculatestudentaveragesdata-outcomeid-courseid-apiclient-promisearrayuserid-average" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calculateStudentAverages(data, outcomeId, courseId, apiClient) → Promise&lt;Array&lt;{userId, average}&gt;&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-helpers-also-exported-for-iegradecalculatorjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared helpers (also exported for ieGradeCalculator.js)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../page-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Page Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power-law/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Law Algorithm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canvas-api-gotchas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canvas API Gotchas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Walkthroughs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Feature Walkthroughs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-outlook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Outlook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/supporting-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin-dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../account-filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account Filtering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobile Module
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobile Module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canvasapiclient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CanvasApiClient
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CanvasApiClient">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enrollmentservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        enrollmentService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="enrollmentService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fetchallenrollmentsapiclient-options-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchAllEnrollments(apiClient, options?) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchsingleenrollmentcourseid-apiclient-promiseobjectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchSingleEnrollment(courseId, apiClient) → Promise&lt;Object|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchcoursestudentscourseid-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchCourseStudents(courseId, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchobservedstudentscourseid-observerenrollments-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchObservedStudents(courseId, observerEnrollments, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetchcoursesectionscourseid-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fetchCourseSections(courseId, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parseenrollmentgradeenrollmentdata-score-lettergrade-customgradestatusid-overridescore-null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parseEnrollmentGrade(enrollmentData) → { score, letterGrade, customGradeStatusId, overrideScore } | null
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extractenrollmentdataenrollments-mapstring-percentage-lettergrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extractEnrollmentData(enrollments) → Map&lt;string, { percentage, letterGrade }&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gradeoverridejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gradeOverride.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="gradeOverride.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#getallenrollmentidscourseid-apiclient-promisemapstring-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getAllEnrollmentIds(courseId, apiClient) → Promise&lt;Map&lt;string, string&gt;&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getenrollmentidforusercourseid-userid-apiclient-promisestringnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getEnrollmentIdForUser(courseId, userId, apiClient) → Promise&lt;string|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setoverridescoregqlenrollmentid-overridescore-apiclient-promisenumbernull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setOverrideScoreGQL(enrollmentId, overrideScore, apiClient) → Promise&lt;number|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queueoverridecourseid-userid-average-apiclient-promisevoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        queueOverride(courseId, userId, average, apiClient) → Promise&lt;void&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcomeservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        outcomeService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="outcomeService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#getrollupcourseid-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getRollup(courseId, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getoutcomeobjectbynamedata-objectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getOutcomeObjectByName(data) → Object|null
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createoutcomecourseid-apiclient-promisevoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        createOutcome(courseId, apiClient) → Promise&lt;void&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setoutcomeorderwithavgfirstcourseid-avgoutcomeid-apiclient-rollupdata-promisevoid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setOutcomeOrderWithAvgFirst(courseId, avgOutcomeId, apiClient, rollupData?) → Promise&lt;void&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gradecalculatorjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gradeCalculator.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="gradeCalculator.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#calculatestudentaveragesdata-outcomeid-courseid-apiclient-promisearrayuserid-average" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calculateStudentAverages(data, outcomeId, courseId, apiClient) → Promise&lt;Array&lt;{userId, average}&gt;&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-helpers-also-exported-for-iegradecalculatorjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared helpers (also exported for ieGradeCalculator.js)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api-service-layer">API Service Layer<a class="headerlink" href="#api-service-layer" title="Permanent link">&para;</a></h1>
+<p><code>src/utils/canvasApiClient.js</code> · <code>src/services/enrollmentService.js</code> · <code>src/services/gradeOverride.js</code> · <code>src/services/outcomeService.js</code> · <code>src/services/gradeCalculator.js</code></p>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>All network communication with Canvas goes through <code>CanvasApiClient</code>. Domain-specific services (enrollment, grade override, outcome, grade calculation) are thin wrappers that call the client, add business logic, and return normalized data structures.</p>
+<hr />
+<h2 id="canvasapiclient"><code>CanvasApiClient</code><a class="headerlink" href="#canvasapiclient" title="Permanent link">&para;</a></h2>
+<p>The central HTTP client. Handles CSRF authentication, <code>per_page=100</code> injection, Link-header pagination, and JSON serialization.</p>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">apiClient</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">CanvasApiClient</span><span class="p">();</span>
+</code></pre></div>
+<p>Reads <code>_csrf_token</code> from <code>document.cookie</code> at construction time and caches it for the lifetime of the instance. <strong>Throws</strong> if the cookie is not found (user not authenticated).</p>
+<blockquote>
+<p><strong>Design note</strong> — Canvas accepts previously-issued CSRF tokens even after cookie rotation. Caching once at construction is intentional and tested. See <code>documents/CSRF-TOKEN-DECISION.md</code> for the full analysis.</p>
+</blockquote>
+<h3 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get</code></td>
+<td><code>(url, options?, context?) → Promise&lt;any&gt;</code></td>
+<td>Single-page GET. Automatically appends <code>per_page=100</code> if absent.</td>
+</tr>
+<tr>
+<td><code>getAllPages</code></td>
+<td><code>(url, options?, context?) → Promise&lt;any[]&gt;</code></td>
+<td>Paginated GET. Follows <code>Link: rel="next"</code> headers until exhausted. Returns combined array.</td>
+</tr>
+<tr>
+<td><code>getWithResponse</code></td>
+<td><code>(url, options?, context?) → Promise&lt;Response&gt;</code></td>
+<td>Returns the raw <code>Response</code> object so callers can read headers (e.g. <code>Link: rel="last"</code> for parallel pagination). Body is <strong>not</strong> parsed.</td>
+</tr>
+<tr>
+<td><code>post</code></td>
+<td><code>(url, data, options?, context?) → Promise&lt;any&gt;</code></td>
+<td>POST with JSON body. Injects <code>authenticity_token</code> into JSON bodies automatically.</td>
+</tr>
+<tr>
+<td><code>put</code></td>
+<td><code>(url, data, options?, context?) → Promise&lt;any&gt;</code></td>
+<td>PUT with JSON body. Same token injection as <code>post</code>.</td>
+</tr>
+<tr>
+<td><code>delete</code></td>
+<td><code>(url, options?, context?) → Promise&lt;any&gt;</code></td>
+<td>DELETE request.</td>
+</tr>
+<tr>
+<td><code>graphql</code></td>
+<td><code>(query, variables?, context?) → Promise&lt;any&gt;</code></td>
+<td>POST to <code>/api/graphql</code> with <code>Content-Type: application/json</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>context</code> parameter</strong> — passed to <code>safeFetch</code>/<code>safeJsonParse</code> for error log attribution. Use a unique, descriptive string (e.g. <code>'fetchCourseStudents'</code>) so errors in logs can be traced to the specific call site.</p>
+<p><strong>CSRF injection</strong> — For JSON bodies, <code>authenticity_token</code> is added if not already present. For non-JSON bodies (e.g. CSV for outcome imports), data is passed as-is.</p>
+<p><strong><code>getAllPages</code> object response</strong> — if a paginated endpoint returns a JSON object instead of an array on the first page (e.g. <code>final_grade_overrides</code>), <code>getAllPages</code> returns that object immediately without following pagination.</p>
+<blockquote>
+<p><strong>Gotcha</strong> — <code>get()</code> adds <code>per_page=100</code> automatically. If you need a different page size, include <code>per_page=N</code> in the URL before calling <code>get()</code>.</p>
+</blockquote>
+<hr />
+<h2 id="enrollmentservicejs"><code>enrollmentService.js</code><a class="headerlink" href="#enrollmentservicejs" title="Permanent link">&para;</a></h2>
+<h3 id="fetchallenrollmentsapiclient-options-promisearray"><code>fetchAllEnrollments(apiClient, options?)</code> → <code>Promise&lt;Array&gt;</code><a class="headerlink" href="#fetchallenrollmentsapiclient-options-promisearray" title="Permanent link">&para;</a></h3>
+<p>Fetches <code>StudentEnrollment</code> and <code>ObserverEnrollment</code> for the current user (<code>/api/v1/users/self/enrollments</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>state</code></td>
+<td><code>'active'</code></td>
+<td>Enrollment state filter</td>
+</tr>
+<tr>
+<td><code>includeTotalScores</code></td>
+<td><code>true</code></td>
+<td>Adds <code>include[]=total_scores</code> to request</td>
+</tr>
+</tbody>
+</table>
+<p>Returns empty array on failure (never throws).</p>
+<hr />
+<h3 id="fetchsingleenrollmentcourseid-apiclient-promiseobjectnull"><code>fetchSingleEnrollment(courseId, apiClient)</code> → <code>Promise&lt;Object|null&gt;</code><a class="headerlink" href="#fetchsingleenrollmentcourseid-apiclient-promiseobjectnull" title="Permanent link">&para;</a></h3>
+<p>Returns the first matching student or observer enrollment for the current user in a specific course. Handles both <code>StudentEnrollment</code> and <code>ObserverEnrollment</code> (observer must have <code>associated_user_id</code>).</p>
+<p>Returns <code>null</code> if not found or on error.</p>
+<hr />
+<h3 id="fetchcoursestudentscourseid-apiclient-promisearray"><code>fetchCourseStudents(courseId, apiClient)</code> → <code>Promise&lt;Array&gt;</code><a class="headerlink" href="#fetchcoursestudentscourseid-apiclient-promisearray" title="Permanent link">&para;</a></h3>
+<p>Teacher-facing. Uses <code>getAllPages</code> to handle courses with more than 100 students.</p>
+<p>Returns:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">[{</span><span class="w"> </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="nx">string</span><span class="p">,</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="nx">string</span><span class="p">,</span><span class="w"> </span><span class="nx">sortableName</span><span class="o">:</span><span class="w"> </span><span class="nx">string</span><span class="p">,</span><span class="w"> </span><span class="nx">sectionId</span><span class="o">:</span><span class="w"> </span><span class="nx">string</span><span class="w"> </span><span class="p">}]</span>
+</code></pre></div></p>
+<p>Normalizes <code>user.name</code>, <code>user.short_name</code>, <code>user.sortable_name</code> with graceful fallbacks.</p>
+<hr />
+<h3 id="fetchobservedstudentscourseid-observerenrollments-apiclient-promisearray"><code>fetchObservedStudents(courseId, observerEnrollments, apiClient)</code> → <code>Promise&lt;Array&gt;</code><a class="headerlink" href="#fetchobservedstudentscourseid-observerenrollments-apiclient-promisearray" title="Permanent link">&para;</a></h3>
+<p>Returns observed students for a parent (observer) in a course. Fetches all observees via <code>/api/v1/users/self/observees</code>, then cross-references with <code>observerEnrollments</code> to determine which are enrolled in the target course.</p>
+<p>Returns the same <code>{ userId, name, sortableName, sectionId }</code> shape as <code>fetchCourseStudents</code>.</p>
+<hr />
+<h3 id="fetchcoursesectionscourseid-apiclient-promisearray"><code>fetchCourseSections(courseId, apiClient)</code> → <code>Promise&lt;Array&gt;</code><a class="headerlink" href="#fetchcoursesectionscourseid-apiclient-promisearray" title="Permanent link">&para;</a></h3>
+<p>Returns <code>[{ id: string, name: string }]</code> sorted alphabetically by name.</p>
+<hr />
+<h3 id="parseenrollmentgradeenrollmentdata-score-lettergrade-customgradestatusid-overridescore-null"><code>parseEnrollmentGrade(enrollmentData)</code> → <code>{ score, letterGrade, customGradeStatusId, overrideScore } | null</code><a class="headerlink" href="#parseenrollmentgradeenrollmentdata-score-lettergrade-customgradestatusid-overridescore-null" title="Permanent link">&para;</a></h3>
+<p>Normalizes the two Canvas grade structures (nested <code>grades</code> object vs. top-level <code>computed_*</code> fields). Returns <code>null</code> if no grade data is found.</p>
+<table>
+<thead>
+<tr>
+<th>Return field</th>
+<th>Source priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>score</code></td>
+<td><code>grades.current_score</code> → <code>grades.final_score</code> → <code>computed_current_score</code> → …</td>
+</tr>
+<tr>
+<td><code>letterGrade</code></td>
+<td><code>grades.current_grade</code> → <code>grades.final_grade</code> → <code>computed_current_grade</code> → …</td>
+</tr>
+<tr>
+<td><code>customGradeStatusId</code></td>
+<td><code>grades.customGradeStatusId</code></td>
+</tr>
+<tr>
+<td><code>overrideScore</code></td>
+<td><code>grades.override_score</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="extractenrollmentdataenrollments-mapstring-percentage-lettergrade"><code>extractEnrollmentData(enrollments)</code> → <code>Map&lt;string, { percentage, letterGrade }&gt;</code><a class="headerlink" href="#extractenrollmentdataenrollments-mapstring-percentage-lettergrade" title="Permanent link">&para;</a></h3>
+<p>Converts an enrollments array to a <code>Map&lt;courseId, { percentage, letterGrade }&gt;</code>. Calls <code>parseEnrollmentGrade</code> on each entry. Note: maps <code>score</code> → <code>percentage</code> for backward compatibility with existing code.</p>
+<hr />
+<h2 id="gradeoverridejs"><code>gradeOverride.js</code><a class="headerlink" href="#gradeoverridejs" title="Permanent link">&para;</a></h2>
+<h3 id="getallenrollmentidscourseid-apiclient-promisemapstring-string"><code>getAllEnrollmentIds(courseId, apiClient)</code> → <code>Promise&lt;Map&lt;string, string&gt;&gt;</code><a class="headerlink" href="#getallenrollmentidscourseid-apiclient-promisemapstring-string" title="Permanent link">&para;</a></h3>
+<p>Returns a <code>Map&lt;userId, enrollmentId&gt;</code> for all student enrollments in a course. Paginated via <code>getAllPages</code>. Memoized per course in <code>__enrollmentMapCache</code> (module-level <code>Map</code>). Subsequent calls for the same course return immediately.</p>
+<hr />
+<h3 id="getenrollmentidforusercourseid-userid-apiclient-promisestringnull"><code>getEnrollmentIdForUser(courseId, userId, apiClient)</code> → <code>Promise&lt;string|null&gt;</code><a class="headerlink" href="#getenrollmentidforusercourseid-userid-apiclient-promisestringnull" title="Permanent link">&para;</a></h3>
+<p>Thin wrapper around <code>getAllEnrollmentIds</code>. Returns the enrollment ID for one user, or <code>null</code> if not found.</p>
+<hr />
+<h3 id="setoverridescoregqlenrollmentid-overridescore-apiclient-promisenumbernull"><code>setOverrideScoreGQL(enrollmentId, overrideScore, apiClient)</code> → <code>Promise&lt;number|null&gt;</code><a class="headerlink" href="#setoverridescoregqlenrollmentid-overridescore-apiclient-promisenumbernull" title="Permanent link">&para;</a></h3>
+<p>Runs the <code>setOverrideScore</code> GraphQL mutation directly. Returns the applied override score or <code>null</code>. <strong>Throws</strong> on GraphQL errors.</p>
+<p><code>overrideScore</code> is on the 0–100 percentage scale (pass through <code>OVERRIDE_SCALE(average)</code> before calling).</p>
+<hr />
+<h3 id="queueoverridecourseid-userid-average-apiclient-promisevoid"><code>queueOverride(courseId, userId, average, apiClient)</code> → <code>Promise&lt;void&gt;</code><a class="headerlink" href="#queueoverridecourseid-userid-average-apiclient-promisevoid" title="Permanent link">&para;</a></h3>
+<p>Combines enrollment lookup and override mutation in one call. No-op if <code>ENABLE_GRADE_OVERRIDE</code> is <code>false</code>. Silent fail — logs warnings, never throws. Used during concurrent bulk grade submissions.</p>
+<p><code>average</code> is on the 0–4 Marzano scale; the function applies <code>OVERRIDE_SCALE</code> internally.</p>
+<hr />
+<h2 id="outcomeservicejs"><code>outcomeService.js</code><a class="headerlink" href="#outcomeservicejs" title="Permanent link">&para;</a></h2>
+<h3 id="getrollupcourseid-apiclient-promiseobject"><code>getRollup(courseId, apiClient)</code> → <code>Promise&lt;Object&gt;</code><a class="headerlink" href="#getrollupcourseid-apiclient-promiseobject" title="Permanent link">&para;</a></h3>
+<p><code>GET /api/v1/courses/:id/outcome_rollups?include[]=outcomes&amp;include[]=users&amp;per_page=100</code></p>
+<p>Returns the raw rollup response object (not paginated — relies on <code>per_page=100</code>).</p>
+<hr />
+<h3 id="getoutcomeobjectbynamedata-objectnull"><code>getOutcomeObjectByName(data)</code> → <code>Object|null</code><a class="headerlink" href="#getoutcomeobjectbynamedata-objectnull" title="Permanent link">&para;</a></h3>
+<p>Searches <code>data.linked.outcomes</code> for an outcome whose <code>title</code> matches <code>AVG_OUTCOME_NAME</code> (from config). Returns the outcome object or <code>null</code>.</p>
+<hr />
+<h3 id="createoutcomecourseid-apiclient-promisevoid"><code>createOutcome(courseId, apiClient)</code> → <code>Promise&lt;void&gt;</code><a class="headerlink" href="#createoutcomecourseid-apiclient-promisevoid" title="Permanent link">&para;</a></h3>
+<p>Creates the "Current Score" outcome via Canvas CSV import (<code>POST /api/v1/courses/:id/outcome_imports?import_type=instructure_csv</code>). Polls the import status every 2 s, up to 15 attempts (30 s total). Throws <code>TimeoutError</code> if import doesn't complete in time.</p>
+<p>Generates a unique <code>vendor_guid</code> (<code>MOREnet_&lt;8-char-random&gt;</code>) to avoid Canvas name conflicts.</p>
+<hr />
+<h3 id="setoutcomeorderwithavgfirstcourseid-avgoutcomeid-apiclient-rollupdata-promisevoid"><code>setOutcomeOrderWithAvgFirst(courseId, avgOutcomeId, apiClient, rollupData?)</code> → <code>Promise&lt;void&gt;</code><a class="headerlink" href="#setoutcomeorderwithavgfirstcourseid-avgoutcomeid-apiclient-rollupdata-promisevoid" title="Permanent link">&para;</a></h3>
+<p>Reorders outcomes in the Learning Mastery Gradebook to place <code>AVG_OUTCOME</code> first. Accepts pre-fetched <code>rollupData</code> to avoid an extra API call. Skips reordering if <code>AVG_OUTCOME</code> is already first. Non-critical — logs a warning and does not throw on failure.</p>
+<p>Canvas expects <code>POST /api/v1/courses/:id/assign_outcome_order</code> with <code>X-Requested-With: XMLHttpRequest</code> and an array of <code>{ outcome_id, position }</code> objects (1-based positions).</p>
+<hr />
+<h2 id="gradecalculatorjs"><code>gradeCalculator.js</code><a class="headerlink" href="#gradecalculatorjs" title="Permanent link">&para;</a></h2>
+<h3 id="calculatestudentaveragesdata-outcomeid-courseid-apiclient-promisearrayuserid-average"><code>calculateStudentAverages(data, outcomeId, courseId, apiClient)</code> → <code>Promise&lt;Array&lt;{userId, average}&gt;&gt;</code><a class="headerlink" href="#calculatestudentaveragesdata-outcomeid-courseid-apiclient-promisearrayuserid-average" title="Permanent link">&para;</a></h3>
+<p>The core grade calculation engine. Returns only students whose average has changed (or whose override grade needs updating).</p>
+<p><strong>Exclusion rules (applied before averaging):</strong></p>
+<ol>
+<li>The <code>outcomeId</code> outcome itself (the "Current Score" assignment — avoids circular calculation)</li>
+<li>Any outcome whose title matches a keyword in <code>EXCLUDED_OUTCOME_KEYWORDS</code> (e.g. <code>"attendance"</code>)</li>
+<li>Students with zero relevant scores are skipped entirely</li>
+</ol>
+<p><strong>Update detection:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Config flag</th>
+<th>Condition to include student</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outcome update</td>
+<td><code>ENABLE_OUTCOME_UPDATES</code></td>
+<td><code>oldAverage !== newAverage</code></td>
+</tr>
+<tr>
+<td>Override update</td>
+<td><code>ENABLE_GRADE_OVERRIDE</code></td>
+<td><code>|actual% - expected%| &gt; 0.01</code></td>
+</tr>
+</tbody>
+</table>
+<p>A student is included if either condition is true. If both flags are false, no students are returned.</p>
+<p><strong>Returns</strong> <code>[{ userId: string, average: number }]</code> where <code>average</code> is rounded to 2 decimal places.</p>
+<hr />
+<h3 id="shared-helpers-also-exported-for-iegradecalculatorjs">Shared helpers (also exported for <code>ieGradeCalculator.js</code>)<a class="headerlink" href="#shared-helpers-also-exported-for-iegradecalculatorjs" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>buildOutcomeMap(data)</code></td>
+<td>Returns <code>{ [outcomeId]: title }</code> from <code>data.linked.outcomes</code></td>
+</tr>
+<tr>
+<td><code>getCurrentOutcomeScore(scores, outcomeId)</code></td>
+<td>Finds score for a specific outcome in a rollup scores array</td>
+</tr>
+<tr>
+<td><code>getRelevantScores(scores, outcomeMap, excludedIds, excludedKeywords)</code></td>
+<td>Filters scores to only those that count toward the average</td>
+</tr>
+<tr>
+<td><code>computeAverage(scores)</code></td>
+<td>Mean of <code>score</code> values, rounded to 2 decimal places</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="gotchas">Gotchas<a class="headerlink" href="#gotchas" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>__enrollmentMapCache</code> is module-level</strong> — it persists for the page session. If a teacher adds a student mid-session, the stale cache will not include them until the page is reloaded.</li>
+<li><strong><code>outcome_rollups</code> does not support <code>user_ids[]</code></strong> — Canvas returns 400. Always fetch all students and filter in JavaScript. (See also the same gotcha in <code>masteryOutlookAvgService.js</code>.)</li>
+<li><strong><code>getAllPages</code> returns early for object responses</strong> — if the first page returns a JSON object instead of an array, pagination stops immediately and that object is returned. This is by design for endpoints like <code>final_grade_overrides</code>.</li>
+<li><strong><code>createOutcome</code> uses a random <code>vendor_guid</code></strong> — each call generates a new GUID. If called twice before the first import completes, two outcomes may be created. Guard the call site against re-entry.</li>
+<li><strong>CSRF token caching</strong> — the token is read once at <code>new CanvasApiClient()</code>. If Canvas rotates the cookie during a long session, the cached token remains valid (by empirical observation), but if authentication is lost entirely, all subsequent calls will fail with 401.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

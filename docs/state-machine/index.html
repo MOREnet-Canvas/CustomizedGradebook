@@ -1,0 +1,2516 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Developer documentation for the Customized Gradebook Canvas extension">
+      
+      
+      
+        <link rel="canonical" href="https://morenet-canvas.github.io/CustomizedGradebook/docs/state-machine/">
+      
+      
+        <link rel="prev" href="../build-pipeline/">
+      
+      
+        <link rel="next" href="../sync-modules/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>State Machine - Customized Gradebook Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#state-machine" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Customized Gradebook Docs" class="md-header__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Customized Gradebook Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              State Machine
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../dev-tools/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Debug Tooling
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../build-pipeline/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Build Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  State Machine
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../sync-modules/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Sync Modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../data-layer/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-service-layer/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Service Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../page-detection/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Page Detection
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../power-law/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Power Law Algorithm
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../canvas-api-gotchas/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Canvas API Gotchas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../walkthroughs/mastery-outlook/" class="md-tabs__link">
+          
+  
+  
+  Feature Walkthroughs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../admin-dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Admin Dashboard
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../account-filtering/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Account Filtering
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mobile/overview/" class="md-tabs__link">
+          
+  
+  
+  Mobile Module
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../development/workflows/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Customized Gradebook Docs" class="md-nav__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Customized Gradebook Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug Tooling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Machine
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#states-and-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        States and transitions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ploutlookstatemachine-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PLOutlookStateMachine class
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PLOutlookStateMachine class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-handlers-ploutlookstatehandlersjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State handlers (plOutlookStateHandlers.js)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="State handlers (plOutlookStateHandlers.js)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pl_state_handlers-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PL_STATE_HANDLERS registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-handler-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key handler details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key handler details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handlecreatingassignment-one-time-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handleCreatingAssignment — one-time setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handlecalculatingchanges-fast-path-54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handleCalculatingChanges — fast-path (#54)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handleverifying-polling-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handleVerifying — polling loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-orchestrator-ploutlooksyncjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run orchestrator (plOutlookSync.js)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run orchestrator (plOutlookSync.js)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runplsyncopts-promiseresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        runPLSync(opts) → Promise&lt;Result&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checksyncneededopts-promisestatuscounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        checkSyncNeeded(opts) → Promise&lt;StatusCounts&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runplsyncforalloutcomesopts-promiseresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        runPLSyncForAllOutcomes(opts) → Promise&lt;Result[]&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions-layer-ploutlookactionsjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Actions layer (plOutlookActions.js)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Actions layer (plOutlookActions.js)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#will_post_lock-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        will_post_lock values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debounced-write-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debounced write mechanism
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sync-modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-service-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Service Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../page-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Page Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power-law/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Law Algorithm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canvas-api-gotchas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canvas API Gotchas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Walkthroughs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Feature Walkthroughs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-outlook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Outlook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/supporting-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin-dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../account-filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account Filtering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobile Module
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobile Module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#states-and-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        States and transitions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ploutlookstatemachine-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PLOutlookStateMachine class
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PLOutlookStateMachine class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-handlers-ploutlookstatehandlersjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State handlers (plOutlookStateHandlers.js)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="State handlers (plOutlookStateHandlers.js)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pl_state_handlers-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PL_STATE_HANDLERS registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-handler-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key handler details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key handler details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handlecreatingassignment-one-time-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handleCreatingAssignment — one-time setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handlecalculatingchanges-fast-path-54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handleCalculatingChanges — fast-path (#54)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handleverifying-polling-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handleVerifying — polling loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-orchestrator-ploutlooksyncjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run orchestrator (plOutlookSync.js)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run orchestrator (plOutlookSync.js)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runplsyncopts-promiseresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        runPLSync(opts) → Promise&lt;Result&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checksyncneededopts-promisestatuscounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        checkSyncNeeded(opts) → Promise&lt;StatusCounts&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runplsyncforalloutcomesopts-promiseresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        runPLSyncForAllOutcomes(opts) → Promise&lt;Result[]&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions-layer-ploutlookactionsjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Actions layer (plOutlookActions.js)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Actions layer (plOutlookActions.js)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#will_post_lock-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        will_post_lock values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debounced-write-mechanism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debounced write mechanism
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="state-machine">State Machine<a class="headerlink" href="#state-machine" title="Permanent link">&para;</a></h1>
+<p><code>src/masteryOutlook/plOutlookStateMachine.js</code> · <code>src/masteryOutlook/plOutlookStateHandlers.js</code> · <code>src/masteryOutlook/plOutlookSync.js</code> · <code>src/masteryOutlook/plOutlookActions.js</code></p>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The PL Outlook sync feature is built around a per-outcome state machine that drives the process of pushing Power Law predicted scores back to Canvas. One <code>PLOutlookStateMachine</code> instance is created per <code>runPLSync()</code> call — it is not a singleton.</p>
+<p>The design deliberately mirrors <code>src/gradebook/stateMachine.js</code> (the gradebook UpdateFlow machine) with the same <code>transition/context/event</code> API, <code>on()</code>/<code>emit()</code> event system, and <code>getStateHistory()</code>/<code>reset()</code> shape. The key differences: it is scoped to a single outcome, uses the mastery outlook cache for setup detection, and reports progress via an <code>onProgress</code> callback rather than a floating banner.</p>
+<hr />
+<h2 id="states-and-transitions">States and transitions<a class="headerlink" href="#states-and-transitions" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>IDLE
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └─▶ CHECKING_SETUP
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        ├─▶ CREATING_ASSIGNMENT ──▶ CHECKING_STUDENTS ─┐
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        │                       └─▶ COMPLETE            │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        └─▶ CHECKING_STUDENTS ◀────────────────────────┘
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>              ├─▶ FETCHING_SUBMISSIONS ──▶ CALCULATING_CHANGES
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>              └─▶ CALCULATING_CHANGES
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                    ├─▶ SYNCING ──▶ VERIFYING ──▶ COMPLETE
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                    └─▶ COMPLETE  (zero updates)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                    └─▶ ERROR
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      (any state) ──▶ ERROR ──▶ IDLE
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      COMPLETE ──▶ IDLE
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Exported constant</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IDLE</code></td>
+<td><code>PL_STATES.IDLE</code></td>
+<td>Start/end state. Machine idles between runs.</td>
+</tr>
+<tr>
+<td><code>CHECKING_SETUP</code></td>
+<td><code>PL_STATES.CHECKING_SETUP</code></td>
+<td>Reads <code>pl_assignments</code> from cache. Fast-path: if entry exists, skip setup.</td>
+</tr>
+<tr>
+<td><code>CREATING_ASSIGNMENT</code></td>
+<td><code>PL_STATES.CREATING_ASSIGNMENT</code></td>
+<td>One-time per-outcome: set outcome to <code>latest</code>, create assignment + rubric, cache submission IDs.</td>
+</tr>
+<tr>
+<td><code>CHECKING_STUDENTS</code></td>
+<td><code>PL_STATES.CHECKING_STUDENTS</code></td>
+<td>Fetches active enrollment, filters departed students, detects new students.</td>
+</tr>
+<tr>
+<td><code>FETCHING_SUBMISSIONS</code></td>
+<td><code>PL_STATES.FETCHING_SUBMISSIONS</code></td>
+<td>Fetches submission records for students who joined after initial setup.</td>
+</tr>
+<tr>
+<td><code>CALCULATING_CHANGES</code></td>
+<td><code>PL_STATES.CALCULATING_CHANGES</code></td>
+<td>Compares PL predictions vs Canvas rollup scores. Builds sync list.</td>
+</tr>
+<tr>
+<td><code>SYNCING</code></td>
+<td><code>PL_STATES.SYNCING</code></td>
+<td>Batch-pushes scores via GraphQL. Updates <code>last_synced_score</code> in <code>sync_state</code>.</td>
+</tr>
+<tr>
+<td><code>VERIFYING</code></td>
+<td><code>PL_STATES.VERIFYING</code></td>
+<td>Re-fetches rollups and confirms scores match. Polls until no progress or convergence.</td>
+</tr>
+<tr>
+<td><code>COMPLETE</code></td>
+<td><code>PL_STATES.COMPLETE</code></td>
+<td>Reports outcome. Transitions back to <code>IDLE</code>.</td>
+</tr>
+<tr>
+<td><code>ERROR</code></td>
+<td><code>PL_STATES.ERROR</code></td>
+<td>Catches thrown errors. Logs and transitions to <code>IDLE</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="ploutlookstatemachine-class"><code>PLOutlookStateMachine</code> class<a class="headerlink" href="#ploutlookstatemachine-class" title="Permanent link">&para;</a></h2>
+<p><strong>File:</strong> <code>src/masteryOutlook/plOutlookStateMachine.js</code></p>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="ow">new</span><span class="w"> </span><span class="nx">PLOutlookStateMachine</span><span class="p">(</span><span class="nx">initialContext</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>courseId</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Canvas course ID</td>
+</tr>
+<tr>
+<td><code>outcomeId</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Canvas outcome ID</td>
+</tr>
+<tr>
+<td><code>outcomeName</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Human-readable name for UI/logging</td>
+</tr>
+<tr>
+<td><code>apiClient</code></td>
+<td><code>CanvasApiClient</code></td>
+<td>Yes</td>
+<td>Pre-constructed API client</td>
+</tr>
+<tr>
+<td><code>onProgress</code></td>
+<td><code>Function</code></td>
+<td>No</td>
+<td><code>(state, outcomeName, message, done, total) =&gt; void</code></td>
+</tr>
+<tr>
+<td><code>targetUserIds</code></td>
+<td><code>string[] \| null</code></td>
+<td>No</td>
+<td>Limit sync to specific students; <code>null</code> = all</td>
+</tr>
+<tr>
+<td><code>setupOnly</code></td>
+<td><code>boolean</code></td>
+<td>No</td>
+<td>Stop after <code>CREATING_ASSIGNMENT</code> — no score push</td>
+</tr>
+<tr>
+<td><code>cachedPLEntry</code></td>
+<td><code>Object \| null</code></td>
+<td>No</td>
+<td>In-memory <code>pl_assignments</code> entry; skips disk read in <code>CHECKING_SETUP</code></td>
+</tr>
+<tr>
+<td><code>plScoreOverrides</code></td>
+<td><code>Object \| null</code></td>
+<td>No</td>
+<td><code>{ [userId]: plScore }</code> — in-memory predictions after ignore/recompute</td>
+</tr>
+<tr>
+<td><code>canvasScoreOverrides</code></td>
+<td><code>Object \| null</code></td>
+<td>No</td>
+<td><code>{ [userId]: canvasScore }</code> — skips rollup re-fetch in <code>CALCULATING_CHANGES</code></td>
+</tr>
+</tbody>
+</table>
+<p>Context fields populated during the run:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Populated by</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assignmentId</code></td>
+<td><code>CHECKING_SETUP</code></td>
+<td><code>string</code></td>
+</tr>
+<tr>
+<td><code>rubricId</code></td>
+<td><code>CHECKING_SETUP</code></td>
+<td><code>string</code></td>
+</tr>
+<tr>
+<td><code>rubricAssociationId</code></td>
+<td><code>CHECKING_SETUP</code></td>
+<td><code>string</code></td>
+</tr>
+<tr>
+<td><code>rubricCriterionId</code></td>
+<td><code>CHECKING_SETUP</code></td>
+<td><code>string</code></td>
+</tr>
+<tr>
+<td><code>submissionIdByUserId</code></td>
+<td><code>CHECKING_SETUP</code> / <code>FETCHING_SUBMISSIONS</code></td>
+<td><code>Map&lt;userId, submissionId&gt;</code></td>
+</tr>
+<tr>
+<td><code>activeUserIds</code></td>
+<td><code>CHECKING_STUDENTS</code></td>
+<td><code>Set&lt;string&gt;</code></td>
+</tr>
+<tr>
+<td><code>effectiveTargetIds</code></td>
+<td><code>CHECKING_STUDENTS</code></td>
+<td><code>Set&lt;string&gt;</code></td>
+</tr>
+<tr>
+<td><code>studentsToSync</code></td>
+<td><code>CALCULATING_CHANGES</code></td>
+<td><code>Array&lt;{userId, submissionId, rubricAssociationId, rubricCriterionId, points, score, plScore, canvasScore, will_post_note}&gt;</code></td>
+</tr>
+<tr>
+<td><code>numberOfUpdates</code></td>
+<td><code>CALCULATING_CHANGES</code></td>
+<td><code>number</code></td>
+</tr>
+<tr>
+<td><code>successCount</code></td>
+<td><code>SYNCING</code></td>
+<td><code>number</code></td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td><code>SYNCING</code></td>
+<td><code>Array</code></td>
+</tr>
+<tr>
+<td><code>verifyMismatches</code></td>
+<td><code>VERIFYING</code></td>
+<td><code>Array</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>getCurrentState()</code></td>
+<td><code>string</code></td>
+<td>Current <code>PL_STATES.*</code> value</td>
+</tr>
+<tr>
+<td><code>getContext()</code></td>
+<td><code>Object</code></td>
+<td>Shallow copy of context — safe to read, do not mutate</td>
+</tr>
+<tr>
+<td><code>updateContext(updates)</code></td>
+<td><code>void</code></td>
+<td>Merges <code>updates</code> into context</td>
+</tr>
+<tr>
+<td><code>getStateHistory()</code></td>
+<td><code>string[]</code></td>
+<td>Ordered list of all states visited</td>
+</tr>
+<tr>
+<td><code>canTransition(toState)</code></td>
+<td><code>boolean</code></td>
+<td>Checks valid transition map</td>
+</tr>
+<tr>
+<td><code>transition(toState, contextUpdates)</code></td>
+<td><code>void</code></td>
+<td>Throws if transition is invalid</td>
+</tr>
+<tr>
+<td><code>progress(message, done, total)</code></td>
+<td><code>void</code></td>
+<td>Calls <code>onProgress</code> if set</td>
+</tr>
+<tr>
+<td><code>on(event, callback)</code></td>
+<td><code>void</code></td>
+<td>Subscribe to <code>'stateChange'</code> or <code>'reset'</code> events</td>
+</tr>
+<tr>
+<td><code>emit(event, data)</code></td>
+<td><code>void</code></td>
+<td>Called internally by <code>transition()</code> and <code>reset()</code></td>
+</tr>
+<tr>
+<td><code>reset()</code></td>
+<td><code>void</code></td>
+<td>Resets to <code>IDLE</code>, clears history, emits <code>'reset'</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="state-handlers-ploutlookstatehandlersjs">State handlers (<code>plOutlookStateHandlers.js</code>)<a class="headerlink" href="#state-handlers-ploutlookstatehandlersjs" title="Permanent link">&para;</a></h2>
+<p>Each handler receives <code>sm</code> (the <code>PLOutlookStateMachine</code> instance), performs its work via <code>sm.getContext()</code> / <code>sm.updateContext()</code>, and <strong>returns the next <code>PL_STATE</code></strong> to transition to.</p>
+<table>
+<thead>
+<tr>
+<th>Export</th>
+<th>Next state(s) returned</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handleCheckingSetup(sm)</code></td>
+<td><code>CHECKING_STUDENTS</code> (cached) or <code>CREATING_ASSIGNMENT</code> (first run)</td>
+</tr>
+<tr>
+<td><code>handleCreatingAssignment(sm)</code></td>
+<td><code>CHECKING_STUDENTS</code> or <code>COMPLETE</code> (if <code>setupOnly</code>)</td>
+</tr>
+<tr>
+<td><code>handleCheckingStudents(sm)</code></td>
+<td><code>FETCHING_SUBMISSIONS</code> (new students) or <code>CALCULATING_CHANGES</code></td>
+</tr>
+<tr>
+<td><code>handleFetchingSubmissions(sm)</code></td>
+<td><code>CALCULATING_CHANGES</code></td>
+</tr>
+<tr>
+<td><code>handleCalculatingChanges(sm)</code></td>
+<td><code>SYNCING</code> or <code>COMPLETE</code> (zero updates)</td>
+</tr>
+<tr>
+<td><code>handleSyncing(sm)</code></td>
+<td><code>VERIFYING</code></td>
+</tr>
+<tr>
+<td><code>handleVerifying(sm)</code></td>
+<td><code>COMPLETE</code></td>
+</tr>
+<tr>
+<td><code>handleComplete(sm)</code></td>
+<td><code>IDLE</code></td>
+</tr>
+<tr>
+<td><code>handleError(sm)</code></td>
+<td><code>IDLE</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="pl_state_handlers-registry"><code>PL_STATE_HANDLERS</code> registry<a class="headerlink" href="#pl_state_handlers-registry" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">PL_STATE_HANDLERS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p">[</span><span class="nx">PL_STATES</span><span class="p">.</span><span class="nx">CHECKING_SETUP</span><span class="p">]</span><span class="o">:</span><span class="w">       </span><span class="nx">handleCheckingSetup</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p">[</span><span class="nx">PL_STATES</span><span class="p">.</span><span class="nx">CREATING_ASSIGNMENT</span><span class="p">]</span><span class="o">:</span><span class="w">  </span><span class="nx">handleCreatingAssignment</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="c1">// …all states mapped</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">};</span>
+</code></pre></div>
+<p>Used by <code>runPLSync()</code> to dispatch to the correct handler.</p>
+<h3 id="key-handler-details">Key handler details<a class="headerlink" href="#key-handler-details" title="Permanent link">&para;</a></h3>
+<h4 id="handlecreatingassignment-one-time-setup"><code>handleCreatingAssignment</code> — one-time setup<a class="headerlink" href="#handlecreatingassignment-one-time-setup" title="Permanent link">&para;</a></h4>
+<ol>
+<li>Checks if a PL assignment already exists in Canvas (<code>findExistingPLAssignment</code>) — adopts it if found rather than creating a duplicate.</li>
+<li>Sets <code>calculation_method: 'latest'</code> on the outcome so PL overrides always win.</li>
+<li>Creates an assignment with <code>only_visible_to_overrides: false</code> (briefly visible to generate submission records), <code>grading_type: PL_GRADING_TYPE</code>, <code>omit_from_final_grade: true</code>.</li>
+<li>Creates a rubric linked to the outcome with <code>OUTCOME_AND_RUBRIC_RATINGS</code> from <code>config.js</code>.</li>
+<li>Waits <strong>3 seconds</strong> for Canvas to generate submission records, then fetches them all.</li>
+<li>Flips assignment to <code>only_visible_to_overrides: true</code> — hides it from the assignments list.</li>
+<li>Writes <code>pl_assignments[outcomeId]</code> into the cache.</li>
+</ol>
+<blockquote>
+<p><strong>Gotcha</strong> — Grading type cannot be changed on an assignment that already has submissions. Pre-existing (adopted) assignments keep their original <code>grading_type</code>.</p>
+</blockquote>
+<h4 id="handlecalculatingchanges-fast-path-54"><code>handleCalculatingChanges</code> — fast-path (#54)<a class="headerlink" href="#handlecalculatingchanges-fast-path-54" title="Permanent link">&para;</a></h4>
+<p>When <code>canvasScoreOverrides</code> is provided (populated by <code>handleSyncStudents</code> from in-memory <code>canvasScore</code>), the handler skips the <code>/outcome_rollups</code> re-fetch entirely. <code>VERIFYING</code> still re-fetches rollups post-push as a backstop.</p>
+<p>Scores that already match (within <code>scoresMatch()</code> tolerance) are silently skipped. Students with <code>manual_override: true</code> in <code>sync_state</code> are always skipped.</p>
+<p>Score resolution order:
+1. <code>will_post</code> (teacher-set explicit value) — used as-is, not rounded
+2. <code>plScoreOverrides[userId]</code> (in-memory after ignore/recompute) — rounded to nearest 0.5
+3. <code>plPrediction</code> from disk cache — rounded to nearest 0.5</p>
+<h4 id="handleverifying-polling-loop"><code>handleVerifying</code> — polling loop<a class="headerlink" href="#handleverifying-polling-loop" title="Permanent link">&para;</a></h4>
+<p>Polls <code>/outcome_rollups</code> every 5 seconds. Stops when:
+- All scores match (<code>mismatches.length === 0</code>), or
+- No progress for 50 consecutive polls (<code>noProgressCount &gt;= noProgressLimit</code>).</p>
+<blockquote>
+<p><strong>Gotcha</strong> — <code>outcome_rollups</code> does not support <code>?page=N</code>. Must follow <code>Link: rel="next"</code> header cursors. <code>apiClient.getAllPages()</code> exits after page 1 on this endpoint — use <code>getWithResponse()</code> + manual cursor loop.</p>
+</blockquote>
+<hr />
+<h2 id="run-orchestrator-ploutlooksyncjs">Run orchestrator (<code>plOutlookSync.js</code>)<a class="headerlink" href="#run-orchestrator-ploutlooksyncjs" title="Permanent link">&para;</a></h2>
+<h3 id="runplsyncopts-promiseresult"><code>runPLSync(opts)</code> → <code>Promise&lt;Result&gt;</code><a class="headerlink" href="#runplsyncopts-promiseresult" title="Permanent link">&para;</a></h3>
+<p>The main public entry point. Creates a <code>PLOutlookStateMachine</code>, wires it to <code>PL_STATE_HANDLERS</code>, and drives the run loop.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">runPLSync</span><span class="p">({</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nx">courseId</span><span class="p">,</span><span class="w"> </span><span class="nx">outcomeId</span><span class="p">,</span><span class="w"> </span><span class="nx">outcomeName</span><span class="p">,</span><span class="w"> </span><span class="nx">apiClient</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nx">onProgress</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">state</span><span class="p">,</span><span class="w"> </span><span class="nx">outcomeName</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="p">,</span><span class="w"> </span><span class="nx">done</span><span class="p">,</span><span class="w"> </span><span class="nx">total</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* update UI */</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nx">targetUserIds</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s1">&#39;642&#39;</span><span class="p">],</span><span class="w">   </span><span class="c1">// optional — omit for all students</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nx">setupOnly</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">});</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1">// result: { success, successCount, errors, stateHistory }</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Return field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td><code>true</code> if <code>ERROR</code> state was never entered</td>
+</tr>
+<tr>
+<td><code>successCount</code></td>
+<td><code>number</code></td>
+<td>Students successfully pushed</td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td><code>Array</code></td>
+<td>Permanent push failures</td>
+</tr>
+<tr>
+<td><code>stateHistory</code></td>
+<td><code>string[]</code></td>
+<td>All states visited in order</td>
+</tr>
+</tbody>
+</table>
+<p>The run loop:
+1. Transitions to <code>CHECKING_SETUP</code>.
+2. Calls <code>PL_STATE_HANDLERS[currentState](sm)</code> — each handler returns the next state.
+3. Unhandled errors in a handler trigger a transition to <code>ERROR</code>.
+4. Loop exits when state is <code>IDLE</code> or <code>ERROR</code>.
+5. Calls <code>sm.reset()</code> before returning.</p>
+<h3 id="checksyncneededopts-promisestatuscounts"><code>checkSyncNeeded(opts)</code> → <code>Promise&lt;StatusCounts&gt;</code><a class="headerlink" href="#checksyncneededopts-promisestatuscounts" title="Permanent link">&para;</a></h3>
+<p>Read-only pre-flight. Reads cache, <code>pl_assignments</code>, and <code>sync_state</code> — no Canvas API writes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">checkSyncNeeded</span><span class="p">({</span><span class="w"> </span><span class="nx">courseId</span><span class="p">,</span><span class="w"> </span><span class="nx">outcomeId</span><span class="p">,</span><span class="w"> </span><span class="nx">apiClient</span><span class="w"> </span><span class="p">});</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">// → { hasSetup, predictionCount, total, synced, needsSync, possibleOverride,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">//     manualOverride, ne, notSetup }</span>
+</code></pre></div>
+<h3 id="runplsyncforalloutcomesopts-promiseresult"><code>runPLSyncForAllOutcomes(opts)</code> → <code>Promise&lt;Result[]&gt;</code><a class="headerlink" href="#runplsyncforalloutcomesopts-promiseresult" title="Permanent link">&para;</a></h3>
+<p>Runs <code>runPLSync</code> sequentially for every outcome in the cache. Returns an array of per-outcome results. No parallelism — outcomes are processed one at a time.</p>
+<hr />
+<h2 id="actions-layer-ploutlookactionsjs">Actions layer (<code>plOutlookActions.js</code>)<a class="headerlink" href="#actions-layer-ploutlookactionsjs" title="Permanent link">&para;</a></h2>
+<p>Teacher-initiated actions that mutate <code>sync_state</code> and trigger cache writes. All actions share a common signature:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span><span class="w"> </span><span class="nx">courseId</span><span class="p">,</span><span class="w"> </span><span class="nx">outcomeId</span><span class="p">,</span><span class="w"> </span><span class="nx">studentId</span><span class="p">,</span><span class="w"> </span><span class="nx">cache</span><span class="p">,</span><span class="w"> </span><span class="nx">apiClient</span><span class="p">,</span><span class="w"> </span><span class="nx">onRerender</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="nx">actionSpecific</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>When <code>cache</code> is provided (normal UI path): mutates in-memory, fires <code>onRerender()</code> immediately for instant feedback, schedules a debounced background write (800 ms trailing edge). Without <code>cache</code>: synchronous read-modify-write.</p>
+<table>
+<thead>
+<tr>
+<th>Export</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handleConfirmOverride</code></td>
+<td>Sets <code>manual_override: true</code> — Canvas score wins on next sync</td>
+</tr>
+<tr>
+<td><code>handleDismissOverride</code></td>
+<td>Clears <code>manual_override</code>, clears <code>last_synced_score</code>, immediately re-pushes PL prediction via <code>runPLSync</code></td>
+</tr>
+<tr>
+<td><code>handleRevertOverride</code></td>
+<td>Alias of <code>handleDismissOverride</code> — shown as "Revert to PL" in the UI</td>
+</tr>
+<tr>
+<td><code>handleSetWillPost</code></td>
+<td>Sets <code>will_post + will_post_lock + note</code> — explicit teacher score</td>
+</tr>
+<tr>
+<td><code>handleClearWillPost</code></td>
+<td>Clears all <code>will_post</code> fields</td>
+</tr>
+<tr>
+<td><code>handleMarzanoPillClick</code></td>
+<td>Clears <code>will_post + will_post_lock</code>; preserves note</td>
+</tr>
+<tr>
+<td><code>handleCanvasPillClick</code></td>
+<td>Sets <code>will_post = canvasScore, will_post_lock = 'unlocked'</code></td>
+</tr>
+<tr>
+<td><code>handleCustomValueTyped</code></td>
+<td>Sets <code>will_post = value</code>; promotes lock to <code>'unlocked'</code> unless already <code>'locked'</code></td>
+</tr>
+<tr>
+<td><code>handleLockWillPost</code></td>
+<td>Sets <code>will_post_lock = 'locked'</code></td>
+</tr>
+<tr>
+<td><code>handleUnlockWillPost</code></td>
+<td>Sets <code>will_post_lock = 'unlocked'</code></td>
+</tr>
+<tr>
+<td><code>handleNoteChanged</code></td>
+<td>Synchronous; updates <code>will_post_note</code> and schedules cache write</td>
+</tr>
+<tr>
+<td><code>handleSyncStudents</code></td>
+<td>Orchestrates a full sync for one outcome + specific students; updates <code>canvasScore</code> in-memory post-sync</td>
+</tr>
+<tr>
+<td><code>handleIgnoreAlignment</code></td>
+<td>Adds to <code>cache.ignored_alignments</code>, recomputes PL projection locally</td>
+</tr>
+<tr>
+<td><code>handleUnignoreAlignment</code></td>
+<td>Removes from <code>cache.ignored_alignments</code>, recomputes PL projection locally</td>
+</tr>
+<tr>
+<td><code>handleOverrideCurrentScore</code></td>
+<td>Writes <code>current_score_overrides[studentId]</code></td>
+</tr>
+<tr>
+<td><code>handleClearCurrentScoreOverride</code></td>
+<td>Removes from <code>current_score_overrides</code></td>
+</tr>
+<tr>
+<td><code>initWriteScheduler(cache)</code></td>
+<td>Seeds the dedupe baseline after initial cache load — prevents a false "no change" skip on the first write</td>
+</tr>
+<tr>
+<td><code>flushCacheWrite(courseId, cache, apiClient)</code></td>
+<td>Immediately flushes any pending debounced write — called before <code>runPLSync</code> so disk is up to date</td>
+</tr>
+</tbody>
+</table>
+<h3 id="will_post_lock-values"><code>will_post_lock</code> values<a class="headerlink" href="#will_post_lock-values" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>'none'</code></td>
+<td>No teacher override; use PL prediction</td>
+</tr>
+<tr>
+<td><code>'unlocked'</code></td>
+<td>Teacher has set a score but allows it to be overwritten by future PL syncs</td>
+</tr>
+<tr>
+<td><code>'locked'</code></td>
+<td>Teacher has locked the score; PL sync will not overwrite it</td>
+</tr>
+</tbody>
+</table>
+<h3 id="debounced-write-mechanism">Debounced write mechanism<a class="headerlink" href="#debounced-write-mechanism" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>scheduleCacheWrite</code> uses a 800 ms trailing-edge timer. Multiple rapid mutations coalesce into a single write.</li>
+<li><code>flushCacheWrite</code> cancels the timer and writes immediately. Safe to call when nothing is pending.</li>
+<li>A snapshot of <code>sync_state</code>, <code>ignored_alignments</code>, and <code>current_score_overrides</code> is compared before writing — if unchanged, the write is skipped.</li>
+<li><code>_writeInFlight</code> prevents concurrent writes by polling every 50 ms until the in-flight write settles.</li>
+</ul>
+<hr />
+<h2 id="gotchas">Gotchas<a class="headerlink" href="#gotchas" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>One machine per sync call</strong> — <code>PLOutlookStateMachine</code> is constructed fresh each time. Do not reuse an instance across outcomes or sync runs.</li>
+<li><strong><code>setupOnly: true</code> stops after <code>CREATING_ASSIGNMENT</code></strong> — use for the Initialize flow so teachers can review predictions before the first push. The assignment exists in Canvas but no scores are posted.</li>
+<li><strong><code>findExistingPLAssignment</code> safeguard</strong> — prevents duplicate assignments on retry. If an assignment with the expected name suffix already exists in Canvas, it is adopted rather than creating a second one.</li>
+<li><strong>3-second delay in <code>CREATING_ASSIGNMENT</code> and <code>FETCHING_SUBMISSIONS</code></strong> — Canvas needs time to generate submission records after an assignment becomes visible. If the delay is insufficient (e.g. large rosters), some students may be missing from the initial submission map and will be picked up in <code>FETCHING_SUBMISSIONS</code> on the next sync.</li>
+<li><strong><code>ignore/unignore</code> are in-memory only</strong> — no Canvas API call, no cache file write. The teacher must explicitly sync to push the recomputed prediction.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
