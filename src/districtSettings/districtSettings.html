@@ -376,9 +376,6 @@
     </main>
   </div>
 
-  <!-- Hidden config div for local testing (empty by default) -->
-  <div id="cg-district-config" style="display:none"></div>
-
   <!-- ============================== SCRIPT ============================== -->
   <script>
   (function () {
@@ -448,24 +445,115 @@
     }
 
     // ========================================================================
-    // Data layer — load / save
+    // Data layer — Canvas Files API (mirrors masteryOutlookCacheService)
+    // Config is stored as a JSON file in the course:
+    //   MOREnet_CustomizedGradebook/district_settings/district_settings.json
     // ========================================================================
+    var SCHEMA_VERSION = '1.0';
+    var PARENT_FOLDER_NAME = 'MOREnet_CustomizedGradebook';
+    var FOLDER_NAME = 'district_settings';
+    var FILE_NAME = 'district_settings.json';
+
+    // Per-page memoized subfolder id (reset on write failure).
+    var _folderId = null;
+
+    function hasCourse() {
+      return !!state.courseId && state.courseId !== 'COURSE_ID';
+    }
+
+    // Minimal Canvas API request: CSRF header + authenticity_token in JSON body,
+    // matching CanvasApiClient. Throws on non-2xx.
+    async function cgApiRequest(method, url, data) {
+      var headers = { 'X-CSRF-Token': state.csrfToken };
+      var body = null;
+      if (data) {
+        headers['Content-Type'] = 'application/json';
+        var payload = data.authenticity_token
+          ? data
+          : Object.assign({}, data, { authenticity_token: state.csrfToken });
+        body = JSON.stringify(payload);
+      }
+      var res = await fetch(url, {
+        method: method,
+        credentials: 'same-origin',
+        headers: headers,
+        body: body
+      });
+      if (!res.ok) {
+        throw new Error(method + ' ' + url + ' -> ' + res.status);
+      }
+      var text = await res.text();
+      return text ? JSON.parse(text) : null;
+    }
+    function cgApiGet(url) { return cgApiRequest('GET', url, null); }
+    function cgApiPost(url, data) { return cgApiRequest('POST', url, data); }
+    function cgApiPut(url, data) { return cgApiRequest('PUT', url, data); }
+
+    // Lock a folder (unpublished) so students cannot access it. Non-fatal.
+    async function lockFolder(folderId) {
+      try {
+        await cgApiPut('/api/v1/folders/' + folderId, {
+          hidden: false,
+          locked: true,
+          unlock_at: '',
+          lock_at: '',
+          visibility_level: 'inherit'
+        });
+      } catch (e) { /* may already be locked */ }
+    }
+
+    // Find-or-create a named folder under parentId; returns its id.
+    async function ensureNamedFolder(name, parentId) {
+      try {
+        var list = await cgApiGet(
+          '/api/v1/courses/' + state.courseId + '/folders?per_page=100'
+        );
+        if (Array.isArray(list)) {
+          var existing = list.find(function (f) {
+            return f.name === name && f.parent_folder_id === parentId && !f.deleted;
+          });
+          if (existing) { await lockFolder(existing.id); return existing.id; }
+        }
+      } catch (e) { /* fall through to create */ }
+
+      var folder = await cgApiPost('/api/v1/courses/' + state.courseId + '/folders', {
+        name: name,
+        parent_folder_id: parentId,
+        hidden: false,
+        locked: true
+      });
+      await lockFolder(folder.id);
+      return folder.id;
+    }
+
+    // Ensure MOREnet_CustomizedGradebook/district_settings/ exists; returns subfolder id.
+    async function ensureFolder() {
+      if (_folderId) { return _folderId; }
+      var root = await cgApiGet('/api/v1/courses/' + state.courseId + '/folders/root');
+      var parentId = await ensureNamedFolder(PARENT_FOLDER_NAME, root.id);
+      var subId = await ensureNamedFolder(FOLDER_NAME, parentId);
+      _folderId = subId;
+      return subId;
+    }
+
     async function loadConfig() {
       try {
-        var res = await fetch(
-          '/api/v1/courses/' + state.courseId + '/pages/district-config',
-          { credentials: 'same-origin' }
-        );
-        if (!res.ok) { return; }
-        var page = await res.json();
-        var body = page && page.body ? page.body : '';
-        if (!body) { return; }
-        var doc = new DOMParser().parseFromString(body, 'text/html');
-        var div = doc.querySelector('#cg-district-config');
-        if (!div) { return; }
-        var raw = (div.textContent || '').trim();
-        if (!raw) { return; }
-        var parsed = JSON.parse(raw);
+        if (!hasCourse()) { return; }
+        var url = '/api/v1/courses/' + state.courseId + '/files'
+          + '?search_term=' + encodeURIComponent(FILE_NAME)
+          + '&content_types[]=application/json&per_page=10';
+        var results = await cgApiGet(url);
+        if (!Array.isArray(results)) { return; }
+        var file = results.find(function (f) {
+          return f.display_name === FILE_NAME && f['content-type'] === 'application/json';
+        });
+        if (!file || !file.url) { return; }
+        var resp = await fetch(file.url, { credentials: 'include' });
+        if (!resp.ok) { return; }
+        var data = JSON.parse(await resp.text());
+        // Discard on schema mismatch (same policy as the mastery cache).
+        if (!data || !data.metadata || data.metadata.schemaVersion !== SCHEMA_VERSION) { return; }
+        var parsed = data.config || {};
         var merged = deepCopy(DEFAULTS);
         Object.keys(parsed).forEach(function (key) {
           merged[key] = parsed[key];
@@ -497,28 +585,57 @@
       }
     }
 
+    // Write config as a JSON file using Canvas' 3-step upload protocol.
     async function saveConfig() {
       applySaveTransforms();
+      if (!hasCourse()) { return false; }
       try {
-        var res = await fetch(
-          '/api/v1/courses/' + state.courseId + '/pages/district-config',
-          {
-            method: 'PUT',
-            credentials: 'same-origin',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRF-Token': state.csrfToken
-            },
-            body: JSON.stringify({
-              wiki_page: {
-                body: '<div id="cg-district-config" style="display:none">' +
-                  JSON.stringify(state.config) + '</div>'
-              }
-            })
-          }
-        );
-        return res.ok;
+        var folderId = await ensureFolder();
+
+        var payload = {
+          metadata: {
+            schemaVersion: SCHEMA_VERSION,
+            updatedAt: new Date().toISOString()
+          },
+          config: state.config
+        };
+        var jsonContent = JSON.stringify(payload, null, 2);
+        var fileSize = new Blob([jsonContent]).size;
+
+        // Step 1: request upload instructions.
+        var upload = await cgApiPost('/api/v1/courses/' + state.courseId + '/files', {
+          name: FILE_NAME,
+          size: fileSize,
+          content_type: 'application/json',
+          parent_folder_id: folderId,
+          on_duplicate: 'overwrite'
+        });
+
+        // Step 2: upload file content to Canvas storage.
+        var formData = new FormData();
+        Object.keys(upload.upload_params).forEach(function (key) {
+          formData.append(key, upload.upload_params[key]);
+        });
+        formData.append('file',
+          new Blob([jsonContent], { type: 'application/json' }), FILE_NAME);
+        var uploadRes = await fetch(upload.upload_url, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include'
+        });
+        if (!uploadRes.ok) { _folderId = null; return false; }
+        var uploaded = await uploadRes.json();
+
+        // Step 3: confirm upload and lock the file (unpublished, teacher-visible).
+        await cgApiPut('/api/v1/files/' + uploaded.id, {
+          locked: true,
+          hidden: false,
+          visibility_level: 'inherit'
+        });
+        return true;
       } catch (err) {
+        // Folder id may be stale — force re-discovery on next save.
+        _folderId = null;
         return false;
       }
     }
