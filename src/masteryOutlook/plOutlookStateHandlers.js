@@ -714,6 +714,13 @@ export async function handleVerifying(sm) {
 
 // ─── COMPLETE ─────────────────────────────────────────────────────────────────
 
+/**
+ * Handle the COMPLETE state of the PL sync state machine.
+ * Reports final sync results via progress messages and alerts on verify mismatches.
+ *
+ * @param {Object} sm - PL sync state machine instance
+ * @returns {Promise<string>} Next state — always `PL_STATES.IDLE`
+ */
 export async function handleComplete(sm) {
     const { numberOfUpdates, successCount, errors, verifyMismatches, zeroUpdates, outcomeName } = sm.getContext();
 
@@ -741,6 +748,13 @@ export async function handleComplete(sm) {
 
 // ─── ERROR ────────────────────────────────────────────────────────────────────
 
+/**
+ * Handle the ERROR state of the PL sync state machine.
+ * Logs the error and surfaces its message via the progress reporter.
+ *
+ * @param {Object} sm - PL sync state machine instance
+ * @returns {Promise<string>} Next state — always `PL_STATES.IDLE`
+ */
 export async function handleError(sm) {
     const { error, outcomeName } = sm.getContext();
     logger.error(`[PLSync] ERROR for ${outcomeName}:`, error);

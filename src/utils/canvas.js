@@ -39,6 +39,14 @@ export function getCourseId() {
     return courseId;
 }
 
+/**
+ * Read a cookie value by name from `document.cookie`.
+ * Used to retrieve the Canvas CSRF token (`_csrf_token`).
+ *
+ * @param {string} name - Cookie name to look up
+ * @returns {string} Decoded cookie value
+ * @throws {Error} If the named cookie is not found
+ */
 export function getTokenCookie(name) {
     const cookies = document.cookie.split(";").map(cookie => cookie.trim());
     let cookieValue = null;
@@ -56,6 +64,13 @@ export function getTokenCookie(name) {
     return cookieValue;
 }
 
+/**
+ * Determine the current user's role group based on Canvas ENV roles/types.
+ * Returns one of: `"teacher_like"`, `"student_like"`, `"observer_like"`, or `"unknown"`.
+ * Result is cached in sessionStorage for the lifetime of the page session.
+ *
+ * @returns {string} Role group identifier for the current Canvas user
+ */
 export function getUserRoleGroup() {
     const userId = ENV?.current_user_id ? String(ENV.current_user_id) : "unknown_user";
     const cacheKeyGroup = `roleGroup_${userId}`;

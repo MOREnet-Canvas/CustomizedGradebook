@@ -7,6 +7,17 @@ import {
     brandButtonSecondaryText,
 } from "./brandColors.js";
 
+/**
+ * Create a styled Canvas-themed button element.
+ *
+ * @param {Object} options
+ * @param {string} options.label - Button text content
+ * @param {string|null} [options.id=null] - Optional id attribute for the button
+ * @param {Function|null} [options.onClick=null] - Click event handler
+ * @param {"primary"|"secondary"} [options.type="primary"] - Visual style variant
+ * @param {string|null} [options.tooltip=null] - Optional title attribute for tooltip text
+ * @returns {HTMLButtonElement} Configured button element ready to append to the DOM
+ */
 export function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
     const button = document.createElement("button");
 
@@ -52,6 +63,11 @@ export function makeButton({ label, id = null, onClick = null, type = "primary",
     return button;
 }
 
+/**
+ * Create a flex-row container div for grouping multiple buttons horizontally.
+ *
+ * @returns {HTMLDivElement} A div styled as a horizontal button row
+ */
 export function createButtonColumnContainer() {
     const container = document.createElement("div");
     container.style.display = "flex";

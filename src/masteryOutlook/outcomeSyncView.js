@@ -31,6 +31,12 @@ import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 
 // ─── Outcome Type Helpers ────────────────────────────────────────────────────
 
+/**
+ * Check if an outcome title matches the configured Current Score outcome name.
+ *
+ * @param {string} title - Outcome title to test
+ * @returns {boolean} true if the title equals `AVG_OUTCOME_NAME`
+ */
 export function isCurrentScoreOutcome(title) {
     return title === AVG_OUTCOME_NAME;
 }
@@ -43,6 +49,13 @@ function isSpecialOutcome(title) {
     return isCurrentScoreOutcome(title) || isExcludedOutcome(title);
 }
 
+/**
+ * Check whether an outcome is a regular (gradable) outcome.
+ * Returns false for the Current Score outcome and any excluded-keyword outcomes.
+ *
+ * @param {{ title: string }} outcome - Outcome object with a title property
+ * @returns {boolean} true if the outcome should be included in Power Law calculations
+ */
 export function isRegularOutcome(outcome) {
     return !isSpecialOutcome(outcome.title);
 }

@@ -1,3 +1,10 @@
+/**
+ * Format a Date object as a human-readable timestamp in the America/Chicago (Central) timezone.
+ * Output format: `YYYY-MM-DD H:MM:SS AM/PM`
+ *
+ * @param {Date} date - The date to format
+ * @returns {string} Formatted timestamp string, e.g. `"2025-06-01 2:30:45 PM"`
+ */
 export function formatTimestampCentral(date) {
     const parts = new Intl.DateTimeFormat("en-US", {
         timeZone: "America/Chicago",

@@ -558,6 +558,16 @@ export async function fetchAllOutcomeResultsParallel(courseId, apiClient, plAssi
     return { results: filtered, alignmentNameMap };
 }
 
+/**
+ * Fetch all outcome results for a course using manual pagination.
+ * Canvas returns `{ outcome_results: [...] }` rather than a direct array,
+ * so `getAllPages` cannot be used; this function pages through manually.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {Object} apiClient - CanvasApiClient instance
+ * @param {Function} [onProgress=() => {}] - Progress callback receiving a status string
+ * @returns {Promise<{ results: Array, alignmentNameMap: Object }>} Paginated outcome results and alignment metadata
+ */
 export async function fetchOutcomeResults(courseId, apiClient, onProgress = () => {}) {
     try {
         logger.info('[outcomesDataService] Fetching ALL outcome results...');
