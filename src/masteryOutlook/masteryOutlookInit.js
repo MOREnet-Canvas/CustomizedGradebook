@@ -185,6 +185,16 @@ async function buildAvgAssignmentSetup(courseId, apiClient) {
     }
 }
 
+/**
+ * Run a full Mastery Outlook data refresh for a course.
+ * Fetches outcomes, enrollments, submissions, and outcome results in parallel,
+ * computes Power Law metrics, and rebuilds the cache.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {Object} apiClient - CanvasApiClient instance
+ * @param {Function} [onProgress=() => {}] - Progress callback receiving a status string
+ * @returns {Promise<Object>} Populated cache object for the course
+ */
 export async function runFullRefresh(courseId, apiClient, onProgress = () => {}) {
     logger.info('[MasteryOutlookInit] runFullRefresh — starting parallel data fetch...');
 

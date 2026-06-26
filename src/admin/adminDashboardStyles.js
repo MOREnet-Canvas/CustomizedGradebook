@@ -319,6 +319,12 @@ const ADMIN_DASHBOARD_CSS = `
 }
 `;
 
+/**
+ * Inject the admin dashboard CSS into the page via a `<style>` element.
+ * Safe to call multiple times — the `injectStyles` helper de-duplicates by element id.
+ *
+ * @returns {void}
+ */
 export function injectAdminDashboardStyles() {
     injectStyles(ADMIN_DASHBOARD_CSS, 'cg-admin-dashboard-styles');
 }

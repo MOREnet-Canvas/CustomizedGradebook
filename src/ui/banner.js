@@ -3,6 +3,22 @@ import { getCourseId } from "../utils/canvas.js";
 import { k } from "../utils/keys.js";
 import { brandPrimary } from "./brandColors.js";
 
+/**
+ * Display a floating notification banner anchored to the Canvas content area.
+ * Removes any existing banners unless `allowMultiple` is true.
+ *
+ * @param {Object} [options={}]
+ * @param {string} [options.text=""] - Banner message text
+ * @param {number|null} [options.duration=null] - Auto-hide delay in ms; null keeps the banner until manually removed
+ * @param {string} [options.top="20px"] - CSS top offset for banner position
+ * @param {string} [options.right="20px"] - CSS right offset for banner position
+ * @param {boolean} [options.center=false] - If true, centers the banner horizontally instead of right-aligning
+ * @param {string} [options.backgroundColor] - Banner background color (defaults to Canvas brand primary)
+ * @param {string} [options.textColor="#ffffff"] - Banner text color
+ * @param {boolean} [options.allowMultiple=false] - If true, existing banners are not removed before showing this one
+ * @param {string} [options.ariaLive="polite"] - ARIA live region setting: "polite", "assertive", or "off"
+ * @returns {HTMLElement} The created banner element
+ */
 export function showFloatingBanner({
                                 text = "",
                                 duration = null,              // null = stays until removed; number = auto-hide after ms

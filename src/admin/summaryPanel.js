@@ -9,6 +9,14 @@ import { CanvasApiClient } from "../utils/canvasApiClient.js";
 
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
+/**
+ * Render the admin dashboard Summary panel into the given container.
+ * Shows current installation status: account, theme assets, grading scheme, and custom grade status.
+ *
+ * @param {HTMLElement} container - DOM element to render the panel into
+ * @param {Object} ctx - Dashboard context object exposing `getConfig()` and related helpers
+ * @returns {void}
+ */
 export function renderSummaryPanel(container, ctx) {
     const { panel, body } = createCollapsiblePanel("Summary", false, "cg-section-summary");
 
