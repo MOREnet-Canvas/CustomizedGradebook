@@ -1,0 +1,2204 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Developer documentation for the Customized Gradebook Canvas extension">
+      
+      
+      
+        <link rel="canonical" href="https://morenet-canvas.github.io/CustomizedGradebook/docs/configuration/">
+      
+      
+        <link rel="prev" href="../power-law/">
+      
+      
+        <link rel="next" href="../canvas-api-gotchas/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Configuration - Customized Gradebook Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Customized Gradebook Docs" class="md-header__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Customized Gradebook Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../dev-tools/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Debug Tooling
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../build-pipeline/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Build Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../state-machine/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  State Machine
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../sync-modules/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Sync Modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../data-layer/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-service-layer/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Service Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../page-detection/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Page Detection
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../power-law/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Power Law Algorithm
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../canvas-api-gotchas/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Canvas API Gotchas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../walkthroughs/mastery-outlook/" class="md-tabs__link">
+          
+  
+  
+  Feature Walkthroughs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../admin-dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Admin Dashboard
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../account-filtering/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Account Filtering
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mobile/overview/" class="md-tabs__link">
+          
+  
+  
+  Mobile Module
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../development/workflows/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Customized Gradebook Docs" class="md-nav__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Customized Gradebook Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug Tooling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state-machine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sync-modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-service-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Service Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../page-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Page Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power-law/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Law Algorithm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grading-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grading mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-grade-status-outcomecompletiongate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom grade status (OutcomeCompletionGate)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grade-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grade scaling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI labels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pl-override-assignment-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PL override assignment naming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pl-assignment-grading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PL assignment grading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grading-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grading scheme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#course-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Course detection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canvas-api-gotchas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canvas API Gotchas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Walkthroughs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Feature Walkthroughs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-outlook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Outlook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/supporting-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin-dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../account-filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account Filtering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobile Module
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobile Module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grading-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grading mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-grade-status-outcomecompletiongate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom grade status (OutcomeCompletionGate)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grade-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grade scaling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI labels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pl-override-assignment-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PL override assignment naming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pl-assignment-grading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PL assignment grading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outcome-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grading-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grading scheme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#course-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Course detection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p><code>src/config.js</code></p>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>All configuration constants are defined in <code>src/config.js</code> with hardcoded defaults. Every constant reads from <code>window.CG_CONFIG</code> first, falling back to the default if that key is absent.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">SOME_CONSTANT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">window</span><span class="p">.</span><span class="nx">CG_CONFIG</span><span class="o">?</span><span class="p">.</span><span class="nx">SOME_CONSTANT</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="nx">defaultValue</span><span class="p">;</span>
+</code></pre></div>
+<p><strong>Customization without rebuilding:</strong> The loader files (<code>upload_dev.js</code> or <code>loader_production.js</code>) run before the bundle and can set <code>window.CG_CONFIG</code> to override any constant. This means teachers or administrators can change behavior by editing only the loader — no rebuild required.</p>
+<p><strong>Execution order:</strong></p>
+<ol>
+<li>Loader file sets <code>window.CG_CONFIG</code></li>
+<li>Loader injects the main bundle <code>&lt;script&gt;</code></li>
+<li>Bundle loads; <code>config.js</code> is imported and reads <code>window.CG_CONFIG</code></li>
+<li>Constants are frozen for the page session</li>
+</ol>
+<hr />
+<h2 id="feature-flags">Feature flags<a class="headerlink" href="#feature-flags" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_STUDENT_GRADE_CUSTOMIZATION</code></td>
+<td><code>true</code></td>
+<td>Master switch for the student-facing grade display customization</td>
+</tr>
+<tr>
+<td><code>REMOVE_ASSIGNMENT_TAB</code></td>
+<td><code>false</code></td>
+<td>If <code>true</code>, hides the Assignments tab on the student grades page</td>
+</tr>
+<tr>
+<td><code>PER_STUDENT_UPDATE_THRESHOLD</code></td>
+<td><code>25</code></td>
+<td>Max students to process concurrently during bulk grade updates</td>
+</tr>
+<tr>
+<td><code>MASTERY_REFRESH_ENABLED</code></td>
+<td><code>true</code></td>
+<td>If <code>false</code>, skips the post-push mastery refresh API call</td>
+</tr>
+<tr>
+<td><code>ADMIN_DASHBOARD_ENABLED</code></td>
+<td><code>true</code></td>
+<td>If <code>false</code>, the CG Admin Dashboard is never initialized</td>
+</tr>
+<tr>
+<td><code>ADMIN_DASHBOARD_LABEL</code></td>
+<td><code>"Open Manager"</code></td>
+<td>Button label for the admin dashboard entry point</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="grading-mode">Grading mode<a class="headerlink" href="#grading-mode" title="Permanent link">&para;</a></h2>
+<p>Three constants together control what gets written to Canvas when a grade update runs.</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_OUTCOME_UPDATES</code></td>
+<td><code>true</code></td>
+<td>Update outcome scores (rubric criteria) and assignment grades</td>
+</tr>
+<tr>
+<td><code>ENABLE_GRADE_OVERRIDE</code></td>
+<td><code>false</code></td>
+<td>Update the course-level final grade override (<code>setOverrideScore</code>)</td>
+</tr>
+<tr>
+<td><code>ENFORCE_COURSE_OVERRIDE</code></td>
+<td><code>false</code></td>
+<td>If <code>true</code>, automatically enables "Allow Final Grade Override" in Canvas via API</td>
+</tr>
+<tr>
+<td><code>ENFORCE_COURSE_GRADING_SCHEME</code></td>
+<td><code>false</code></td>
+<td>If <code>true</code>, automatically applies the selected grading scheme to the course via API</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Supported modes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th><code>ENABLE_OUTCOME_UPDATES</code></th>
+<th><code>ENABLE_GRADE_OVERRIDE</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Outcome only</td>
+<td><code>true</code></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td>Override only</td>
+<td><code>false</code></td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td>Both (full sync)</td>
+<td><code>true</code></td>
+<td><code>true</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="custom-grade-status-outcomecompletiongate">Custom grade status (OutcomeCompletionGate)<a class="headerlink" href="#custom-grade-status-outcomecompletiongate" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_GRADE_CUSTOM_STATUS</code></td>
+<td><code>false</code></td>
+<td>Master switch for the OutcomeCompletionGate state in the grading pipeline</td>
+</tr>
+<tr>
+<td><code>ENABLE_NEGATIVE_ZERO_COUNT</code></td>
+<td><code>false</code></td>
+<td>When gate fails: <code>true</code> sets <code>overrideScore = -zeroCount</code>; <code>false</code> sets <code>overrideScore = null</code></td>
+</tr>
+<tr>
+<td><code>DEFAULT_CUSTOM_STATUS_ID</code></td>
+<td><code>null</code></td>
+<td>Canvas custom grade status ID applied when gate fails</td>
+</tr>
+<tr>
+<td><code>USE_UNIFIED_GRAPHQL_ONLY</code></td>
+<td><code>false</code> (auto <code>true</code> if <code>ENABLE_GRADE_CUSTOM_STATUS</code>)</td>
+<td>Skip the REST/bulk pipeline and use the unified GraphQL mutation path</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Auto-enable:</strong> <code>USE_UNIFIED_GRAPHQL_ONLY</code> is automatically set to <code>true</code> if <code>ENABLE_GRADE_CUSTOM_STATUS</code> is <code>true</code>, because custom status requires GraphQL. This auto-enable logs a console message at startup. Override explicitly via <code>window.CG_CONFIG.USE_UNIFIED_GRAPHQL_ONLY</code> if needed.</p>
+</blockquote>
+<hr />
+<h2 id="grade-scaling">Grade scaling<a class="headerlink" href="#grade-scaling" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OVERRIDE_SCALE</code></td>
+<td><code>avg =&gt; Number((avg * 25).toFixed(2))</code></td>
+<td>Function that converts 0–4 Marzano average to 0–100 Canvas override percentage</td>
+</tr>
+</tbody>
+</table>
+<p>The default maps the 0–4 scale linearly to 0–100 (multiply by 25). To use a different scale (e.g. 0–4 → 0–40 for a 40-point scheme), set a custom function in <code>window.CG_CONFIG.OVERRIDE_SCALE</code>.</p>
+<hr />
+<h2 id="ui-labels">UI labels<a class="headerlink" href="#ui-labels" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UPDATE_AVG_BUTTON_LABEL</code></td>
+<td><code>"Update Current Score"</code></td>
+<td>Label on the button that triggers avg assignment update</td>
+</tr>
+<tr>
+<td><code>AVG_OUTCOME_NAME</code></td>
+<td><code>"Current Score"</code></td>
+<td>Title of the outcome representing the class average</td>
+</tr>
+<tr>
+<td><code>AVG_ASSIGNMENT_NAME</code></td>
+<td><code>"Current Score Assignment"</code></td>
+<td>Name of the Canvas assignment used for avg grade posting</td>
+</tr>
+<tr>
+<td><code>AVG_RUBRIC_NAME</code></td>
+<td><code>"Current Score Rubric"</code></td>
+<td>Name of the rubric attached to the avg assignment</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="pl-override-assignment-naming">PL override assignment naming<a class="headerlink" href="#pl-override-assignment-naming" title="Permanent link">&para;</a></h2>
+<p>PL override assignments are named <code>"&lt;Outcome Name&gt; — &lt;PL_ASSIGNMENT_SUFFIX&gt;"</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Example result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PL_ASSIGNMENT_SUFFIX</code></td>
+<td><code>'Projected Score'</code></td>
+<td><code>"Argumentative Writing — Projected Score"</code></td>
+</tr>
+<tr>
+<td><code>PL_RUBRIC_SUFFIX</code></td>
+<td><code>'Projected Score Rubric'</code></td>
+<td><code>"Argumentative Writing — Projected Score Rubric"</code></td>
+</tr>
+</tbody>
+</table>
+<p>Common alternatives: <code>'Growth Score'</code>, <code>'Current Level'</code>, <code>'Trend Score'</code>, <code>'Marzano Score'</code>.</p>
+<hr />
+<h2 id="pl-assignment-grading">PL assignment grading<a class="headerlink" href="#pl-assignment-grading" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PL_GRADING_TYPE</code></td>
+<td><code>'gpa_scale'</code></td>
+<td>Canvas grading type for PL override assignments. Supported: <code>pass_fail</code>, <code>percent</code>, <code>letter_grade</code>, <code>gpa_scale</code>, <code>points</code>, <code>not_graded</code></td>
+</tr>
+<tr>
+<td><code>PL_GRADING_SCHEME_ID</code></td>
+<td><code>null</code></td>
+<td>Canvas grading standard ID attached to PL assignments. <code>null</code> uses the course-level default</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Validation:</strong> If <code>PL_GRADING_TYPE</code> is set to an unsupported value, a <code>console.warn</code> is emitted at startup. Canvas will return 400 if an invalid value is sent to the assignments API.</p>
+</blockquote>
+<hr />
+<h2 id="outcome-configuration">Outcome configuration<a class="headerlink" href="#outcome-configuration" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEFAULT_MAX_POINTS</code></td>
+<td><code>4</code></td>
+<td>Default <code>points_possible</code> for auto-created outcomes and rubric criteria</td>
+</tr>
+<tr>
+<td><code>DEFAULT_MASTERY_THRESHOLD</code></td>
+<td><code>3</code></td>
+<td>Mastery threshold used when creating outcomes via CSV import</td>
+</tr>
+<tr>
+<td><code>OUTCOME_AND_RUBRIC_RATINGS</code></td>
+<td>9-level scale (see below)</td>
+<td>Rating levels for auto-created outcomes and rubrics</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Default rating scale</strong> (9 levels, 0–4):</p>
+<table>
+<thead>
+<tr>
+<th>Points</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4</td>
+<td>Exemplary</td>
+</tr>
+<tr>
+<td>3.5</td>
+<td>Beyond Target</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Target</td>
+</tr>
+<tr>
+<td>2.5</td>
+<td>Approaching Target</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Developing</td>
+</tr>
+<tr>
+<td>1.5</td>
+<td>Beginning</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Needs Partial Support</td>
+</tr>
+<tr>
+<td>0.5</td>
+<td>Needs Full Support</td>
+</tr>
+<tr>
+<td>0</td>
+<td>Insufficient Evidence</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="outcome-filtering">Outcome filtering<a class="headerlink" href="#outcome-filtering" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EXCLUDED_OUTCOME_KEYWORDS</code></td>
+<td><code>[]</code></td>
+<td>Outcome title substrings to exclude from grade averaging. Case-insensitive match. Example: <code>["attendance", "behavior"]</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="grading-scheme">Grading scheme<a class="headerlink" href="#grading-scheme" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEFAULT_GRADING_SCHEME_ID</code></td>
+<td><code>null</code></td>
+<td>Canvas grading standard ID for auto-created assignments</td>
+</tr>
+<tr>
+<td><code>DEFAULT_GRADING_TYPE</code></td>
+<td><code>'points'</code></td>
+<td>Grading type for auto-created assignments</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="course-detection">Course detection<a class="headerlink" href="#course-detection" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STANDARDS_BASED_COURSE_PATTERNS</code></td>
+<td>See below</td>
+<td>Array of strings or RegExp objects matched against course names to identify standards-based courses (shown differently on the all-grades page)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Default patterns:</strong> <code>"Standards Based"</code>, <code>"SBG"</code>, <code>"Mastery"</code>, <code>/\[SBG\]/i</code>, <code>/^SBG[-\s]/i</code></p>
+<p>Both string patterns (case-insensitive substring match) and <code>RegExp</code> objects are supported.</p>
+<hr />
+<h2 id="timing">Timing<a class="headerlink" href="#timing" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MASTERY_REFRESH_DELAY_MS</code></td>
+<td><code>5000</code></td>
+<td>Milliseconds to wait for Canvas to propagate <code>points_possible</code> changes before the mastery refresh step reverts the value to <code>0</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="gotchas">Gotchas<a class="headerlink" href="#gotchas" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>window.CG_CONFIG</code> must be set before the bundle loads</strong> — the loader sets it synchronously before injecting the <code>&lt;script&gt;</code> tag. If the bundle loads first, all constants read <code>undefined</code> from <code>CG_CONFIG</code> and fall back to defaults.</li>
+<li><strong><code>OVERRIDE_SCALE</code> must be a function</strong> — passing a number instead of a function will throw at runtime when <code>OVERRIDE_SCALE(avg)</code> is called.</li>
+<li><strong><code>USE_UNIFIED_GRAPHQL_ONLY</code> auto-enable</strong> — setting <code>ENABLE_GRADE_CUSTOM_STATUS=true</code> without explicitly setting <code>USE_UNIFIED_GRAPHQL_ONLY</code> will auto-enable it. If you want <code>ENABLE_GRADE_CUSTOM_STATUS=true</code> but still use the REST pipeline, you must explicitly set <code>USE_UNIFIED_GRAPHQL_ONLY: false</code> in <code>window.CG_CONFIG</code>.</li>
+<li><strong><code>EXCLUDED_OUTCOME_KEYWORDS</code> is an empty array by default</strong> — no outcomes are excluded. If your courses include non-academic outcomes (attendance, behavior), add those keywords to prevent them from skewing the calculated average.</li>
+<li><strong>Console logs at startup</strong> — <code>config.js</code> always logs <code>ENABLE_GRADE_CUSTOM_STATUS</code> and <code>USE_UNIFIED_GRAPHQL_ONLY</code> to the browser console. This is intentional for operator visibility and not gated by the debug logger.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

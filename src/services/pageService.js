@@ -104,27 +104,28 @@ export async function getPage(courseId, pageUrl, apiClient) {
  */
 export async function findMasteryDashboardPageUrl(courseId, apiClient) {
     try {
-        // Search for pages with "Mastery Dashboard" in the title
-        const pages = await apiClient.get(
-            `/api/v1/courses/${courseId}/pages`,
-            { search_term: 'Mastery Dashboard', per_page: 10 },
-            'findMasteryDashboardPageUrl'
-        );
+        // Search for "Mastery View" (new name) first, then fall back to "Mastery Dashboard"
+        // for backward compatibility with existing deployments.
+        for (const searchTerm of ['Mastery View', 'Mastery Dashboard']) {
+            const pages = await apiClient.get(
+                `/api/v1/courses/${courseId}/pages`,
+                { search_term: searchTerm, per_page: 10 },
+                'findMasteryDashboardPageUrl'
+            );
 
-        // Find the non-deleted page with exact title match
-        const masteryPage = pages.find(p =>
-            p.title === 'Mastery Dashboard' &&
-            p.workflow_state !== 'deleted' &&
-            p.url &&
-            p.url.startsWith('mastery-dashboard')  // Ensure it's the right page
-        );
+            const masteryPage = pages.find(p =>
+                (p.title === 'Mastery View' || p.title === 'Mastery Dashboard') &&
+                p.workflow_state !== 'deleted' &&
+                p.url &&
+                p.url.startsWith('mastery-dashboard')
+            );
 
-        if (masteryPage) {
-            logger.debug(`[PageService] Found Mastery Dashboard at: ${masteryPage.url}`);
-            return masteryPage.url;  // Could be 'mastery-dashboard-2'
+            if (masteryPage) {
+                logger.debug(`[PageService] Found Mastery page at: ${masteryPage.url}`);
+                return masteryPage.url;
+            }
         }
 
-        // Return null if not found (don't use fallback)
         logger.debug('[PageService] Mastery Dashboard page not found');
         return null;
 

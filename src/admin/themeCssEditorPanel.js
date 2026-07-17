@@ -36,23 +36,16 @@ export function renderThemeCssEditorPanel(root) {
 
     // Installed CSS URL display
     const urlDisplay = createElement('div', {
-        style: {
-            fontSize: '13px',
-            color: '#666',
-            marginBottom: '10px',
-            padding: '10px',
-            background: '#f5f5f5',
-            borderRadius: '6px'
-        }
+        attrs: { class: 'cg-theme-url-display' }
     });
     urlDisplay.innerHTML = `
         <strong>Detected installed Theme CSS URL:</strong>
-        <div style="margin-top:4px; word-break:break-all; font-family:monospace; font-size:12px;">${installedCssUrl || '(none)'}</div>
+        <div class="cg-theme-url-text">${installedCssUrl || '(none)'}</div>
     `;
 
     // Load status display
     const loadStatus = createElement('div', {
-        style: { marginBottom: '10px' }
+        attrs: { class: 'cg-theme-load-status' }
     });
 
     // CSS Textarea using Canvas helper
@@ -64,9 +57,7 @@ export function renderThemeCssEditorPanel(root) {
         attrs: { spellcheck: 'false' }
     });
 
-    // Add monospace font to textarea
-    cssTextarea.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-    cssTextarea.style.background = '#fafafa';
+    // Monospace font + background are set via #theme-css-textarea in adminDashboardStyles
 
     // Button row using CSS class
     const buttonRow = createElement('div', {
@@ -131,7 +122,7 @@ export function renderThemeCssEditorPanel(root) {
             const warningMsg = createElement('div', {
                 attrs: { class: 'cg-status cg-status--warning' }
             });
-            warningMsg.innerHTML = '⚠️ Could not load CSS from installed URL (likely CORS).<br><span style="color:#666; font-size:13px;">Please paste your CSS manually.</span>';
+            warningMsg.innerHTML = '⚠️ Could not load CSS from installed URL (likely CORS).<br><span class="cg-theme-cors-hint">Please paste your CSS manually.</span>';
             loadStatus.appendChild(warningMsg);
         }
     }

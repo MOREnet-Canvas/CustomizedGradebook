@@ -13,10 +13,11 @@ import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { getFrontPage, createPage, updatePage, setCourseDefaultViewToWiki, getPage } from '../services/pageService.js';
 import { handleError } from '../utils/errorHandler.js';
-import { isCourseSettingsPage } from '../utils/pageDetection.js';
+import { waitForSettingsSidebar } from '../utils/pageDetection.js';
+import { brandButtonPrimaryBg, brandButtonPrimaryText } from '../ui/brandColors.js';
 
 const INJECTION_MARKER = 'cg-mastery-dashboard-creator';
-const MASTERY_PAGE_TITLE = 'Mastery Dashboard';
+const MASTERY_PAGE_TITLE = 'Mastery View';
 const MASTERY_PAGE_URL = 'mastery-dashboard';
 const MASTERY_PAGE_BODY = '<div id="mastery-dashboard-root"></div>';
 
@@ -31,9 +32,8 @@ const MASTERY_PAGE_BODY = '<div id="mastery-dashboard-root"></div>';
  */
 function createMasteryButtonHtml(baseUrl, courseId, pageUrl) {
     // Get Canvas theme colors
-    const rootStyles = getComputedStyle(document.documentElement);
-    const primaryButtonColor = rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || "#0c7d9d";
-    const textColor = rootStyles.getPropertyValue("--ic-brand-button--primary-text").trim() || "#ffffff";
+    const primaryButtonColor = brandButtonPrimaryBg();
+    const textColor = brandButtonPrimaryText();
 
     return `<div data-cg-mastery-button="true" data-page-url="${pageUrl}" style="margin: 16px 0;">
     <a style="display: block; padding: 14px; background: ${primaryButtonColor}; color: ${textColor}; text-align: center; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; margin-bottom: 8px;" href="${baseUrl}/courses/${courseId}/pages/${pageUrl}?cg_web=1" data-api-endpoint="${baseUrl}/api/v1/courses/${courseId}/pages/${pageUrl}" data-api-returntype="Page">
@@ -370,32 +370,6 @@ export function injectMasteryDashboardButton() {
         }
 
         logger.info('[MasteryDashboard] Button injected successfully');
-    });
+    }, 'MasteryDashboard');
 }
 
-/**
- * Wait for settings sidebar to be ready
- * @param {Function} callback - Callback to execute when sidebar is found
- */
-function waitForSettingsSidebar(callback) {
-    let attempts = 0;
-    const maxAttempts = 33; // ~10 seconds
-    const intervalMs = 300;
-
-    const intervalId = setInterval(() => {
-        const onSettingsPage = isCourseSettingsPage();
-        const documentReady = document.readyState === 'complete';
-        const sidebar = document.querySelector('#right-side') ||
-                        document.querySelector('#right-side-wrapper') ||
-                        document.querySelector('aside[id="right-side"]');
-
-        if (onSettingsPage && documentReady && sidebar) {
-            clearInterval(intervalId);
-            logger.debug('[MasteryDashboard] Settings sidebar found');
-            callback(sidebar);
-        } else if (attempts++ >= maxAttempts) {
-            clearInterval(intervalId);
-            logger.warn('[MasteryDashboard] Settings sidebar not found after 10 seconds');
-        }
-    }, intervalMs);
-}

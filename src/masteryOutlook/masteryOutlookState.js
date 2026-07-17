@@ -9,6 +9,8 @@
  *   fetchingStudentIds — tracks in-flight per-student refreshes so the
  *   lazy background fetch (outcomeRow.js) and per-student refresh button
  *   (studentSyncTable.js) don't race on the same student.
+ *   syncingStudentIds / syncStudentPhase — track in-flight score pushes so
+ *   each student row can show a live "Pushing…" / "Verifying…" spinner.
  */
 
 /**
@@ -17,3 +19,34 @@
  * (per-student refresh button). Shared to prevent race conditions.
  */
 export const fetchingStudentIds = new Set();
+
+/**
+ * Set of in-flight sync keys in format "outcomeId_studentId".
+ * Written by handleSyncStudents (plOutlookActions.js) for the duration of a
+ * score push; read by buildOutcomeStudentRow (studentSyncTable.js) to show a
+ * per-row spinner. Always cleared in a finally so a row can't get stuck.
+ */
+export const syncingStudentIds = new Set();
+
+/**
+ * Map of sync key → current phase ('pushing' | 'verifying') for keys present
+ * in syncingStudentIds. Advances as the sync state machine progresses so the
+ * row can distinguish the push from the Canvas verification step.
+ */
+export const syncStudentPhase = new Map();
+
+/**
+ * Set of in-flight sync keys for entire outcomes in format "outcomeId".
+ * Used to show an outcome-level "Checking..." indicator before specific
+ * students are marked as pushing.
+ */
+export const syncingOutcomeIds = new Set();
+
+/**
+ * Map of outcomeId → current outcome-level phase ('checking' | 'syncing') for
+ * outcomes present in syncingOutcomeIds. Held for the ENTIRE run so the chip
+ * reads "Checking…" → "Syncing…" → "✓ Synced" instead of flashing "N need"
+ * between calculation and completion. Cleared alongside syncingOutcomeIds.
+ */
+export const syncingOutcomePhase = new Map();
+

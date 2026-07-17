@@ -50,12 +50,12 @@ import { logger } from '../utils/logger.js';
  *                   values in preference to the stale disk value.
  * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
  */
-export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null }) {
+export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null, canvasScoreOverrides = null, onStudentsResolved = null }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
 
     const sm = new PLOutlookStateMachine({
         courseId, outcomeId, outcomeName, apiClient, onProgress,
-        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides
+        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides, canvasScoreOverrides, onStudentsResolved
     });
 
     // ── Run loop ──

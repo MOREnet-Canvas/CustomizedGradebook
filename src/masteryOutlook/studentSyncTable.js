@@ -19,6 +19,7 @@
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
+import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
     handleSyncStudents,
@@ -28,7 +29,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingStudentIds, syncStudentPhase, syncingOutcomeIds } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -68,14 +69,15 @@ function formatDateShort(iso) {
  * @param {Object}   syncEntry           - sync_state[outcomeId][studentId] (may be {})
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
- * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, pushing}}
+ * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, syncPhase}}
+ *   status: 'ne' | 'synced' | 'verify_failed' | 'needs'
  */
 function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
     const canvas  = outcomeData?.canvasScore  ?? null;
     const marzano = outcomeData?.plPrediction ?? null;
 
     const storedWP = syncEntry?.will_post ?? null;
-    const willPost = storedWP ?? marzano;
+    const willPost = storedWP ?? (marzano !== null ? roundToHalf(marzano) : null);
 
     const wpLock = syncEntry?.will_post_lock;
     const lock = wpLock === 'locked' ? 'locked'
@@ -111,6 +113,10 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         // synced when score matches Canvas AND no unsubmitted note exists.
         // willPost ?? marzano: use teacher override if set, else PL prediction.
         status = 'synced';
+    } else if (syncEntry?.verify_mismatch === true) {
+        // Score was pushed but Canvas rollup didn't confirm after all retries.
+        // Persisted so the "partial update" state is visible after navigation/reload.
+        status = 'verify_failed';
     } else {
         status = 'needs';
     }
@@ -126,7 +132,11 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         note,
         dots,
         status,
-        pushing: false
+        // Live sync phase for this row ('pushing' | 'verifying' | null) — driven
+        // by syncingStudentIds/syncStudentPhase while a push is in flight.
+        syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
+            ? (syncStudentPhase.get(`${oidStr}_${sidStr}`) ?? 'pushing')
+            : null
     };
 }
 
@@ -187,14 +197,15 @@ function renderDot(dot, oidStr, sidStr, i) {
  * @returns {string} HTML <tr>
  */
 function renderOutcomeStudentRow(s, oidStr) {
-    const needsCls   = s.status === 'needs' ? 'os-needs-row' : '';
-    const differsCls = s.lock !== 'none'    ? 'differs'     : '';
+    const needsSync  = s.status === 'needs' || s.status === 'verify_failed';
+    const needsCls   = needsSync          ? 'os-needs-row' : '';
+    const differsCls = s.lock !== 'none' ? 'differs'      : '';
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
-    const marzDisp    = s.marzano != null ? s.marzano.toFixed(2) : 'NE';
+    const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
     const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
     const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
-    const marzFaded   = scoresMatch(s.marzano, s.willPost) ? '' : 'faded';
+    const marzFaded   = scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
 
     const dotsHtml = s.dots.length
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
@@ -204,22 +215,26 @@ function renderOutcomeStudentRow(s, oidStr) {
         <button class="os-wp-lock ${s.lock}"
                 data-action="${s.lock === 'locked' ? 'os-unlock' : 'os-lock'}"
                 data-stu="${s.id}" data-oid="${oidStr}"
-                aria-label="${s.lock === 'locked' ? 'Unlock Post' : 'Lock Post'}">
+                aria-label="${s.lock === 'locked' ? 'Unlock Override' : 'Lock Override'}">
           ${s.lock === 'locked' ? '🔒' : '🔓'}
           <span class="os-lock-tip">${
               s.lock === 'locked'
-                  ? 'Post is locked. Click to unlock.'
+                  ? 'Override is locked. Click to unlock.'
                   : 'Score differs from Marzano. Click to lock this value.'
           }</span>
         </button>` : '';
 
-    const saveMod   = s.status === 'needs' ? 'needs' : 'synced';
-    const saveTitle = s.status === 'needs' ? `Push ${wpDisp} to Canvas` : 'Synced with Canvas';
-    const saveTip   = s.status === 'needs' ? 'Push to Canvas' : 'Up to date';
-    const saveHtml = s.pushing
-        ? `<span class="os-posting"><span class="spinner"></span> Pushing…</span>`
+    const saveMod   = needsSync ? 'needs' : 'synced';
+    const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
+                    : needsSync                    ? `Push ${wpDisp} to Canvas`
+                    :                               'Synced with Canvas';
+    const saveTip   = s.status === 'verify_failed' ? 'Verify failed — re-sync'
+                    : needsSync                    ? 'Push to Canvas'
+                    :                               'Up to date';
+    const saveHtml = s.syncPhase
+        ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
-               ${s.status !== 'needs' ? 'disabled' : ''} title="${saveTitle}">
+               ${!needsSync ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
                ${saveMod === 'synced'
                   ? '<polyline points="2.5,6.5 5,9 9.5,3.5"/>'
@@ -235,21 +250,21 @@ function renderOutcomeStudentRow(s, oidStr) {
         <button class="os-pill-btn ${canvasFaded}" data-action="os-use-canvas"
                 data-stu="${s.id}" data-oid="${oidStr}" data-canvas="${s.canvas ?? ''}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
-          <span class="os-pill-tip">Set Post = ${canvasDisp}</span>
+          <span class="os-pill-tip">Set Override = ${canvasDisp}</span>
         </button>
       </td>
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
                 data-stu="${s.id}" data-oid="${oidStr}">
-          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano))}">${marzDisp}</span>
-          <span class="os-pill-tip">Set Post = ${marzDisp} (Marzano)</span>
+          <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano !== null ? roundToHalf(s.marzano) : null))}">${marzDisp}</span>
+          <span class="os-pill-tip">Set Override = ${marzDisp} (Marzano)</span>
         </button>
       </td>
       <td class="c">
         <div class="os-wp-outer">
           <div class="os-wp-box-wrap ${differsCls}" data-action="os-wp-click"
                data-stu="${s.id}" data-oid="${oidStr}" tabindex="0" role="button"
-               aria-label="Post: ${wpDisp}">
+               aria-label="Override: ${wpDisp}">
             <div class="os-wp-box">${wpDisp}</div>
             ${lockHtml}
           </div>
@@ -310,19 +325,41 @@ export function renderOutcomeStudentTable(outcome, cache) {
 
     const needsCount = studentStates.filter(s => s.status === 'needs').length;
 
+    const refreshOutcomeBtn =
+        `<button class="os-refresh-outcome-btn" data-action="os-refresh-outcome"
+            title="Refresh scores from Canvas"
+            aria-label="Refresh scores from Canvas">↻</button>`;
+
+    const isSyncing = syncingOutcomeIds.has(oidStr);
     const toolbarHtml = needsCount > 0
-        ? `<div class="os-status-banner warn">
-             <div class="os-status-banner-left">
-               ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-             </div>
-             <button class="btn btn-sm btn-primary" data-action="os-post-all">
-               Save grades to Canvas
-             </button>
-           </div>`
+        ? isSyncing
+            ? `<div class="os-status-banner syncing">
+                 <div class="os-status-banner-left">
+                   <span class="spinner"></span> <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
+                 </div>
+                 <div class="os-status-banner-actions">
+                   ${refreshOutcomeBtn}
+                   <button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>
+                     Save grades to Canvas
+                   </button>
+                 </div>
+               </div>`
+            : `<div class="os-status-banner warn">
+                 <div class="os-status-banner-left">
+                   ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
+                 </div>
+                 <div class="os-status-banner-actions">
+                   ${refreshOutcomeBtn}
+                   <button class="btn btn-sm btn-primary" data-action="os-post-all">
+                     Save grades to Canvas
+                   </button>
+                 </div>
+               </div>`
         : `<div class="os-status-banner ok">
              <div class="os-status-banner-left">
                ✓ Canvas gradebook is up to date
              </div>
+             ${refreshOutcomeBtn}
            </div>`;
 
     // Legend commented out — color coding is self-evident from the dot colors
@@ -348,7 +385,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
               <th>Alignments</th>
               <th class="c">Canvas</th>
               <th class="c">Marzano</th>
-              <th class="c">Post</th>
+              <th class="c">Override</th>
               <th>Note</th>
               <th class="c">Save</th>
             </tr></thead>
@@ -356,7 +393,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </table>
         </div>
         <div class="os-table-hint">
-          Click Canvas / Marzano pills to copy to Post · Click Post box to type · Padlock locks an override
+          Click Canvas / Marzano pills to copy to Override · Click Override box to type · Padlock locks an override
         </div>`;
 }
 
@@ -366,8 +403,9 @@ export function renderOutcomeStudentTable(outcome, cache) {
  * Attach all event listeners for the student sync table.
  *
  * Owns: os-use-canvas, os-use-marzano, os-wp-click (inline edit), os-lock,
- * os-unlock, os-save, os-post-all, dot-toggle, dot-ignore-toggle, os-note input,
- * and a document-level "click outside dot to close popover" listener.
+ * os-unlock, os-save, os-post-all, os-refresh-outcome, dot-toggle,
+ * dot-ignore-toggle, os-note input, and a document-level "click outside dot to
+ * close popover" listener.
  *
  * @param {Object} options
  * @param {HTMLElement} options.contentEl     - the .od-detail-content node
@@ -376,9 +414,11 @@ export function renderOutcomeStudentTable(outcome, cache) {
  * @param {string|number} options.courseId
  * @param {Object} options.apiClient
  * @param {Function} options.renderTable      - re-render callback
+ * @param {Function} [options.onRefreshOutcome] - re-pull live rollups for this outcome
+ * @param {Function} [options.onChipUpdate]   - refresh the outcome-level chip/strip
  * @returns {Function} teardown — remove the document-level listener
  */
-export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable, onChipUpdate }) {
+export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, apiClient, renderTable, onRefreshOutcome, onChipUpdate }) {
     const outcomeName = outcome.title || String(outcome.id);
 
     // Seed the write scheduler's dedupe baseline with the on-disk state so the first
@@ -437,9 +477,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             input.className = 'os-wp-input';
             input.type = 'text'; input.inputMode = 'decimal';
             input.value = (curVal !== 'NE' && curVal !== '—') ? curVal : '';
-            input.style.cssText =
-                'width:3.5em;max-width:3.5em;min-width:0;box-sizing:border-box;' +
-                'font-size:0.923em;text-align:center;';
+
             boxEl?.replaceWith(input);
             input.select();
 
@@ -505,6 +543,22 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
                 fetchingStudentIds.delete(key);
                 el.disabled = false;
                 el.textContent = '↻';
+            }
+            return;
+        }
+
+        // ── Refresh outcome — re-pull live rollups for this outcome ───────
+        if (action === 'os-refresh-outcome') {
+            if (el.disabled) return;
+            el.disabled = true;
+            el.classList.add('spinning');
+            try {
+                await onRefreshOutcome?.();
+            } catch (err) {
+                logger.error('[MasteryOutlook] os-refresh-outcome failed', err);
+            } finally {
+                el.disabled = false;
+                el.classList.remove('spinning');
             }
             return;
         }

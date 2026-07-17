@@ -10,7 +10,8 @@
  * Used by both teacherMasteryView.js and observerMasteryView.js
  */
 
-const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif;";
+import { injectStyles } from '../ui/styles.js';
+import { STUDENT_PICKER_CSS } from './studentPickerStyles.js';
 
 /**
  * Render the student picker UI
@@ -23,6 +24,8 @@ const FONT = "font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetic
  * @param {Object} [options.autoSelectStudent] - Optional student object to auto-select on render
  */
 export function renderStudentPicker({ students, sections, cardsEl, onStudentSelected, autoSelectStudent }) {
+    injectStyles(STUDENT_PICKER_CSS, 'pm-student-picker-styles');
+
     // Sort students by sortable name (Last, First)
     const sortedStudents = [...students].sort((a, b) => a.sortableName.localeCompare(b.sortableName));
 
@@ -60,7 +63,6 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
         dropdown = document.createElement('div');
         dropdown.id = 'pm-student-dropdown';
         dropdown.setAttribute('role', 'listbox');
-        dropdown.style.cssText = `display:none; position:absolute; background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 6px 6px; max-height:320px; overflow-y:auto; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.15); box-sizing:border-box;`;
         document.body.appendChild(dropdown);
     }
 
@@ -89,13 +91,13 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
         activeIndex = -1;
 
         if (filteredStudents.length === 0) {
-            dropdown.innerHTML = `<div style="padding:10px 12px; ${FONT} font-size:0.9rem; color:#888;">No students found.</div>`;
+            dropdown.innerHTML = `<div class="pm-dropdown-empty">No students found.</div>`;
         } else {
             dropdown.innerHTML = filteredStudents.map((s, i) => {
                 const sectionLabel = sections.length > 1 && !selectedSectionId
-                    ? `<span style="color:#888; font-size:0.8rem; margin-left:6px;">${escapeHtml(getSectionName(sections, s.sectionId))}</span>`
+                    ? `<span class="pm-dropdown-section">${escapeHtml(getSectionName(sections, s.sectionId))}</span>`
                     : '';
-                return `<div role="option" data-index="${i}" data-user-id="${s.userId}" style="padding:8px 12px; cursor:pointer; ${FONT} font-size:0.95rem; color:#333; border-bottom:1px solid #f0f0f0; line-height:1.4;" onmouseenter="this.style.background='#f5f5f5';" onmouseleave="this.style.background='';">${escapeHtml(s.name)}${sectionLabel}</div>`;
+                return `<div role="option" data-index="${i}" data-user-id="${s.userId}" class="pm-dropdown-item">${escapeHtml(s.name)}${sectionLabel}</div>`;
             }).join('');
         }
         positionDropdown();
@@ -210,7 +212,7 @@ function ensureStudentHeader(cardsEl) {
     if (!header) {
         header = document.createElement('div');
         header.id = 'pm-teacher-header';
-        header.style.cssText = `display:none; justify-content:space-between; align-items:center; padding:8px 4px 12px; border-bottom:1px solid #e0e0e0; margin-bottom:10px;`;
+        header.style.display = 'none';
         cardsEl.parentNode.insertBefore(header, cardsEl.parentNode.firstChild);
     }
     return header;
@@ -218,7 +220,7 @@ function ensureStudentHeader(cardsEl) {
 
 /** Update the persistent header content and show it. */
 function updateStudentHeader(header, studentName, onChangeStudent) {
-    header.innerHTML = `<span style="${FONT} font-size:0.9rem; color:#555;">Viewing:</span><span style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-left:6px;">${escapeHtml(studentName)}</span><button id="pm-change-student" style="${FONT} font-size:0.85rem; color:#0374B5; background:none; border:none; cursor:pointer; padding:4px 12px; margin-left:12px; text-decoration:underline;">← Change Student</button>`;
+    header.innerHTML = `<span class="pm-header-label">Viewing:</span><span class="pm-header-name">${escapeHtml(studentName)}</span><button id="pm-change-student" class="pm-change-student-btn">← Change Student</button>`;
     header.style.display = 'flex';
     header.querySelector('#pm-change-student').addEventListener('click', onChangeStudent);
 }
@@ -226,22 +228,22 @@ function updateStudentHeader(header, studentName, onChangeStudent) {
 /** Build the picker HTML shell */
 function buildPickerHtml(sections) {
     const sectionRow = sections.length > 1 ? `
-        <div style="margin-bottom:10px;">
-            <label for="pm-section-select" style="${FONT} font-size:0.85rem; color:#555; display:block; margin-bottom:4px;">Section</label>
-            <select id="pm-section-select" style="${FONT} width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; color:#333; background:#fff;">
+        <div class="pm-section-row">
+            <label for="pm-section-select" class="pm-picker-label">Section</label>
+            <select id="pm-section-select" class="pm-picker-select">
                 <option value="">All Sections</option>
                 ${sections.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}
             </select>
         </div>` : '';
 
     return `
-        <div style="padding:4px 0 12px;">
-            <div style="${FONT} font-size:1rem; font-weight:700; color:#333; margin-bottom:12px;">Select a Student</div>
+        <div class="pm-picker">
+            <div class="pm-picker-title">Select a Student</div>
             ${sectionRow}
             <div>
-                <label for="pm-student-search" style="${FONT} font-size:0.85rem; color:#555; display:block; margin-bottom:4px;">Student Name</label>
+                <label for="pm-student-search" class="pm-picker-label">Student Name</label>
                 <input id="pm-student-search" type="text" placeholder="Type to search…" autocomplete="off"
-                       style="${FONT} width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.95rem; color:#333; box-sizing:border-box;" />
+                       class="pm-picker-input" />
             </div>
         </div>`;
 }

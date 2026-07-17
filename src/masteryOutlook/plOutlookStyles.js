@@ -610,14 +610,30 @@ tr.os-needs-row td { background:#FFFDF7; }
    would be clipped. The input is already box-sizing:border-box + max-width. */
 .mo-shell .os-wp-box-wrap { width:3.5em; min-width:3.5em; max-width:3.5em; }
 .mo-shell .os-wp-box      { width:100%; min-width:0; }
-.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.846em; }
+.mo-shell .os-wp-input    { width:3.5em; max-width:3.5em; min-width:0; box-sizing:border-box; text-align:center; font-size:0.923em; }
 
 /* Top-of-table tinted status banner (replaces section divider rows) */
+/* Mastery Outlook creation button container (settings sidebar) */
+.cg-mastery-outlook-creator {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
 .os-status-banner { display:flex; align-items:center; justify-content:space-between; gap:0.769em; padding:0.615em 0.923em; margin:0 0 0.615em; border:0.5px solid transparent; border-radius:var(--radius-md); flex-wrap:wrap; font-size:0.923em; font-weight:500; }
 .os-status-banner-left   { display:flex; align-items:center; gap:0.385em; }
 .os-status-banner-left b { font-weight:700; }
-.os-status-banner.warn { background:var(--amber-bg); border-color:#E5C892; color:var(--amber); }
-.os-status-banner.ok   { background:#E8F2EC; border-color:#BCD9C5; color:#276749; }
+.os-status-banner.warn    { background:var(--amber-bg); border-color:#E5C892; color:var(--amber); }
+.os-status-banner.ok      { background:#E8F2EC; border-color:#BCD9C5; color:#276749; }
+.os-status-banner.syncing { background:var(--bg-secondary); border-color:var(--border-tertiary); color:var(--text-tertiary); }
+.os-status-banner-actions { display:flex; align-items:center; gap:0.538em; }
+
+/* Per-outcome refresh button (#54 manual rollup re-pull) */
+.os-refresh-outcome-btn { background:none; border:none; color:inherit; cursor:pointer; font-size:1.077em; line-height:1; padding:0 0.2em; opacity:0.65; transition:opacity 0.15s; }
+.os-refresh-outcome-btn:hover { opacity:1; }
+.os-refresh-outcome-btn:disabled { opacity:0.35; cursor:default; }
+.os-refresh-outcome-btn.spinning { display:inline-block; animation:mo-spin .8s linear infinite; }
 
 /* Per-row save button */
 .os-save-row-btn { width:1.692em; height:1.692em; border-radius:0.385em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-tertiary); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:background .1s, border-color .1s, color .1s; flex-shrink:0; position:relative; }
@@ -897,6 +913,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-sync-chip.needs   { background:var(--amber-bg); color:var(--amber); }
 .mo-shell .od-sync-chip.override{ background:#FCEBEB; color:#791F1F; }
 .mo-shell .od-sync-chip.setup   { background:var(--blue-bg); color:var(--blue-ink); }
+.mo-shell .od-sync-chip.checking{ background:var(--blue-bg); color:var(--blue-ink); }
 .mo-shell .od-sync-chip.none    { background:transparent; color:var(--text-tertiary); font-weight:500; }
 .mo-shell .od-sync-cell { text-align:center; }
 

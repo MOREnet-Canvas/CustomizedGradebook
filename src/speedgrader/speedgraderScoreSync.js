@@ -357,8 +357,13 @@ async function submitGrade(courseId, assignmentId, studentId, score, apiClient, 
 
 /**
  * Fetch submission with rubric assessment
+ * @param {string} courseId - Canvas course ID
+ * @param {string} assignmentId - Canvas assignment ID
+ * @param {string} studentId - Canvas student ID
+ * @param {CanvasApiClient} apiClient - API client instance
+ * @returns {Promise<Object|null>} Submission data or null on error
  */
-async function fetchSubmission(courseId, assignmentId, studentId) {
+async function fetchSubmission(courseId, assignmentId, studentId, apiClient) {
     // Build URL with proper query parameters
     const params = new URLSearchParams();
     params.append('include[]', 'rubric_assessment');
@@ -367,18 +372,7 @@ async function fetchSubmission(courseId, assignmentId, studentId) {
     logger.trace(`[ScoreSync] GET ${url}`);
 
     try {
-        const response = await fetch(url, {
-            credentials: 'same-origin'
-        });
-
-        logger.trace(`[ScoreSync] Fetch response status: ${response.status} ${response.statusText}`);
-
-        if (!response.ok) {
-            logger.error(`[ScoreSync] Failed to fetch submission: ${response.status} ${response.statusText}`);
-            return null;
-        }
-
-        const data = await response.json();
+        const data = await apiClient.get(url, {}, 'fetchSubmission');
         logger.trace(`[ScoreSync] Submission data: id=${data.id}, user_id=${data.user_id}, rubric_assessment=${!!data.rubric_assessment}`);
 
         if (data.rubric_assessment) {
@@ -434,7 +428,7 @@ async function handleRubricSubmitInternal(courseId, assignmentId, studentId, api
 
         for (let i = 0; i < TIMING_CONSTANTS.RUBRIC_FETCH_DELAYS.length; i++) {
             await new Promise(r => setTimeout(r, TIMING_CONSTANTS.RUBRIC_FETCH_DELAYS[i]));
-            submission = await fetchSubmission(courseId, assignmentId, studentId);
+            submission = await fetchSubmission(courseId, assignmentId, studentId, apiClient);
 
             const ra = submission?.rubric_assessment;
             if (ra && Object.keys(ra).length > 0) break;

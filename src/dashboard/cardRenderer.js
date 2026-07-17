@@ -10,6 +10,8 @@ import { logger } from '../utils/logger.js';
 import { OUTCOME_AND_RUBRIC_RATINGS } from '../config.js';
 import { GRADE_SOURCE } from '../services/gradeDataService.js';
 import { HERO_SELECTORS, findCourseCard } from './cardSelectors.js';
+import { injectStyles } from '../ui/styles.js';
+import { CARD_RENDERER_CSS } from './cardRendererStyles.js';
 
 /**
  * CSS class prefix for grade elements
@@ -125,28 +127,10 @@ function createGradeBadge(gradeData, containerElement = null) {
         }
     }
 
-    // Apply inline styles with frosted-glass effect
-    // Always position at bottom-right corner of the header/hero area
-    badge.style.cssText = `
-        position: absolute;
-        bottom: 8px;
-        right: 8px;
-        font-size: 0.875rem;
-        line-height: 1.4;
-        border-radius: 8px;
-        background: ${badgeBackground};
-        color: #fff;
-        display: inline-block;
-        text-align: center;
-        box-sizing: border-box;
-        padding: 6px 10px;
-        font-weight: 600;
-        white-space: nowrap;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        z-index: 10;
-    `;
+    // Apply background colour inline — it is derived per-card from the hero
+    // colour, so it can't live in the shared stylesheet. All other badge
+    // styling comes from the .cg-dashboard-grade class (cardRendererStyles.js).
+    badge.style.background = badgeBackground;
 
     return badge;
 }
@@ -306,6 +290,9 @@ export function renderGradeOnCard(cardElement, gradeData) {
         logger.trace('Invalid grade data, skipping badge render');
         return;
     }
+
+    // Ensure the shared badge stylesheet is present (idempotent).
+    injectStyles(CARD_RENDERER_CSS, 'cg-dashboard-grade-styles');
 
     // Remove any existing grade badge first
     removeGradeFromCard(cardElement);

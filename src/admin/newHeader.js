@@ -54,6 +54,13 @@ function navigateToPanel(targetId) {
     });
 }
 
+/**
+ * Render the admin dashboard toolbar header into the given container element.
+ * Builds the top bar with title, subtitle, version selector, and navigation controls.
+ *
+ * @param {HTMLElement} container - DOM element to render the header into
+ * @returns {void}
+ */
 export function renderHeader(container) {
     const bar = createElement("div", { attrs: { class: "cg-toolbar" } });
     const inner = createElement("div", { attrs: { class: "cg-toolbar__inner" } });

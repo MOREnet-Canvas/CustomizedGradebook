@@ -19,15 +19,16 @@
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
-import { getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
+import { roundToHalf } from './powerLaw.js';
+import { getSyncStatus, aggregateSyncStatus, scoresMatch } from './plOutlookSyncStatus.js';
 import {
     handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
 } from './plOutlookActions.js';
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds } from './masteryOutlookState.js';
+import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -104,6 +105,15 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         return `<span class="od-sync-chip setup">⚙ Setup</span>`;
     }
 
+    if (syncingOutcomeIds.has(String(outcome.id))) {
+        // #55: hold an active state for the whole run so the chip never flashes
+        // back to "N need" between calculation and completion.
+        const label = syncingOutcomePhase.get(String(outcome.id)) === 'syncing'
+            ? 'Syncing…'
+            : 'Checking…';
+        return `<span class="od-sync-chip checking"><span class="spinner"></span> ${label}</span>`;
+    }
+
     const plConfig = {
         pl_assignments: cache.pl_assignments ?? {},
         sync_state:     cache.sync_state     ?? {},
@@ -125,8 +135,7 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
         if (marzano === null) return false;
         if (canvas === null)  return false;
-        const matched = Math.abs((willPost ?? marzano) - canvas) < 0.01;
-        return !matched || noteIsPending;
+        return !scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending;
     }).length;
 
     if (needsCount > 0) {
@@ -136,7 +145,16 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const n = counts.possibleOverride + counts.manualOverride;
         return `<span class="od-sync-chip override">⚑ ${n}</span>`;
     }
-    if (counts.synced > 0) {
+    // Use needsCount (scoresMatch-based) as the source of truth for synced status.
+    // counts.synced from aggregateSyncStatus requires last_synced_score to be set,
+    // so it returns 0 for students whose scores match but were never explicitly tracked —
+    // causing "—" even when every row is up to date. If needsCount === 0 and at least
+    // one student has both a prediction and a Canvas score, all of them are synced.
+    const hasActiveStu = (cache.students || []).some(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        return od?.plPrediction != null && od?.canvasScore != null;
+    });
+    if (hasActiveStu) {
         return `<span class="od-sync-chip synced">✓ Synced</span>`;
     }
     return `<span class="od-sync-chip none">—</span>`;
@@ -253,7 +271,7 @@ function buildExceptionsTable(outcome, cache) {
         const entry     = outcomeSync[sId] ?? {};
         const od        = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
-        const marzDisp   = od?.plPrediction != null ? od.plPrediction.toFixed(2) : 'NE';
+        const marzDisp   = od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE';
         const wpDisp     = entry.will_post != null ? entry.will_post.toFixed(2) : '—';
         const note       = escapeHtml(entry.will_post_note ?? '');
         const dateRaw    = entry.override_at ?? entry.last_synced_at ?? '';
@@ -261,7 +279,7 @@ function buildExceptionsTable(outcome, cache) {
 
         const types = [];
         if (entry.manual_override)             types.push('<span class="od-ex-pill override">Override</span>');
-        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked WP</span>');
+        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked Override</span>');
         if (ignoredIds.has(sId))               types.push('<span class="od-ex-pill ignored">Ignored</span>');
 
         return `<tr>
@@ -281,7 +299,7 @@ function buildExceptionsTable(outcome, cache) {
             <th>Type</th>
             <th class="od-center">Canvas</th>
             <th class="od-center">Marzano</th>
-            <th class="od-center">Post</th>
+            <th class="od-center">Override</th>
             <th>Note</th>
             <th>Date</th>
         </tr></thead>
@@ -340,8 +358,8 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
     }
 
     const rowsHTML = students.map(s => {
-        const c = s.plPrediction !== null ? profColor(s.plPrediction) : { bg: '#f5f5f3', tx: '#999' };
-        const plDisplay = s.plPrediction !== null ? s.plPrediction.toFixed(2) : 'NE';
+        const c = s.plPrediction !== null ? profColor(roundToHalf(s.plPrediction)) : { bg: '#f5f5f3', tx: '#999' };
+        const plDisplay = s.plPrediction !== null ? roundToHalf(s.plPrediction).toFixed(2) : 'NE';
         const canvasScoreDisplay = s.canvasScore !== null && s.canvasScore !== undefined
             ? s.canvasScore.toFixed(2) : '—';
         const decayingAvgDisplay = s.decayingAvg !== null ? s.decayingAvg.toFixed(2) : '—';
@@ -394,7 +412,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             </tr>`;
     }).join('');
 
-    const plColumnHeader = isCurrentScoreRow ? 'PL Avg' : 'PL Pred.';
+    const plColumnHeader = isCurrentScoreRow ? 'PL Avg' : 'Marzano';
 
     return `
         <table class="od-stu-table">
@@ -441,17 +459,42 @@ function buildPlAssignmentIds(cache) {
  * @param {Object}   ctx
  * @param {Function} onStudentDone  - Called after each student update with (studentId)
  */
-async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone) {
+/**
+ * Fetch all outcome results for the given outcome in one paginated sequence,
+ * then iterate students in-memory — no per-student API calls.
+ *
+ * Replaces the previous sequential per-student loop (~40–80 s for 200 students)
+ * with a single bulk fetch (~1–4 s), grouped by student in JS.
+ * Falls back gracefully (skips refresh) if the bulk fetch fails.
+ *
+ * @param {string}   outcomeId
+ * @param {Object}   cache
+ * @param {Object}   ctx
+ * @param {Function} onStudentDone       - Called after each student update with (studentId)
+ * @param {Map|null} [preloadedScoreMap] - Rollup scoreMap already fetched by the caller;
+ *                                         when provided, per-student rollup calls are skipped.
+ */
+async function bulkRefreshOutcomeStudents(outcomeId, cache, ctx, onStudentDone, preloadedScoreMap = null) {
     const plAssignmentIds = buildPlAssignmentIds(cache);
-    const students = cache.students ?? [];
+    const students        = cache.students ?? [];
+
+    const bulkData = await bulkFetchOutcomeResults(ctx.courseId, outcomeId, ctx.apiClient, plAssignmentIds);
+    if (!bulkData) {
+        logger.warn(`[MasteryOutlook] bulkFetchOutcomeResults failed for outcome ${outcomeId} — skipping lazy refresh`);
+        return;
+    }
+
+    const { grouped } = bulkData;
 
     for (const student of students) {
         const sid = String(student.id);
-        const key = `${outcomeId}_${sid}`;
-        if (fetchingStudentIds.has(key)) continue;   // skip if manual refresh in flight
+        if (fetchingStudentIds.has(`${outcomeId}_${sid}`)) continue;   // skip if manual refresh in flight
 
+        // Look up pre-fetched attempts for this student; [] means confirmed no results.
+        const preloadedAttempts = grouped[`${sid}_${outcomeId}`] ?? [];
         const changed = await refreshStudentOutcomeData(
-            ctx.courseId, outcomeId, sid, cache, ctx.apiClient, plAssignmentIds
+            ctx.courseId, outcomeId, sid, cache, ctx.apiClient,
+            plAssignmentIds, preloadedScoreMap, preloadedAttempts
         );
         if (changed) onStudentDone(sid);
     }
@@ -468,12 +511,14 @@ async function lazyFetchOutcomeStudents(outcomeId, cache, ctx, onStudentDone) {
  * @param {string} outcomeId
  * @param {Object} cache     - In-memory cache (mutated in place)
  * @param {Object} ctx       - Contains courseId and apiClient
+ * @returns {Promise<Map<string, number>>} The fetched scoreMap (may be empty on failure).
+ *   Always resolves so callers can chain unconditionally.
  */
 async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
     const scoreMap = await fetchOutcomeRollupsForOutcome(
         ctx.courseId, outcomeId, ctx.apiClient
     );
-    if (scoreMap.size === 0) return;
+    if (scoreMap.size === 0) return scoreMap;
 
     let updated = 0;
     cache.students?.forEach(student => {
@@ -511,13 +556,15 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
             }
         }
     }
+
+    return scoreMap;
 }
 
 // ─── Detail panel (tabs + content) ───────────────────────────────────────────
 
 function buildOutcomeDetailPanel({
     outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-    profColor, rerender,
+    profColor, rerender, isSpecial,
 }) {
     const panel = document.createElement('div');
     panel.className = 'od-detail-panel';
@@ -544,7 +591,8 @@ function buildOutcomeDetailPanel({
 
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
-        const isActive = state.activeTab === tab.id;
+        tabBtn.dataset.tabId = tab.id;
+        const isActive = (state.activeTabs[outcome.id] ?? 'students') === tab.id;
         tabBtn.className = 'od-detail-tab';
         tabBtn.style.cssText = `
             color:${isActive ? '#185FA5' : '#666'};
@@ -554,8 +602,18 @@ function buildOutcomeDetailPanel({
         tabBtn.textContent = tab.label;
         tabBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            state.activeTab = tab.id;
-            rerender();
+            state.activeTabs[outcome.id] = tab.id;
+
+            // Local refresh instead of global rerender
+            tabBar.querySelectorAll('.od-detail-tab').forEach(btn => {
+                const isNowActive = btn.dataset.tabId === tab.id;
+                btn.style.cssText = `
+                    color:${isNowActive ? '#185FA5' : '#666'};
+                    border-bottom:2px solid ${isNowActive ? '#185FA5' : 'transparent'};
+                    background:${isNowActive ? '#fff' : 'transparent'};
+                    font-weight:${isNowActive ? '500' : '400'};`;
+            });
+            renderTable();
         });
         tabBar.appendChild(tabBtn);
     });
@@ -580,13 +638,14 @@ function buildOutcomeDetailPanel({
         const savedValue  = isNoteInput ? active.value          : null;
         // ───────────────────────────────────────────────────────────────────
 
-        if (state.activeTab === 'exceptions') {
+        const activeTab = state.activeTabs[outcome.id] ?? 'students';
+        if (activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);
-        } else if (state.activeTab === 'students') {
+        } else if (activeTab === 'students') {
             content.innerHTML = renderOutcomeStudentTable(outcome, cache);
         } else {
             content.innerHTML = buildStudentTable(
-                outcome, state.activeTab, cache, ctx,
+                outcome, activeTab, cache, ctx,
                 isCurrentScoreRow, isRegularOutcome, profColor
             );
         }
@@ -611,18 +670,36 @@ function buildOutcomeDetailPanel({
             input.addEventListener('dragstart', (e) => e.preventDefault());
         });
 
+        // Refresh the outcome-level sync chip (e.g., to show "Checking...")
+        const container = content.closest('.od-outcome-container');
+        const syncCellEl = container?.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+
         // ───────────────────────────────────────────────────────────────────
     };
     renderTable();
 
-    // Live Canvas score refresh — fetches current rollup scores for this outcome
-    // and re-renders the student table in place once the data arrives.
-    // Fires after the initial render so the teacher sees data immediately.
-    refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then(() => {
+    // Debounced renderTable for lazy-fetch updates — collapses rapid per-student
+    // repaints into a single animation frame so the DOM isn't thrashed once per
+    // student as the sequential background fetch processes the class roster.
+    let pendingLazyRender = null;
+    const debouncedRenderTable = () => {
+        if (pendingLazyRender != null) cancelAnimationFrame(pendingLazyRender);
+        pendingLazyRender = requestAnimationFrame(() => {
+            pendingLazyRender = null;
+            renderTable();
+        });
+    };
+
+    // Live Canvas score refresh — fetches the outcome rollup once, re-renders the
+    // table with live scores, then immediately starts the lazy alignment fetch
+    // with the preloaded scoreMap so per-student refreshes skip the redundant
+    // class-wide rollup call (N+1 → 1 total rollup API call per expand).
+    refreshCanvasScoresForOutcome(outcome.id, cache, ctx).then((scoreMap) => {
         renderTable();
-        // Update the outcome header chip and spread bar with fresh classStats
+        // Update the outcome header chip, sync chip, and spread bar with fresh data
         const outcomeContainer = content.closest('.od-outcome-container');
-        const chipEl = outcomeContainer.querySelector('.od-pl-chip');
+        const chipEl = outcomeContainer?.querySelector('.od-pl-chip');
         const barEl = outcomeContainer?.querySelector('.od-spread-bar');
         if (chipEl && outcome.classStats?.plAvg != null) {
             const { profColor } = makeRenderers(ctx);
@@ -642,12 +719,18 @@ function buildOutcomeDetailPanel({
                 [d['1'] / total * 100, profColor(1.0).bg],
             ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
         }
-    });
 
-    // Lazy alignment fetch — updates dots and plPrediction for each student
-    // sequentially in the background. Re-renders each row as data arrives.
-    lazyFetchOutcomeStudents(outcome.id, cache, ctx, (_studentId) => {
-        renderTable();
+        // F1 — refresh the sync chip so it reflects the freshly fetched Canvas scores.
+        // buildSyncChip re-reads canvasScore from the in-memory cache, which
+        // refreshCanvasScoresForOutcome() has already updated above.
+        const syncCellEl = outcomeContainer?.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+
+        // Bulk alignment fetch — one paginated call for the whole outcome, then
+        // in-memory per-student grouping. Replaces the sequential per-student loop.
+        // Pass the scoreMap so each student's refresh skips a redundant rollup call.
+        // Re-renders are debounced so rapid successive updates coalesce into one repaint.
+        bulkRefreshOutcomeStudents(outcome.id, cache, ctx, debouncedRenderTable, scoreMap);
     });
 
     // Legacy per-row actions (non-students tabs only) — students tab is owned
@@ -690,6 +773,12 @@ function buildOutcomeDetailPanel({
         courseId:  ctx.courseId,
         apiClient: ctx.apiClient,
         renderTable,
+        onRefreshOutcome: async () => {
+            // #54 manual safety valve — re-pull live rollups for this outcome,
+            // update in-memory canvasScore, then repaint the table + chip.
+            await refreshCanvasScoresForOutcome(outcome.id, cache, ctx);
+            renderTable();
+        },
         onChipUpdate: () => {
             const container = content.closest('.od-outcome-container');
             const chipEl    = container?.querySelector('.od-pl-chip');
@@ -710,6 +799,12 @@ function buildOutcomeDetailPanel({
                     [d['1'] / total * 100, profColor(1.0).bg],
                 ].map(([w, bg]) => `<div style="width:${w}%; background:${bg};"></div>`).join('');
             }
+            // F1 — refresh the sync chip to reflect canvasScore updates after a push
+            const syncCellEl = container?.querySelector('.od-sync-cell');
+            if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+
+            // F5 — refresh the course-wide sync strip (unified counting)
+            rerender({ stripOnly: true });
         },
     });
 
@@ -801,7 +896,7 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
  * @param {Object}   args.cache
  * @param {import('./viewRegistry.js').ViewContext} args.ctx
  * @param {Object}   args.state                 - shared per-mount state
- *                                                ({ expandedOutcomeId, activeTab })
+ *                                                ({ expandedOutcomeIds, activeTabs })
  * @param {Object}   args.displayStats          - precomputed classStats (Current
  *                                                Score uses a derived object)
  * @param {string|number} args.displayNumber    - row number (blank for special)
@@ -821,8 +916,10 @@ export function mountOutcomeRow({
 }) {
     const { profColor, plAvgChip, spreadBar } = makeRenderers(ctx);
 
+    let detailTeardown = null;
+
     const initialized = isOutcomeInitialized(outcome, cache, { isSpecial });
-    const isExpanded  = state.expandedOutcomeId === outcome.id;
+    const isExpanded  = state.expandedOutcomeIds.has(outcome.id);
 
     const outcomeContainer = document.createElement('div');
     outcomeContainer.className = 'od-outcome-container';
@@ -854,13 +951,44 @@ export function mountOutcomeRow({
         <div class="row-chevron">${chevron}</div>
     `;
 
+    /**
+     * Local expand/collapse toggle. Avoids a full view re-render by manipulating
+     * only this row's DOM and detail panel.
+     */
+    function refreshExpansion() {
+        const isExpanded = state.expandedOutcomeIds.has(outcome.id);
+        row.classList.toggle('expanded', isExpanded);
+        const chevronEl = row.querySelector('.row-chevron');
+        if (chevronEl) chevronEl.textContent = isExpanded ? '▼' : '›';
+
+        if (detailTeardown) {
+            try { detailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
+            detailTeardown = null;
+        }
+        outcomeContainer.querySelector('.od-detail-panel')?.remove();
+
+        if (isExpanded && initialized) {
+            const built = buildOutcomeDetailPanel({
+                outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
+                profColor, rerender, isSpecial,
+            });
+            outcomeContainer.appendChild(built.panel);
+            detailTeardown = built.detailTeardown;
+        }
+    }
+
     row.addEventListener('click', (e) => {
         // Init-panel buttons live outside the row but the Initialize button is
         // inside the row's right column — guard so its click doesn't toggle.
         if (e.target.closest('[data-init-action]')) return;
-        state.expandedOutcomeId = (state.expandedOutcomeId === outcome.id) ? null : outcome.id;
-        state.activeTab = 'students';
-        rerender();
+        if (state.expandedOutcomeIds.has(outcome.id)) {
+            state.expandedOutcomeIds.delete(outcome.id);
+            delete state.activeTabs[outcome.id]; // cleanup stale tab state
+        } else {
+            state.expandedOutcomeIds.add(outcome.id);
+            state.activeTabs[outcome.id] = 'students'; // reset tab on fresh expand
+        }
+        refreshExpansion();
     });
 
     outcomeContainer.appendChild(row);
@@ -873,15 +1001,8 @@ export function mountOutcomeRow({
         wireInitFlow(outcomeContainer, outcome, cache, ctx, rerender);
     }
 
-    let detailTeardown = null;
-    if (isExpanded && initialized) {
-        const built = buildOutcomeDetailPanel({
-            outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-            profColor, rerender,
-        });
-        outcomeContainer.appendChild(built.panel);
-        detailTeardown = built.detailTeardown;
-    }
+    // Mount-time expansion
+    refreshExpansion();
 
     if (!isSpecial) {
         outcomeContainer.draggable = true;
@@ -947,5 +1068,14 @@ export function mountOutcomeRow({
         }
     }
 
-    return { rootEl: outcomeContainer, teardown };
+    /**
+     * Refresh the sync chip in-place without a full row re-render.
+     * Called by the background canvas score refresh in outcomeSyncView.js.
+     */
+    function refreshChip() {
+        const syncCellEl = outcomeContainer.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+    }
+
+    return { rootEl: outcomeContainer, teardown, refreshChip };
 }

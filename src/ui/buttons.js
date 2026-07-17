@@ -1,8 +1,23 @@
 //TODO: Button moves to center after verifying and the last time completed doesn't stay
 import { inheritFontStylesFrom } from "../utils/dom.js";
+import {
+    brandButtonPrimaryBg,
+    brandButtonPrimaryText,
+    brandButtonSecondaryBg,
+    brandButtonSecondaryText,
+} from "./brandColors.js";
 
-const BRAND_COLOR_FALLBACK = "#0c7d9d";
-
+/**
+ * Create a styled Canvas-themed button element.
+ *
+ * @param {Object} options
+ * @param {string} options.label - Button text content
+ * @param {string|null} [options.id=null] - Optional id attribute for the button
+ * @param {Function|null} [options.onClick=null] - Click event handler
+ * @param {"primary"|"secondary"} [options.type="primary"] - Visual style variant
+ * @param {string|null} [options.tooltip=null] - Optional title attribute for tooltip text
+ * @returns {HTMLButtonElement} Configured button element ready to append to the DOM
+ */
 export function makeButton({ label, id = null, onClick = null, type = "primary", tooltip = null }) {
     const button = document.createElement("button");
 
@@ -27,15 +42,10 @@ export function makeButton({ label, id = null, onClick = null, type = "primary",
     button.style.cursor = "pointer";
     button.style.transition = "background 0.3s, color 0.3s";
 
-    const rootStyles = getComputedStyle(document.documentElement);
-    const primaryButtonColor =
-        rootStyles.getPropertyValue("--ic-brand-button--primary-bgd").trim() || BRAND_COLOR_FALLBACK;
-    const textColor =
-        rootStyles.getPropertyValue("--ic-brand-button--primary-text").trim() || "#ffffff";
-    const secondaryButtonColor =
-        rootStyles.getPropertyValue("--ic-brand-button--secondary-bgd").trim() || "#e0e0e0";
-    const secondaryTextColor =
-        rootStyles.getPropertyValue("--ic-brand-button--secondary-text").trim() || "#ffffff";
+    const primaryButtonColor   = brandButtonPrimaryBg();
+    const textColor            = brandButtonPrimaryText();
+    const secondaryButtonColor = brandButtonSecondaryBg();
+    const secondaryTextColor   = brandButtonSecondaryText();
 
     if (type === "primary") {
         button.style.background = primaryButtonColor;
@@ -53,6 +63,11 @@ export function makeButton({ label, id = null, onClick = null, type = "primary",
     return button;
 }
 
+/**
+ * Create a flex-row container div for grouping multiple buttons horizontally.
+ *
+ * @returns {HTMLDivElement} A div styled as a horizontal button row
+ */
 export function createButtonColumnContainer() {
     const container = document.createElement("div");
     container.style.display = "flex";

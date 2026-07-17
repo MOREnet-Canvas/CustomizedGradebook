@@ -51,8 +51,25 @@ export async function renderMasteryOutlook({ containerEl, courseId, apiClient, o
     // Shell renders immediately — no waiting on cache or outcomes fetch
     const shell = buildShell(containerEl);
 
+    // Initial-load indicator: the outcomes column is empty while tryLoadCache
+    // resolves (a cache read that can take a moment on large classes). Show a
+    // centered spinner so the page doesn't look blank/stuck during that gap.
+    // Reuses the existing .spinner class; removed once the cache resolves.
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'od-initial-loading';
+    loadingEl.style.cssText =
+        'display:flex; align-items:center; justify-content:center; gap:8px; ' +
+        'padding:32px 16px; color:var(--blue); font-size:13px;';
+    loadingEl.innerHTML = '<span class="spinner"></span> Loading outcomes…';
+    containerEl.querySelector('#od-outcomes-col')?.prepend(loadingEl);
+
     // Try to load cache first
-    let cache = await tryLoadCache(courseId, apiClient);
+    let cache;
+    try {
+        cache = await tryLoadCache(courseId, apiClient);
+    } finally {
+        loadingEl.remove();
+    }
 
     if (!cache) {
         // No cache yet — pull outcome names from Canvas for the default state

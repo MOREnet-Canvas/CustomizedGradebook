@@ -1,0 +1,2181 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Developer documentation for the Customized Gradebook Canvas extension">
+      
+      
+      
+        <link rel="canonical" href="https://morenet-canvas.github.io/CustomizedGradebook/docs/data-layer/">
+      
+      
+        <link rel="prev" href="../sync-modules/">
+      
+      
+        <link rel="next" href="../api-service-layer/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Data Layer - Customized Gradebook Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-layer" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Customized Gradebook Docs" class="md-header__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Customized Gradebook Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data Layer
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../dev-tools/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Debug Tooling
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../build-pipeline/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Build Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../state-machine/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  State Machine
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../sync-modules/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Sync Modules
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Data Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-service-layer/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Service Layer
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../page-detection/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Page Detection
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../power-law/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Power Law Algorithm
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../canvas-api-gotchas/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Canvas API Gotchas
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../walkthroughs/mastery-outlook/" class="md-tabs__link">
+          
+  
+  
+  Feature Walkthroughs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../admin-dashboard/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Admin Dashboard
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../account-filtering/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Account Filtering
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../mobile/overview/" class="md-tabs__link">
+          
+  
+  
+  Mobile Module
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../development/workflows/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Customized Gradebook Docs" class="md-nav__button md-logo" aria-label="Customized Gradebook Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Customized Gradebook Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/morenet-canvas/CustomizedGradebook" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    morenet-canvas/CustomizedGradebook
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug Tooling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state-machine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Machine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sync-modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Layer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-memory-state-masteryoutlookstatejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-Memory State — masteryOutlookState.js
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistent-cache-masteryoutlookcacheservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent Cache — masteryOutlookCacheService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Persistent Cache — masteryOutlookCacheService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cache-file-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache file location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ensurefoldercourseid-apiclient-promisestring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ensureFolder(courseId, apiClient) → Promise&lt;string&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writemasteryoutlookcachecourseid-apiclient-cachedata-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        writeMasteryOutlookCache(courseId, apiClient, cacheData) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readmasteryoutlookcachecourseid-apiclient-promiseobjectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readMasteryOutlookCache(courseId, apiClient) → Promise&lt;Object|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readplassignmentscourseid-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readPLAssignments(courseId, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writeplassignmentscourseid-plassignments-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        writePLAssignments(courseId, plAssignments, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readsyncstatecourseid-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readSyncState(courseId, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writesyncstatecourseid-syncstate-apiclient-basecache-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        writeSyncState(courseId, syncState, apiClient, baseCache?) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readignoredalignmentscourseid-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readIgnoredAlignments(courseId, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readavgassignmentcourseid-apiclient-promiseobjectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readAvgAssignment(courseId, apiClient) → Promise&lt;Object|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#avg-assignment-service-masteryoutlookavgservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Avg Assignment Service — masteryOutlookAvgService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Avg Assignment Service — masteryOutlookAvgService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updateavgassignmentforstudentsopts-promiseboolean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        updateAvgAssignmentForStudents(opts) → Promise&lt;boolean&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postnotetoavgassignmentopts-promiseboolean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        postNoteToAvgAssignment(opts) → Promise&lt;boolean&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-service-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Service Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../page-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Page Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power-law/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Law Algorithm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../canvas-api-gotchas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canvas API Gotchas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Walkthroughs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Feature Walkthroughs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-outlook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Outlook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/mastery-view/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walkthroughs/supporting-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supporting Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin-dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../account-filtering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account Filtering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobile Module
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobile Module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobile/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/versioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-memory-state-masteryoutlookstatejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-Memory State — masteryOutlookState.js
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistent-cache-masteryoutlookcacheservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent Cache — masteryOutlookCacheService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Persistent Cache — masteryOutlookCacheService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cache-file-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache file location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ensurefoldercourseid-apiclient-promisestring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ensureFolder(courseId, apiClient) → Promise&lt;string&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writemasteryoutlookcachecourseid-apiclient-cachedata-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        writeMasteryOutlookCache(courseId, apiClient, cacheData) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readmasteryoutlookcachecourseid-apiclient-promiseobjectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readMasteryOutlookCache(courseId, apiClient) → Promise&lt;Object|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readplassignmentscourseid-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readPLAssignments(courseId, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writeplassignmentscourseid-plassignments-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        writePLAssignments(courseId, plAssignments, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readsyncstatecourseid-apiclient-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readSyncState(courseId, apiClient) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writesyncstatecourseid-syncstate-apiclient-basecache-promiseobject" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        writeSyncState(courseId, syncState, apiClient, baseCache?) → Promise&lt;Object&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readignoredalignmentscourseid-apiclient-promisearray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readIgnoredAlignments(courseId, apiClient) → Promise&lt;Array&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readavgassignmentcourseid-apiclient-promiseobjectnull" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        readAvgAssignment(courseId, apiClient) → Promise&lt;Object|null&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#avg-assignment-service-masteryoutlookavgservicejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Avg Assignment Service — masteryOutlookAvgService.js
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Avg Assignment Service — masteryOutlookAvgService.js">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updateavgassignmentforstudentsopts-promiseboolean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        updateAvgAssignmentForStudents(opts) → Promise&lt;boolean&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postnotetoavgassignmentopts-promiseboolean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        postNoteToAvgAssignment(opts) → Promise&lt;boolean&gt;
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="data-layer">Data Layer<a class="headerlink" href="#data-layer" title="Permanent link">&para;</a></h1>
+<p><code>src/masteryOutlook/masteryOutlookState.js</code> · <code>src/masteryOutlook/masteryOutlookCacheService.js</code> · <code>src/masteryOutlook/masteryOutlookAvgService.js</code></p>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The data layer has two distinct tiers:</p>
+<ul>
+<li><strong>In-memory transient state</strong> (<code>masteryOutlookState.js</code>) — module-level <code>Set</code> and <code>Map</code> objects that track live UI state (spinners, in-flight operations). Never persisted; reset on page reload.</li>
+<li><strong>Persistent JSON cache</strong> (<code>masteryOutlookCacheService.js</code>) — a single JSON file written to Canvas Files and read back at startup. The <code>masteryOutlookAvgService.js</code> reads from this cache at sync time to avoid repeating setup REST calls.</li>
+</ul>
+<hr />
+<h2 id="in-memory-state-masteryoutlookstatejs">In-Memory State — <code>masteryOutlookState.js</code><a class="headerlink" href="#in-memory-state-masteryoutlookstatejs" title="Permanent link">&para;</a></h2>
+<p>All exports are module-level singletons. Import directly; never re-declare in individual files.</p>
+<table>
+<thead>
+<tr>
+<th>Export</th>
+<th>Type</th>
+<th>Key format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fetchingStudentIds</code></td>
+<td><code>Set&lt;string&gt;</code></td>
+<td><code>"outcomeId_studentId"</code></td>
+<td>In-flight per-student refresh operations. Guards against race between <code>outcomeRow.js</code> lazy fetch and the refresh button in <code>studentSyncTable.js</code>.</td>
+</tr>
+<tr>
+<td><code>syncingStudentIds</code></td>
+<td><code>Set&lt;string&gt;</code></td>
+<td><code>"outcomeId_studentId"</code></td>
+<td>In-flight score pushes. Written by <code>handleSyncStudents</code>; read by <code>buildOutcomeStudentRow</code> to show a per-row spinner. Always cleared in a <code>finally</code> block.</td>
+</tr>
+<tr>
+<td><code>syncStudentPhase</code></td>
+<td><code>Map&lt;string, string&gt;</code></td>
+<td><code>"outcomeId_studentId"</code> → <code>'pushing' \| 'verifying'</code></td>
+<td>Tracks current phase for each key in <code>syncingStudentIds</code>. Advances as the state machine progresses so the row UI can distinguish "Pushing…" from "Verifying…".</td>
+</tr>
+<tr>
+<td><code>syncingOutcomeIds</code></td>
+<td><code>Set&lt;string&gt;</code></td>
+<td><code>"outcomeId"</code></td>
+<td>In-flight outcome-level syncs. Triggers the outcome chip "Checking…" / "Syncing…" banner.</td>
+</tr>
+<tr>
+<td><code>syncingOutcomePhase</code></td>
+<td><code>Map&lt;string, string&gt;</code></td>
+<td><code>"outcomeId"</code> → <code>'checking' \| 'syncing'</code></td>
+<td>Held for the <strong>entire</strong> sync run so the chip doesn't flash "N need" between calculation and completion. Cleared alongside <code>syncingOutcomeIds</code>.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Gotcha</strong> — Because these are module-level, they are shared across all outcome rows and all calls for a given page load. Always clear entries in a <code>finally</code> block. A forgotten entry leaves a row stuck in the spinner state until page reload.</p>
+</blockquote>
+<hr />
+<h2 id="persistent-cache-masteryoutlookcacheservicejs">Persistent Cache — <code>masteryOutlookCacheService.js</code><a class="headerlink" href="#persistent-cache-masteryoutlookcacheservicejs" title="Permanent link">&para;</a></h2>
+<h3 id="cache-file-location">Cache file location<a class="headerlink" href="#cache-file-location" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Canvas Files / MOREnet_CustomizedGradebook / mastery_outlook_cache / mastery_outlook_cache.json
+</code></pre></div>
+<p>Folders are created locked (<code>locked: true</code>, <code>hidden: false</code>) — unpublished so students cannot access them, but visible to teachers.</p>
+<h3 id="schema-version">Schema version<a class="headerlink" href="#schema-version" title="Permanent link">&para;</a></h3>
+<p><code>SCHEMA_VERSION = '1.0'</code>. On read, <code>cache.metadata.schemaVersion</code> is compared. A mismatch returns <code>null</code> and discards the file (no migration — the caller must trigger a full Refresh Data).</p>
+<hr />
+<h3 id="ensurefoldercourseid-apiclient-promisestring"><code>ensureFolder(courseId, apiClient)</code> → <code>Promise&lt;string&gt;</code><a class="headerlink" href="#ensurefoldercourseid-apiclient-promisestring" title="Permanent link">&para;</a></h3>
+<p>Returns the Canvas folder ID of <code>mastery_outlook_cache/</code>. Memoized per <code>courseId</code> — first call does up to 5 roundtrips (root folder, parent list/create, parent lock, subfolder list/create, subfolder lock); subsequent calls return immediately from <code>_cachedFolderIdByCourse</code>.</p>
+<p>Invalidates its own memo on write failure so stale folder IDs don't persist across retry.</p>
+<hr />
+<h3 id="writemasteryoutlookcachecourseid-apiclient-cachedata-promiseobject"><code>writeMasteryOutlookCache(courseId, apiClient, cacheData)</code> → <code>Promise&lt;Object&gt;</code><a class="headerlink" href="#writemasteryoutlookcachecourseid-apiclient-cachedata-promiseobject" title="Permanent link">&para;</a></h3>
+<p>Persists the full cache object to Canvas Files via a 3-step upload protocol:</p>
+<ol>
+<li><strong>Request upload URL</strong> — <code>POST /api/v1/courses/:id/files</code> with <code>on_duplicate: 'overwrite'</code></li>
+<li><strong>Upload</strong> — multipart <code>POST</code> to the presigned S3-style <code>upload_url</code></li>
+<li><strong>Lock file</strong> — <code>PUT /api/v1/files/:id</code> with <code>locked: true, hidden: false</code></li>
+</ol>
+<p>Always stamps <code>metadata.schemaVersion</code> before writing.</p>
+<p><strong>Throws</strong> on any step failure. Invalidates the folder memo so the next call re-discovers the folder ID.</p>
+<hr />
+<h3 id="readmasteryoutlookcachecourseid-apiclient-promiseobjectnull"><code>readMasteryOutlookCache(courseId, apiClient)</code> → <code>Promise&lt;Object|null&gt;</code><a class="headerlink" href="#readmasteryoutlookcachecourseid-apiclient-promiseobjectnull" title="Permanent link">&para;</a></h3>
+<p>Returns the parsed cache or <code>null</code> if:
+- File not found
+- Schema version mismatch
+- Invalid JSON (corrupted file)</p>
+<p>Treats all read errors as "no cache" — never throws.</p>
+<hr />
+<h3 id="readplassignmentscourseid-apiclient-promiseobject"><code>readPLAssignments(courseId, apiClient)</code> → <code>Promise&lt;Object&gt;</code><a class="headerlink" href="#readplassignmentscourseid-apiclient-promiseobject" title="Permanent link">&para;</a></h3>
+<p>Returns <code>cache.pl_assignments</code> or <code>{}</code>. Shape:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p">[</span><span class="nx">outcomeId</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nx">assignment_id</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nx">rubric_id</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nx">rubric_association_id</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nx">criterion_id</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nx">submission_ids</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">[</span><span class="nx">userId</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="nx">submissionId</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="writeplassignmentscourseid-plassignments-apiclient-promiseobject"><code>writePLAssignments(courseId, plAssignments, apiClient)</code> → <code>Promise&lt;Object&gt;</code><a class="headerlink" href="#writeplassignmentscourseid-plassignments-apiclient-promiseobject" title="Permanent link">&para;</a></h3>
+<p>Read-before-write merge: reads the current cache, sets <code>pl_assignments</code>, writes back. If no cache exists yet, creates a minimal placeholder so other fields are not lost.</p>
+<hr />
+<h3 id="readsyncstatecourseid-apiclient-promiseobject"><code>readSyncState(courseId, apiClient)</code> → <code>Promise&lt;Object&gt;</code><a class="headerlink" href="#readsyncstatecourseid-apiclient-promiseobject" title="Permanent link">&para;</a></h3>
+<p>Returns <code>cache.sync_state</code> or <code>{}</code> (never <code>null</code>). Shape:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p">[</span><span class="nx">outcomeId</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p">[</span><span class="nx">studentId</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nx">status</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nx">last_synced_score</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nx">last_synced_at</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nx">manual_override</span><span class="p">,</span><span class="w">       </span><span class="c1">// true if teacher manually edited Canvas after last PL push</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nx">will_post</span><span class="p">,</span><span class="w">             </span><span class="c1">// teacher-set score override (null = track Marzano)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="nx">will_post_lock</span><span class="p">,</span><span class="w">        </span><span class="c1">// &#39;locked&#39; | &#39;unlocked&#39; | undefined</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="nx">will_post_note</span><span class="p">,</span><span class="w">        </span><span class="c1">// pending teacher note text</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nx">will_post_note_last_submitted</span><span class="p">,</span><span class="w">  </span><span class="c1">// note text as last sent to Canvas</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nx">verify_mismatch</span><span class="p">,</span><span class="w">       </span><span class="c1">// true if Canvas didn&#39;t confirm score after all retries</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="nx">avg_verify_at</span><span class="p">,</span><span class="w">         </span><span class="c1">// ISO timestamp of avg assignment verification</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nx">avg_verify_mismatch</span><span class="w">    </span><span class="c1">// true if avg assignment verify found a mismatch</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="writesyncstatecourseid-syncstate-apiclient-basecache-promiseobject"><code>writeSyncState(courseId, syncState, apiClient, baseCache?)</code> → <code>Promise&lt;Object&gt;</code><a class="headerlink" href="#writesyncstatecourseid-syncstate-apiclient-basecache-promiseobject" title="Permanent link">&para;</a></h3>
+<p>Read-before-write merge. Pass the <strong>full</strong> <code>sync_state</code> object. Callers that need to update a single student entry should <code>readSyncState</code> first, mutate in place, then call this.</p>
+<p><code>baseCache</code> (optional): pass an already-loaded cache object to skip the read roundtrip (~600 ms saved). Caller must ensure the cache is fresh enough that other fields won't be clobbered.</p>
+<hr />
+<h3 id="readignoredalignmentscourseid-apiclient-promisearray"><code>readIgnoredAlignments(courseId, apiClient)</code> → <code>Promise&lt;Array&gt;</code><a class="headerlink" href="#readignoredalignmentscourseid-apiclient-promisearray" title="Permanent link">&para;</a></h3>
+<p>Returns <code>cache.ignored_alignments</code> or <code>[]</code>. Shape:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">[{</span><span class="w"> </span><span class="nx">student_id</span><span class="p">,</span><span class="w"> </span><span class="nx">outcome_id</span><span class="p">,</span><span class="w"> </span><span class="nx">alignment_id</span><span class="p">,</span><span class="w"> </span><span class="nx">reason</span><span class="p">,</span><span class="w"> </span><span class="nx">ignored_by</span><span class="p">,</span><span class="w"> </span><span class="nx">ignored_at</span><span class="p">,</span><span class="w"> </span><span class="nx">comment_posted</span><span class="w"> </span><span class="p">}]</span>
+</code></pre></div></p>
+<hr />
+<h3 id="readavgassignmentcourseid-apiclient-promiseobjectnull"><code>readAvgAssignment(courseId, apiClient)</code> → <code>Promise&lt;Object|null&gt;</code><a class="headerlink" href="#readavgassignmentcourseid-apiclient-promiseobjectnull" title="Permanent link">&para;</a></h3>
+<p>Returns <code>cache.avg_assignment</code> or <code>null</code> if not yet set up. Shape:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nx">assignment_id</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nx">rubric_id</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nx">rubric_association_id</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nx">criterion_id</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nx">avg_outcome_id</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nx">submission_ids</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">[</span><span class="nx">userId</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="nx">submissionId</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nx">created_at</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h2 id="avg-assignment-service-masteryoutlookavgservicejs">Avg Assignment Service — <code>masteryOutlookAvgService.js</code><a class="headerlink" href="#avg-assignment-service-masteryoutlookavgservicejs" title="Permanent link">&para;</a></h2>
+<h3 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h3>
+<p>After a Marzano score push, updates the "Current Score" (average) assignment for affected students. Always a best-effort, silent-fail operation — the Marzano sync has already succeeded before this runs.</p>
+<hr />
+<h3 id="updateavgassignmentforstudentsopts-promiseboolean"><code>updateAvgAssignmentForStudents(opts)</code> → <code>Promise&lt;boolean&gt;</code><a class="headerlink" href="#updateavgassignmentforstudentsopts-promiseboolean" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>courseId</code></td>
+<td><code>string</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>outcomeId</code></td>
+<td><code>string</code></td>
+<td>The outcome that was just synced</td>
+</tr>
+<tr>
+<td><code>outcomeName</code></td>
+<td><code>string</code></td>
+<td>Used to prefix the submission comment</td>
+</tr>
+<tr>
+<td><code>studentIds</code></td>
+<td><code>string[]</code></td>
+<td>Students whose scores were updated</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td><code>{ [studentId]: string }</code></td>
+<td>Teacher note text per student</td>
+</tr>
+<tr>
+<td><code>cache</code></td>
+<td><code>Object</code></td>
+<td>In-memory Mastery Outlook cache</td>
+</tr>
+<tr>
+<td><code>apiClient</code></td>
+<td><code>CanvasApiClient</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Returns <code>true</code> if all batch calls succeeded, <code>false</code> if any failed or setup was missing. Never throws.</p>
+<p><strong>8-step flow:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Read <code>avg_assignment</code> from in-memory cache; abort if missing (teacher must run Refresh Data)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>GET /api/v1/courses/:id/outcome_rollups</code> for fresh Canvas averages</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>calculateStudentAverages(rollup, avg_outcome_id)</code> — only students whose avg changed are returned</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>getAllEnrollmentIds(courseId, apiClient)</code> — memory-cached after first call</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Build batch params: <code>points</code>, <code>comment</code>, <code>enrollmentId</code>/<code>overrideScore</code> if enrollment found</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>submitRubricAssessmentBatch(students, apiClient, { concurrency: 3, maxAttempts: 2 })</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Mark notes as submitted (<code>will_post_note_last_submitted</code>), run <code>refreshMasteryForAssignment</code>, persist cache</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Verify avg scores via polling loop (no-progress-in-50-polls exit); persist <code>avg_verify_at</code> / <code>avg_verify_mismatch</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Comment format:</strong></p>
+<ul>
+<li>With note: <code>"&lt;outcomeName&gt; Score updated: &lt;plScore&gt;, Note: &lt;noteText&gt; | &lt;AVG_OUTCOME_NAME&gt; updated: &lt;avg&gt;"</code></li>
+<li>Without note: <code>"&lt;outcomeName&gt; Score updated: &lt;plScore&gt; | &lt;AVG_OUTCOME_NAME&gt; updated: &lt;avg&gt;"</code></li>
+</ul>
+<blockquote>
+<p><strong>Gotcha — <code>outcome_rollups</code> ignores <code>user_ids[]</code></strong>: Canvas returns 400 if you pass <code>user_ids[]</code> to the rollup endpoint. The service fetches all students and filters in JavaScript.</p>
+<p><strong>Gotcha — notes for unchanged averages</strong>: Students with a pending note but no average change are handled separately via <code>postNoteToAvgAssignment</code> (see below). The main batch only runs for students whose average actually changed.</p>
+</blockquote>
+<hr />
+<h3 id="postnotetoavgassignmentopts-promiseboolean"><code>postNoteToAvgAssignment(opts)</code> → <code>Promise&lt;boolean&gt;</code><a class="headerlink" href="#postnotetoavgassignmentopts-promiseboolean" title="Permanent link">&para;</a></h3>
+<p>Posts a submission comment on the Current Score assignment for students whose average <strong>did not</strong> change but who have a pending note.</p>
+<p>Uses the <strong>Canvas REST submissions API</strong> (<code>PUT /api/v1/courses/:id/assignments/:id/submissions/:userId</code>) rather than GraphQL. GraphQL rubric mutations always write criterion data; this REST endpoint posts a comment without touching the rubric score or grade override.</p>
+<p>After posting, marks <code>will_post_note_last_submitted</code> in the in-memory cache and persists to disk.</p>
+<p>Returns <code>true</code> if all comments posted, <code>false</code> if any failed. Never throws.</p>
+<hr />
+<h2 id="gotchas">Gotchas<a class="headerlink" href="#gotchas" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Schema version mismatch discards all data</strong> — there is no migration path. If <code>SCHEMA_VERSION</code> is bumped, all existing caches are silently dropped and the teacher must run Refresh Data.</li>
+<li><strong><code>writeSyncState</code> is a full-file overwrite</strong> — always read-before-write. If two code paths call <code>writeSyncState</code> concurrently (rare but possible), one write will overwrite the other's data. The design assumes serialized writes.</li>
+<li><strong><code>ensureFolder</code> memo survives the page session</strong> — if a teacher deletes the Canvas folder mid-session, the memo returns the stale folder ID and writes fail. The error handler calls <code>invalidateFolderCache</code> so the next attempt re-discovers, but the first write attempt throws.</li>
+<li><strong>Avg verify polling</strong> uses a no-progress counter (50 polls at 5 s = ~4 min max). A stuck verification emits a detailed log warning with recovery instructions but does not block the sync completion status.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

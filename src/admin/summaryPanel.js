@@ -5,9 +5,18 @@ import {
     getInstalledThemeCssUrl
 } from "./pageDetection.js";
 import {logger} from "../utils/logger.js";
+import { CanvasApiClient } from "../utils/canvasApiClient.js";
 
 const ACCOUNTS_CACHE_KEY = "cg_admin_accounts_cache";
 
+/**
+ * Render the admin dashboard Summary panel into the given container.
+ * Shows current installation status: account, theme assets, grading scheme, and custom grade status.
+ *
+ * @param {HTMLElement} container - DOM element to render the panel into
+ * @param {Object} ctx - Dashboard context object exposing `getConfig()` and related helpers
+ * @returns {void}
+ */
 export function renderSummaryPanel(container, ctx) {
     const { panel, body } = createCollapsiblePanel("Summary", false, "cg-section-summary");
 
@@ -434,12 +443,8 @@ function getAccountsCacheMap() {
 
 async function fetchAccountName(accountId) {
     try {
-        const r = await fetch(`/api/v1/accounts/${accountId}`, {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" }
-        });
-        if (!r.ok) return null;
-        const acct = await r.json();
+        const api = new CanvasApiClient();
+        const acct = await api.get(`/api/v1/accounts/${accountId}`, {}, "fetchAccountName");
         return acct?.name || null;
     } catch {
         return null;

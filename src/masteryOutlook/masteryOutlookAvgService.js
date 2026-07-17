@@ -21,7 +21,7 @@ import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.j
 import { getAllEnrollmentIds } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
 import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
-import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
+import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
 
 /**
  * Update the Current Score (avg) assignment for students whose Marzano score
@@ -63,11 +63,11 @@ export async function updateAvgAssignmentForStudents({
             return false;
         }
 
-        // Step 2: Fetch fresh rollup for only the affected students
-        const userIdParams   = studentIds.map(id => `user_ids[]=${id}`).join('&');
+        // Step 2: Fetch fresh rollup for all students — outcome_rollups does not support
+        // user_ids[] filtering (returns 400); JS filtering against studentIds below.
         const rollupResponse = await apiClient.get(
             `/api/v1/courses/${courseId}/outcome_rollups`
-                + `?include[]=outcomes&include[]=users&per_page=100&${userIdParams}`,
+                + `?include[]=outcomes&include[]=users&per_page=100`,
             {},
             'MOAvgService:fetchRollup'
         );
@@ -202,6 +202,94 @@ export async function updateAvgAssignmentForStudents({
                 logger.info(`[MOAvgService] Mastery refreshed for avg assignment ${assignment_id}`);
             } catch (err) {
                 logger.warn('[MOAvgService] Mastery refresh failed (non-critical):', err.message);
+            }
+
+            // Step 8: Verify avg scores were accepted by Canvas — no-progress-in-10-polls loop.
+            // Never throws; a failure here does not block COMPLETE.
+            try {
+                const noProgressLimit = 50;
+                const retryDelayMs    = 5000;
+                const verifyUserIds   = averages.map(a => String(a.userId));
+                const expectedByUser  = new Map(averages.map(a => [String(a.userId), a.average]));
+
+                let avgMismatches    = [];
+                let lastMismatchCount = Infinity;
+                let noProgressCount  = 0;
+                let attempt          = 1;
+
+                while (true) {
+                    logger.debug(`[MOAvgService] Step 8 avg verify poll ${attempt} (noProgressCount=${noProgressCount})`);
+                    // outcome_rollups does not support user_ids[] (400) — fetch all, filter in JS.
+                    const verifyResponse = await apiClient.get(
+                        `/api/v1/courses/${courseId}/outcome_rollups`
+                            + `?outcome_ids[]=${avg_outcome_id}&include[]=outcomes&include[]=users`
+                            + `&per_page=100`,
+                        {},
+                        'MOAvgService:verifyAvgRollup'
+                    );
+                    const verifyRollups = verifyResponse?.rollups || [];
+
+                    const actualAvg = new Map();
+                    verifyRollups.forEach(rollup => {
+                        const uid = String(rollup.links?.user);
+                        if (!verifyUserIds.includes(uid)) return;
+                        const score = rollup.scores?.find(
+                            s => String(s.links?.outcome) === String(avg_outcome_id)
+                        )?.score;
+                        if (score !== undefined) actualAvg.set(uid, score);
+                    });
+
+                    avgMismatches = verifyUserIds.filter(uid => {
+                        const actual   = actualAvg.get(uid);
+                        const expected = expectedByUser.get(uid);
+                        return actual === undefined || Math.abs(actual - expected) >= 0.005;
+                    });
+
+                    if (avgMismatches.length === 0) {
+                        logger.info(`[MOAvgService] Avg scores verified on poll ${attempt}`);
+                        break;
+                    }
+
+                    if (avgMismatches.length < lastMismatchCount) {
+                        lastMismatchCount = avgMismatches.length;
+                        noProgressCount   = 0;
+                    } else {
+                        noProgressCount++;
+                    }
+
+                    if (noProgressCount >= noProgressLimit) {
+                        logger.warn(
+                            `[MOAvgService] ${avgMismatches.length} avg mismatch(es) — no progress for `
+                            + `${noProgressLimit} polls, giving up. `
+                            + 'There was an issue verifying all grades were updated. Try checking back in a few minutes — '
+                            + 'if grades show as synced, run the Current Score (avg) update from the Learning Mastery Gradebook '
+                            + 'to ensure averages are updated. If students still show as not synced after 15+ minutes, '
+                            + 're-run the Mastery Outlook sync.'
+                        );
+                        break;
+                    }
+
+                    attempt++;
+                    await new Promise(r => setTimeout(r, retryDelayMs));
+                }
+
+                // Persist avg_verify_at / avg_verify_mismatch so status survives reload
+                const syncState = await readSyncState(courseId, apiClient);
+                const oId       = String(avg_outcome_id);
+                if (!syncState[oId]) syncState[oId] = {};
+                const mismatchSet = new Set(avgMismatches);
+                const verifyAt    = new Date().toISOString();
+                for (const uid of verifyUserIds) {
+                    syncState[oId][uid] = {
+                        ...(syncState[oId][uid] ?? {}),
+                        avg_verify_at:       verifyAt,
+                        avg_verify_mismatch: mismatchSet.has(uid),
+                    };
+                }
+                await writeSyncState(courseId, syncState, apiClient);
+                logger.debug(`[MOAvgService] avg verify results persisted for ${verifyUserIds.length} student(s)`);
+            } catch (err) {
+                logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message);
             }
         }
 
