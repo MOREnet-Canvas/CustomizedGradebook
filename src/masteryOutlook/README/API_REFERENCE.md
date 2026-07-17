@@ -100,13 +100,13 @@ GET /api/v1/courses/{courseId}/outcome_results
       id: 12345,
       score: 4,
       percent: 1.0,
-      submitted_at: "2026-03-30T14:29:51Z",           // ← Timestamp for chronological sorting
-      submitted_or_assessed_at: "2026-03-30T14:29:51Z",
+      // submitted_at may be absent — always fall back to submitted_or_assessed_at
+      submitted_or_assessed_at: "2026-03-30T14:29:51Z", // ← USE THIS for chronological sorting
       links: {
         user: "642",                                   // ← Student ID
         learning_outcome: "598",                       // ← Outcome ID
         alignment: "assignment_123",                   // ← Which assignment this score is from
-        assignment: "123"                              // ← Assignment ID (for deduplication)
+        assignment: "assignment_123"                   // ← Same prefixed format as alignment (for deduplication)
       }
     },
     {
@@ -135,7 +135,8 @@ GET /api/v1/courses/{courseId}/outcome_results
 **Key Fields:**
 - `outcome_results[]` - **Array of ALL individual attempts** (one per submission)
 - `outcome_results[].score` - The rubric criteria score for this attempt
-- `outcome_results[].submitted_or_assessed_at` - **USE THIS for chronological sorting**
+- `outcome_results[].submitted_or_assessed_at` - **USE THIS for chronological sorting** (`submitted_at` may be absent)
+- `outcome_results[].links.assignment` - Same prefixed format as `alignment` (e.g. `"assignment_123"`), not a bare ID
 - `outcome_results[].links.user` - Student ID
 - `outcome_results[].links.learning_outcome` - Outcome ID
 - `outcome_results[].links.alignment` - Assignment identifier (format: `"assignment_{id}"`)

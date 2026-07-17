@@ -53,7 +53,7 @@
       user: "642",                    // Student ID
       learning_outcome: "598",        // Outcome ID
       alignment: "assignment_123",    // Assignment identifier
-      assignment: "123"               // Assignment ID (for deduplication)
+      assignment: "assignment_123"    // Same prefixed format as alignment (for deduplication)
     }
   },
   {
