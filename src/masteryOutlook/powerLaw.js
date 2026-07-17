@@ -24,13 +24,14 @@ function clamp(value, min, max) {
 }
 
 /**
- * Predict the next score using Marzano's Power Law algorithm.
- * Fits y = a · x^b through the score history via log-linear regression.
+ * Calculate a true score using Marzano's Power Law algorithm.
+ * Fits y = a · x^b through the score history via log-linear regression
+ * and evaluates the curve at the last known time point (n).
  *
  * @param {number[]} scores - Rubric criteria scores for a single outcome,
  *   in chronological order (oldest first). Caller is responsible for
  *   correct ordering. Minimum 3 scores required.
- * @returns {number|null} Predicted next score clamped to [MIN_SCORE, MAX_SCORE],
+ * @returns {number|null} True score clamped to [MIN_SCORE, MAX_SCORE],
  *   or null if insufficient data (NE status)
  */
 export function powerLawPredict(scores) {
@@ -57,8 +58,8 @@ export function powerLawPredict(scores) {
     const b = (n * sumLnXY - sumLnX * sumLnY) / denom;
     const a = Math.exp((sumLnY - b * sumLnX) / n);
 
-    // Predict at the next time point (n + 1)
-    const predicted = a * Math.pow(n + 1, b);
+    // True score at the last known time point (n)
+    const predicted = a * Math.pow(n, b);
 
     return clamp(predicted, MIN_SCORE, MAX_SCORE);
 }
