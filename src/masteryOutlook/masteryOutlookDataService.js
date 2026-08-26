@@ -11,7 +11,7 @@
  * 4. fetchAllOutcomeData() - Orchestrate all fetches
  * 5. computeOutcomeStats() - Apply Power Law calculations
  *
- * See: docs/AI_SERVICES_REFERENCE.md and src/MasteryOutlook/API_REFERENCE.md
+ * See: AI_SERVICES_REFERENCE.md (repo root) and src/MasteryOutlook/API_REFERENCE.md
  */
 
 import { logger } from '../utils/logger.js';

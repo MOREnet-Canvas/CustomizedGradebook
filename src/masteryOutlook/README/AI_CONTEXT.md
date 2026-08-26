@@ -176,7 +176,7 @@ const stats = computeStudentOutcome(scores);
 
 **Rule:** Search codebase first before creating new utilities!
 
-**See also:** `docs/AI_SERVICES_REFERENCE.md` for complete service list
+**See also:** `AI_SERVICES_REFERENCE.md` (repo root) for complete service list
 
 ---
 

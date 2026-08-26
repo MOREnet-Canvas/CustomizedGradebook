@@ -6,9 +6,15 @@ This guide explains the development and release workflows for both the main Cust
 
 The project uses a **local build + manual deploy** workflow:
 
-1. Build locally (faster than GitHub Actions)
-2. Deploy to GitHub Releases manually
-3. Trigger GitHub Pages updates manually
+1. Build and deploy locally with a single npm script
+2. Assets land on GitHub Releases
+3. Canvas loaders pull straight from those releases
+
+Every script in `buildScripts/` runs esbuild itself and then uploads via the `gh` CLI. There is
+**no standalone `build` script** — building only happens as a step inside a deploy or release script.
+
+!!! note "Node version"
+    Local and CI both run Node 22.x, so `local build === CI build === release build`.
 
 ## Main Customized Gradebook Workflow
 
@@ -18,18 +24,18 @@ The project uses a **local build + manual deploy** workflow:
 
 ```bash
 # 1. Make changes to src/**/*.js files
-# 2. Build locally
-npm run build:dev
-
-# 3. Deploy to dev release
+# 2. Build and deploy to the dev release
 npm run deploy:dev
 ```
 
 **What happens:**
-- Builds bundle with source maps
-- Uploads to `dev` GitHub Release
-- Overwrites previous dev build
-- Available immediately at: `.../releases/download/dev/customGradebookInit.js`
+
+- Builds `src/customGradebookInit.js` → `dist/dev/customGradebookInit.js`, unminified with source maps
+- Uploads the bundle and its `.map` to the `dev` GitHub Release, overwriting the previous build
+- Also builds and uploads the **mobile** dev bundle in the same run (see [Mobile Module](#mobile-module-workflow))
+- Available immediately at `.../releases/download/dev/customGradebookInit.js`
+
+No clean-tree check runs on dev — you can deploy uncommitted work for testing.
 
 ### Production Release Workflow
 
@@ -47,55 +53,61 @@ npm run release:major
 ```
 
 **What happens:**
-1. Bumps version in `package.json`
-2. Creates git commit
-3. Creates git tag (e.g., `v1.2.1`)
-4. Pushes to GitHub with tags
-5. Builds production bundle
-6. Creates GitHub Release
-7. Uploads bundle to release
-8. Triggers `update-version-manifest.yml` workflow
+
+1. Refuses to run if the working tree is dirty; warns if you are not on `main`
+2. Bumps the version in `package.json`
+3. Commits with the bare version number as the message (e.g. `1.2.1`)
+4. Creates an annotated git tag (e.g. `v1.2.1`)
+5. Pushes commits and tags (`git push --follow-tags`)
+6. Builds the production bundle — minified, no source maps
+7. Creates the GitHub Release and uploads the bundle
+8. `update-version-manifest.yml` regenerates `versions.json`
+
+**To re-publish the current version without bumping:**
+
+```bash
+npm run redeploy:prod
+```
+
+This rebuilds and re-uploads to the existing `vX.Y.Z` release. It also refuses to run on a dirty tree.
 
 ### Build Process
 
 The main CG uses **esbuild** to bundle multiple source files:
 
-**Input:** `src/**/*.js` (many files)  
-**Output:** `dist/prod/customGradebookInit.js` (single bundle)
+**Input:** `src/customGradebookInit.js` (entry point, bundles `src/**/*.js`)
+**Output:** `dist/dev/customGradebookInit.js` or `dist/prod/customGradebookInit.js`
 
-**Build command:**
-```bash
-npm run build:prod
-```
+| | Dev | Prod |
+|---|---|---|
+| Minified | No | Yes |
+| Source map | Yes | No |
+| Format / target | IIFE / es2017 | IIFE / es2017 |
 
-**What it does:**
-- Bundles all source files
-- Minifies code
-- Generates source maps (dev only)
-- Outputs to `dist/prod/`
+Each build injects `ENV_NAME`, `ENV_DEV`, `ENV_PROD`, and a `BUILD_VERSION` string (timestamp + short git hash) via esbuild `define`.
 
 ## Mobile Module Workflow
 
+The Mobile Module (Parent Mastery) is an esbuild bundle from `src/masteryDashboard/mobileInit.js`,
+versioned independently in `mobile/package.json`.
+
 ### Development Workflow
 
-**For testing changes:**
-
 ```bash
-# 1. Edit mobile/mobile_test.js directly
-# 2. Deploy to dev release
-npm run deploy:mobile:dev
+npm run deploy:dev
 ```
 
-**What happens:**
-- Uploads `mobile/mobile_test.js` to `mobile-dev` GitHub Release
-- Overwrites previous dev build
-- Available immediately at: `.../releases/download/mobile-dev/mobile_test.js`
+The mobile dev bundle is built and uploaded as part of the standard dev deploy — desktop and mobile
+ship together. Output goes to `dist/mobile/dev/mobileInit.js` and uploads to the `mobile-dev`
+release, available at `.../releases/download/mobile-dev/mobileInit.js`.
 
-**No build process needed** - mobile module is already production-ready vanilla JavaScript.
+To re-publish the current mobile version without bumping:
+
+```bash
+npm run redeploy:mobile
+```
 
 ### Production Release Workflow
-
-**For stable releases:**
 
 ```bash
 # Patch release (0.1.1 → 0.1.2)
@@ -109,32 +121,43 @@ npm run release:mobile:major
 ```
 
 **What happens:**
-1. Bumps version in `mobile/package.json`
-2. Creates git commit
-3. Creates git tag (e.g., `mobile-v0.1.2`)
-4. Pushes to GitHub with tags
-5. Creates GitHub Release
-6. Uploads `mobile/mobile_test.js` to release
+
+1. Refuses to run if the working tree is dirty
+2. Bumps the version in `mobile/package.json`
+3. Commits `Bump mobile version to X.Y.Z`
+4. Creates an annotated git tag (e.g. `mobile-v0.1.2`)
+5. Pushes commits and tags
+6. Builds `dist/mobile/prod/mobileInit.js` — minified
+7. Creates the GitHub Release and uploads the bundle
+8. `update-mobile-version-manifest.yml` regenerates the mobile version tracks
 
 ## GitHub Actions Workflows
 
-### `update-version-manifest.yml`
+### `update-version-manifest.yml` / `update-mobile-version-manifest.yml`
 
-**Trigger:** Manual (`workflow_dispatch`) or auto-triggered by release scripts
+**Trigger:** Manual (`workflow_dispatch`) or auto-triggered after a release
 
-**What it does:**
-1. Scans all git tags (`v*` and `mobile-v*`)
-2. Generates `versions.json` with version tracks
-3. Deploys to GitHub Pages with landing page and button_directions.html
+**What they do:**
 
-**When to trigger:**
-- After releasing a new version (auto-triggered)
-- To update GitHub Pages content manually
+1. Scan git tags (`v*` and `mobile-v*`)
+2. Generate `versions.json` with version tracks
+3. Deploy to GitHub Pages with the landing page and `button_directions.html`
 
 **Command:**
+
 ```bash
 gh workflow run update-version-manifest.yml
 ```
+
+### `dev-release.yml` — currently inactive
+
+!!! warning "Not wired up"
+    This workflow's `push: branches: [main]` trigger is commented out, so it only runs on manual
+    dispatch — and a dispatch fails, because it calls `npm run build:dev`, which is not a defined
+    script. Dev publishing is local-only via `npm run deploy:dev`.
+
+    To reactivate: add a `build:dev` script (or change the step to run `deploy:dev`) and uncomment
+    the `push` trigger.
 
 ## Version Tracks
 
@@ -150,9 +173,10 @@ The `versions.json` file contains version tracks for auto-patch loaders:
 ```
 
 **How it works:**
-- Loaders request a track (e.g., `v1.2-latest`)
-- `versions.json` resolves to specific version (e.g., `v1.2.0`)
-- Loader fetches that version from GitHub Releases
+
+- Loaders request a track (e.g. `v1.2-latest`)
+- `versions.json` resolves to a specific version (e.g. `v1.2.0`)
+- The loader fetches that version from GitHub Releases
 
 See [Versioning](versioning.md) for details.
 
@@ -160,9 +184,10 @@ See [Versioning](versioning.md) for details.
 
 | Task | Main CG | Mobile |
 |------|---------|--------|
-| **Dev changes** | `npm run build:dev && npm run deploy:dev` | Edit file → `npm run deploy:mobile:dev` |
+| **Dev changes** | `npm run deploy:dev` | Covered by `npm run deploy:dev` |
+| **Re-deploy current version** | `npm run redeploy:prod` | `npm run redeploy:mobile` |
 | **Prod release** | `npm run release:minor` | `npm run release:mobile:minor` |
-| **Build process** | ✅ esbuild | ❌ None (vanilla JS) |
+| **Build process** | esbuild (inside deploy/release scripts) | esbuild (inside deploy/release scripts) |
+| **Entry point** | `src/customGradebookInit.js` | `src/masteryDashboard/mobileInit.js` |
 | **Tag format** | `v1.2.0` | `mobile-v0.1.1` |
-| **Dev URL** | `.../dev/customGradebookInit.js` | `.../mobile-dev/mobile_test.js` |
-
+| **Dev URL** | `.../dev/customGradebookInit.js` | `.../mobile-dev/mobileInit.js` |

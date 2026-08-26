@@ -9,7 +9,7 @@
  * 2. Inject creation button on Course Settings page
  * 3. Initialize outlook on Mastery Outlook page
  *
- * See: docs/AI_SERVICES_REFERENCE.md for existing services
+ * See: AI_SERVICES_REFERENCE.md (repo root) for existing services
  */
 
 import { logger } from '../utils/logger.js';

@@ -36,7 +36,7 @@ This includes:
 ### 3. Use Existing Services — Do Not Recreate
 Before writing any new utility, helper, or service function:
 
-- **Check `docs/AI_SERVICES_REFERENCE.md`** for existing services and utilities
+- **Check `AI_SERVICES_REFERENCE.md`** (repo root) for existing services and utilities
 - Search the codebase for an existing implementation that covers the need
 - Prefer calling or extending an existing service over creating a parallel one
 - If an existing service is close but not quite right, prefer modifying it (safely) over duplicating it
