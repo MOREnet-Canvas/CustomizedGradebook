@@ -122,8 +122,11 @@ function invalidateFolderCache(districtCourseId) {
  *
  * Unlike masteryOutlookCacheService.js's equivalent, folders here are NOT
  * locked — this data must remain student-readable via visibility_level on
- * the file itself, and folder-level locking has not been verified to be safe
- * alongside that (flagged for live verification, not assumed).
+ * the file itself. Confirmed by live testing on morenetlab (course 581,
+ * scripts/canvas-test/verifyVisibility.js): a locked folder blocks student
+ * reads exactly like a locked file, even when the file inside it is unlocked
+ * and visibility_level: institution. Locking either folder in this chain
+ * would silently break student reads the same way locking the file does.
  *
  * @param {string} districtCourseId
  * @param {import('../utils/canvasApiClient.js').CanvasApiClient} apiClient

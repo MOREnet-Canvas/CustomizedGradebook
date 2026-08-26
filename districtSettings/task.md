@@ -116,13 +116,20 @@ This repo has three separate version/manifest-shaped things that must stay separ
 
 This file is outside the esbuild/Vitest pipeline (not an ES module, can't be imported by the test runner without a DOM-scraping harness this repo doesn't have). `src/services/districtConfigService.js` — the bundled runtime consumer of the same `district_config.json` shape — has full Vitest coverage instead; that's where the read/parse/fallback logic is verified. This file's own correctness has to be checked by hand.
 
-## Manual verification checklist (no browser/Canvas credentials were available while this file was authored — these have NOT been run against a live Canvas instance yet)
+## Manual verification checklist
 
+Split by what's been confirmed via the `scripts/canvas-test/` API harness (Bearer token, course 581, student `642`) versus what still requires an actual browser session, since the two aren't interchangeable — the harness never exercises this file's or `districtConfigService.js`'s own code paths, only the underlying Canvas platform behavior they depend on.
+
+**Confirmed via `scripts/canvas-test/verifyVisibility.js`:**
+- [x] An unenrolled student test account can read an unlocked, `visibility_level: institution` file directly (200 metadata, 200 download).
+- [x] A locked file blocks that same student regardless of `visibility_level` (200 metadata with `locked_for_user: true`, but no `url` issued — no way to actually fetch content).
+- [x] **New coverage:** an unlocked, `institution`-visible file inside a *locked folder* is blocked the same way — folder lock cascades exactly like file lock. This confirms `districtConfigService.js`'s `ensureFolder()` is right to never lock either folder in the chain.
+
+**Still needs a real browser session (not run yet):**
 - [ ] Paste into a real `[District Settings]` page in a test district course (e.g. morenetlab) and confirm it renders without console errors.
-- [ ] Save with all four toggles off/unlocked; confirm `district_config.json` lands in `MOREnet_CustomizedGradebook/district_config/` with `locked: false`, `visibility_level: institution`.
-- [ ] Confirm an unenrolled student test account can read the file directly (200, not 401/403).
+- [ ] Save with all four toggles off/unlocked through the actual page UI; confirm `district_config.json` lands in `MOREnet_CustomizedGradebook/district_config/` with `locked: false`, `visibility_level: institution` (the harness only tested hand-created fixtures, not a save performed through this file's own code).
 - [ ] Toggle a setting on and lock it; confirm the summary card and row reflect both value and lock state after a save + reload.
-- [ ] Confirm `districtConfigService.js`, pointed at this course via `window.CG_DISTRICT_COURSE`, resolves a locked setting's value correctly from a different (teacher) course context.
+- [ ] Confirm `districtConfigService.js`, pointed at this course via `window.CG_DISTRICT_COURSE`, resolves a locked setting's value correctly from a different (teacher) course context — this exercises the application's own cookie/CSRF code path, which the Bearer-token harness deliberately never touches.
 - [ ] Bump `districtSettings/district-settings-manifest.json`'s version (and `notes`), confirm the update banner appears, and confirm clicking Update successfully overwrites this page's body without touching `district_config.json`.
-- [ ] Confirm the raw GitHub URL for both files (`.../main/districtSettings/district-settings-manifest.json` and `.../districtSettings.html`) actually resolves once this branch is pushed to `main`.
+- [ ] Confirm the raw GitHub URL for both files (`.../main/districtSettings/district-settings-manifest.json` and `.../districtSettings.html`) actually resolves once this branch is merged and pushed to `main`.
 - [ ] Try the Canvas-native `ic-Super-toggle` / `icon-lock` classes live; if they render correctly, consider swapping them in for the current Unicode fallback.
