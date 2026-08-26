@@ -23,6 +23,7 @@ import {
 } from "../config.js";
 import { UserCancelledError } from "../utils/errorHandler.js";
 import { CanvasApiClient } from "../utils/canvasApiClient.js";
+import { getEffectiveValue } from "../services/districtConfigService.js";
 import { calculateStudentAverages } from "../services/gradeCalculator.js";
 import { downloadErrorSummary } from "../services/gradeSubmission.js";
 import { fetchAllSubmissions, fetchRubricAssociationId } from "../services/submissionService.js";
@@ -132,8 +133,15 @@ export async function handleCheckingSetup(stateMachine) {
         }
     }
 
+    // Resolve district-lockable settings once, up front, and thread the result through
+    // context so downstream states (VERIFYING_OVERRIDES, COMPLETE) see the same value
+    // instead of each re-reading the static config.js constant.
+    const enforceCourseOverride = await getEffectiveValue('ENFORCE_COURSE_OVERRIDE', undefined, ENFORCE_COURSE_OVERRIDE, apiClient);
+    const enforceCourseGradingScheme = await getEffectiveValue('ENFORCE_COURSE_GRADING_SCHEME', undefined, ENFORCE_COURSE_GRADING_SCHEME, apiClient);
+    stateMachine.updateContext({ enforceCourseOverride, enforceCourseGradingScheme });
+
     // Enable final grade override if configured
-    if (ENABLE_GRADE_OVERRIDE && ENFORCE_COURSE_OVERRIDE) {
+    if (ENABLE_GRADE_OVERRIDE && enforceCourseOverride) {
         try {
             await enableCourseOverride(courseId, apiClient);
         } catch (error) {
@@ -143,7 +151,7 @@ export async function handleCheckingSetup(stateMachine) {
     }
 
     // Enable course grading scheme if configured
-    if (ENFORCE_COURSE_GRADING_SCHEME) {
+    if (enforceCourseGradingScheme) {
         try {
             await enableCourseGradingScheme(courseId, apiClient);
         } catch (error) {
@@ -440,7 +448,7 @@ export async function handleVerifying(stateMachine) {
  * Does not re-submit overrides — submission is handled by submitRubricAssessmentBatch.
  */
 export async function handleVerifyingOverrides(stateMachine) {
-    const { courseId, averages, banner } = stateMachine.getContext();
+    const { courseId, averages, banner, enforceCourseOverride } = stateMachine.getContext();
     const apiClient = new CanvasApiClient();
 
     // Check if grade override is enabled
@@ -500,8 +508,8 @@ export async function handleVerifyingOverrides(stateMachine) {
                     actual: m.actual
                 })));
 
-                // If all verifications failed and ENFORCE_COURSE_OVERRIDE is false, likely course setting not enabled
-                if (currentMismatchCount === averages.length && !ENFORCE_COURSE_OVERRIDE) {
+                // If all verifications failed and course override enforcement is off, likely course setting not enabled
+                if (currentMismatchCount === averages.length && !enforceCourseOverride) {
                     stateMachine.updateContext({ overridesNotEnabled: true });
                 }
 
@@ -529,7 +537,7 @@ export async function handleVerifyingOverrides(stateMachine) {
  * Shows success message and cleans up
  */
 export async function handleComplete(stateMachine) {
-    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled, overrideMismatchCount } = stateMachine.getContext();
+    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled, overrideMismatchCount, enforceCourseOverride } = stateMachine.getContext();
 
     const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
@@ -572,7 +580,7 @@ export async function handleComplete(stateMachine) {
     let completionMessage = `All ${updateTarget} have been updated. (elapsed time: ${elapsedTime}s)\nYou may need to refresh the page to see the new scores.`;
 
     // Add warning if override grades were not enabled in the course
-    if (overridesNotEnabled && ENABLE_GRADE_OVERRIDE && !ENFORCE_COURSE_OVERRIDE) {
+    if (overridesNotEnabled && ENABLE_GRADE_OVERRIDE && !enforceCourseOverride) {
         completionMessage += '\n\nOverride grades not enabled for this course';
     }
 

@@ -37,6 +37,7 @@ import { initMasteryDashboardCreation } from "./masteryDashboardCreation/mastery
 import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
 import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
 import { exposeCGDevTools } from "./masteryOutlook/cgDevTools.js";
+import { loadDistrictConfig } from "./services/districtConfigService.js";
 
 /**
  * Main initialization function
@@ -68,6 +69,20 @@ import { exposeCGDevTools } from "./masteryOutlook/cgDevTools.js";
 
     // Validate all existing snapshots on initialization (security)
     validateAllSnapshots();
+
+    // District config warm-up — fire-and-forget, never blocks or delays tool init.
+    // getEffectiveValue() calls made later during this page load will await this
+    // same in-flight promise instead of re-fetching. If CG_DISTRICT_COURSE isn't
+    // set, loadDistrictConfig() resolves immediately without a network call.
+    if (window.CG_DISTRICT_COURSE) {
+        try {
+            loadDistrictConfig(new CanvasApiClient()).catch(err => {
+                logger.warn('[Init] Failed to warm district config cache:', err);
+            });
+        } catch (err) {
+            logger.warn('[Init] Failed to initialize CanvasApiClient for district config warm-up:', err);
+        }
+    }
 
     // Admin Dashboard (Theme Editor and virtual admin page)
     // Must run early to prevent normal CG behavior on admin dashboard page
