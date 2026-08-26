@@ -1,148 +1,128 @@
-# District Settings — Build Task List
+# District Settings — Spec
 
 ## Overview
-Build a single standalone hand-crafted HTML file at `src/districtSettings/districtSettings.html`: a self-contained Canvas wiki deliverable (inline CSS + inline JS, zero external dependencies) that reads/writes a district config JSON on a Canvas `district-config` wiki page and renders an 8-section settings UI. It is pasted into the Canvas HTML editor and exported as `.imscc` — it is NOT built or deployed.
 
-**Hard constraints:** Create only the one new file. Do NOT add it to `esbuild.config.js`. Do NOT import it anywhere. Do NOT modify ANY existing file (including `esbuild.config.js` and `package.json`).
+`districtSettings/districtSettings.html` is a single standalone hand-crafted HTML file: a self-contained Canvas wiki deliverable (inline CSS + inline JS, zero external dependencies). It is pasted directly into the `[District Settings]` page body in the district config course. It is NOT built or deployed — it is entirely outside the esbuild pipeline and is never touched by `deploy-dev.js`, `deploy-prod.js`, or `release.js`.
 
-## Task Breakdown
+It manages a separate storage artifact, `district_config.json`, uploaded via the Canvas Files API into the same course (`MOREnet_CustomizedGradebook/district_config/district_config.json`). That file is what `src/services/districtConfigService.js` reads at runtime in the bundled extension.
 
-### Builder A — Scaffold, CSS design system, and data layer
+**Hard constraints:** Do NOT add this file to `esbuild.config.js`. Do NOT import it anywhere. Do NOT modify `package.json`. No CDN links, no build step, no `alert()` calls — inline feedback only.
 
-#### Scaffold
-- [ ] Add `<!DOCTYPE html>` + full `<html>`/`<head>`/`<body>` so it opens locally in a browser.
-- [ ] Put all CSS in one inline `<style>` block in `<head>`; all JS in one inline `<script>` at the bottom of `<body>`. No CDN links, no imports, no script fetches.
+## Per-key lock model
 
-#### Body layout containers
-- [ ] Outer shell: CSS grid, `220px` sidebar + `1fr` main, `min-height: 100vh`.
-- [ ] Sidebar (white bg, `0.5px` right border `#C7CDD1`, padding 0) with logo area (`padding 20px 16px 16px`, `0.5px` bottom border) and a nav list.
-- [ ] Main column: flex column with sticky topbar (`padding 14px 20px`, `0.5px` bottom border, flex space-between: title + district name left, save button right) + scrollable content area (`padding 20px`, flex column `gap 16px`).
-- [ ] Content root element `#cg-district-settings-root`.
-- [ ] Hidden config div consumed at runtime: `<div id="cg-district-config" style="display:none">...</div>`.
+This is the core mechanic, modeled on Canvas's native Feature Flags UI (toggle switch + small padlock icon per row). Each setting has two independent values:
 
-#### CSS design system (exact values)
-- [ ] Colors: primary `#185FA5`, success `#0F6E56`, text `#2D3B45`, text-secondary `#6b7785`, text-tertiary `#9aa5b0`, border `#C7CDD1` at `0.5px`, page bg `#f5f5f5`, surface `#ffffff`, secondary bg `#F5F5F5`.
-- [ ] Status colors: success bg `#F6FFED`/border `#B7EB8F`; warning bg `#FFF7E6`/border `#F3D19E`; error bg `#FFF1F0`/border `#FFA39E`; info bg `#F0F7FF`/border `#0374B5`.
-- [ ] Typography: font `system-ui, -apple-system, sans-serif`; body `14px`/`1.5`; labels `11px`/weight `500`/text-secondary; hints `11px`/text-tertiary; code `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`.
-- [ ] Nav items: `36px` tall, `8px` horizontal / `7px` vertical padding, `border-radius 6px`, `13px` font, `gap 8px` icon+label, active = white bg + primary text.
-- [ ] Summary bar: 2x2 grid, `gap 10px`. Metric cards: bg `#F5F5F5`, `border-radius 8px`, `padding 12px 14px`, `11px` muted label, `18px`/`500` value.
-- [ ] Panels: `0.5px` border `#C7CDD1`, `border-radius 12px`, white bg, `overflow hidden`. Header: `padding 12px 16px`, flex space-between, `13px`/`500`, hover bg `#F5F5F5`, cursor pointer, chevron on right. Body: `padding 16px`, `0.5px` top border, hidden when collapsed.
-- [ ] Toggle rows: flex space-between, `padding 8px 0`, `0.5px` bottom border on all but last.
-- [ ] Toggle switch: `32px` wide × `18px` tall, `border-radius 99px`, gray off / `#185FA5` on, white `12px` circle thumb sliding left/right.
-- [ ] Field labels: `11px`/`500`/`#6b7785`/`margin-bottom 4px`. Inputs & selects: `12px` font, `6px 8px` padding, `0.5px` border `#C7CDD1`, `border-radius 6px`, full width.
-- [ ] Code block: bg `#F5F5F5`, `0.5px` border, `border-radius 6px`, `padding 14px`, monospace `12px`, `line-height 1.8`, `position relative`. Copy button: absolute top-right, `11px` font, small padding, secondary style.
-- [ ] Step list: flex column `gap 6px`, `12px` font, muted; step number tertiary color `min-width 14px`.
-- [ ] Save button: Button--primary, blue bg, white text, `padding 6px 16px`, `border-radius 6px`, `13px` font.
+- **Locked** — the district `value` wins outright for every course, regardless of any per-course value.
+- **Unlocked** — the district `value` is only a fallback default; a per-course value would take precedence if one existed.
 
-#### Data layer (`<script>`)
-- [ ] `DEFAULTS` config object with EVERY key/default: `ENABLE_STUDENT_GRADE_CUSTOMIZATION:true`, `ENABLE_GRADE_OVERRIDE:true`, `ENFORCE_COURSE_OVERRIDE:false`, `ENFORCE_COURSE_GRADING_SCHEME:false`, `ENABLE_GRADE_CUSTOM_STATUS:false`, `ENABLE_NEGATIVE_ZERO_COUNT:false`, `UPDATE_AVG_BUTTON_LABEL:'Update Current Score'`, `AVG_OUTCOME_NAME:'Current Score'`, `AVG_ASSIGNMENT_NAME:'Current Score Assignment'`, `AVG_RUBRIC_NAME:'Current Score Rubric'`, `DEFAULT_MAX_POINTS:4`, `DEFAULT_MASTERY_THRESHOLD:3`, `EXCLUDED_OUTCOME_KEYWORDS:[]`, `DEFAULT_GRADING_TYPE:'letter_grade'`, `DEFAULT_GRADING_SCHEME_ID:null`, `ENABLE_ACCOUNT_FILTER:false`, `ALLOWED_ACCOUNT_IDS:[]`, `DEFAULT_CUSTOM_STATUS_ID:null`.
-- [ ] Runtime state object (current config) seeded from `DEFAULTS`.
-- [ ] Parse courseId from `window.location.pathname` via `/\/courses\/(\d+)/`; fallback to `'COURSE_ID'`.
-- [ ] Read CSRF token: `document.querySelector('meta[name="csrf-token"]')?.content` OR parse `document.cookie` for `_csrf_token`.
-- [ ] `GET /api/v1/courses/{courseId}/pages/district-config`; on failure/404 use defaults silently.
-- [ ] Extract JSON from `#cg-district-config` div text content and merge over defaults.
-- [ ] PUT save: `PUT /api/v1/courses/{courseId}/pages/district-config`, headers `{ 'Content-Type':'application/json', 'X-CSRF-Token': csrfToken }`, body `JSON.stringify({ wiki_page: { body: '<div id="cg-district-config" style="display:none">' + JSON.stringify(config) + '</div>' } })`.
-- [ ] Save transforms: `EXCLUDED_OUTCOME_KEYWORDS`/`ALLOWED_ACCOUNT_IDS` split CSV; empty `DEFAULT_GRADING_SCHEME_ID` → `null`; empty `DEFAULT_CUSTOM_STATUS_ID` → `null`.
-- [ ] Inline save feedback (success/error) — NO `alert()` anywhere.
-- [ ] Clearly-named stub render functions for Builder B (e.g. `renderSummary`, `renderFeatureFlags`, `renderLabels`, `renderOutcomeConfig`, `renderGrading`, `renderAccountFilter`, `renderCustomStatus`, `renderCanvasLoader`, `renderSidebar`).
+**No per-course settings store exists yet** (as of this writing). This means `perCourseValue` is always absent at every call site today, so **unlocked currently behaves identically to locked in practice** — the district value applies either way. This is expected, not a defect. It will start to matter once a per-course store is built as separate, later work.
 
-### Builder B — UI rendering and interactions
+## Round 1 settings (exact keys, defaults, labels/hints)
 
-#### Sections
-- [ ] **Summary**: 2x2 metric cards — Active version (hardcoded `'district config'`), Grade override (enabled/disabled from `ENABLE_GRADE_OVERRIDE`), Account filter (count of `ALLOWED_ACCOUNT_IDS` or `'off'`), Custom status (ID or `'none'`).
-- [ ] **Feature flags**: 6 toggle rows (label + hint + toggle), exact labels/hints:
-    - [ ] `ENABLE_STUDENT_GRADE_CUSTOMIZATION` → 'Student grade customization' / 'Allows per-student grade overrides in the gradebook'
-    - [ ] `ENABLE_GRADE_OVERRIDE` → 'Grade override' / 'Requires final grade override feature flag on the Canvas account'
-    - [ ] `ENFORCE_COURSE_OVERRIDE` → 'Enforce course override' / 'Sets course override via API on every sync'
-    - [ ] `ENFORCE_COURSE_GRADING_SCHEME` → 'Enforce grading scheme' / 'Sets grading scheme via API on every sync'
-    - [ ] `ENABLE_GRADE_CUSTOM_STATUS` → 'Custom grade statuses' / 'Apply custom status labels when outcomes lack evidence'
-    - [ ] `ENABLE_NEGATIVE_ZERO_COUNT` → 'Zero grade penalty' / 'Each zero subtracts 1 from the score'
-- [ ] **Labels**: 4 text inputs (UPDATE_AVG_BUTTON_LABEL, AVG_OUTCOME_NAME, AVG_ASSIGNMENT_NAME, AVG_RUBRIC_NAME) in single-column layout.
-- [ ] **Outcome config**: DEFAULT_MAX_POINTS + DEFAULT_MASTERY_THRESHOLD side by side (number, `min 1`); EXCLUDED_OUTCOME_KEYWORDS full width below (CSV text, joined with `', '` for display).
-- [ ] **Grading**: DEFAULT_GRADING_TYPE select (options `letter_grade`, `gpa_scale`, `points`) + DEFAULT_GRADING_SCHEME_ID number input, side by side.
-- [ ] **Account filter**: ENABLE_ACCOUNT_FILTER toggle + ALLOWED_ACCOUNT_IDS CSV input shown only when toggle is on.
-- [ ] **Custom status**: DEFAULT_CUSTOM_STATUS_ID text input.
-- [ ] **Canvas loader**: header explainer; courseId in monospace badge (from URL); pre-filled code block (exact snippet below); copy button (plain-text copy + 2s checkmark); divider; 3 numbered steps (exact text below).
+Scoped to four existing plain booleans, chosen because they already exist with clear defaults on both `src/config.js` and the admin dashboard's `src/admin/data/defaultConfigConstants.js`. Labels/hints below are reused verbatim from `src/config.js`'s own comments.
 
-#### Interactions
-- [ ] Sidebar nav: clicking an item scrolls to and expands that section, collapsing all others.
-- [ ] Toggle switch behavior (thumb slides, on/off color, updates state).
-- [ ] Conditional ALLOWED_ACCOUNT_IDS visibility tied to ENABLE_ACCOUNT_FILTER.
-- [ ] Copy-to-clipboard with `✓`/checkmark feedback for 2 seconds.
-- [ ] Save button states: 'Saving...' (disabled) → '✓ Saved' (green, brief) → normal; on error show inline message below topbar and restore button.
-- [ ] Summary metric cards refresh immediately on save.
+| Key | Default | Label | Hint |
+|---|---|---|---|
+| `ENFORCE_COURSE_OVERRIDE` | `false` | Enforce course override | Sets course override via API on every sync |
+| `ENFORCE_COURSE_GRADING_SCHEME` | `false` | Enforce grading scheme | Sets grading scheme via API on every sync |
+| `ENABLE_GRADE_CUSTOM_STATUS` | `false` | Custom grade statuses | Apply custom status labels when outcomes lack evidence |
+| `ENABLE_NEGATIVE_ZERO_COUNT` | `false` | Zero grade penalty | Each zero subtracts 1 from the score |
 
-## Verification Checklist
+**Known gap:** `ENABLE_NEGATIVE_ZERO_COUNT` has no runtime call site anywhere in the codebase yet — `src/config.js`'s own comment describes an `overrideScore = -zeroCount` behavior that was never actually implemented. It's included here for round-1 UI/schema completeness (so the toggle+lock pattern is proven out for all four), but there is currently nothing in the bundled extension that reads its resolved value. Wiring it is future work once (or if) the underlying gate logic is built.
 
-### Structure & dependencies
-- [ ] Only `src/districtSettings/districtSettings.html` created; no other files added/modified.
-- [ ] `esbuild.config.js` and `package.json` untouched; file not imported anywhere.
-- [ ] `<!DOCTYPE html>` + full `<html>`/`<head>`/`<body>` present.
-- [ ] All CSS inline in `<head>` `<style>`; all JS inline in bottom-of-body `<script>`.
-- [ ] No external deps: no CDN links, no imports, no script fetches.
-- [ ] No `alert()` calls anywhere; no icon fonts (Unicode icons only).
+Deferred to a later round: grading scheme objects, rating scales, and other free-text/complex-shaped settings — those need a different (likely nested-JSON) editing UI.
 
-### Runtime / data layer
-- [ ] courseId parsed via `/\/courses\/(\d+)/` with `'COURSE_ID'` fallback.
-- [ ] CSRF via `meta[name="csrf-token"]` content OR `_csrf_token` cookie.
-- [ ] `GET /api/v1/courses/{courseId}/pages/district-config`; silent defaults on failure/404.
-- [ ] JSON parsed from `#cg-district-config` div text content.
-- [ ] `PUT /api/v1/courses/{courseId}/pages/district-config` with headers `Content-Type: application/json` + `X-CSRF-Token`.
-- [ ] PUT body exactly `{ wiki_page: { body: '<div id="cg-district-config" style="display:none">' + JSON.stringify(config) + '</div>' } }`.
-- [ ] Save transforms: keywords/account IDs CSV split; empty grading-scheme-id → null; empty custom-status-id → null.
+## Storage: Canvas Files API — unlocked, `visibility_level: 'institution'`
 
-### Config keys & defaults
-- [ ] Flags: ENABLE_STUDENT_GRADE_CUSTOMIZATION=true, ENABLE_GRADE_OVERRIDE=true, ENFORCE_COURSE_OVERRIDE=false, ENFORCE_COURSE_GRADING_SCHEME=false, ENABLE_GRADE_CUSTOM_STATUS=false, ENABLE_NEGATIVE_ZERO_COUNT=false.
-- [ ] Labels: UPDATE_AVG_BUTTON_LABEL='Update Current Score', AVG_OUTCOME_NAME='Current Score', AVG_ASSIGNMENT_NAME='Current Score Assignment', AVG_RUBRIC_NAME='Current Score Rubric'.
-- [ ] Outcome: DEFAULT_MAX_POINTS=4 (min 1), DEFAULT_MASTERY_THRESHOLD=3 (min 1), EXCLUDED_OUTCOME_KEYWORDS=[] (CSV, joined `', '` for display).
-- [ ] Grading: DEFAULT_GRADING_TYPE='letter_grade' (options letter_grade/gpa_scale/points), DEFAULT_GRADING_SCHEME_ID=null.
-- [ ] Account filter: ENABLE_ACCOUNT_FILTER=false, ALLOWED_ACCOUNT_IDS=[].
-- [ ] Custom status: DEFAULT_CUSTOM_STATUS_ID=null.
+This deviates from the pattern `src/masteryOutlook/masteryOutlookCacheService.js` uses for its own cache file, on purpose:
 
-### Feature-flag labels/hints (all 6 exact — see Builder B list)
-- [ ] All 6 human-readable labels + hints match spec verbatim.
+- Confirmed by live testing on `morenetlab` course 581 with an unenrolled student test account: a **locked** file blocks institution-visibility reads even for authenticated students — Canvas checks the `locked` flag before `visibility_level` and blocks regardless of the visibility setting underneath. Locked + `visibility_level: institution` cannot coexist.
+- District config needs to be readable by students eventually (a student-facing gradebook display toggle is a known future use case), so the file — and both folders in its path (`MOREnet_CustomizedGradebook`, `district_config`) — are created and kept **unlocked**.
+- This is safe: locking was never the write-protection mechanism. It only controls read visibility. Write access is governed by the district course's `manage_files` permission, which already restricts writes to whoever has an actual admin/teacher/designer role in that course. Leaving the file unlocked doesn't open a write path that wasn't already closed by the permissions model.
+- After the 3-step upload, an explicit follow-up `PUT /api/v1/files/{id}` sets `visibility_level: 'institution'` — this is not set by default on upload and needs its own call.
 
-### Sections content
-- [ ] Summary: 4 cards (active version 'district config', grade override status, account filter count/'off', custom status ID/'none').
-- [ ] Labels: 4 text inputs, single column.
-- [ ] Outcome: max points + mastery side by side; keywords full width below.
-- [ ] Grading: type select + scheme id side by side.
-- [ ] Account filter: toggle + conditional CSV input.
-- [ ] Custom status: single text input.
-- [ ] Canvas loader: explainer header, monospace courseId badge, code block, copy button (2s checkmark), divider, 3 numbered steps.
+## File shape (`district_config.json`)
 
-### Canvas loader snippet (exact)
-- [ ] `var CG_DISTRICT_COURSE = '{courseId}';`
-- [ ] `var CG_BASE = 'https://cdn.morenet.net/cg/';`
-- [ ] `var s = document.createElement('script');`
-- [ ] `s.src = CG_BASE + 'dist/main.js';`
-- [ ] `document.head.appendChild(s);`
-- [ ] Steps: 1 'Copy the snippet above'; 2 'In Canvas go to Admin → Themes → Edit theme → JavaScript file'; 3 'Paste and save — teachers will pick up district settings automatically'.
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-26T00:00:00.000Z",
+  "settings": {
+    "ENFORCE_COURSE_OVERRIDE": { "value": false, "locked": false },
+    "ENFORCE_COURSE_GRADING_SCHEME": { "value": false, "locked": false },
+    "ENABLE_GRADE_CUSTOM_STATUS": { "value": false, "locked": false },
+    "ENABLE_NEGATIVE_ZERO_COUNT": { "value": false, "locked": false }
+  }
+}
+```
 
-### Styling — colors
-- [ ] #185FA5, #0F6E56, #2D3B45, #6b7785, #9aa5b0, #C7CDD1 (0.5px), #f5f5f5, #ffffff, #F5F5F5.
-- [ ] Status: #F6FFED/#B7EB8F, #FFF7E6/#F3D19E, #FFF1F0/#FFA39E, #F0F7FF/#0374B5.
+- `schemaVersion` mismatch or absence → treated as malformed; readers fall back to defaults silently, never throw.
+- A key **absent** from `settings` → no district opinion for that key; resolvers fall through to `perCourseValue ?? fallbackDefault`. This makes adding a new lockable key later backward-compatible with older stored files.
+- Key names are exactly `src/config.js`'s export names, not `defaultConfigConstants.js`'s `DEFAULT_`-prefixed names.
 
-### Styling — typography
-- [ ] Font `system-ui, -apple-system, sans-serif`; body 14px/1.5; labels 11px/500/secondary; hints 11px/tertiary; code `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`.
+## Data layer (`<script>`)
 
-### Styling — layout dimensions
-- [ ] Shell grid 220px sidebar + 1fr, min-height 100vh; sidebar white + 0.5px right border; logo area padding 20px 16px 16px + 0.5px bottom border.
-- [ ] Nav items 36px tall, 8px/7px padding, radius 6px, 13px, gap 8px, active white bg + primary text.
-- [ ] Topbar sticky, padding 14px 20px, 0.5px bottom border, flex space-between; content area padding 20px, gap 16px.
-- [ ] Summary 2x2 grid gap 10px; metric cards bg #F5F5F5 radius 8px padding 12px 14px, 11px label, 18px/500 value.
-- [ ] Panels 0.5px border radius 12px white overflow hidden; header padding 12px 16px, 13px/500, hover #F5F5F5, chevron; body padding 16px + 0.5px top border, hidden when collapsed.
-- [ ] Toggle rows flex space-between padding 8px 0, 0.5px bottom border (not last); toggle switch 32x18 radius 99px, gray off / #185FA5 on, 12px white thumb.
-- [ ] Field labels 11px/500/#6b7785/mb 4px; inputs/selects 12px, 6px 8px padding, 0.5px border, radius 6px, full width.
-- [ ] Code block bg #F5F5F5, 0.5px border, radius 6px, padding 14px, monospace 12px, line-height 1.8, position relative; copy button absolute top-right, 11px, secondary.
-- [ ] Step list flex column gap 6px, 12px muted, step number tertiary min-width 14px; save button blue/white padding 6px 16px radius 6px 13px.
+- Course ID parsed from `window.location.pathname` via `/\/courses\/(\d+)/`; fallback `'COURSE_ID'`.
+- CSRF: hand-lifted from `src/utils/canvasApiClient.js`'s cookie-reading logic (`document.cookie` split/trim/match on `_csrf_token`, `X-CSRF-Token` header, `authenticity_token` body field). `safeFetch`/`safeJsonParse`/`logger` are intentionally not ported — this file can't import anything, so plain `fetch`/`console` are used instead.
+- Read: search `/api/v1/courses/{courseId}/files` for `district_config.json`, download via the returned file `url`, `JSON.parse`, validate `schemaVersion`. Any failure (not found, non-OK download, malformed JSON, schema mismatch) → keep defaults silently.
+- Write: standard Canvas 3-step upload (`POST .../files` for upload instructions → `FormData` POST to `upload_url` → `PUT /api/v1/files/{id}` to finalize with `locked: false, hidden: false, visibility_level: 'institution'`).
+- Folders (`MOREnet_CustomizedGradebook` → `district_config`) are found-or-created idempotently, never locked.
+- Inline save feedback only (success/error) — no `alert()`.
 
-### Icons & interactions
-- [ ] Unicode icons used: ▶ ▼ (chevrons), ✓ (success), ⎘ or 'Copy' (copy).
-- [ ] Sidebar nav scroll+expand-one / collapse-others.
-- [ ] Toggle behavior, conditional account-filter visibility, copy 2s checkmark.
-- [ ] Save states: 'Saving...' (disabled) → '✓ Saved' (green) → normal; inline error below topbar on failure.
-- [ ] Summary cards refresh immediately on save.
+## Sections
 
-### Do not touch
-- [ ] No existing file modified; esbuild.config.js, package.json, and all other files untouched.
+- **Summary** — one metric card per round-1 setting, showing on/off plus a 🔒 marker when locked.
+- **Feature flags** — one row per round-1 setting: label + hint, a value toggle, and a padlock button (🔒 locked / 🔓 unlocked) that flips lock state independently of the value.
+- **Canvas loader** — unchanged from the original design: courseId badge from URL, minimal loader snippet (`CG_DISTRICT_COURSE` + plain `<script src>` injection, no generated config block), copy button, 3 numbered steps.
+
+Removed from the original prototype (out of round-1 scope, no longer fit the new schema): Labels, Outcome config, Grading, Account filter, Custom status sections. These referenced settings that aren't part of round 1 and had their own drifted key shapes (e.g. an invented `ENABLE_ACCOUNT_FILTER`/`ALLOWED_ACCOUNT_IDS` shape that didn't match `src/config.js`). They can come back in a later round once those settings get their own (likely nested-JSON) editing UI.
+
+## Lock icon — known limitation
+
+No lock icon or toggle-switch CSS exists anywhere else in the repo to reuse. The plan's preferred option was Canvas's native `ic-Super-toggle` switch markup and `icon-lock`/`icon-unlock` icon-font classes, since this page renders inside a real Canvas page and inherits Canvas's site CSS — but that requires live verification against a real Canvas page, which wasn't available while this file was authored. It currently ships with a safe, dependency-free fallback: the hand-rolled `.cg-toggle` CSS already used elsewhere in this file, plus plain Unicode lock glyphs (🔒/🔓) for the padlock button. Swapping in Canvas-native classes is a follow-up someone with live Canvas access can do if the native look is wanted.
+
+## Self-update mechanism
+
+This applies only to `districtSettings.html`'s own page body — it never touches `district_config.json`. Saved settings are completely unaffected by applying a self-update.
+
+1. The script embeds its own version, `CG_DS_VERSION`, near the top.
+2. On load, it fetches `districtSettings/district-settings-manifest.json` from its **raw GitHub URL** (`https://raw.githubusercontent.com/MOREnet-Canvas/CustomizedGradebook/main/districtSettings/district-settings-manifest.json`) — a small static file: `{ version, url, notes }`. Fails silently on any error — a missed update check isn't worth surfacing.
+
+   **Deliberately not GitHub Pages.** `.github/workflows/deploy-pages.yml` does not publish the whole repo root — it builds a curated `site/` artifact that only copies `docs/`, `versions.json`, `mobile-versions.json`, and two files from `github-pages/`. `districtSettings/**` was never added to it and never should be. Raw GitHub URLs work immediately on every push to `main` with zero CI/CD involvement (the repo is public, so this is an unauthenticated, CORS-open fetch) — this was the original design intent from day one ("GitHub raw URL is the simple option"), not a workaround.
+
+   **Filename is `district-settings-manifest.json`, not `manifest.json`.** Named deliberately unlike `versions.json`/`mobile-versions.json` to avoid a future reader assuming a relationship — see "Three independent systems" below.
+3. If `manifest.version` differs from `CG_DS_VERSION`, a dismissible banner appears with an "Update" button and the manifest's `notes`.
+4. Clicking Update: `window.confirm()` (explaining that only this page's UI changes, not saved settings), then fetches `manifest.url` (the new HTML), then `PUT /api/v1/courses/{courseId}/pages/{currentPageSlug}` with `{ wiki_page: { body: <new html> } }`, using the same hand-lifted CSRF helper. If the current URL doesn't look like a normal Canvas page URL (e.g. previewed locally), self-update is refused with an inline error instead of guessing at a page slug.
+
+**Banner trigger is version-only, never content-diffing.** `checkForUpdate()` compares `manifest.version !== CG_DS_VERSION` — it never fetches or inspects `districtSettings.html`'s own content to decide whether to show the banner. `manifest.url` is only fetched after the admin clicks Update.
+
+### Hard rule: keep the manifest in sync, same commit, every time
+
+**Every commit that changes `districtSettings.html` must, in the same commit, bump the version number in `district-settings-manifest.json` and write a meaningful `notes` line describing what changed.** Not a follow-up step. This is the same class of drift that hit the original prototype (`task.md` describing Pages API while the code had already moved to Files API) — a file describing another file, edited out of sync.
+
+- `district-settings-manifest.json`'s `url` field does **not** need to change commit-to-commit — it always points at this file's raw content on `main` (`.../main/districtSettings/districtSettings.html`), not a pinned tag or commit SHA. This is safe specifically because of the same-commit rule above: both files land in one atomic push, so by the time a version bump makes the banner fire for anyone, the corresponding HTML is already live at that same URL. If the rule is ever violated (HTML changed without a version bump), the failure mode is a silent miss — the banner just doesn't fire — not a false trigger pointing at unreachable content.
+
+### Three independent systems — do not cross-wire
+
+This repo has three separate version/manifest-shaped things that must stay separate:
+
+1. **`district-settings-manifest.json`** (this file's own self-update signal) — hand-edited, read only by `districtSettings.html`'s own banner via its raw GitHub URL. No workflow generates or triggers it.
+2. **`versions.json` / `mobile-versions.json`** — generated, never hand-edited. Chain: `npm run release:patch/minor/major` (`buildScripts/release.js`) bumps `package.json`, tags, pushes, uploads a GitHub Release → publishing that release triggers `update-version-manifest.yml`, which runs `buildScripts/update-version-manifest.js` to regenerate `versions.json` from `v*.*.*` git tags → `deploy-pages.yml` publishes it to GitHub Pages. Mobile has an identical parallel chain (`release-mobile.js` → `update-mobile-version-manifest.yml` → `mobile-versions.json`). This is the product's own auto-patch version resolution — unrelated to district settings.
+3. **The `customGradebookInit.js` bundle itself** — built and uploaded to GitHub Releases by `release.js`/`deploy-dev.js`/`deploy-prod.js`, fetched by the loader snippet teachers paste into Canvas Theme JS. A separate distribution path from either of the above.
+
+`district-settings-manifest.json` must never be wired into `update-version-manifest.yml`, `update-mobile-version-manifest.yml`, `release.js`, `release-mobile.js`, `deploy-dev.js`, `deploy-prod.js`, or any release-tag-triggered workflow, and `deploy-pages.yml` must never be extended to cover `districtSettings/**`. Its version string has no relationship to `package.json`'s version or any git tag.
+
+## No automated test coverage — by design
+
+This file is outside the esbuild/Vitest pipeline (not an ES module, can't be imported by the test runner without a DOM-scraping harness this repo doesn't have). `src/services/districtConfigService.js` — the bundled runtime consumer of the same `district_config.json` shape — has full Vitest coverage instead; that's where the read/parse/fallback logic is verified. This file's own correctness has to be checked by hand.
+
+## Manual verification checklist (no browser/Canvas credentials were available while this file was authored — these have NOT been run against a live Canvas instance yet)
+
+- [ ] Paste into a real `[District Settings]` page in a test district course (e.g. morenetlab) and confirm it renders without console errors.
+- [ ] Save with all four toggles off/unlocked; confirm `district_config.json` lands in `MOREnet_CustomizedGradebook/district_config/` with `locked: false`, `visibility_level: institution`.
+- [ ] Confirm an unenrolled student test account can read the file directly (200, not 401/403).
+- [ ] Toggle a setting on and lock it; confirm the summary card and row reflect both value and lock state after a save + reload.
+- [ ] Confirm `districtConfigService.js`, pointed at this course via `window.CG_DISTRICT_COURSE`, resolves a locked setting's value correctly from a different (teacher) course context.
+- [ ] Bump `districtSettings/district-settings-manifest.json`'s version (and `notes`), confirm the update banner appears, and confirm clicking Update successfully overwrites this page's body without touching `district_config.json`.
+- [ ] Confirm the raw GitHub URL for both files (`.../main/districtSettings/district-settings-manifest.json` and `.../districtSettings.html`) actually resolves once this branch is pushed to `main`.
+- [ ] Try the Canvas-native `ic-Super-toggle` / `icon-lock` classes live; if they render correctly, consider swapping them in for the current Unicode fallback.
