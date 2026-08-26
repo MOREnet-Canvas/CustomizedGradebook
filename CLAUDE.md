@@ -34,10 +34,12 @@ Doc files become fair game only on an explicit trigger — "doc mode on", "updat
 
 **Ask before anything that writes.** Get explicit approval before running commands that change files, repo state, or anything remote:
 
-- `git commit`, `git push`, `git checkout`, `git reset`, `git merge`, `git rebase`
+- `git push`, `git checkout`, `git reset`, `git merge`, `git rebase`
 - `npm run deploy:*`, `npm run release:*`, `npm install`, `npm version`
 - `gh release`, `gh pr create`, `gh issue create/close`, `gh workflow run`
 - Any file creation, move, or deletion outside the edit being requested
+
+**`git commit` to a working/feature branch is allowed without asking** — commits are non-destructive and easy to amend, squash, or revert later. Commit at the completion of each logically complete, test-passing step — not on a timer, not mid-edit, and never a known-broken state. Write messages specific enough that `git log` alone explains what changed and why, without needing to re-read a chat session.
 
 Never assume or fabricate command output. If a command was not actually run, say so.
 
