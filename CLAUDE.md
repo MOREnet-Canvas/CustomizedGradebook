@@ -161,6 +161,10 @@ Design decisions worth knowing before changing anything:
 
 - **Config via `window.CG_CONFIG`** — every constant in `src/config.js` reads `window.CG_CONFIG` first, falling back to a default. Loaders set it before the bundle loads, so per-tenant behavior changes without a rebuild.
 - **Persistent cache lives in Canvas Files** — a single JSON blob at `MOREnet_CustomizedGradebook/mastery_outlook_cache/mastery_outlook_cache.json`, shared across teachers in a course. No external database.
+- **A second, separate persistence path exists for outcome order** — not in the JSON cache above. Teacher-controlled outcome order is saved directly into the Mastery Dashboard wiki page's HTML as a `data-outcome-order` attribute on `#mastery-dashboard-root`.
+    - **Capture:** `src/masteryOutlook/outcomeRow.js` (~1008-1064) — drag-and-drop reorder, `dragend` fires `onReorderCommit`.
+    - **Save:** `src/masteryOutlook/outcomeSyncView.js` `saveCustomOutcomeOrder()` (~519-583) — reads the new DOM order, fetches the Mastery Dashboard wiki page via `pageService.js`, rewrites the attribute, calls `updatePage`.
+    - **Read-back:** `src/masteryOutlook/masteryOutlookView.js` `enrichCache()` (~715-722) regex-extracts the attribute into `cache.meta.customOutcomeOrder` (in-memory only, never written back to the JSON cache). Two independent consumers read it via two different paths — `outcomeSyncView.js` (~491-500) uses the extracted cache value, while `src/masteryDashboard/masteryDashboardViewer.js` (~419-448) reads `dataset.outcomeOrder` directly off the live DOM. Check both if debugging outcome-order behavior.
 - **Transient state is module-level `Set`/`Map`** (`masteryOutlookState.js`) — never persisted, reset on reload. Always clear in `finally` blocks.
 - **Power Law replaces Canvas scoring** — Marzano's `y = a·x^b` for Mastery Outlook. Minimum 3 scored attempts; fewer shows "NE".
 - **Explicit state machines** for both PL sync and gradebook Refresh Mastery, so multi-step async flows (push → verify → complete) stay auditable.

@@ -2,11 +2,15 @@
 
 ## Overview
 
-`districtSettings/districtSettings.html` is a single standalone hand-crafted HTML file: a self-contained Canvas wiki deliverable (inline CSS + inline JS, zero external dependencies). It is pasted directly into the `[District Settings]` page body in the district config course. It is NOT built or deployed — it is entirely outside the esbuild pipeline and is never touched by `deploy-dev.js`, `deploy-prod.js`, or `release.js`.
+**Delivery mechanism pivoted — read this before touching anything below.** `districtSettings.html` as a *pasted-into-a-Canvas-page* deliverable is dead. Live testing confirmed it cannot work as designed: Canvas's RCE strips `<script>` tags from wiki page bodies, and file-preview iframes are sandboxed without `allow-scripts` — a standalone HTML file with inline JS can never execute once it's actually placed on a Canvas page.
 
-It manages a separate storage artifact, `district_config.json`, uploaded via the Canvas Files API into the same course (`MOREnet_CustomizedGradebook/district_config/district_config.json`). That file is what `src/services/districtConfigService.js` reads at runtime in the bundled extension.
+The district settings editing UI will instead ship as **theme-injected code**, part of the normal esbuild bundle, loaded via Canvas's Theme JS field (which Canvas never sanitizes). This mirrors how Cidi Labs' DesignPLUS solves the identical problem — confirmed via network capture and page-source inspection on a live Canvas instance: the settings-editing UI is never pasted page content, it's part of their theme-injected bundle, gated to only render on a specific course + page combination. The `[District Settings]` wiki page itself becomes an empty placeholder that the injected UI mounts into.
 
-**Hard constraints:** Do NOT add this file to `esbuild.config.js`. Do NOT import it anywhere. Do NOT modify `package.json`. No CDN links, no build step, no `alert()` calls — inline feedback only.
+`districtSettings.html` stays in the repo, retained as an **implementation reference** — its toggle+lock row markup, CSS, and Files API read/write logic (described below) are the starting point for porting into the theme-injected version. It is not a shipped artifact. It can be formally retired once the theme-injected UI exists and those pieces have been ported. `districtSettings/district-settings-manifest.json` also stays in the repo, unused for now, same reasoning — it is **not wired to anything** (see "Self-update mechanism is dead" below).
+
+The underlying storage layer is unaffected by any of this: `district_config.json` is still stored and read the same way (sparse-override JSON via Canvas Files API), and `src/services/districtConfigService.js` — the bundled runtime consumer teachers'/students' pages actually hit — did not change.
+
+**Hard constraints on `districtSettings.html` as a reference file, while it's still in this state:** it stays exactly as authored (Files API + per-key lock model, described below) — don't delete or modify it until the theme-injected UI is built and ready to formally replace it.
 
 ## Per-key lock model
 
@@ -40,6 +44,7 @@ This deviates from the pattern `src/masteryOutlook/masteryOutlookCacheService.js
 - District config needs to be readable by students eventually (a student-facing gradebook display toggle is a known future use case), so the file — and both folders in its path (`MOREnet_CustomizedGradebook`, `district_config`) — are created and kept **unlocked**.
 - This is safe: locking was never the write-protection mechanism. It only controls read visibility. Write access is governed by the district course's `manage_files` permission, which already restricts writes to whoever has an actual admin/teacher/designer role in that course. Leaving the file unlocked doesn't open a write path that wasn't already closed by the permissions model.
 - After the 3-step upload, an explicit follow-up `PUT /api/v1/files/{id}` sets `visibility_level: 'institution'` — this is not set by default on upload and needs its own call.
+- Confirmed by live testing (`scripts/canvas-test/verifyVisibility.js`, course 581): a **locked folder** blocks student reads the same way a locked file does, even when the file inside it is unlocked and `institution`-visible. This is why neither folder in the path is ever locked either.
 
 ## File shape (`district_config.json`)
 
@@ -60,76 +65,74 @@ This deviates from the pattern `src/masteryOutlook/masteryOutlookCacheService.js
 - A key **absent** from `settings` → no district opinion for that key; resolvers fall through to `perCourseValue ?? fallbackDefault`. This makes adding a new lockable key later backward-compatible with older stored files.
 - Key names are exactly `src/config.js`'s export names, not `defaultConfigConstants.js`'s `DEFAULT_`-prefixed names.
 
-## Data layer (`<script>`)
+## Data layer (reference implementation in `districtSettings.html`)
+
+This describes the read/write logic as implemented in the retained reference file — port this logic (not the file itself) into the theme-injected UI:
 
 - Course ID parsed from `window.location.pathname` via `/\/courses\/(\d+)/`; fallback `'COURSE_ID'`.
-- CSRF: hand-lifted from `src/utils/canvasApiClient.js`'s cookie-reading logic (`document.cookie` split/trim/match on `_csrf_token`, `X-CSRF-Token` header, `authenticity_token` body field). `safeFetch`/`safeJsonParse`/`logger` are intentionally not ported — this file can't import anything, so plain `fetch`/`console` are used instead.
+- CSRF: hand-lifted from `src/utils/canvasApiClient.js`'s cookie-reading logic (`document.cookie` split/trim/match on `_csrf_token`, `X-CSRF-Token` header, `authenticity_token` body field). The theme-injected version can and should just import `CanvasApiClient` directly instead — this hand-lifted duplication only existed because a standalone pasted-HTML file couldn't import anything; that constraint goes away once the UI ships in the normal bundle.
 - Read: search `/api/v1/courses/{courseId}/files` for `district_config.json`, download via the returned file `url`, `JSON.parse`, validate `schemaVersion`. Any failure (not found, non-OK download, malformed JSON, schema mismatch) → keep defaults silently.
 - Write: standard Canvas 3-step upload (`POST .../files` for upload instructions → `FormData` POST to `upload_url` → `PUT /api/v1/files/{id}` to finalize with `locked: false, hidden: false, visibility_level: 'institution'`).
 - Folders (`MOREnet_CustomizedGradebook` → `district_config`) are found-or-created idempotently, never locked.
 - Inline save feedback only (success/error) — no `alert()`.
 
-## Sections
+## Sections (reference implementation in `districtSettings.html`)
 
 - **Summary** — one metric card per round-1 setting, showing on/off plus a 🔒 marker when locked.
 - **Feature flags** — one row per round-1 setting: label + hint, a value toggle, and a padlock button (🔒 locked / 🔓 unlocked) that flips lock state independently of the value.
-- **Canvas loader** — unchanged from the original design: courseId badge from URL, minimal loader snippet (`CG_DISTRICT_COURSE` + plain `<script src>` injection, no generated config block), copy button, 3 numbered steps.
+- **Canvas loader** — courseId badge from URL, minimal loader snippet (`CG_DISTRICT_COURSE` + plain `<script src>` injection, no generated config block), copy button, 3 numbered steps. This section's *purpose* changes under the new architecture (see "District course ID must be configurable per-district" below) but its display logic is still a useful reference.
 
 Removed from the original prototype (out of round-1 scope, no longer fit the new schema): Labels, Outcome config, Grading, Account filter, Custom status sections. These referenced settings that aren't part of round 1 and had their own drifted key shapes (e.g. an invented `ENABLE_ACCOUNT_FILTER`/`ALLOWED_ACCOUNT_IDS` shape that didn't match `src/config.js`). They can come back in a later round once those settings get their own (likely nested-JSON) editing UI.
 
 ## Lock icon — known limitation
 
-No lock icon or toggle-switch CSS exists anywhere else in the repo to reuse. The plan's preferred option was Canvas's native `ic-Super-toggle` switch markup and `icon-lock`/`icon-unlock` icon-font classes, since this page renders inside a real Canvas page and inherits Canvas's site CSS — but that requires live verification against a real Canvas page, which wasn't available while this file was authored. It currently ships with a safe, dependency-free fallback: the hand-rolled `.cg-toggle` CSS already used elsewhere in this file, plus plain Unicode lock glyphs (🔒/🔓) for the padlock button. Swapping in Canvas-native classes is a follow-up someone with live Canvas access can do if the native look is wanted.
+No lock icon or toggle-switch CSS exists anywhere else in the repo to reuse. The preferred option was Canvas's native `ic-Super-toggle` switch markup and `icon-lock`/`icon-unlock` icon-font classes, since the theme-injected UI still renders inside real Canvas pages and inherits Canvas's site CSS — but that requires live verification against a real Canvas page, which wasn't available while the reference file was authored. It currently ships (in the reference file) with a safe, dependency-free fallback: hand-rolled `.cg-toggle` CSS plus plain Unicode lock glyphs (🔒/🔓) for the padlock button. Swapping in Canvas-native classes is a follow-up someone with live Canvas access can do when porting to the theme-injected UI, if the native look is wanted.
 
-## Self-update mechanism
+## Self-update mechanism is dead
 
-This applies only to `districtSettings.html`'s own page body — it never touches `district_config.json`. Saved settings are completely unaffected by applying a self-update.
+The pasted-HTML delivery model needed a way to update itself in place (a version-check banner + PUT-to-page-body flow) since there was no normal release pipeline putting new code in front of the admin. That entire problem goes away with theme-injected delivery — the UI ships through the same release/deploy pipeline as everything else in this codebase, so it never needs to update itself. `district-settings-manifest.json` remains in the repo, unused, for the same no-urgency-to-delete reasoning as `districtSettings.html` itself — it is not read by anything, not generated by anything, and not wired into `update-version-manifest.yml`, `update-mobile-version-manifest.yml`, `release.js`, `release-mobile.js`, `deploy-dev.js`, `deploy-prod.js`, `deploy-pages.yml`, or any other workflow. Don't go looking for a self-update flow — there isn't one anymore.
 
-1. The script embeds its own version, `CG_DS_VERSION`, near the top.
-2. On load, it fetches `districtSettings/district-settings-manifest.json` from its **raw GitHub URL** (`https://raw.githubusercontent.com/MOREnet-Canvas/CustomizedGradebook/main/districtSettings/district-settings-manifest.json`) — a small static file: `{ version, url, notes }`. Fails silently on any error — a missed update check isn't worth surfacing.
+## Route gate
 
-   **Deliberately not GitHub Pages.** `.github/workflows/deploy-pages.yml` does not publish the whole repo root — it builds a curated `site/` artifact that only copies `docs/`, `versions.json`, `mobile-versions.json`, and two files from `github-pages/`. `districtSettings/**` was never added to it and never should be. Raw GitHub URLs work immediately on every push to `main` with zero CI/CD involvement (the repo is public, so this is an unauthenticated, CORS-open fetch) — this was the original design intent from day one ("GitHub raw URL is the simple option"), not a workaround.
+The theme-injected settings UI only mounts when **both** conditions match:
 
-   **Filename is `district-settings-manifest.json`, not `manifest.json`.** Named deliberately unlike `versions.json`/`mobile-versions.json` to avoid a future reader assuming a relationship — see "Three independent systems" below.
-3. If `manifest.version` differs from `CG_DS_VERSION`, a dismissible banner appears with an "Update" button and the manifest's `notes`.
-4. Clicking Update: `window.confirm()` (explaining that only this page's UI changes, not saved settings), then fetches `manifest.url` (the new HTML), then `PUT /api/v1/courses/{courseId}/pages/{currentPageSlug}` with `{ wiki_page: { body: <new html> } }`, using the same hand-lifted CSRF helper. If the current URL doesn't look like a normal Canvas page URL (e.g. previewed locally), self-update is refused with an inline error instead of guessing at a page slug.
+- The loader is running inside the district-config course (course ID check).
+- The current page matches the designated `[District Settings]` page (page-slug check).
 
-**Banner trigger is version-only, never content-diffing.** `checkForUpdate()` compares `manifest.version !== CG_DS_VERSION` — it never fetches or inspects `districtSettings.html`'s own content to decide whether to show the banner. `manifest.url` is only fetched after the admin clicks Update.
+Outside that exact course+page combination — every teacher course, every student, every other page in the district-config course itself — this code never mounts. Everyone else only ever hits `districtConfigService.js`'s read path (`getEffectiveValue()`/`loadDistrictConfig()`); they never load any settings-editing UI at all.
 
-### Hard rule: keep the manifest in sync, same commit, every time
+## District course ID must be configurable per-district, not hardcoded
 
-**Every commit that changes `districtSettings.html` must, in the same commit, bump the version number in `district-settings-manifest.json` and write a meaningful `notes` line describing what changed.** Not a follow-up step. This is the same class of drift that hit the original prototype (`task.md` describing Pages API while the code had already moved to Files API) — a file describing another file, edited out of sync.
+This needs to work for districts beyond Sedalia eventually, so the district-config course ID can't be baked into the bundle.
 
-- `district-settings-manifest.json`'s `url` field does **not** need to change commit-to-commit — it always points at this file's raw content on `main` (`.../main/districtSettings/districtSettings.html`), not a pinned tag or commit SHA. This is safe specifically because of the same-commit rule above: both files land in one atomic push, so by the time a version bump makes the banner fire for anyone, the corresponding HTML is already live at that same URL. If the rule is ever violated (HTML changed without a version bump), the failure mode is a silent miss — the banner just doesn't fire — not a false trigger pointing at unreachable content.
+**Bootstrapping idea under active investigation (not finalized):** a generic "starter loader" that locates the district-config course **by name** rather than a hardcoded ID. This solves the install-time chicken-and-egg problem — a district admin importing the `.imscc` has no course ID to configure yet (it's assigned at import time), but does know/control the course's name.
 
-### Three independent systems — do not cross-wire
+**Open unknown, still being tested:** whether Canvas's `.imscc` import actually lets a district admin control the resulting course's name — forced from the cartridge manifest, assigned by the importer regardless of manifest content, or dependent on importing into an already-named course shell. This will determine the exact mechanics of the starter loader and isn't settled yet.
 
-This repo has three separate version/manifest-shaped things that must stay separate:
+## Future loader specialization (planned, not built)
 
-1. **`district-settings-manifest.json`** (this file's own self-update signal) — hand-edited, read only by `districtSettings.html`'s own banner via its raw GitHub URL. No workflow generates or triggers it.
-2. **`versions.json` / `mobile-versions.json`** — generated, never hand-edited. Chain: `npm run release:patch/minor/major` (`buildScripts/release.js`) bumps `package.json`, tags, pushes, uploads a GitHub Release → publishing that release triggers `update-version-manifest.yml`, which runs `buildScripts/update-version-manifest.js` to regenerate `versions.json` from `v*.*.*` git tags → `deploy-pages.yml` publishes it to GitHub Pages. Mobile has an identical parallel chain (`release-mobile.js` → `update-mobile-version-manifest.yml` → `mobile-versions.json`). This is the product's own auto-patch version resolution — unrelated to district settings.
-3. **The `customGradebookInit.js` bundle itself** — built and uploaded to GitHub Releases by `release.js`/`deploy-dev.js`/`deploy-prod.js`, fetched by the loader snippet teachers paste into Canvas Theme JS. A separate distribution path from either of the above.
+Once real settings exist, for any values that should live in the static loader itself for performance (skipping the async Files API fetch on every page load), the district settings UI will generate updated loader text reflecting current config — similar to the existing Loader Generator panel pattern (`src/admin/loaderGenerator.js`), but sourced from district settings instead of per-course config. The district admin takes that generated text and uploads it as a more specialized loader via Canvas's Theme JS field, replacing the generic starter loader. Not built yet — documented here so the intent isn't lost.
 
-`district-settings-manifest.json` must never be wired into `update-version-manifest.yml`, `update-mobile-version-manifest.yml`, `release.js`, `release-mobile.js`, `deploy-dev.js`, `deploy-prod.js`, or any release-tag-triggered workflow, and `deploy-pages.yml` must never be extended to cover `districtSettings/**`. Its version string has no relationship to `package.json`'s version or any git tag.
+## Per-course teacher overrides do NOT live here
+
+Per-course teacher overrides (mentioned elsewhere as a possible future feature) will **not** live on this district settings page or in this course. If/when built, they'll be a separate, course-by-course mechanism. Don't assume this page is where that would go.
 
 ## No automated test coverage — by design
 
-This file is outside the esbuild/Vitest pipeline (not an ES module, can't be imported by the test runner without a DOM-scraping harness this repo doesn't have). `src/services/districtConfigService.js` — the bundled runtime consumer of the same `district_config.json` shape — has full Vitest coverage instead; that's where the read/parse/fallback logic is verified. This file's own correctness has to be checked by hand.
+`districtSettings.html` is outside the esbuild/Vitest pipeline (not an ES module, can't be imported by the test runner without a DOM-scraping harness this repo doesn't have) — this remains true as a reference file. `src/services/districtConfigService.js` — the bundled runtime consumer of the same `district_config.json` shape — has full Vitest coverage; that's where the read/parse/fallback logic is verified. Once the theme-injected settings UI is built as part of the normal bundle, it should get normal Vitest coverage like everything else in `src/` — the "no automated coverage" constraint was specific to the pasted-HTML delivery model, not a permanent property of this feature.
 
 ## Manual verification checklist
 
-Split by what's been confirmed via the `scripts/canvas-test/` API harness (Bearer token, course 581, student `642`) versus what still requires an actual browser session, since the two aren't interchangeable — the harness never exercises this file's or `districtConfigService.js`'s own code paths, only the underlying Canvas platform behavior they depend on.
+Split by what's been confirmed via the `scripts/canvas-test/` API harness (Bearer token, course 581, student `642`) versus what still requires an actual browser session with the future theme-injected UI, since the two aren't interchangeable — the harness never exercises `districtConfigService.js`'s own code paths, only the underlying Canvas platform behavior it depends on.
 
 **Confirmed via `scripts/canvas-test/verifyVisibility.js`:**
 - [x] An unenrolled student test account can read an unlocked, `visibility_level: institution` file directly (200 metadata, 200 download).
 - [x] A locked file blocks that same student regardless of `visibility_level` (200 metadata with `locked_for_user: true`, but no `url` issued — no way to actually fetch content).
-- [x] **New coverage:** an unlocked, `institution`-visible file inside a *locked folder* is blocked the same way — folder lock cascades exactly like file lock. This confirms `districtConfigService.js`'s `ensureFolder()` is right to never lock either folder in the chain.
+- [x] An unlocked, `institution`-visible file inside a *locked folder* is blocked the same way — folder lock cascades exactly like file lock. Confirms `districtConfigService.js`'s `ensureFolder()` is right to never lock either folder in the chain.
 
-**Still needs a real browser session (not run yet):**
-- [ ] Paste into a real `[District Settings]` page in a test district course (e.g. morenetlab) and confirm it renders without console errors.
-- [ ] Save with all four toggles off/unlocked through the actual page UI; confirm `district_config.json` lands in `MOREnet_CustomizedGradebook/district_config/` with `locked: false`, `visibility_level: institution` (the harness only tested hand-created fixtures, not a save performed through this file's own code).
-- [ ] Toggle a setting on and lock it; confirm the summary card and row reflect both value and lock state after a save + reload.
+**Still needs the theme-injected UI to exist and a real browser session (not run yet):**
+- [ ] Confirm the route gate actually mounts the settings UI only on the district-config course's `[District Settings]` page, and nowhere else.
+- [ ] Save with all four toggles off/unlocked through the actual injected UI; confirm `district_config.json` lands in `MOREnet_CustomizedGradebook/district_config/` with `locked: false`, `visibility_level: institution` (the harness only tested hand-created fixtures, not a save performed through this code path).
+- [ ] Toggle a setting on and lock it; confirm the UI reflects both value and lock state after a save + reload.
 - [ ] Confirm `districtConfigService.js`, pointed at this course via `window.CG_DISTRICT_COURSE`, resolves a locked setting's value correctly from a different (teacher) course context — this exercises the application's own cookie/CSRF code path, which the Bearer-token harness deliberately never touches.
-- [ ] Bump `districtSettings/district-settings-manifest.json`'s version (and `notes`), confirm the update banner appears, and confirm clicking Update successfully overwrites this page's body without touching `district_config.json`.
-- [ ] Confirm the raw GitHub URL for both files (`.../main/districtSettings/district-settings-manifest.json` and `.../districtSettings.html`) actually resolves once this branch is merged and pushed to `main`.
-- [ ] Try the Canvas-native `ic-Super-toggle` / `icon-lock` classes live; if they render correctly, consider swapping them in for the current Unicode fallback.
+- [ ] Once the starter-loader-by-name idea is resolved, confirm it actually locates the district-config course correctly on a fresh `.imscc` import.
