@@ -5,11 +5,9 @@
  * This module contains UI-related helper functions including:
  * - Elapsed time tracking and display
  * - Last update notice rendering
- * - Gradebook DOM waiting
  */
 
 import { getCourseId } from "./canvas.js";
-import { logger } from "./logger.js";
 
 /**
  * Calculate elapsed time since the update started
@@ -112,28 +110,4 @@ export function renderLastUpdateNotice(container, courseId) {
     row.textContent = lastAt
         ? `Last update: ${new Date(lastAt).toLocaleString()} | Duration: ${formatDuration(durSec)}`
         : `Last update: none yet`;
-}
-
-/**
- * Wait for the gradebook page and toolbar to be ready
- * @param {Function} callback - Function to call when ready, receives toolbar element
- */
-export function waitForGradebookAndToolbar(callback) {
-    let attempts = 0;
-    const intervalId = setInterval(() => {
-        const onGradebookPage = window.location.pathname.includes('/gradebook');
-        const documentReady = document.readyState === 'complete';
-        const toolbar = document.querySelector(
-            '.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]'
-        );
-
-        if (onGradebookPage && documentReady && toolbar) {
-            clearInterval(intervalId);
-            logger.debug("Gradebook page and toolbar found.");
-            callback(toolbar);
-        } else if (attempts++ > 33) {
-            clearInterval(intervalId);
-            logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
-        }
-    }, 300);
 }
