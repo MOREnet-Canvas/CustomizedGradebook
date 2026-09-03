@@ -17,6 +17,7 @@ node_modules/
 old_code/
 
 dist/
+.env
 
 # Generated documentation (built by MkDocs)
 
