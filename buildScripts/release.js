@@ -61,7 +61,7 @@ const tag = `v${newVersion}`;
 console.log(`   • Updated package.json: ${oldVersion} → ${newVersion}`);
 
 // Commit the version change
-execSync(`git add package.json`, { stdio: "ignore" });
+execSync(`git add package.json package-lock.json`, { stdio: "ignore" });
 execSync(`git commit -m "${newVersion}"`, { stdio: "ignore" });
 console.log(`   • Committed: "${newVersion}"`);
 
