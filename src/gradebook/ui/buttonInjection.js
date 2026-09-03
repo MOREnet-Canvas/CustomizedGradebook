@@ -26,7 +26,7 @@ export function injectButtons() {
         return;
     }
 
-    waitForGradebookAndToolbar((toolbar) => {
+    waitForBreadcrumbsAnchor((anchor) => {
         const courseId = getCourseId();
 
         // Create a vertical container for the button and the notice
@@ -56,7 +56,7 @@ export function injectButtons() {
         // Add the wrapper into a column container so it stays on the right
         const buttonContainer = createButtonColumnContainer();
         buttonContainer.appendChild(buttonWrapper);
-        toolbar.appendChild(buttonContainer);
+        anchor.appendChild(buttonContainer);
     });
 }
 
@@ -82,25 +82,25 @@ export function resetButtonToNormal(button) {
 }
 
 /**
- * Wait for Canvas gradebook page and toolbar to be ready
- * @param {Function} callback - Callback to execute when toolbar is found
+ * Wait for Canvas gradebook page and the breadcrumbs bar's right-hand extension
+ * slot to be ready. Anchoring here instead of an LMGB-specific toolbar element
+ * avoids breaking every time Canvas reworks the gradebook's internal DOM.
+ * @param {Function} callback - Callback to execute when the anchor is found
  */
-function waitForGradebookAndToolbar(callback) {
+function waitForBreadcrumbsAnchor(callback) {
     let attempts = 0;
     const intervalId = setInterval(() => {
         const onGradebookPage = isGradebookPage();
         const documentReady = document.readyState === 'complete';
-        const toolbar = document.querySelector(
-            '.outcome-gradebook-container nav, [data-testid="gradebook-toolbar"]'
-        );
+        const anchor = document.querySelector('.right-of-crumbs');
 
-        if (onGradebookPage && documentReady && toolbar) {
+        if (onGradebookPage && documentReady && anchor) {
             clearInterval(intervalId);
-            logger.debug("Gradebook page and toolbar found.");
-            callback(toolbar);
+            logger.debug("Gradebook page and breadcrumbs anchor found.");
+            callback(anchor);
         } else if (attempts++ > 33) {
             clearInterval(intervalId);
-            logger.warn("Gradebook toolbar not found after 10 seconds, UI not injected.");
+            logger.warn("Breadcrumbs anchor not found after 10 seconds, UI not injected.");
         }
     }, 300);
 }
