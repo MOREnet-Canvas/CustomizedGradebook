@@ -103,9 +103,20 @@ describe('powerLawPredict', () => {
         const pred = powerLawPredict([3, 3, 3]);
         expect(pred).toBeCloseTo(3, 1);
     });
-    it('increasing trend produces higher prediction than first score', () => {
+    it('perfectly linear trend evaluates to exactly the last score at x=n', () => {
+        // [1, 2, 3] is an exact linear fit through the origin, so the power law
+        // curve evaluated at x=n reproduces the last raw score rather than
+        // extrapolating past it — this method estimates current standing, not
+        // a next-attempt forecast.
         const pred = powerLawPredict([1, 2, 3]);
-        expect(pred).toBeGreaterThan(3);
+        expect(pred).toBeCloseTo(3, 5);
+    });
+    it('non-linear history smooths the fitted value below a noisy last score', () => {
+        // [1, 3, 2, 4] has a dip at the third attempt, so the log-linear fit
+        // pulls the curve's value at x=n below the raw last score of 4.
+        const pred = powerLawPredict([1, 3, 2, 4]);
+        expect(pred).toBeLessThan(4);
+        expect(pred).toBeCloseTo(3.657, 3);
     });
     it('prediction is clamped at MAX_SCORE (4) for very strong increasing trend', () => {
         const pred = powerLawPredict([1, 2, 4, 4]);
