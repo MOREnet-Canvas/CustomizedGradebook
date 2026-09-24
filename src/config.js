@@ -113,6 +113,10 @@ export const AVG_OUTCOME_NAME = window.CG_CONFIG?.AVG_OUTCOME_NAME ?? "Current S
 export const AVG_ASSIGNMENT_NAME = window.CG_CONFIG?.AVG_ASSIGNMENT_NAME ?? "Current Score Assignment";
 export const AVG_RUBRIC_NAME = window.CG_CONFIG?.AVG_RUBRIC_NAME ?? "Current Score Rubric";
 
+// PL Override assignment naming suffix — "<Outcome Name> — <PL_ASSIGNMENT_SUFFIX>".
+// Used here only to hide those assignments from student views.
+export const PL_ASSIGNMENT_SUFFIX = window.CG_CONFIG?.PL_ASSIGNMENT_SUFFIX ?? 'Projected Score';
+
 // Outcome configuration
 export const DEFAULT_MAX_POINTS = window.CG_CONFIG?.DEFAULT_MAX_POINTS ?? 4;
 export const DEFAULT_MASTERY_THRESHOLD = window.CG_CONFIG?.DEFAULT_MASTERY_THRESHOLD ?? 3;
