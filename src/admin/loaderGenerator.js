@@ -78,6 +78,7 @@ const C_END = '/* ========== END SECTION C: CG LOADER TEMPLATE ========== */';
  * @param {string} [options.defaultGradingType='points'] - Default grading type for assignments
  * @param {boolean} [options.enableAccountFilter=false] - Enable account filtering
  * @param {Array<string>} [options.allowedAccountIds=[]] - Array of allowed account IDs
+ * @param {Array<string>} [options.pilotCourseIds=[]] - Course IDs whose teacher-like users load the PILOT build
  * @param {string|null} [options.defaultCustomStatusId=null] - Default custom grade status ID
  * @returns {string} Managed config block content (Section B)
  */
@@ -106,7 +107,8 @@ export function buildCGManagedBlock({
     allowedAccountIds = DEFAULT_ALLOWED_ACCOUNT_IDS,
     defaultCustomStatusId = DEFAULT_CUSTOM_STATUS_ID,
     enableGradeCustomStatus = DEFAULT_ENABLE_GRADE_CUSTOM_STATUS,
-    enableNegativeZeroCount = DEFAULT_ENABLE_NEGATIVE_ZERO_COUNT
+    enableNegativeZeroCount = DEFAULT_ENABLE_NEGATIVE_ZERO_COUNT,
+    pilotCourseIds = []
 }) {
     logger.debug('[LoaderGenerator] Building managed config block (Section B)', {
         accountId,
@@ -131,6 +133,7 @@ export function buildCGManagedBlock({
         `    channel: ${JSON.stringify(channel)},`,
         `    version: ${JSON.stringify(version)},${channel === 'prod' ? '  // Keep in sync with package.json version' : ''}`,
         channel === 'auto-patch' ? `    versionTrack: ${JSON.stringify(versionTrack)},  // Auto-updates to latest patch in this track` : '',
+        pilotCourseIds.length ? `    pilotCourseIds: ${JSON.stringify(pilotCourseIds.map(String))},  // Courses whose teachers load the PILOT build` : '',
         `    source: ${JSON.stringify(source)}`,
         '};',
         '',

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "deploy:dev": "node buildScripts/deploy-dev.js",
+    "deploy:pilot": "node buildScripts/deploy-pilot.js",
     "redeploy:prod": "node buildScripts/deploy-prod.js",
     "redeploy:mobile": "node buildScripts/deploy-mobile.js",
     "release:patch": "node buildScripts/release.js patch",
