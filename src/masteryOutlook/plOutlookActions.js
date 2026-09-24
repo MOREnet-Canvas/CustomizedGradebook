@@ -267,8 +267,9 @@ export async function handleSetWillPost({ courseId, outcomeId, studentId, score,
 }
 
 /**
- * Teacher clears the Will Post override — score reverts to plPrediction on
- * the next sync push.
+ * Teacher clears the Will Post override — nothing is pushed for this student
+ * until a teacher sets a new value. Also clears the note (the "Reason for
+ * override…" text).
  *
  * @param {Object}   opts
  * @param {string}   opts.courseId

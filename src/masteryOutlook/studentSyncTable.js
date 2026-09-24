@@ -23,7 +23,7 @@ import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
     handleSyncStudents,
-    handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
+    handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped, handleClearWillPost,
     handleLockWillPost, handleUnlockWillPost, handleNoteChanged,
     handleIgnoreAlignment, handleUnignoreAlignment,
     initWriteScheduler,
@@ -489,7 +489,10 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
 
             const commitEdit = async () => {
                 const raw = parseFloat(input.value);
-                if (!isNaN(raw)) {
+                if (input.value.trim() === '') {
+                    // Blank input → remove the override (nothing will be pushed)
+                    await handleClearWillPost({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
+                } else if (!isNaN(raw)) {
                     const clamped = Math.max(0, Math.min(4, raw));
                     await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: clamped, cache, apiClient, onRerender: renderTable });
                 } else {

@@ -13,7 +13,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
 }));
 
 import { renderOutcomeStudentTable } from '../studentSyncTable.js';
-import { handleMarzanoPillClick } from '../plOutlookActions.js';
+import { handleMarzanoPillClick, handleClearWillPost } from '../plOutlookActions.js';
 
 function makeCache(syncEntry = {}) {
     return {
@@ -57,5 +57,20 @@ describe('Override does not default to Marzano', () => {
         });
         expect(cache.sync_state['101']['s2'].will_post).toBe(2.5);
         expect(cache.sync_state['101']['s2'].will_post_lock).toBe('unlocked');
+    });
+
+    test('clearing an override (blank input) returns the row to no-override', async () => {
+        const cache = makeCache({ will_post: 3.0, will_post_lock: 'unlocked', will_post_note: 'why' });
+        await handleClearWillPost({
+            courseId: '1', outcomeId: '101', studentId: 's2',
+            cache, apiClient: {}, onRerender: () => {},
+        });
+        const entry = cache.sync_state['101']['s2'];
+        expect(entry.will_post).toBeNull();
+        expect(entry.will_post_lock).toBe('none');
+
+        const row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+        expect(row.classList.contains('os-needs-row')).toBe(false);
+        expect(row.querySelector('.os-wp-box').textContent.trim()).toBe('');
     });
 });
