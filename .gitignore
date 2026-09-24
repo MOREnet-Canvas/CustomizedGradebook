@@ -20,3 +20,10 @@ dist/
 
 # Generated documentation (built by MkDocs)
 /docs
+
+# Local-only files (matches main)
+.env
+/fileTree.txt
+/output.txt
+/src/masteryOutlook/Mastery Outlook-handoff/
+/src/masteryOutlook/Mastery Outlook/design_handoff_mastery_outlook/
