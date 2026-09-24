@@ -585,6 +585,10 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-wp-outer { display:inline-flex; align-items:center; justify-content:center; }
 .os-wp-box-wrap { position:relative; display:inline-block; cursor:pointer; border-radius:0.615em; }
 .os-wp-box { font-size:0.846em; font-weight:500; font-family:inherit; padding:0.231em 0.769em; min-width:3.538em; text-align:center; border-radius:0.615em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-primary); display:inline-block; line-height:1.4; transition:border-color .12s, background .12s; user-select:none; position:relative; }
+/* Empty Override (no teacher value) — hold one line of height so the blank
+   box matches a filled one. Pseudo-content keeps textContent '' for the
+   inline-edit handler. */
+.os-wp-box:empty::after { content:'\\00a0'; }
 .os-wp-box-wrap:hover .os-wp-box { border-color:var(--border-primary); background:var(--bg-secondary); }
 .os-wp-box-wrap:focus-visible { outline:2px solid var(--blue); outline-offset:2px; border-radius:0.615em; }
 .os-wp-box-wrap.differs .os-wp-box { border-color:var(--amber-border); background:#FFF8EE; }
