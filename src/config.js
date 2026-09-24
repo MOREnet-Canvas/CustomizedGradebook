@@ -100,9 +100,6 @@ if (typeof window !== 'undefined' && typeof console !== 'undefined') {
     if (ENABLE_GRADE_CUSTOM_STATUS && !window.CG_CONFIG?.USE_UNIFIED_GRAPHQL_ONLY) {
         console.log('[CG Config] USE_UNIFIED_GRAPHQL_ONLY auto-enabled due to ENABLE_GRADE_CUSTOM_STATUS=true');
     }
-    if (PL_GRADING_TYPE && !['pass_fail', 'percent', 'letter_grade', 'gpa_scale', 'points', 'not_graded'].includes(PL_GRADING_TYPE)) {
-        console.warn(`[CG Config] Invalid PL_GRADING_TYPE: "${PL_GRADING_TYPE}". Canvas API may return 400 error.`);
-    }
 }
 
 // Grade scaling function (0-4 scale to 0-100 scale)
@@ -140,6 +137,12 @@ export const PL_RUBRIC_SUFFIX = window.CG_CONFIG?.PL_RUBRIC_SUFFIX ?? 'Projected
 //   course-level default scheme.
 export const PL_GRADING_TYPE = window.CG_CONFIG?.PL_GRADING_TYPE ?? 'gpa_scale';
 export const PL_GRADING_SCHEME_ID = window.CG_CONFIG?.PL_GRADING_SCHEME_ID ?? null;
+
+// Validated here (not in the debug block above) so PL_GRADING_TYPE is initialized first.
+if (typeof console !== 'undefined'
+    && !['pass_fail', 'percent', 'letter_grade', 'gpa_scale', 'points', 'not_graded'].includes(PL_GRADING_TYPE)) {
+    console.warn(`[CG Config] Invalid PL_GRADING_TYPE: "${PL_GRADING_TYPE}". Canvas API may return 400 error.`);
+}
 
 // Outcome configuration
 export const DEFAULT_MAX_POINTS = window.CG_CONFIG?.DEFAULT_MAX_POINTS ?? 4;
