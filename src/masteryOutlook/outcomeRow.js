@@ -129,13 +129,12 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const syncEntry     = ((cache.sync_state ?? {})[String(outcome.id)] ?? {})[String(student.id)] ?? {};
         const willPost      = syncEntry.will_post ?? null;
         const canvas        = od.canvasScore;
-        const marzano       = od.plPrediction;
         const pendingNote   = syncEntry.will_post_note ?? null;
         const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
-        if (marzano === null) return false;
-        if (canvas === null)  return false;
-        return !scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending;
+        if (willPost === null) return false;   // no teacher override → nothing to push
+        if (canvas === null)   return false;
+        return !scoresMatch(willPost, canvas) || noteIsPending;
     }).length;
 
     if (needsCount > 0) {

@@ -21,7 +21,6 @@ import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX, PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { findExistingPLAssignment } from './plOutlookSetup.js';
-import { roundToHalf } from './powerLaw.js';
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -379,16 +378,14 @@ export async function handleFetchingSubmissions(sm) {
 // ─── CALCULATING_CHANGES ──────────────────────────────────────────────────────
 
 /**
- * Compare PL predictions (from mastery_outlook_cache.json) vs current Canvas
- * outcome rollup scores. Builds list of students who need syncing.
- *
- * PL predictions are read directly from cache.students[n].outcomes[n].plPrediction
- * — no separate lookup table needed.
+ * Compare teacher-set will_post overrides (from sync_state) vs current Canvas
+ * outcome rollup scores. Builds list of students who need syncing. Students
+ * with no will_post are skipped — the PL prediction is never pushed implicitly.
  */
 export async function handleCalculatingChanges(sm) {
     const { courseId, outcomeId, outcomeName, submissionIdByUserId,
             rubricAssociationId, rubricCriterionId, effectiveTargetIds,
-            plScoreOverrides, canvasScoreOverrides, apiClient } = sm.getContext();
+            canvasScoreOverrides, apiClient } = sm.getContext();
 
     sm.progress('Calculating changes...');
     logger.debug(`[PLSync] CALCULATING_CHANGES for outcome ${outcomeId}`);
@@ -398,16 +395,6 @@ export async function handleCalculatingChanges(sm) {
     if (!cache) {
         throw new Error('[PLSync] No mastery outlook cache found — run Refresh Data first');
     }
-
-    // Build userId → plPrediction map from cache.students
-    const plPredictionByUserId = new Map();
-    (cache.students || []).forEach(student => {
-        const outcomeData = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-        if (outcomeData?.plPrediction !== null && outcomeData?.plPrediction !== undefined && outcomeData?.status !== 'NE') {
-            plPredictionByUserId.set(String(student.id), outcomeData.plPrediction);
-        }
-    });
-    logger.debug(`[PLSync] ${plPredictionByUserId.size} student(s) have PL predictions for outcome ${outcomeId}`);
 
     // Resolve current Canvas rollup scores. Fast-path (#54): when the caller
     // supplies in-memory canvasScore values (kept current by outcome expansion +
@@ -448,7 +435,7 @@ export async function handleCalculatingChanges(sm) {
     const studentsToSync          = [];
     let skippedNoChange           = 0;
     let skippedNoSubmission       = 0;
-    let skippedNoPrediction       = 0;
+    let skippedNoOverride         = 0;
     let skippedManualOverride     = 0;
 
     for (const userId of effectiveTargetIds) {
@@ -464,14 +451,10 @@ export async function handleCalculatingChanges(sm) {
         const submissionId = submissionIdByUserId?.get(userId);
         if (!submissionId) { skippedNoSubmission++; logger.warn(`[PLSync] No submission ID for student ${userId} — skipping`); continue; }
 
-        // Prefer in-memory override (post-recompute value) over stale disk value
-        const rawPlScore = plScoreOverrides?.[userId] ?? plPredictionByUserId.get(userId);
-        if (rawPlScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
-
-        // 3b — use teacher-set will_post value when provided (will_post_lock: "unlocked"),
-        // otherwise fall back to the Power Law prediction rounded to nearest 0.5.
-        // Teacher-set will_post values are NOT rounded — they are intentional.
-        const plScore = (entry?.will_post != null) ? entry.will_post : roundToHalf(rawPlScore);
+        // 3b — only teacher-set will_post overrides are pushed; there is no
+        // fallback to the Power Law prediction. Values are NOT rounded — they are intentional.
+        if (entry?.will_post == null) { skippedNoOverride++; continue; }
+        const plScore = entry.will_post;
 
         const canvasScore = canvasScoreByUserId.get(userId);
         if (canvasScore !== undefined && scoresMatch(plScore, canvasScore)) { skippedNoChange++; continue; }
@@ -492,7 +475,7 @@ export async function handleCalculatingChanges(sm) {
     const numberOfUpdates = studentsToSync.length;
     logger.info(
         `[PLSync] ${outcomeName}: ${numberOfUpdates} need sync, ` +
-        `${skippedNoChange} no change, ${skippedNoPrediction} no prediction, ` +
+        `${skippedNoChange} no change, ${skippedNoOverride} no override, ` +
         `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped`
     );
 
@@ -500,7 +483,7 @@ export async function handleCalculatingChanges(sm) {
 
     // Notify the UI so it can trim spinners to only the students actually being synced.
     // Students in effectiveTargetIds that aren't in studentsToSync (skipped for no-change,
-    // no submission, no prediction, or manual_override) should have their spinners cleared.
+    // no submission, no override, or manual_override) should have their spinners cleared.
     const { onStudentsResolved } = sm.getContext();
     onStudentsResolved?.(studentsToSync.map(s => String(s.userId)));
 

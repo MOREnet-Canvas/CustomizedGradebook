@@ -197,7 +197,8 @@ function renderCourseSyncStrip(cache) {
             const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
             const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
 
-            if (!scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending) {
+            // Only teacher-set overrides are pushed — no override means not "needs".
+            if (willPost !== null && (!scoresMatch(willPost, canvas) || noteIsPending)) {
                 needsCount++;
             }
         }

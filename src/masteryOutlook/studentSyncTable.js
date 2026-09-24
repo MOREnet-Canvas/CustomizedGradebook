@@ -70,14 +70,15 @@ function formatDateShort(iso) {
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
  * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, syncPhase}}
- *   status: 'ne' | 'synced' | 'verify_failed' | 'needs'
+ *   status: 'ne' | 'none' | 'synced' | 'verify_failed' | 'needs'
+ *   'none' = no teacher-set override; nothing will be pushed for this row.
  */
 function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
     const canvas  = outcomeData?.canvasScore  ?? null;
     const marzano = outcomeData?.plPrediction ?? null;
 
-    const storedWP = syncEntry?.will_post ?? null;
-    const willPost = storedWP ?? (marzano !== null ? roundToHalf(marzano) : null);
+    // Override is blank until a teacher sets it — no Marzano fallback.
+    const willPost = syncEntry?.will_post ?? null;
 
     const wpLock = syncEntry?.will_post_lock;
     const lock = wpLock === 'locked' ? 'locked'
@@ -106,12 +107,11 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     const noteIsPending     = pendingNote !== null && pendingNote !== lastSubmittedNote;
 
     let status;
-    if (marzano === null) {
-        status = 'ne';
-    } else if (canvas !== null && scoresMatch(willPost ?? marzano, canvas)
+    if (willPost === null) {
+        status = marzano === null ? 'ne' : 'none';
+    } else if (canvas !== null && scoresMatch(willPost, canvas)
             && !noteIsPending) {
-        // synced when score matches Canvas AND no unsubmitted note exists.
-        // willPost ?? marzano: use teacher override if set, else PL prediction.
+        // synced when the override matches Canvas AND no unsubmitted note exists.
         status = 'synced';
     } else if (syncEntry?.verify_mismatch === true) {
         // Score was pushed but Canvas rollup didn't confirm after all retries.
@@ -203,9 +203,11 @@ function renderOutcomeStudentRow(s, oidStr) {
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
     const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
-    const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
-    const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
-    const marzFaded   = scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
+    const hasWP       = s.willPost != null;
+    const wpDisp      = hasWP ? s.willPost.toFixed(2) : '';
+    // With no override set, neither pill is faded — neither is "chosen".
+    const canvasFaded = !hasWP || scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
+    const marzFaded   = !hasWP || scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
 
     const dotsHtml = s.dots.length
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
@@ -227,9 +229,11 @@ function renderOutcomeStudentRow(s, oidStr) {
     const saveMod   = needsSync ? 'needs' : 'synced';
     const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
                     : needsSync                    ? `Push ${wpDisp} to Canvas`
+                    : !hasWP                       ? 'No override set'
                     :                               'Synced with Canvas';
     const saveTip   = s.status === 'verify_failed' ? 'Verify failed — re-sync'
                     : needsSync                    ? 'Push to Canvas'
+                    : !hasWP                       ? 'No override set'
                     :                               'Up to date';
     const saveHtml = s.syncPhase
         ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
@@ -255,7 +259,7 @@ function renderOutcomeStudentRow(s, oidStr) {
       </td>
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
-                data-stu="${s.id}" data-oid="${oidStr}">
+                data-stu="${s.id}" data-oid="${oidStr}" data-marzano="${s.marzano ?? ''}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano !== null ? roundToHalf(s.marzano) : null))}">${marzDisp}</span>
           <span class="os-pill-tip">Set Override = ${marzDisp} (Marzano)</span>
         </button>
@@ -264,7 +268,7 @@ function renderOutcomeStudentRow(s, oidStr) {
         <div class="os-wp-outer">
           <div class="os-wp-box-wrap ${differsCls}" data-action="os-wp-click"
                data-stu="${s.id}" data-oid="${oidStr}" tabindex="0" role="button"
-               aria-label="Override: ${wpDisp}">
+               aria-label="Override: ${hasWP ? wpDisp : 'not set'}">
             <div class="os-wp-box">${wpDisp}</div>
             ${lockHtml}
           </div>
@@ -461,9 +465,11 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             return;
         }
 
-        // ── Marzano pill → revert Will Post to auto-track ─────────────────
+        // ── Marzano pill → set Will Post = rounded Marzano score ──────────
         if (action === 'os-use-marzano') {
-            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
+            const mz = parseFloat(el.dataset.marzano);
+            if (isNaN(mz)) return;
+            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, plPrediction: mz, cache, apiClient, onRerender: renderTable });
             return;
         }
 

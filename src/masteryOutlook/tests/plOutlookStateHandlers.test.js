@@ -1,4 +1,4 @@
-// src/masteryOutlook/plOutlookStateHandlers.test.js
+// src/masteryOutlook/tests/plOutlookStateHandlers.test.js
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PLOutlookStateMachine, PL_STATES } from '../plOutlookStateMachine.js';
 import {
@@ -14,25 +14,31 @@ import {
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
-vi.mock('../utils/logger.js', () => ({
+vi.mock('../../utils/logger.js', () => ({
     logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }));
 
-vi.mock('./masteryOutlookCacheService.js', () => ({
+vi.mock('../masteryOutlookCacheService.js', () => ({
     readMasteryOutlookCache: vi.fn(),
     readPLAssignments:       vi.fn(),
-    writePLAssignments:      vi.fn()
+    writePLAssignments:      vi.fn(),
+    readSyncState:           vi.fn(async () => ({})),
+    writeSyncState:          vi.fn()
 }));
 
-vi.mock('../services/enrollmentService.js', () => ({
+vi.mock('../../services/enrollmentService.js', () => ({
     fetchCourseStudents: vi.fn()
 }));
 
-vi.mock('../services/graphqlGradingService.js', () => ({
+vi.mock('../../services/graphqlGradingService.js', () => ({
     submitRubricAssessmentBatch: vi.fn()
 }));
 
-vi.mock('../config.js', () => ({
+vi.mock('../../config.js', () => ({
+    PL_ASSIGNMENT_SUFFIX:        'Projected Score',
+    PL_RUBRIC_SUFFIX:            'Projected Score Rubric',
+    PL_GRADING_TYPE:             'gpa_scale',
+    PL_GRADING_SCHEME_ID:        null,
     DEFAULT_MAX_POINTS:          4,
     OUTCOME_AND_RUBRIC_RATINGS: [
         { description: 'Exemplary',  points: 4 },
@@ -44,9 +50,21 @@ vi.mock('../config.js', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-import { readMasteryOutlookCache, readPLAssignments, writePLAssignments } from '../masteryOutlookCacheService.js';
+import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState } from '../masteryOutlookCacheService.js';
 import { fetchCourseStudents } from '../../services/enrollmentService.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
+
+/**
+ * Add a getWithResponse() to a mock client that wraps its get() mock — rollup
+ * fetches use getWithResponse for Link-header pagination (single page here).
+ */
+function withResponse(client) {
+    client.getWithResponse = vi.fn(async (...args) => {
+        const data = await client.get(...args);
+        return { json: async () => data, headers: { get: () => null } };
+    });
+    return client;
+}
 
 /** Build a state machine pre-populated with the given context */
 function buildSM(extraContext = {}) {
@@ -171,7 +189,15 @@ describe('handleCheckingStudents', () => {
 // ── handleCalculatingChanges ──────────────────────────────────────────────────
 
 describe('handleCalculatingChanges', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        readSyncState.mockResolvedValue({});
+    });
+
+    /** Teacher-set Override (will_post) for u1 on outcome 598 */
+    function setOverride(willPost) {
+        readSyncState.mockResolvedValue({ '598': { u1: { will_post: willPost, will_post_lock: 'unlocked' } } });
+    }
 
     /** Minimal cache with one student who has a PL prediction */
     function makeCache(plPrediction, status = 'active') {
@@ -195,7 +221,8 @@ describe('handleCalculatingChanges', () => {
 
     test('student needs sync → returns SYNCING and sets studentsToSync', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) });
 
         const sm = buildSM({
             apiClient,
@@ -215,8 +242,9 @@ describe('handleCalculatingChanges', () => {
 
     test('scores match at hundredths → returns COMPLETE with zero studentsToSync', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
+        setOverride(3.5);
         // 3.5 rounds to 350 at hundredths — exact match, no sync needed
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 3.5)) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 3.5)) });
 
         const sm = buildSM({
             apiClient,
@@ -231,9 +259,9 @@ describe('handleCalculatingChanges', () => {
         expect(sm.getContext().studentsToSync).toHaveLength(0);
     });
 
-    test('student with status NE is skipped', async () => {
+    test('student with status NE and no override is skipped', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5, 'NE'));
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
 
         const sm = buildSM({
             apiClient,
@@ -250,7 +278,8 @@ describe('handleCalculatingChanges', () => {
 
     test('student with no submission ID is skipped', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
 
         const sm = buildSM({
             apiClient,
@@ -267,7 +296,7 @@ describe('handleCalculatingChanges', () => {
 
     test('throws when cache is missing', async () => {
         readMasteryOutlookCache.mockResolvedValue(null);
-        const apiClient = { get: vi.fn() };
+        const apiClient = withResponse({ get: vi.fn() });
 
         const sm = buildSM({ apiClient, effectiveTargetIds: new Set() });
         await expect(handleCalculatingChanges(sm)).rejects.toThrow(/run Refresh Data/);
@@ -277,7 +306,8 @@ describe('handleCalculatingChanges', () => {
         // PL=3.50, Canvas=3.30 — rounds to 350 vs 330, different → needs sync
         // Under old SYNC_THRESHOLD=0.25, diff=0.2 would have been skipped
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 3.3)) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 3.3)) });
 
         const sm = buildSM({
             apiClient,
@@ -295,7 +325,8 @@ describe('handleCalculatingChanges', () => {
     test('floating-point scores equal at hundredths are treated as matching', async () => {
         // 3.500 and 3.504 both round to 350 at hundredths → no sync needed
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.500));
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 3.504)) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 3.504)) });
 
         const sm = buildSM({
             apiClient,
@@ -312,8 +343,9 @@ describe('handleCalculatingChanges', () => {
 
     test('student with no canvas rollup score is included in sync', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.0));
+        setOverride(3.0);
         // Rollup has no score for this outcome
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
 
         const sm = buildSM({
             apiClient,
@@ -326,6 +358,41 @@ describe('handleCalculatingChanges', () => {
 
         expect(next).toBe(PL_STATES.SYNCING);
         expect(sm.getContext().studentsToSync[0].canvasScore).toBeNull();
+    });
+
+    test('no override → PL prediction is NOT pushed even when it differs from Canvas', async () => {
+        readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) });
+
+        const sm = buildSM({
+            apiClient,
+            submissionIdByUserId: new Map([['u1', 'sub-1']]),
+            effectiveTargetIds:   new Set(['u1']),
+            rubricAssociationId:  'assoc-1',
+            rubricCriterionId:    'crit-1'
+        });
+        const next = await handleCalculatingChanges(sm);
+
+        expect(next).toBe(PL_STATES.COMPLETE);
+        expect(sm.getContext().studentsToSync).toHaveLength(0);
+    });
+
+    test('teacher override is pushed as-is, not the PL prediction', async () => {
+        readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
+        setOverride(2.0);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) });
+
+        const sm = buildSM({
+            apiClient,
+            submissionIdByUserId: new Map([['u1', 'sub-1']]),
+            effectiveTargetIds:   new Set(['u1']),
+            rubricAssociationId:  'assoc-1',
+            rubricCriterionId:    'crit-1'
+        });
+        const next = await handleCalculatingChanges(sm);
+
+        expect(next).toBe(PL_STATES.SYNCING);
+        expect(sm.getContext().studentsToSync[0].plScore).toBe(2.0);
     });
 });
 
@@ -613,7 +680,8 @@ describe('handleSyncing', () => {
         await handleSyncing(sm);
 
         expect(submitRubricAssessmentBatch).toHaveBeenCalledWith(
-            sm.getContext().studentsToSync,
+            // handleSyncing adds a per-student comment field to each batch param
+            sm.getContext().studentsToSync.map(s => expect.objectContaining(s)),
             apiClient,
             expect.objectContaining({ concurrency: 5, maxAttempts: 3 })
         );
@@ -704,7 +772,7 @@ describe('handleVerifying', () => {
 
     test('all scores match → returns COMPLETE with empty verifyMismatches', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.5)) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.5)) });
         const sm = buildSMAtVerifying(students, { apiClient });
 
         const promise = handleVerifying(sm);
@@ -718,7 +786,7 @@ describe('handleVerifying', () => {
     test('scores match at hundredths (not exact float) → no mismatch', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
         // 3.504 rounds to 350 at hundredths, same as 3.5 → should match
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.504)) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.504)) });
         const sm = buildSMAtVerifying(students, { apiClient });
 
         const promise = handleVerifying(sm);
@@ -732,7 +800,7 @@ describe('handleVerifying', () => {
     test('persistent mismatches → still returns COMPLETE after maxRetries (does not throw)', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
         // Canvas always returns a mismatching score
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
         const sm = buildSMAtVerifying(students, { apiClient });
 
         const promise = handleVerifying(sm);
@@ -746,18 +814,18 @@ describe('handleVerifying', () => {
         expect(apiClient.get.mock.calls.length).toBeGreaterThan(1);
     });
 
-    test('mismatches capped: 4 total API calls (1 initial Infinity-reset + 3 retry attempts)', async () => {
+    test('persistent mismatch gives up after 50 no-progress polls (51 total API calls)', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
         const sm = buildSMAtVerifying(students, { apiClient });
 
         const promise = handleVerifying(sm);
         await vi.runAllTimersAsync();
         await promise;
 
-        // previousMismatchCount starts at Infinity, so call 1 (1 mismatch < Infinity) always
-        // resets attempt to 1. Then calls 2, 3, 4 are the 3 real retry attempts.
-        expect(apiClient.get.mock.calls.length).toBe(4);
+        // lastMismatchCount starts at Infinity, so poll 1 counts as progress. Polls 2-51
+        // make no progress; handleVerifying gives up at noProgressLimit (50).
+        expect(apiClient.get.mock.calls.length).toBe(51);
     });
 
     test('decreasing mismatch count resets retry counter (more than 3 calls made)', async () => {
@@ -768,14 +836,14 @@ describe('handleVerifying', () => {
         // Call 1: both mismatch (2 mismatches)
         // Call 2: only u1 mismatches (1 mismatch — count decreased → reset attempt to 1)
         // Calls 3-5: u1 keeps mismatching (3 more attempts before giving up)
-        const apiClient = {
+        const apiClient = withResponse({
             get: vi.fn()
                     .mockResolvedValueOnce({ rollups: [
                         { links: { user: 'u1' }, scores: [{ links: { outcome: '598' }, score: 1.0 }] },
                         { links: { user: 'u2' }, scores: [{ links: { outcome: '598' }, score: 1.0 }] }
                     ]})
                     .mockResolvedValue(makeVerifyRollup('u1', 1.0))   // u2 now matches (missing from rollup = no entry)
-        };
+        });
         const sm = buildSMAtVerifying(students, { apiClient });
 
         const promise = handleVerifying(sm);
@@ -789,7 +857,7 @@ describe('handleVerifying', () => {
     test('missing rollup score for a student counts as mismatch', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
         // Canvas returns no rollup at all for u1
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
         const sm = buildSMAtVerifying(students, { apiClient });
 
         const promise = handleVerifying(sm);

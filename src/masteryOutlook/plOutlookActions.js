@@ -293,24 +293,26 @@ export async function handleClearWillPost({ courseId, outcomeId, studentId, cach
 // ─── Will Post: granular pill-click handlers (write timing table events 1–6) ──
 
 /**
- * Event 1 — Teacher clicks the Marzano pill → revert will_post to auto-track.
- * Clears will_post + will_post_lock; preserves any note.
+ * Event 1 — Teacher clicks the Marzano pill → adopt the Marzano score
+ * (rounded to the nearest 0.5) as an explicit will_post override.
+ * Preserves any note.
  *
  * @param {Object}   opts
  * @param {string}   opts.courseId
  * @param {string}   opts.outcomeId
  * @param {string}   opts.studentId
+ * @param {number}   opts.plPrediction - Raw Power Law prediction for this student
  * @param {Object}   opts.apiClient
  * @param {Function} opts.onRerender
  */
-export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, cache, apiClient, onRerender }) {
-    logger.debug(`[PLActions] Marzano pill click: outcome ${outcomeId}, student ${studentId}`);
+export async function handleMarzanoPillClick({ courseId, outcomeId, studentId, plPrediction, cache, apiClient, onRerender }) {
+    logger.debug(`[PLActions] Marzano pill click (${plPrediction}): outcome ${outcomeId}, student ${studentId}`);
 
     return mutateSyncEntry(
         { courseId, outcomeId, studentId, cache, apiClient, onRerender },
         (entry) => {
-            entry.will_post      = null;
-            entry.will_post_lock = 'none';
+            entry.will_post      = roundToHalf(plPrediction);
+            entry.will_post_lock = 'unlocked';
             // will_post_note intentionally preserved — teacher may have context notes
         }
     );
@@ -490,19 +492,14 @@ export async function handleSyncStudents({
     const effectiveIds = studentIds
         ?? (cache?.students ?? []).map(s => String(s.id));
 
-    // Capture the score that will actually be pushed to Canvas for each student.
-    // BEFORE runPLSync clears will_post from sync_state.
-    // Mirrors handleCalculatingChanges: use will_post when set, otherwise
-    // roundToHalf(plPrediction) — the value Canvas actually receives.
-    // Using the raw plPrediction here would cause canvasScore to be written
-    // with an unrounded value, making the chip/row show "needs sync" forever.
+    // Capture the score that will actually be pushed to Canvas for each student
+    // BEFORE runPLSync clears will_post from sync_state. Only teacher-set
+    // overrides are pushed (mirrors handleCalculatingChanges) — students with
+    // no will_post are skipped there and never get a pushed score.
     const pushedScores = {};
     for (const sid of effectiveIds) {
         const entry = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(sid)] ?? {};
-        const od    = cache?.students?.find(s => String(s.id) === String(sid))
-            ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-        pushedScores[String(sid)] = entry.will_post
-            ?? (od?.plPrediction != null ? roundToHalf(od.plPrediction) : null);
+        if (entry.will_post != null) pushedScores[String(sid)] = entry.will_post;
     }
 
     const plScoreOverrides = {};
@@ -647,7 +644,7 @@ export async function handleSyncStudents({
             const student = cache?.students?.find(s => String(s.id) === String(sid));
             const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
             if (od != null) {
-                od.canvasScore = pushedScores[String(sid)] ?? od.plPrediction;
+                if (pushedScores[String(sid)] != null) od.canvasScore = pushedScores[String(sid)];
             }
         }
 

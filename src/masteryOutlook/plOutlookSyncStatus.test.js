@@ -67,13 +67,28 @@ describe('getSyncStatus', () => {
         expect(result.status).toBe('synced');
     });
 
-    it('returns needs_sync when prediction differs from canvas score', () => {
+    it('returns needs_sync when the teacher override differs from canvas score', () => {
+        const config = {
+            pl_assignments: { '101': { assignment_id: 'a1' } },
+            sync_state: { '101': { 's1': { last_synced_score: 2.5, will_post: 3.0, manual_override: false } } },
+        };
+        const result = getSyncStatus('s1', '101', 3.0, 2.5, config);
+        expect(result.status).toBe('needs_sync');
+    });
+
+    it('does not return needs_sync when prediction differs but no override is set', () => {
         const config = {
             pl_assignments: { '101': { assignment_id: 'a1' } },
             sync_state: { '101': { 's1': { last_synced_score: 2.5, manual_override: false } } },
         };
         const result = getSyncStatus('s1', '101', 3.0, 2.5, config);
-        expect(result.status).toBe('needs_sync');
+        expect(result.status).not.toBe('needs_sync');
+    });
+
+    it('does not return needs_sync for a never-pushed student with no override', () => {
+        const config = { pl_assignments: { '101': { assignment_id: 'a1' } }, sync_state: {} };
+        const result = getSyncStatus('s1', '101', 3.0, 1.0, config);
+        expect(result.status).not.toBe('needs_sync');
     });
 
     it('returns manual_override when state has manual_override flag', () => {
@@ -111,7 +126,7 @@ describe('aggregateSyncStatus', () => {
             sync_state: {
                 '101': {
                     's1': { last_synced_score: 2.5, manual_override: false },
-                    's2': { last_synced_score: 3.0, manual_override: false },
+                    's2': { last_synced_score: 3.0, will_post: 3.5, manual_override: false },
                 },
             },
         };

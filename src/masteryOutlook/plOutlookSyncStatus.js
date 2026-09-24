@@ -8,7 +8,6 @@
  *   - plOutlookSync.js       → checkSyncNeeded counts
  *   - plOutlookActions.js    → deciding what chain step to run next
  */
-import { roundToHalf } from './powerLaw.js';
 
 
 /**
@@ -32,7 +31,7 @@ export function scoresMatch(a, b) {
  *  2. not_setup  — no PL assignment exists for this outcome yet
  *  3. manual_override — teacher has confirmed Canvas score should be kept
  *  4. possible_override — Canvas score changed AFTER the last PL push
- *  5. needs_sync — plPrediction differs from Canvas score (or never pushed)
+ *  5. needs_sync — teacher-set will_post differs from Canvas score (or never pushed)
  *  6. synced     — Canvas score matches last pushed PL prediction
  *
  * @param {string|number} studentId
@@ -88,8 +87,9 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
     }
 
     // 5. needs_sync — never pushed (no lastSyncedScore) OR prediction has drifted
-    const targetScore = state?.will_post ?? roundToHalf(plPrediction);
-    if (lastSyncedScore === null || !scoresMatch(targetScore, canvasScore)) {
+    // Only a teacher-set override is ever pushed — no override means nothing to sync.
+    const targetScore = state?.will_post ?? null;
+    if (targetScore !== null && (lastSyncedScore === null || !scoresMatch(targetScore, canvasScore))) {
         return {
             status:   'needs_sync',
             label:    '↑ Needs sync',
