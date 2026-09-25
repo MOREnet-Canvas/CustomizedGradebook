@@ -25,7 +25,7 @@ import {
     rowSavePhase, rowsAwaitingOutcome, setRowPhase, clearRowPhase, subscribeSaveStatus,
 } from '../masteryOutlookState.js';
 import { mountOutcomeRow } from '../outcomeRow.js';
-import { clearCourseRollupReuse } from '../masteryOutlookDataService.js';
+import { clearCourseRollupReuse, applyCanvasClassStats } from '../masteryOutlookDataService.js';
 
 const CS = '603';   // Current Score
 const HW = '700';   // Homework Completion (excluded)
@@ -261,5 +261,37 @@ describe('mounted detail panel', () => {
         expect(rootEl.querySelectorAll('.od-detail-tab').length).toBeGreaterThan(0);
         expect(rootEl.querySelector('.cs-chip')).toBeNull();
         teardown();
+    });
+});
+
+describe('outcome list', () => {
+    test('every outcome row renders after Current Score, with the divider after the special rows', async () => {
+        const { mountOutcomeSyncView } = await import('../outcomeSyncView.js');
+        const cache = makeCache();
+        cache.pl_assignments = {};
+        cache.outcomes.forEach(o => applyCanvasClassStats(o, cache, 3));   // as Refresh Data does
+        const outcomesEl = document.createElement('div');
+        document.body.replaceChildren(outcomesEl);
+        const ctx = {
+            courseId: '566',
+            apiClient: {
+                get: vi.fn(async () => ({ rollups: [] })),
+                getAllPages: vi.fn(async () => []),
+                getWithResponse: vi.fn(async () => ({ json: async () => ({ rollups: [] }), headers: { get: () => null } })),
+            },
+            getThreshold: () => 3,
+            getColorScheme: () => 'soft',
+        };
+        const view = mountOutcomeSyncView({ outcomesEl }, cache, ctx);
+
+        const children   = [...outcomesEl.children];
+        const containers = children.filter(el => el.classList.contains('od-outcome-container'));
+        const titles     = ['Current Score', 'Homework Completion', 'Outcome 2 — Writing', 'Outcome 1 — Reading closely'];
+        expect(containers).toHaveLength(4);
+        containers.forEach((el, i) => expect(el.textContent).toContain(titles[i]));
+        // Divider sits between the last special row (Homework) and the first regular row
+        const divider = outcomesEl.querySelector('.od-outcome-divider');
+        expect(children.indexOf(divider)).toBe(children.indexOf(containers[2]) - 1);
+        view?.teardown?.();
     });
 });

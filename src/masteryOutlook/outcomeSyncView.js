@@ -435,6 +435,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
 
         // Current Score → Excluded → Regular (teacher order)
         const sortedOutcomes = orderOutcomesForPage(cache);
+        const hasRegular     = sortedOutcomes.some(o => !isSpecialOutcome(o.title));
 
         if (!sortedOutcomes.some(o => isCurrentScoreOutcome(o.title))) {
             const noCurrentScore = document.createElement('div');
@@ -482,7 +483,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
             // Divider between the last special outcome and the first regular one
             const isLastSpecial = isSpecial &&
                 (i === sortedOutcomes.length - 1 || !isSpecialOutcome(sortedOutcomes[i + 1].title));
-            if (isLastSpecial && regular.length > 0) {
+            if (isLastSpecial && hasRegular) {
                 const divider = document.createElement('div');
                 divider.className = 'od-outcome-divider';
                 outcomesEl.appendChild(divider);
