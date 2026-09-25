@@ -106,10 +106,12 @@ function renderChip(chip) {
     const style = scoreToneStyle(hasScore ? scoreTone(chip.score) : 'ne');
     const text  = hasScore ? chip.score.toFixed(2) : '—';
     const tip   = chip.pending ? `${chip.title} — updating in Canvas` : chip.title;
-    return `<span class="os-pill cs-chip${hasScore ? '' : ' cs-chip-empty'}"
+    // ⏳ sits beside the pill; its slot is always present (hidden when idle) so
+    // chips stay lined up across students.
+    return `<span class="cs-chip-wrap" data-oid="${escapeHtml(chip.outcomeId)}"><span class="os-pill cs-chip${hasScore ? '' : ' cs-chip-empty'}"
         data-oid="${escapeHtml(chip.outcomeId)}"
         title="${escapeHtml(tip)}"
-        style="${style}">${text}${chip.pending ? '<span class="cs-pending"> ⏳</span>' : ''}</span>`;
+        style="${style}">${text}</span><span class="cs-pending${chip.pending ? '' : ' hidden'}"${chip.pending ? '' : ' aria-hidden="true"'}>⏳</span></span>`;
 }
 
 /**

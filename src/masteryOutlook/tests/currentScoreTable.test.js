@@ -141,7 +141,16 @@ describe('sortCurrentScoreRows', () => {
 });
 
 describe('⏳ on the Current Score table', () => {
-    const hasHourglass = (el) => el.textContent.includes('⏳');
+    // A visible ⏳ slot (chip slots are always rendered, hidden when idle)
+    const hasHourglass = (el) => !!el.querySelector('.cs-pending:not(.hidden)');
+
+    test('⏳ sits outside the chip, not inside it', () => {
+        rowSavePhase.set(`${O2}_2`, 'queued');
+        const wrap = rowOf(mountTable(makeCache()), '2').querySelector(`.cs-chip-wrap[data-oid="${O2}"]`);
+        expect(wrap.querySelector('.cs-chip').textContent.trim()).toBe('2.00');
+        expect(wrap.querySelector('.cs-chip .cs-pending')).toBeNull();
+        expect(wrap.querySelector(':scope > .cs-pending:not(.hidden)').textContent).toBe('⏳');
+    });
 
     test('none when nothing is saving', () => {
         const root = mountTable(makeCache());
@@ -152,8 +161,8 @@ describe('⏳ on the Current Score table', () => {
         rowSavePhase.set(`${O2}_2`, phase);
         const root = mountTable(makeCache());
         const row = rowOf(root, '2');
-        expect(hasHourglass(row.querySelector(`.cs-chip[data-oid="${O2}"]`))).toBe(true);
-        expect(hasHourglass(row.querySelector(`.cs-chip[data-oid="${O1}"]`))).toBe(false);
+        expect(hasHourglass(row.querySelector(`.cs-chip-wrap[data-oid="${O2}"]`))).toBe(true);
+        expect(hasHourglass(row.querySelector(`.cs-chip-wrap[data-oid="${O1}"]`))).toBe(false);
         expect(hasHourglass(row.querySelector('.cs-current'))).toBe(true);
         expect(hasHourglass(rowOf(root, '1'))).toBe(false);
     });
@@ -161,7 +170,7 @@ describe('⏳ on the Current Score table', () => {
     test('waiting for the outcome score → ⏳ on the chip and the Current Score', () => {
         rowsAwaitingOutcome.add(`${O1}_3`);
         const row = rowOf(mountTable(makeCache()), '3');
-        expect(hasHourglass(row.querySelector(`.cs-chip[data-oid="${O1}"]`))).toBe(true);
+        expect(hasHourglass(row.querySelector(`.cs-chip-wrap[data-oid="${O1}"]`))).toBe(true);
         expect(hasHourglass(row.querySelector('.cs-current'))).toBe(true);
     });
 

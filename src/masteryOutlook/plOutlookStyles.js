@@ -643,7 +643,10 @@ tr.os-needs-row td { background:#FFFDF7; }
 /* Current Score table */
 .cs-toolbar select { margin-left:0.385em; font-size:inherit; }
 .cs-chips { line-height:2; }
-.cs-chips .os-pill { margin:0.1em 0.15em; cursor:default; }
+.cs-chip-wrap { display:inline-flex; align-items:center; white-space:nowrap; margin:0.1em 0.15em; }
+.cs-chip-wrap .os-pill { cursor:default; }
+.cs-chip-wrap .cs-pending { width:1.2em; font-size:0.85em; text-align:center; }
+.cs-chip-wrap .cs-pending.hidden { visibility:hidden; }
 
 /* Per-outcome refresh button (#54 manual rollup re-pull) */
 .os-refresh-outcome-btn { background:none; border:none; color:inherit; cursor:pointer; font-size:1.077em; line-height:1; padding:0 0.2em; opacity:0.65; transition:opacity 0.15s; }
