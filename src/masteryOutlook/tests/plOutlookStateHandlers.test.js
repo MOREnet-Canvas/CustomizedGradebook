@@ -628,6 +628,56 @@ describe('handleCreatingAssignment', () => {
         expect(writePLAssignments).not.toHaveBeenCalled();
     });
 
+    test('outcome already latest → skips calculation_method PUT', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeApiClient();
+        apiClient.get.mockImplementation(async (url) =>
+            url === '/api/v1/outcomes/598' ? { calculation_method: 'latest' } : { rubric: [{ id: 'crit-1' }] }
+        );
+        const sm = buildSMAtCreating({ apiClient });
+
+        const promise = handleCreatingAssignment(sm);
+        await vi.runAllTimersAsync();
+        await promise;
+
+        const outcomePut = apiClient.put.mock.calls.find(([url]) => url === '/api/v1/outcomes/598');
+        expect(outcomePut).toBeUndefined();
+        expect(writePLAssignments).toHaveBeenCalled();
+    });
+
+    test('outcome not latest → PUTs calculation_method before creating the assignment', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeApiClient();
+        apiClient.get.mockImplementation(async (url) =>
+            url === '/api/v1/outcomes/598' ? { calculation_method: 'decaying_average' } : { rubric: [{ id: 'crit-1' }] }
+        );
+        const sm = buildSMAtCreating({ apiClient });
+
+        const promise = handleCreatingAssignment(sm);
+        await vi.runAllTimersAsync();
+        await promise;
+
+        const putIdx = apiClient.put.mock.calls.findIndex(([url]) => url === '/api/v1/outcomes/598');
+        expect(putIdx).toBeGreaterThanOrEqual(0);
+        expect(apiClient.put.mock.calls[putIdx][1]).toEqual({ calculation_method: 'latest' });
+        expect(apiClient.put.mock.invocationCallOrder[putIdx]).toBeLessThan(apiClient.post.mock.invocationCallOrder[0]);
+    });
+
+    test('calculation_method PUT forbidden (district outcome) → friendly error, nothing created', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const forbidden = Object.assign(new Error('HTTP 403'), { name: 'CanvasApiError', statusCode: 403 });
+        const apiClient = makeApiClient();
+        apiClient.get.mockImplementation(async (url) =>
+            url === '/api/v1/outcomes/598' ? { calculation_method: 'decaying_average' } : { rubric: [{ id: 'crit-1' }] }
+        );
+        apiClient.put.mockRejectedValueOnce(forbidden);
+        const sm = buildSMAtCreating({ apiClient });
+
+        await expect(handleCreatingAssignment(sm)).rejects.toThrow(/"Algebra" is a district outcome using decaying_average/);
+        expect(apiClient.post).not.toHaveBeenCalled();
+        expect(writePLAssignments).not.toHaveBeenCalled();
+    });
+
     test('setupOnly=true → writes cache and returns COMPLETE instead of CHECKING_STUDENTS', async () => {
         readPLAssignments.mockResolvedValue({});
         const apiClient = makeApiClient();

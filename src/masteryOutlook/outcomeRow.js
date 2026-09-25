@@ -860,7 +860,7 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
                 progressEl.textContent = 'Starting…';
             }
             try {
-                await runPLSync({
+                const result = await runPLSync({
                     courseId:    ctx.courseId,
                     outcomeId:   outcome.id,
                     outcomeName: outcome.title || String(outcome.id),
@@ -870,6 +870,8 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
                         if (progressEl && msg) progressEl.textContent = msg;
                     },
                 });
+                // runPLSync reports handler errors via its result rather than throwing
+                if (!result?.success) throw new Error(result?.error || 'Setup did not complete');
                 await refreshCacheConfigInPlace(cache, ctx);
                 rerender();
             } catch (err) {

@@ -48,7 +48,8 @@ import { logger } from '../utils/logger.js';
  *                   whose in-memory plPrediction differs from the disk cache (e.g. after an
  *                   ignore/recompute without a cache write). handleCalculatingChanges uses these
  *                   values in preference to the stale disk value.
- * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
+ * @returns {Promise<{ success: boolean, successCount: number, errors: Array, error: string|null, stateHistory: string[] }>}
+ *   error: message of the handler error that moved the flow to ERROR (null on success)
  */
 export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null, canvasScoreOverrides = null, onStudentsResolved = null }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
@@ -104,6 +105,7 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
         success,
         successCount: ctx.successCount || 0,
         errors:       ctx.errors       || [],
+        error:        ctx.error?.message ?? null,
         stateHistory
     };
 }
