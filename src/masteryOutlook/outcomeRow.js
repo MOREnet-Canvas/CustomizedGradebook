@@ -872,6 +872,7 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
                 });
                 // runPLSync reports handler errors via its result rather than throwing
                 if (!result?.success) throw new Error(result?.error || 'Setup did not complete');
+                if (result.warning) logger.warn(`[MasteryOutlook] Initialize: ${result.warning}`);
                 await refreshCacheConfigInPlace(cache, ctx);
                 rerender();
             } catch (err) {

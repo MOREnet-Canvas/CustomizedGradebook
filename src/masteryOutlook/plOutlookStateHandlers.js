@@ -58,28 +58,55 @@ export async function handleCheckingSetup(sm) {
 // ─── CREATING_ASSIGNMENT ─────────────────────────────────────────────────────
 
 /**
- * Make sure the outcome uses the 'latest' calculation method so the pushed PL
- * score becomes the Canvas rollup score.
+ * Read an outcome's calculation_method as the current user sees it.
  *
- * Skips the PUT when the outcome is already 'latest' — teachers can read but not
- * edit account-level (district) outcomes, so an unconditional PUT would 403.
- * If the PUT is forbidden, throws a teacher-readable error before anything is created.
+ * Tries the course's outcome links first (always readable by the course's
+ * teachers), then falls back to /api/v1/outcomes/:id. Returns null when
+ * neither read yields a value.
  *
+ * @param {string|number} courseId
  * @param {string|number} outcomeId
- * @param {string} outcomeName
  * @param {Object} apiClient - CanvasApiClient instance
- * @returns {Promise<void>}
+ * @returns {Promise<string|null>} e.g. 'latest', 'decaying_average', or null
  */
-export async function ensureLatestCalculationMethod(outcomeId, outcomeName, apiClient) {
-    let currentMethod = null;
+export async function readOutcomeCalculationMethod(courseId, outcomeId, apiClient) {
     try {
-        const outcome = await apiClient.get(`/api/v1/outcomes/${outcomeId}`, {}, 'PLSync:readOutcome');
-        currentMethod = outcome?.calculation_method ?? null;
+        const links = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/outcome_group_links?outcome_style=full`,
+            {}, 'PLSync:readOutcomeLinks'
+        );
+        const link = (links ?? []).find(l => String(l?.outcome?.id) === String(outcomeId));
+        if (link?.outcome?.calculation_method) return link.outcome.calculation_method;
     } catch (err) {
-        // Unreadable — fall through and attempt the PUT as before
-        logger.warn(`[PLSync] Could not read outcome ${outcomeId} calculation_method: ${err.message}`);
+        logger.warn(`[PLSync] Could not read course outcome links: ${err.message}`);
     }
 
+    try {
+        const outcome = await apiClient.get(`/api/v1/outcomes/${outcomeId}`, {}, 'PLSync:readOutcome');
+        return outcome?.calculation_method ?? null;
+    } catch (err) {
+        logger.warn(`[PLSync] Could not read outcome ${outcomeId} calculation_method: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * Make sure the outcome uses the 'latest' (Most Recent Score) calculation method
+ * so the pushed PL score becomes the Canvas rollup score.
+ *
+ * Skips the PUT when the outcome already reads as 'latest'. Teachers cannot edit
+ * account-level (district) outcomes, and the method may be managed at the
+ * account level where the outcome's own field is unreliable — so a 403 on the
+ * PUT does not block setup. It records `calcMethodWarning` on the state machine
+ * context instead; a wrong method still surfaces later as "verify failed".
+ *
+ * @param {PLOutlookStateMachine} sm - reads courseId, outcomeId, outcomeName, apiClient
+ * @returns {Promise<void>}
+ */
+export async function ensureLatestCalculationMethod(sm) {
+    const { courseId, outcomeId, outcomeName, apiClient } = sm.getContext();
+
+    const currentMethod = await readOutcomeCalculationMethod(courseId, outcomeId, apiClient);
     if (currentMethod === 'latest') {
         logger.debug(`[PLSync] Outcome ${outcomeId} already uses latest — skipping update`);
         return;
@@ -93,15 +120,14 @@ export async function ensureLatestCalculationMethod(outcomeId, outcomeName, apiC
         );
         logger.debug(`[PLSync] Outcome ${outcomeId} calculation_method set to latest`);
     } catch (err) {
-        if (err?.statusCode === 403) {
-            const methodLabel = currentMethod ?? 'a different calculation method';
-            throw new Error(
-                `"${outcomeName}" is a district outcome using ${methodLabel}. ` +
-                `Only a Canvas admin can change it to Most Recent Score (this affects all courses using it). ` +
-                `Ask an admin to change it, or to click Initialize, then try again.`
-            );
-        }
-        throw err;
+        if (err?.statusCode !== 403) throw err;
+
+        const warning =
+            `Couldn't confirm "${outcomeName}" uses Most Recent Score` +
+            `${currentMethod ? ` (reads as ${currentMethod})` : ''}. ` +
+            `If Canvas scores don't match after saving, ask an admin to check its calculation method.`;
+        logger.warn(`[PLSync] Outcome ${outcomeId}: calculation_method update forbidden — continuing setup. ${warning}`);
+        sm.updateContext({ calcMethodWarning: warning });
     }
 }
 
@@ -206,7 +232,7 @@ export async function handleCreatingAssignment(sm) {
     // ── End safeguard — no existing assignment found, proceed with creation ──
 
     // Step 1: Ensure outcome calculation_method is 'latest' (runs before any Canvas writes)
-    await ensureLatestCalculationMethod(outcomeId, outcomeName, apiClient);
+    await ensureLatestCalculationMethod(sm);
 
     // Step 2: Create assignment visible to everyone
     // Assignment name uses PL_ASSIGNMENT_SUFFIX from config.js (default: 'Projected Score')

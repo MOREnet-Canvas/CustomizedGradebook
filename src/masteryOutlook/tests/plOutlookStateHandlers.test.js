@@ -574,7 +574,7 @@ describe('handleCreatingAssignment', () => {
         expect(hideCall).toBeDefined();
 
         // getAllPages (submission fetch) must be called between create and hide
-        const getAllPagesCallOrder  = apiClient.getAllPages.mock.invocationCallOrder[0];
+        const getAllPagesCallOrder  = apiClient.getAllPages.mock.invocationCallOrder.at(-1);  // submissions fetch (after outcome-link read)
         const putHideCallOrder     = apiClient.put.mock.invocationCallOrder[putCalls.indexOf(hideCall)];
         expect(getAllPagesCallOrder).toBeLessThan(putHideCallOrder);
     });
@@ -628,52 +628,91 @@ describe('handleCreatingAssignment', () => {
         expect(writePLAssignments).not.toHaveBeenCalled();
     });
 
-    test('outcome already latest → skips calculation_method PUT', async () => {
-        readPLAssignments.mockResolvedValue({});
+    /**
+     * Happy-path client whose calculation_method reads are controlled per test.
+     * @param {Object} opts
+     * @param {string|null} [opts.linkMethod]    - method on the course outcome link (null = outcome not linked)
+     * @param {string|null} [opts.outcomeMethod] - method from /api/v1/outcomes/598 (null = read fails)
+     */
+    function makeCalcClient({ linkMethod = null, outcomeMethod = null } = {}) {
         const apiClient = makeApiClient();
-        apiClient.get.mockImplementation(async (url) =>
-            url === '/api/v1/outcomes/598' ? { calculation_method: 'latest' } : { rubric: [{ id: 'crit-1' }] }
-        );
-        const sm = buildSMAtCreating({ apiClient });
+        apiClient.getAllPages.mockImplementation(async (url) => url.includes('outcome_group_links')
+            ? (linkMethod ? [{ outcome: { id: 598, calculation_method: linkMethod } }] : [])
+            : [{ id: 'sub-1', user_id: 'u1' }]);
+        apiClient.get.mockImplementation(async (url) => {
+            if (url === '/api/v1/outcomes/598') {
+                if (outcomeMethod === null) throw Object.assign(new Error('HTTP 403'), { statusCode: 403 });
+                return { calculation_method: outcomeMethod };
+            }
+            return { rubric: [{ id: 'crit-1' }] };
+        });
+        return apiClient;
+    }
 
+    const outcomePutCalls = (apiClient) => apiClient.put.mock.calls.filter(([url]) => url === '/api/v1/outcomes/598');
+
+    async function runCreating(apiClient) {
+        const sm = buildSMAtCreating({ apiClient });
         const promise = handleCreatingAssignment(sm);
         await vi.runAllTimersAsync();
-        await promise;
+        const next = await promise;
+        return { sm, next };
+    }
 
-        const outcomePut = apiClient.put.mock.calls.find(([url]) => url === '/api/v1/outcomes/598');
-        expect(outcomePut).toBeUndefined();
+    test('course outcome link reads latest → skips calculation_method PUT', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: 'latest' });
+
+        await runCreating(apiClient);
+
+        expect(outcomePutCalls(apiClient)).toHaveLength(0);
+        expect(apiClient.get).not.toHaveBeenCalledWith('/api/v1/outcomes/598', expect.anything(), expect.anything());
+        expect(writePLAssignments).toHaveBeenCalled();
+    });
+
+    test('outcome not in course links, /outcomes/:id reads latest → skips PUT', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: null, outcomeMethod: 'latest' });
+
+        await runCreating(apiClient);
+
+        expect(outcomePutCalls(apiClient)).toHaveLength(0);
         expect(writePLAssignments).toHaveBeenCalled();
     });
 
     test('outcome not latest → PUTs calculation_method before creating the assignment', async () => {
         readPLAssignments.mockResolvedValue({});
-        const apiClient = makeApiClient();
-        apiClient.get.mockImplementation(async (url) =>
-            url === '/api/v1/outcomes/598' ? { calculation_method: 'decaying_average' } : { rubric: [{ id: 'crit-1' }] }
-        );
-        const sm = buildSMAtCreating({ apiClient });
+        const apiClient = makeCalcClient({ linkMethod: 'decaying_average' });
 
-        const promise = handleCreatingAssignment(sm);
-        await vi.runAllTimersAsync();
-        await promise;
+        const { sm } = await runCreating(apiClient);
 
         const putIdx = apiClient.put.mock.calls.findIndex(([url]) => url === '/api/v1/outcomes/598');
         expect(putIdx).toBeGreaterThanOrEqual(0);
         expect(apiClient.put.mock.calls[putIdx][1]).toEqual({ calculation_method: 'latest' });
         expect(apiClient.put.mock.invocationCallOrder[putIdx]).toBeLessThan(apiClient.post.mock.invocationCallOrder[0]);
+        expect(sm.getContext().calcMethodWarning).toBeUndefined();
     });
 
-    test('calculation_method PUT forbidden (district outcome) → friendly error, nothing created', async () => {
+    test('PUT forbidden (district outcome) → continues setup and records calcMethodWarning', async () => {
         readPLAssignments.mockResolvedValue({});
-        const forbidden = Object.assign(new Error('HTTP 403'), { name: 'CanvasApiError', statusCode: 403 });
-        const apiClient = makeApiClient();
-        apiClient.get.mockImplementation(async (url) =>
-            url === '/api/v1/outcomes/598' ? { calculation_method: 'decaying_average' } : { rubric: [{ id: 'crit-1' }] }
-        );
-        apiClient.put.mockRejectedValueOnce(forbidden);
+        const apiClient = makeCalcClient({ linkMethod: null, outcomeMethod: null });
+        apiClient.put.mockRejectedValueOnce(Object.assign(new Error('HTTP 403'), { name: 'CanvasApiError', statusCode: 403 }));
+
+        const { sm, next } = await runCreating(apiClient);
+
+        expect(next).toBe(PL_STATES.CHECKING_STUDENTS);
+        expect(apiClient.post).toHaveBeenCalledTimes(2);   // assignment + rubric created
+        expect(writePLAssignments).toHaveBeenCalled();
+        expect(sm.getContext().calcMethodWarning).toMatch(/Couldn't confirm "Algebra" uses Most Recent Score/);
+    });
+
+    test('PUT fails with a non-403 error → throws before anything is created', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: 'decaying_average' });
+        apiClient.put.mockRejectedValueOnce(Object.assign(new Error('HTTP 500'), { name: 'CanvasApiError', statusCode: 500 }));
         const sm = buildSMAtCreating({ apiClient });
 
-        await expect(handleCreatingAssignment(sm)).rejects.toThrow(/"Algebra" is a district outcome using decaying_average/);
+        await expect(handleCreatingAssignment(sm)).rejects.toThrow(/HTTP 500/);
         expect(apiClient.post).not.toHaveBeenCalled();
         expect(writePLAssignments).not.toHaveBeenCalled();
     });
