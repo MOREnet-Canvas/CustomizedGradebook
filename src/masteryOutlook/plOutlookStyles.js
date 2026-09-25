@@ -573,6 +573,12 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-pill-btn { display:inline-block; position:relative; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; font-size:inherit; border-radius:0.769em; transition:opacity .15s, box-shadow .12s; }
 .os-pill-btn:focus-visible { outline:2px solid var(--blue); outline-offset:2px; border-radius:0.769em; }
 .os-pill-btn.faded { opacity:0.55; }
+.os-last-btn { display:inline-flex; flex-direction:column; align-items:center; background:none; border:none; padding:0.154em 0.385em; cursor:pointer; font-family:inherit; font-size:inherit; border-radius:0.462em; line-height:1.2; }
+.os-last-btn:hover { box-shadow:0 0 0 1.5px var(--border-primary); }
+.os-last-btn:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.os-last-score { font-size:0.846em; font-weight:600; color:var(--text-secondary); }
+.os-last-date { font-size:0.692em; color:var(--text-tertiary); }
+.os-last-none { font-size:0.769em; color:var(--text-tertiary); }
 .os-pill-btn:not(.faded):hover { box-shadow:0 0 0 1.5px var(--border-primary); }
 .os-pill { font-size:0.846em; font-weight:500; padding:0.231em 0.769em; border-radius:0.615em; display:inline-block; min-width:3.538em; text-align:center; white-space:nowrap; line-height:1.4; }
 .os-pill-tip { display:none; position:absolute; bottom:calc(100% + 0.46em); left:50%; transform:translateX(-50%); background:var(--text-primary); color:#fff; padding:0.308em 0.538em; border-radius:var(--radius-sm); font-size:0.769em; font-weight:400; white-space:nowrap; z-index:40; pointer-events:none; }

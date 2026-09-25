@@ -631,6 +631,7 @@ export async function handleSyncStudents({
             const entry = getOrInitEntry(cache.sync_state, outcomeId, sid);
             entry.last_synced_score = pushed;
             entry.last_synced_at    = now;
+            entry.last_synced_note  = notes[sid] ?? null;
             entry.verify_mismatch   = false;
             if (entry.will_post_note) entry.will_post_note = null;
             if (entry.will_post != null && Math.round(entry.will_post * 100) === Math.round(pushed * 100)) {

@@ -51,7 +51,7 @@ vi.mock('../../config.js', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState } from '../masteryOutlookCacheService.js';
+import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState, writeSyncState } from '../masteryOutlookCacheService.js';
 import { fetchCourseStudents } from '../../services/enrollmentService.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
 
@@ -795,6 +795,22 @@ describe('handleSyncing', () => {
         expect(next).toBe(PL_STATES.VERIFYING);
         expect(onPushed).toHaveBeenCalledTimes(1);
         expect(onPushed).toHaveBeenCalledWith(expect.objectContaining({ successCount: 1, pushedUserIds: ['u1'] }));
+    });
+
+    test('records last_synced_note with the pushed score (kept after will_post_note is cleared)', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({ successCount: 1, errors: [], retryCounts: [] });
+        readSyncState.mockResolvedValue({});
+        const sm = buildSMAtSyncing({
+            studentsToSync: [{ userId: 'u1', submissionId: 'sub-1', rubricAssociationId: 'assoc-1',
+                rubricCriterionId: 'crit-1', points: 2, score: 2, plScore: 2, will_post_note: ' retest ' }],
+        });
+
+        await handleSyncing(sm);
+
+        const written = writeSyncState.mock.calls.at(-1)[1]['598']['u1'];
+        expect(written.last_synced_score).toBe(2);
+        expect(written.last_synced_note).toBe('retest');
+        expect(written.will_post_note).toBeNull();
     });
 
     test('does not call onPushed when nothing was pushed', async () => {

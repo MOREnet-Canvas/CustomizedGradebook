@@ -619,6 +619,8 @@ export async function handleSyncing(sm) {
             ...existing,
             last_synced_score: s.plScore,
             last_synced_at:    now,
+            // Kept after will_post_note is cleared so the "Last Override" column can show it
+            last_synced_note:  s.will_post_note?.trim() || null,
             // Optimistically clear any previous verify failure — handleVerifying will
             // set it back to true if the rollup still doesn't match after retries.
             verify_mismatch:   false,

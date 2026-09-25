@@ -70,7 +70,7 @@ function formatDateShort(iso) {
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
  * @param {Object}   [plConfig]          - { pl_assignments, sync_state } for the Canvas-sync marker
- * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, marker, syncPhase}}
+ * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, marker, lastOverride, syncPhase}}
  *   status: 'ne' | 'none' | 'synced' | 'verify_failed' | 'needs'
  *   'none' = no teacher-set override; nothing will be pushed for this row.
  *   marker: 'verifying' | 'possible_override' | null — from getSyncStatus(), shown beside the Canvas pill
@@ -140,6 +140,15 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         dots,
         status,
         marker,
+        // Last score pushed to Canvas (only teacher overrides are pushed) — survives
+        // the Override box being cleared after a successful save.
+        lastOverride: syncEntry?.last_synced_score != null
+            ? {
+                score: Number(syncEntry.last_synced_score),
+                at:    syncEntry.last_synced_at   ?? null,
+                note:  syncEntry.last_synced_note ?? null,
+            }
+            : null,
         // Live sync phase for this row ('pushing' | 'verifying' | null) — driven
         // by syncingStudentIds/syncStudentPhase while a push is in flight.
         syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
@@ -240,6 +249,23 @@ function renderOutcomeStudentRow(s, oidStr) {
             ? `<span class="os-sync-marker override" title="${POSSIBLE_OVERRIDE_TIP}" aria-label="${POSSIBLE_OVERRIDE_TIP}">⚑</span>`
             : '';
 
+    const last     = s.lastOverride;
+    const lastHtml = last
+        ? (() => {
+            const scoreStr = last.score.toFixed(2);
+            const when     = last.at ? new Date(last.at) : null;
+            const whenStr  = when && !isNaN(when.getTime())
+                ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                : 'unknown date';
+            const tip = `Saved to Canvas ${whenStr}${last.note ? ` · Note: ${last.note}` : ''}. Click to copy to Override.`;
+            return `<button class="os-last-btn" data-action="os-use-last" data-stu="${s.id}" data-oid="${oidStr}"
+                     data-last="${last.score}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(`Last override ${scoreStr}. ${tip}`)}">
+                  <span class="os-last-score">${scoreStr}</span>
+                  <span class="os-last-date">${escapeHtml(formatDateShort(last.at))}</span>
+                </button>`;
+        })()
+        : `<span class="os-last-none">—</span>`;
+
     const saveMod   = needsSync ? 'needs' : 'synced';
     const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
                     : needsSync                    ? `Push ${wpDisp} to Canvas`
@@ -288,6 +314,7 @@ function renderOutcomeStudentRow(s, oidStr) {
           </div>
         </div>
       </td>
+      <td class="c">${lastHtml}</td>
       <td class="os-td-comment">
         <div class="os-note-wrap" style="position:relative; display:flex; align-items:center;">
           <input class="os-comment-input${s.lock !== 'none' ? ' override-prompted' : ''}${s.note ? ' has-note' : ''}"
@@ -405,6 +432,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
               <th class="c">Canvas</th>
               <th class="c">Marzano</th>
               <th class="c">Override</th>
+              <th class="c">Last Override</th>
               <th>Note</th>
               <th class="c">Save</th>
             </tr></thead>
@@ -412,7 +440,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </table>
         </div>
         <div class="os-table-hint">
-          Click Canvas / Marzano pills to copy to Override · Click Override box to type · Padlock locks an override
+          Click Canvas / Marzano / Last Override to copy to Override · Click Override box to type · Padlock locks an override
         </div>`;
 }
 
@@ -421,7 +449,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
 /**
  * Attach all event listeners for the student sync table.
  *
- * Owns: os-use-canvas, os-use-marzano, os-wp-click (inline edit), os-lock,
+ * Owns: os-use-canvas, os-use-marzano, os-use-last, os-wp-click (inline edit), os-lock,
  * os-unlock, os-save, os-post-all, os-refresh-outcome, dot-toggle,
  * dot-ignore-toggle, os-note input, and a document-level "click outside dot to
  * close popover" listener.
@@ -485,6 +513,14 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             const mz = parseFloat(el.dataset.marzano);
             if (isNaN(mz)) return;
             await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, plPrediction: mz, cache, apiClient, onRerender: renderTable });
+            return;
+        }
+
+        // ── Last Override → set Will Post = last score pushed to Canvas ───
+        if (action === 'os-use-last') {
+            const last = parseFloat(el.dataset.last);
+            if (isNaN(last)) return;
+            await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: last, cache, apiClient, onRerender: renderTable });
             return;
         }
 

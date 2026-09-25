@@ -12,7 +12,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
     writeMasteryOutlookCache:  vi.fn(async () => {}),
 }));
 
-import { renderOutcomeStudentTable } from '../studentSyncTable.js';
+import { renderOutcomeStudentTable, wireOutcomeStudentTable } from '../studentSyncTable.js';
 import { handleMarzanoPillClick, handleClearWillPost } from '../plOutlookActions.js';
 
 function makeCache(syncEntry = {}) {
@@ -80,6 +80,36 @@ describe('Override does not default to Marzano', () => {
         const marker = row.querySelector('.os-sync-marker');
         expect(marker.classList.contains('override')).toBe(true);
         expect(marker.getAttribute('title')).toMatch(/changed directly in Canvas/);
+    });
+
+    test('Last Override shows the last pushed score, date, and note tooltip', () => {
+        const cache = makeCache({
+            last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53.086Z', last_synced_note: 'retest',
+        });
+        const row  = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+        const last = row.querySelector('[data-action="os-use-last"]');
+        expect(last.querySelector('.os-last-score').textContent).toBe('2.00');
+        expect(last.querySelector('.os-last-date').textContent).toBe('Sep 25');
+        expect(last.getAttribute('title')).toMatch(/^Saved to Canvas Sep 25, .* · Note: retest\. Click to copy to Override\.$/);
+    });
+
+    test('Last Override shows — when nothing has been pushed', () => {
+        const row = rowFor(renderOutcomeStudentTable({ id: '101' }, makeCache()));
+        expect(row.querySelector('[data-action="os-use-last"]')).toBeNull();
+        expect(row.querySelector('.os-last-none').textContent).toBe('—');
+    });
+
+    test('clicking Last Override copies it into the Override', async () => {
+        const cache = makeCache({ last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53.086Z' });
+        const contentEl = document.createElement('div');
+        contentEl.innerHTML = renderOutcomeStudentTable({ id: '101' }, cache);
+        document.body.replaceChildren(contentEl);
+        wireOutcomeStudentTable({ contentEl, outcome: { id: '101' }, cache, courseId: '1',
+            apiClient: {}, renderTable: () => {} });
+
+        contentEl.querySelector('[data-action="os-use-last"]').click();
+        await vi.waitFor(() => expect(cache.sync_state['101']['s2'].will_post).toBe(2));
+        expect(cache.sync_state['101']['s2'].will_post_lock).toBe('unlocked');
     });
 
     test('no push history → no marker', () => {

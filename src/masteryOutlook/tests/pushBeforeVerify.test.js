@@ -85,6 +85,7 @@ describe('handleSyncStudents — work that must not wait for verification', () =
         const entry = cache.sync_state['599']['642'];
         expect(entry.last_synced_score).toBe(2);
         expect(entry.last_synced_at).toBeTruthy();
+        expect(entry.last_synced_note).toBe('retest');
         expect(entry.will_post).toBeNull();
         expect(entry.will_post_note).toBeNull();
         expect(cache.students[0].outcomes[0].canvasScore).toBe(2);
