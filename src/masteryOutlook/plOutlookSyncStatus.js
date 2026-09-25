@@ -39,6 +39,40 @@ export const POSSIBLE_OVERRIDE_TIP =
     'it may have been changed directly in Canvas. Open the outcome to review.';
 
 /**
+ * Describe a sync_state entry as an override "exception" for the exceptions
+ * views, or return null when there is nothing to report.
+ *
+ * Covers teacher overrides waiting to be saved (will_post), overrides already
+ * saved to Canvas (last_synced_score — only teacher overrides are pushed),
+ * locked overrides, and confirmed manual Canvas overrides.
+ *
+ * @param {Object|undefined} entry - sync_state[outcomeId][studentId]
+ * @returns {{ types: string[], score: number|null, note: string, date: string|null }|null}
+ *   types: display labels, e.g. ['Saved Override'] or ['Pending Override', 'Locked']
+ */
+export function describeOverrideException(entry) {
+    if (!entry) return null;
+    const pending = entry.will_post != null;
+    const saved   = entry.last_synced_score != null;
+    const locked  = entry.will_post_lock === 'locked';
+    const manual  = entry.manual_override === true;
+    if (!pending && !saved && !locked && !manual) return null;
+
+    const types = [];
+    if (pending)    types.push('Pending Override');
+    else if (saved) types.push('Saved Override');
+    if (locked) types.push('Locked');
+    if (manual) types.push('Canvas Override');
+
+    return {
+        types,
+        score: pending ? Number(entry.will_post) : (saved ? Number(entry.last_synced_score) : null),
+        note:  (pending ? entry.will_post_note : entry.last_synced_note) ?? entry.will_post_note ?? '',
+        date:  pending ? (entry.override_at ?? null) : (entry.last_synced_at ?? entry.override_at ?? null),
+    };
+}
+
+/**
  * True when a push happened but no verify pass completed after it, and the
  * push is recent enough that Canvas may simply not have caught up yet.
  *

@@ -20,7 +20,7 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
 import { roundToHalf } from './powerLaw.js';
-import { getSyncStatus, aggregateSyncStatus, scoresMatch, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
+import { getSyncStatus, aggregateSyncStatus, scoresMatch, describeOverrideException, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import {
     handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
 } from './plOutlookActions.js';
@@ -92,7 +92,7 @@ function makeRenderers(ctx) {
  * collapsed outcome row. Returns a single span chip whose modifier reflects
  * the worst-priority state across the student cohort.
  *
- * Priority: needs > override > setup > synced > none.
+ * Priority: setup > syncing > needs > verifying > override > synced (special outcomes: none).
  *
  * @param {Object} outcome
  * @param {Object} cache
@@ -133,7 +133,7 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
         if (willPost === null) return false;   // no teacher override → nothing to push
-        if (canvas === null)   return false;
+        if (canvas === null)   return true;    // override set, nothing in Canvas yet (row is amber too)
         return !scoresMatch(willPost, canvas) || noteIsPending;
     }).length;
 
@@ -147,19 +147,14 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const n = counts.possibleOverride + counts.manualOverride;
         return `<span class="od-sync-chip override" title="${POSSIBLE_OVERRIDE_TIP}">⚑ ${n}</span>`;
     }
-    // Use needsCount (scoresMatch-based) as the source of truth for synced status.
-    // counts.synced from aggregateSyncStatus requires last_synced_score to be set,
-    // so it returns 0 for students whose scores match but were never explicitly tracked —
-    // causing "—" even when every row is up to date. If needsCount === 0 and at least
-    // one student has both a prediction and a Canvas score, all of them are synced.
-    const hasActiveStu = (cache.students || []).some(student => {
-        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
-        return od?.plPrediction != null && od?.canvasScore != null;
-    });
-    if (hasActiveStu) {
-        return `<span class="od-sync-chip synced">✓ Synced</span>`;
+    // Special outcomes (Current Score, excluded) are not managed by overrides.
+    if (isSpecial) {
+        return `<span class="od-sync-chip none">—</span>`;
     }
-    return `<span class="od-sync-chip none">—</span>`;
+    // Only teacher-set overrides are ever pushed, so a set-up outcome with no
+    // pending override, verification, or flag is up to date — even when every
+    // student is still NE (fewer than 3 attempts) and has no Marzano score.
+    return `<span class="od-sync-chip synced" title="No overrides waiting to be saved to Canvas">✓ Synced</span>`;
 }
 
 // ─── Initialize panel (handoff sec. "initialize panel") ──────────────────────
@@ -235,13 +230,8 @@ function countExceptionStudents(outcome, cache) {
     const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
     return cache.students.filter(student => {
-        const sId   = String(student.id);
-        const entry = outcomeSync[sId];
-        return (
-            entry?.will_post_lock === 'locked' ||
-            entry?.manual_override === true     ||
-            ignoredIds.has(sId)
-        );
+        const sId = String(student.id);
+        return describeOverrideException(outcomeSync[sId]) !== null || ignoredIds.has(sId);
     }).length;
 }
 
@@ -255,13 +245,8 @@ function buildExceptionsTable(outcome, cache) {
     const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
     const exceptionStudents = cache.students.filter(student => {
-        const sId   = String(student.id);
-        const entry = outcomeSync[sId];
-        return (
-            entry?.will_post_lock === 'locked' ||
-            entry?.manual_override === true     ||
-            ignoredIds.has(sId)
-        );
+        const sId = String(student.id);
+        return describeOverrideException(outcomeSync[sId]) !== null || ignoredIds.has(sId);
     });
 
     if (exceptionStudents.length === 0) {
@@ -269,20 +254,19 @@ function buildExceptionsTable(outcome, cache) {
     }
 
     const rows = exceptionStudents.map(student => {
-        const sId       = String(student.id);
-        const entry     = outcomeSync[sId] ?? {};
-        const od        = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        const sId        = String(student.id);
+        const ex         = describeOverrideException(outcomeSync[sId]);
+        const od         = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
         const marzDisp   = od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE';
-        const wpDisp     = entry.will_post != null ? entry.will_post.toFixed(2) : '—';
-        const note       = escapeHtml(entry.will_post_note ?? '');
-        const dateRaw    = entry.override_at ?? entry.last_synced_at ?? '';
+        const wpDisp     = ex?.score != null ? ex.score.toFixed(2) : '—';
+        const note       = escapeHtml(ex?.note ?? '');
+        const dateRaw    = ex?.date ?? '';
         const dateFmt    = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
 
-        const types = [];
-        if (entry.manual_override)             types.push('<span class="od-ex-pill override">Override</span>');
-        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked Override</span>');
-        if (ignoredIds.has(sId))               types.push('<span class="od-ex-pill ignored">Ignored</span>');
+        const types = (ex?.types ?? []).map(t =>
+            `<span class="od-ex-pill ${t === 'Locked' ? 'locked' : 'override'}">${escapeHtml(t)}</span>`);
+        if (ignoredIds.has(sId)) types.push('<span class="od-ex-pill ignored">Ignored</span>');
 
         return `<tr>
             <td class="od-name">${escapeHtml(student.name || `Student ${student.id}`)}</td>

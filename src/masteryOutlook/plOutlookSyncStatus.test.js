@@ -1,6 +1,39 @@
 // src/masteryOutlook/plOutlookSyncStatus.test.js
 import { describe, it, expect } from 'vitest';
-import { scoresMatch, getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, aggregateSyncStatus, describeOverrideException } from './plOutlookSyncStatus.js';
+
+describe('describeOverrideException', () => {
+    it('returns null when there is nothing to report', () => {
+        expect(describeOverrideException(undefined)).toBeNull();
+        expect(describeOverrideException({})).toBeNull();
+        expect(describeOverrideException({ will_post: null, will_post_lock: 'none', manual_override: false })).toBeNull();
+    });
+
+    it('pending override → Pending Override with its value and note', () => {
+        const ex = describeOverrideException({ will_post: 2.5, will_post_lock: 'unlocked', will_post_note: 'retest' });
+        expect(ex).toEqual({ types: ['Pending Override'], score: 2.5, note: 'retest', date: null });
+    });
+
+    it('saved override (Override box cleared after save) → Saved Override with saved score, note, date', () => {
+        const ex = describeOverrideException({
+            will_post: null, will_post_lock: 'none',
+            last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53Z', last_synced_note: 'retest',
+        });
+        expect(ex).toEqual({ types: ['Saved Override'], score: 2, note: 'retest', date: '2026-09-25T16:10:53Z' });
+    });
+
+    it('pending takes precedence over an older saved override', () => {
+        const ex = describeOverrideException({ will_post: 3, last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53Z' });
+        expect(ex.types).toEqual(['Pending Override']);
+        expect(ex.score).toBe(3);
+    });
+
+    it('adds Locked and Canvas Override labels', () => {
+        expect(describeOverrideException({ will_post: 3, will_post_lock: 'locked' }).types)
+            .toEqual(['Pending Override', 'Locked']);
+        expect(describeOverrideException({ manual_override: true }).types).toEqual(['Canvas Override']);
+    });
+});
 
 describe('scoresMatch', () => {
     it('returns false when either value is null or undefined', () => {
