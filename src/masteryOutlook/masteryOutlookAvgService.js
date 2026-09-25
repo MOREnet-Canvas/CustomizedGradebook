@@ -24,6 +24,29 @@ import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
 import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
 
 /**
+ * Replace one outcome's score in an outcome_rollups response with scores that
+ * were just pushed to Canvas, so averages don't depend on Canvas having
+ * finished recalculating the rollup. Mutates and returns `rollupResponse`.
+ *
+ * @param {Object} rollupResponse - { rollups: [{ links: { user }, scores: [{ score, links: { outcome } }] }] }
+ * @param {string|number} outcomeId
+ * @param {Object} pushedScores   - { [userId]: score }
+ * @returns {Object} rollupResponse
+ */
+export function applyPushedScoresToRollups(rollupResponse, outcomeId, pushedScores = {}) {
+    const oId = String(outcomeId);
+    for (const rollup of (rollupResponse?.rollups ?? [])) {
+        const pushed = pushedScores[String(rollup.links?.user)];
+        if (pushed == null) continue;
+        rollup.scores = rollup.scores ?? [];
+        const existing = rollup.scores.find(s => String(s.links?.outcome) === oId);
+        if (existing) existing.score = pushed;
+        else rollup.scores.push({ score: pushed, links: { outcome: oId } });
+    }
+    return rollupResponse;
+}
+
+/**
  * Update the Current Score (avg) assignment for students whose Marzano score
  * was just pushed to Canvas via Mastery Outlook.
  *
@@ -36,12 +59,14 @@ import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './maste
  * @param {string}   opts.outcomeName  - Used to prefix the comment
  * @param {string[]} opts.studentIds   - Students whose scores were updated
  * @param {Object}   opts.notes        - Map of { [studentId]: noteText }
+ * @param {Object}   [opts.pushedScores] - { [studentId]: score } just pushed for outcomeId; used in
+ *                                         place of the (possibly not yet updated) Canvas rollup score
  * @param {Object}   opts.cache        - In-memory Mastery Outlook cache
  * @param {Object}   opts.apiClient
  * @returns {Promise<boolean>}
  */
 export async function updateAvgAssignmentForStudents({
-    courseId, outcomeId, outcomeName, studentIds, notes = {}, cache, apiClient
+    courseId, outcomeId, outcomeName, studentIds, notes = {}, pushedScores = {}, cache, apiClient
 }) {
     if (!studentIds?.length) return false;
 
@@ -76,6 +101,9 @@ export async function updateAvgAssignmentForStudents({
             logger.warn('[MOAvgService] No rollup data for affected students');
             return false;
         }
+
+        // Canvas may not have recalculated the rollup yet — use the scores we just pushed
+        applyPushedScoresToRollups(rollupResponse, outcomeId, pushedScores);
 
         // Step 3: Calculate new averages — only students whose avg changed are returned.
         // Students with no avg change get no call; notes-only handling is a future prompt.
@@ -114,9 +142,9 @@ export async function updateAvgAssignmentForStudents({
 
             const enrollmentId = enrollmentMap.get(String(userId));
             const noteText     = notes[String(userId)];
-            // Use will_post if set (teacher override) otherwise fall back to plPrediction
+            // Prefer the score actually pushed, then will_post (teacher override), then plPrediction
             const syncEntry  = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(userId)] ?? {};
-            const plScore    = syncEntry.will_post ?? plScoreByUserId.get(userId);
+            const plScore    = pushedScores[String(userId)] ?? syncEntry.will_post ?? plScoreByUserId.get(String(userId));
             const plScoreStr = plScore != null ? Number(plScore).toFixed(2) : '—';
             const avgStr       = Number(average).toFixed(2);
 

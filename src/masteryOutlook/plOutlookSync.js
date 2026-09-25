@@ -48,16 +48,21 @@ import { logger } from '../utils/logger.js';
  *                   whose in-memory plPrediction differs from the disk cache (e.g. after an
  *                   ignore/recompute without a cache write). handleCalculatingChanges uses these
  *                   values in preference to the stale disk value.
- * @returns {Promise<{ success: boolean, successCount: number, errors: Array, error: string|null, warning: string|null, stateHistory: string[] }>}
+ * @param {Function|null} [opts.onPushed=null] - ({ successCount, errors, pushedUserIds }) => void.
+ *                   Called once scores are written to Canvas, before VERIFYING polls, so
+ *                   follow-up work (e.g. the Current Score update) doesn't depend on the
+ *                   teacher staying on the page through verification.
+ * @returns {Promise<{ success: boolean, successCount: number, errors: Array, error: string|null, warning: string|null, verifyMismatchIds: string[], stateHistory: string[] }>}
  *   error: message of the handler error that moved the flow to ERROR (null on success)
  *   warning: non-blocking setup warning, e.g. calculation method could not be confirmed
+ *   verifyMismatchIds: student IDs whose Canvas rollup didn't confirm the pushed score
  */
-export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null, canvasScoreOverrides = null, onStudentsResolved = null }) {
+export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null, canvasScoreOverrides = null, onStudentsResolved = null, onPushed = null }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
 
     const sm = new PLOutlookStateMachine({
         courseId, outcomeId, outcomeName, apiClient, onProgress,
-        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides, canvasScoreOverrides, onStudentsResolved
+        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides, canvasScoreOverrides, onStudentsResolved, onPushed
     });
 
     // ── Run loop ──
@@ -108,6 +113,7 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
         errors:       ctx.errors       || [],
         error:        ctx.error?.message ?? null,
         warning:      ctx.calcMethodWarning ?? null,
+        verifyMismatchIds: (ctx.verifyMismatches ?? []).map(m => String(m.userId)),
         stateHistory
     };
 }

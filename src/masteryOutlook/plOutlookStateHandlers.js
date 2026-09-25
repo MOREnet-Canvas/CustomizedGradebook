@@ -646,6 +646,21 @@ export async function handleSyncing(sm) {
     logger.debug(`[PLSync] sync_state updated for ${successCount} student(s) on outcome ${outcomeId}`);
 
     sm.updateContext({ successCount, errors, retryCounts });
+
+    // Hand off post-push work now rather than after VERIFYING, which can take
+    // minutes and is lost if the teacher leaves the page mid-verify.
+    const { onPushed } = sm.getContext();
+    if (onPushed && successCount > 0) {
+        const pushedUserIds = studentsToSync
+            .map(s => String(s.userId))
+            .filter(id => !errorUserIds.has(id));
+        try {
+            onPushed({ successCount, errors, pushedUserIds });
+        } catch (err) {
+            logger.warn('[PLSync] onPushed callback failed:', err.message);
+        }
+    }
+
     return PL_STATES.VERIFYING;
 }
 

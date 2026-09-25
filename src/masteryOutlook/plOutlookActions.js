@@ -51,6 +51,16 @@ function getOrInitEntry(syncState, outcomeId, studentId) {
     return syncState[oId][sId];
 }
 
+/**
+ * beforeunload handler — shows the browser's "Leave site?" prompt while a push
+ * is in flight. Registered by handleSyncStudents; removed once no outcome is syncing.
+ * @param {BeforeUnloadEvent} e
+ */
+function warnBeforeUnload(e) {
+    e.preventDefault();
+    e.returnValue = '';
+}
+
 // ─── Debounced cache writer (optimistic UI + dedupe) ─────────────────────────
 
 /** Trailing-edge debounce window for cache writes. */
@@ -451,11 +461,16 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
  *   - All students: handleSyncStudents({ studentIds: null, ... })
  *   - Specific set: handleSyncStudents({ studentIds: ['a','b','c'], ... })
  *
- * Post-sync (on success with successCount > 0):
- *   1. Updates canvasScore in-memory for each synced student
- *   2. Writes the full cache to disk once (persists ignored_alignments and
+ * As soon as scores are pushed (onPushed, before verification):
+ *   1. Mirrors the push into in-memory sync_state (last_synced_*, clears will_post/note)
+ *   2. Updates canvasScore in-memory for each pushed student
+ *   3. Starts the Current Score (avg) update using the pushed scores
+ * After the run (on success with successCount > 0):
+ *   4. Mirrors the verify result (last_verify_at, verify_mismatch) into memory
+ *   5. Writes the full cache to disk once (persists ignored_alignments and
  *      any other pending in-memory mutations)
- *   3. Calls onRerender
+ *   6. Calls onRerender
+ * A beforeunload prompt is active while the push is in flight.
  *
  * Guards:
  *   - cachedPLEntry prevents a Canvas Files race condition after Initialize
@@ -541,6 +556,7 @@ export async function handleSyncStudents({
     const syncKeys = effectiveIds.map(sid => `${outcomeId}_${String(sid)}`);
     syncingOutcomeIds.add(String(outcomeId));
     syncingOutcomePhase.set(String(outcomeId), 'checking');
+    window.addEventListener('beforeunload', warnBeforeUnload);
     onRerender?.();
 
     // Wrap onProgress to flip the row phase when the state machine enters
@@ -568,16 +584,13 @@ export async function handleSyncStudents({
             syncingStudentIds.delete(k);
             syncStudentPhase.delete(k);
         }
+        if (syncingOutcomeIds.size === 0) window.removeEventListener('beforeunload', warnBeforeUnload);
     };
 
-    // After CALCULATING_CHANGES resolves the final sync list:
-    //   1. Advance the outcome chip from "Checking…" to "Syncing…" (#55) and add
-    //      per-row spinners ONLY for students actually being pushed.
-    //   2. Capture the resolved IDs for the post-sync canvasScore update below —
-    //      we must only update students who were actually synced, not all effectiveIds.
-    let resolvedStudentIds = null;
+    // After CALCULATING_CHANGES resolves the final sync list, advance the outcome
+    // chip from "Checking…" to "Syncing…" (#55) and add per-row spinners ONLY for
+    // students actually being pushed. (Post-push updates use onPushed's IDs.)
     const onStudentsResolved = (resolvedUserIds) => {
-        resolvedStudentIds = new Set(resolvedUserIds);
         const resolvedKeys = new Set(resolvedUserIds.map(id => `${outcomeId}_${id}`));
 
         // #55: keep the outcome in an active state for the whole run. Advance the
@@ -599,6 +612,51 @@ export async function handleSyncStudents({
         onRerender?.();
     };
 
+    // Runs as soon as scores are written to Canvas — before VERIFYING, which can
+    // take minutes and is lost if the teacher leaves. Mirrors the SYNCING
+    // sync_state changes into the in-memory cache (so later whole-cache writes
+    // don't undo them) and starts the Current Score update from the pushed scores.
+    let pushedIds = [];
+    const onPushed = ({ pushedUserIds }) => {
+        pushedIds = pushedUserIds;
+        const now = new Date().toISOString();
+        if (!cache.sync_state) cache.sync_state = {};
+        const avgPushedScores = {};
+
+        for (const sid of pushedUserIds) {
+            const pushed = pushedScores[sid];
+            if (pushed == null) continue;
+            avgPushedScores[sid] = pushed;
+
+            const entry = getOrInitEntry(cache.sync_state, outcomeId, sid);
+            entry.last_synced_score = pushed;
+            entry.last_synced_at    = now;
+            entry.verify_mismatch   = false;
+            if (entry.will_post_note) entry.will_post_note = null;
+            if (entry.will_post != null && Math.round(entry.will_post * 100) === Math.round(pushed * 100)) {
+                entry.will_post      = null;
+                entry.will_post_lock = 'none';
+            }
+
+            const od = cache.students?.find(s => String(s.id) === sid)
+                ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+            if (od) od.canvasScore = pushed;
+        }
+
+        updateAvgAssignmentForStudents({
+            courseId,
+            outcomeId,
+            outcomeName,
+            studentIds:   effectiveIds.filter(Boolean),
+            notes,
+            pushedScores: avgPushedScores,
+            cache,
+            apiClient,
+        })
+            .then(() => onRerender?.())
+            .catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
+    };
+
     let result;
     try {
         result = await runPLSync({
@@ -612,6 +670,7 @@ export async function handleSyncStudents({
             canvasScoreOverrides: Object.keys(canvasScoreOverrides).length > 0 ? canvasScoreOverrides : null,
             onProgress:         phaseProgress,
             onStudentsResolved,
+            onPushed,
         });
     } catch (err) {
         // On a thrown error there's no cache write below, so repaint here to
@@ -626,26 +685,17 @@ export async function handleSyncStudents({
     // canvasScore instead of flickering through the stale value first.
     clearSyncKeys();
 
-    // Update canvasScore in-memory and write cache to disk once after the batch.
+    // Scores were pushed: canvasScore, sync_state, and the Current Score update were
+    // already handled in onPushed. Mirror the verify outcome into memory too, then
+    // write the cache once so the in-memory copy doesn't undo the handlers' disk writes.
     if (result.success && result.successCount > 0) {
-        const syncState   = cache?.sync_state ?? {};
-        const outcomeSync = syncState[String(outcomeId)] ?? {};
-
-        // Only update students that were actually resolved by handleCalculatingChanges
-        // (i.e. had a real score delta). Students skipped for no-change, no submission,
-        // no prediction, or manual_override are NOT in resolvedStudentIds and must not
-        // have their canvasScore overwritten.
-        // Also exclude students whose push failed (present in result.errors).
-        const failedIds = new Set((result.errors ?? []).map(e => String(e.userId)));
-        const idsToUpdate = resolvedStudentIds
-            ? [...resolvedStudentIds].filter(id => !failedIds.has(String(id)))
-            : effectiveIds.filter(id => !failedIds.has(String(id)));
-
-        for (const sid of idsToUpdate) {
-            const student = cache?.students?.find(s => String(s.id) === String(sid));
-            const od      = student?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-            if (od != null) {
-                if (pushedScores[String(sid)] != null) od.canvasScore = pushedScores[String(sid)];
+        if (result.stateHistory?.includes(PL_STATES.VERIFYING)) {
+            const verifiedAt  = new Date().toISOString();
+            const mismatchIds = new Set(result.verifyMismatchIds ?? []);
+            for (const sid of pushedIds) {
+                const entry = getOrInitEntry(cache.sync_state, outcomeId, sid);
+                entry.last_verify_at  = verifiedAt;
+                entry.verify_mismatch = mismatchIds.has(sid);
             }
         }
 
@@ -657,22 +707,7 @@ export async function handleSyncStudents({
     }
 
     if (result.success) {
-        const syncedIds = effectiveIds.filter(Boolean);
-
-        if (result.successCount > 0) {
-            // Scores were pushed — update avg score + post comment via GraphQL
-            updateAvgAssignmentForStudents({
-                courseId,
-                outcomeId,
-                outcomeName,
-                studentIds: syncedIds,
-                notes,
-                cache,
-                apiClient,
-            })
-                .then(() => onRerender?.())
-                .catch(err => logger.warn('[PLActions] Avg update failed:', err.message));
-        } else if (Object.keys(notes).length > 0) {
+        if (result.successCount === 0 && Object.keys(notes).length > 0) {
             // No score change but notes exist — post comment-only via REST.
             // Awaited so onRerender fires after will_post_note_last_submitted
             // is written to cache, letting buildOutcomeStudentRow clear the row.

@@ -785,6 +785,36 @@ describe('handleSyncing', () => {
         expect(next).toBe(PL_STATES.VERIFYING);
     });
 
+    test('calls onPushed with pushed (non-failed) students before verification', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({ successCount: 1, errors: [], retryCounts: [] });
+        const onPushed = vi.fn();
+        const sm = buildSMAtSyncing({ onPushed });
+
+        const next = await handleSyncing(sm);
+
+        expect(next).toBe(PL_STATES.VERIFYING);
+        expect(onPushed).toHaveBeenCalledTimes(1);
+        expect(onPushed).toHaveBeenCalledWith(expect.objectContaining({ successCount: 1, pushedUserIds: ['u1'] }));
+    });
+
+    test('does not call onPushed when nothing was pushed', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({
+            successCount: 0, errors: [{ userId: 'u1', error: 'timeout' }], retryCounts: []
+        });
+        const onPushed = vi.fn();
+        const sm = buildSMAtSyncing({ onPushed });
+
+        await handleSyncing(sm);
+        expect(onPushed).not.toHaveBeenCalled();
+    });
+
+    test('a throwing onPushed does not break the sync', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({ successCount: 1, errors: [], retryCounts: [] });
+        const sm = buildSMAtSyncing({ onPushed: () => { throw new Error('boom'); } });
+
+        await expect(handleSyncing(sm)).resolves.toBe(PL_STATES.VERIFYING);
+    });
+
     test('batch errors are stored in context', async () => {
         const batchErrors = [{ userId: 'u1', submissionId: 'sub-1', error: 'timeout' }];
         submitRubricAssessmentBatch.mockResolvedValue({ successCount: 0, errors: batchErrors, retryCounts: [] });
