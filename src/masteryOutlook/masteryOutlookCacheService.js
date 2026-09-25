@@ -242,6 +242,10 @@ async function lockFolder(apiClient, folderId) {
 /**
  * Write mastery outlook cache to Canvas Files API
  *
+ * Reads the current file first and merges (mergeCacheForWrite) so sync_state
+ * entries, pl_assignments, and metadata on disk are never dropped by a write
+ * from an older copy. Accepts the view's `meta` key and writes it as `metadata`.
+ *
  * 3-step process:
  * 1. Request upload URL from Canvas
  * 2. Upload file to that URL
@@ -249,7 +253,7 @@ async function lockFolder(apiClient, folderId) {
  *
  * @param {string} courseId - Canvas course ID
  * @param {CanvasApiClient} apiClient - Canvas API client instance
- * @param {Object} cacheData - Complete mastery outlook cache data structure
+ * @param {Object} cacheData - Complete mastery outlook cache data structure (`metadata` or view `meta`)
  * @returns {Promise<Object>} Canvas file object
  */
 export async function writeMasteryOutlookCache(courseId, apiClient, cacheData) {
@@ -257,14 +261,11 @@ export async function writeMasteryOutlookCache(courseId, apiClient, cacheData) {
         // Ensure folder exists
         const folderId = await ensureFolder(courseId, apiClient);
 
-        // Add schema version to metadata
-        const cacheWithVersion = {
-            ...cacheData,
-            metadata: {
-                ...cacheData.metadata,
-                schemaVersion: SCHEMA_VERSION
-            }
-        };
+        // Merge with the file on disk so a write from an older copy (view memory,
+        // a read-modify-write that read stale data, another tab) can't drop
+        // sync_state entries, pl_assignments, or metadata written by someone else.
+        const onDisk = await readMasteryOutlookCache(courseId, apiClient);
+        const cacheWithVersion = mergeCacheForWrite(onDisk, cacheData);
 
         const jsonContent = JSON.stringify(cacheWithVersion, null, 2);
         const fileSize = new Blob([jsonContent]).size;
@@ -374,9 +375,11 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
 
         logger.debug(`[masteryOutlookCacheService] Cache file found (id: ${cacheFile.id})`);
 
-        // Step 2: Download file content
+        // Step 2: Download file content (no-store: a stale browser copy would make
+        // read-modify-write callers drop recent changes)
         const fileResponse = await fetch(cacheFile.url, {
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
         });
 
         if (!fileResponse.ok) {
@@ -415,6 +418,74 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
  * Export schema version for external validation
  */
 export { SCHEMA_VERSION };
+
+// ═══════════════════════════════════════════════════════════════════════
+// MERGE-ON-WRITE
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Combine the view's in-memory metadata (`meta`) and the file's `metadata`
+ * into one object. The view renames `metadata` → `meta` on load, and older
+ * writes split fields between the two keys.
+ *
+ * @param {Object|null} cache - cache object from disk or memory
+ * @returns {Object} merged metadata (never null)
+ */
+export function normalizeCacheMetadata(cache) {
+    return { ...(cache?.meta ?? {}), ...(cache?.metadata ?? {}) };
+}
+
+/**
+ * Build the object to write from what is on disk and the incoming cache.
+ *
+ * - metadata: disk fields, overlaid by incoming `metadata`/`meta` fields; always
+ *   written as `metadata` (no `meta` key) with the current schemaVersion.
+ * - sync_state: merged outcome → student → field. Incoming fields win; outcomes,
+ *   students, and fields only on disk are kept. (Resets set fields to null
+ *   rather than deleting them, so a union never resurrects cleared values.)
+ * - pl_assignments: per outcome, incoming wins; disk-only outcomes are kept.
+ * - everything else (students, outcomes, ignored_alignments, avg_assignment, …):
+ *   incoming as-is — ignored_alignments must stay authoritative so un-ignore works.
+ *
+ * Pure — does not mutate either argument.
+ *
+ * @param {Object|null} disk     - current file contents (null when none / unreadable)
+ * @param {Object}      incoming - cache the caller wants to write
+ * @returns {Object} cache to serialize
+ */
+export function mergeCacheForWrite(disk, incoming) {
+    const { meta: _meta, ...rest } = incoming ?? {};
+    const merged = {
+        ...rest,
+        metadata: {
+            ...(disk?.metadata ?? {}),
+            ...normalizeCacheMetadata(incoming),
+            schemaVersion: SCHEMA_VERSION,
+        },
+    };
+
+    const diskSync = disk?.sync_state ?? {};
+    const inSync   = incoming?.sync_state ?? {};
+    if (Object.keys(diskSync).length > 0 || incoming?.sync_state) {
+        const sync = {};
+        for (const oId of new Set([...Object.keys(diskSync), ...Object.keys(inSync)])) {
+            const dOut = diskSync[oId] ?? {};
+            const iOut = inSync[oId] ?? {};
+            sync[oId] = {};
+            for (const sId of new Set([...Object.keys(dOut), ...Object.keys(iOut)])) {
+                sync[oId][sId] = { ...(dOut[sId] ?? {}), ...(iOut[sId] ?? {}) };
+            }
+        }
+        merged.sync_state = sync;
+    }
+
+    const diskPL = disk?.pl_assignments ?? {};
+    if (Object.keys(diskPL).length > 0 || incoming?.pl_assignments) {
+        merged.pl_assignments = { ...diskPL, ...(incoming?.pl_assignments ?? {}) };
+    }
+
+    return merged;
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // PL ASSIGNMENTS — read/write pl_assignments section of the shared cache

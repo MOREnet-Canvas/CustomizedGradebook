@@ -14,7 +14,7 @@
 import { logger } from '../utils/logger.js';
 import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
-import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
+import { readMasteryOutlookCache, normalizeCacheMetadata } from './masteryOutlookCacheService.js';
 import { startPolling, stopPolling, startVisibilityListener, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
@@ -735,7 +735,8 @@ async function tryLoadCache(courseId, apiClient) {
         if (cache) {
             logger.info('[MasteryOutlook] Cache loaded successfully');
             cache = {
-                meta:               cache.metadata,
+                // Older writes split fields between `meta` and `metadata` — combine both.
+                meta:               normalizeCacheMetadata(cache),
                 outcomes:           cache.outcomes,
                 students:           cache.students,
                 // Preserve PL data so sync status badges and action buttons work
