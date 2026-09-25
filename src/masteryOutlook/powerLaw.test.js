@@ -118,6 +118,18 @@ describe('powerLawPredict', () => {
         expect(pred).toBeLessThan(4);
         expect(pred).toBeCloseTo(3.657, 3);
     });
+    it('floor is 0 (the rating scale), not 1 — a trailing 0 pulls the score below 1', () => {
+        expect(MIN_SCORE).toBe(0);
+        const pred = powerLawPredict([2.5, 2, 3, 0]);
+        expect(pred).toBeCloseTo(0.109, 2);
+        expect(pred).toBeGreaterThanOrEqual(0);
+    });
+    it('evaluates at the current attempt n (screenshot students, Outcome 2)', () => {
+        expect(powerLawPredict([3, 2, 2, 1.5])).toBeCloseTo(1.574, 2);
+        expect(powerLawPredict([3.5, 2, 2.5, 3])).toBeCloseTo(2.498, 2);
+        expect(powerLawPredict([2.5, 2, 3.5, 1])).toBeCloseTo(1.629, 2);
+        expect(powerLawPredict([2.5, 2.5, 1.5, 1])).toBeCloseTo(1.196, 2);
+    });
     it('prediction is clamped at MAX_SCORE (4) for very strong increasing trend', () => {
         const pred = powerLawPredict([1, 2, 4, 4]);
         expect(pred).toBeLessThanOrEqual(MAX_SCORE);

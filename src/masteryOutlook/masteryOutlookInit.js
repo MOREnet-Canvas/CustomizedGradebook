@@ -18,7 +18,7 @@ import { isMasteryOutlookPage } from '../utils/pageDetection.js';
 import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
 import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides, reapplyIgnoredAlignments } from './masteryOutlookDataService.js';
+import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides, reapplyIgnoredAlignments, applyCanvasClassStats } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache, readPLAssignments, readSyncState, readIgnoredAlignments } from './masteryOutlookCacheService.js';
 import { stopPolling, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { getThreshold } from './thresholdStorage.js';
@@ -234,7 +234,7 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     logger.debug(`[MasteryOutlookInit] Using threshold: ${threshold} for user ${userId}`);
 
     // Compute Power Law stats
-    onProgress('Computing Power Law predictions...');
+    onProgress('Computing Marzano Power Law scores...');
     const cache = computeOutcomeStats(data, threshold);
 
     // Find Mastery Dashboard page URL
@@ -275,30 +275,9 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     // so it used all attempts. This corrects those plPrediction values in place.
     reapplyIgnoredAlignments(cache);
 
-    // Step 7c.1: Recalculate plAvg using Canvas outcome rollup scores
-    // (canvasScore) rather than Power Law predictions. This makes the
-    // displayed average directly comparable to what teachers see in Canvas.
-    cache.outcomes.forEach(outcome => {
-        const canvasScores = cache.students
-            .map(student => student.outcomes?.find(o => o.outcomeId === outcome.id)?.canvasScore)
-            .filter(s => s != null);
-        if (canvasScores.length > 0 && outcome.classStats) {
-            const avg = canvasScores.reduce((a, b) => a + b, 0) / canvasScores.length;
-            outcome.classStats.plAvg     = parseFloat(avg.toFixed(4));
-            outcome.classStats.classMean = outcome.classStats.plAvg;
-
-            // Recalculate distribution using Canvas scores
-            const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
-            canvasScores.forEach(s => {
-                if      (s < 1.5) distribution['1']++;
-                else if (s < 2.5) distribution['2']++;
-                else if (s < 3.5) distribution['3']++;
-                else              distribution['4']++;
-            });
-            outcome.classStats.distribution = distribution;
-            outcome.classStats.belowThresholdCount = canvasScores.filter(s => s < outcome.classStats.computedThreshold).length;
-        }
-    });
+    // Step 7c.1: Class stats (row average, spread, below threshold) come from
+    // the scores Canvas reports, so they match what teachers see in Canvas.
+    cache.outcomes.forEach(outcome => applyCanvasClassStats(outcome, cache));
 
     // Step 7d: Build/refresh avg_assignment setup for Current Score updates.
     // Non-critical — Mastery Outlook works without it; avg updates are skipped.

@@ -61,32 +61,18 @@ export function isRegularOutcome(outcome) {
 }
 
 /**
- * Calculate a student's PL Avg from their regular outcome PL Predictions.
- * Used for Current Score outcome rendering.
+ * Compute class stats for the Current Score row from each student's Current
+ * Score as reported by Canvas — consistent with the other rows' Canvas averages.
+ *
+ * @param {Object} cache
+ * @param {number} threshold
+ * @param {string|number} currentScoreOutcomeId
+ * @returns {Object} classStats
  */
-function calculateStudentPLAvg(student, cache) {
-    const regularOutcomes = cache.outcomes.filter(o => isRegularOutcome(o));
-
-    const plPredictions = student.outcomes
-        .filter(so => {
-            const outcome = regularOutcomes.find(ro => String(ro.id) === String(so.outcomeId));
-            return outcome && so.plPrediction !== null;
-        })
-        .map(so => so.plPrediction);
-
-    if (plPredictions.length === 0) return null;
-
-    return plPredictions.reduce((sum, p) => sum + p, 0) / plPredictions.length;
-}
-
-/**
- * Compute class stats for Current Score outcome based on student PL Avgs
- * (the average of each student's regular outcome PL Predictions).
- */
-function computeCurrentScoreClassStats(cache, threshold) {
+export function computeCurrentScoreClassStats(cache, threshold, currentScoreOutcomeId) {
     const studentPLAvgs = cache.students
-        .map(student => calculateStudentPLAvg(student, cache))
-        .filter(v => v !== null);
+        .map(student => student.outcomes?.find(o => String(o.outcomeId) === String(currentScoreOutcomeId))?.canvasScore)
+        .filter(v => v !== null && v !== undefined);
 
     if (studentPLAvgs.length === 0) {
         return {
@@ -136,7 +122,7 @@ export function initOutcomeSyncContainer(containerEl) {
         <div id="od-col-headers" class="od-col-headers">
             <div class="od-col-header">#</div>
             <div class="od-col-header">Outcome</div>
-            <div class="od-col-header center">PL avg</div>
+            <div class="od-col-header center">Canvas avg</div>
             <div class="od-col-header center">Spread</div>
             <div class="od-col-header center">Below threshold</div>
             <div class="od-col-header center">Canvas sync</div>
@@ -300,7 +286,7 @@ function buildRefreshPrompt() {
     return `
         <div class="od-refresh-prompt">
             Outcome names loaded from Canvas. Hit
-            <strong>Refresh Data</strong> to calculate Power Law predictions,
+            <strong>Refresh Data</strong> to calculate Marzano Power Law scores,
             class distribution, and intervention flags.
         </div>`;
 }
@@ -507,7 +493,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
             const displayNumber     = isSpecial ? '' : ++regularIndex;
             const isCurrentScoreRow = isCurrentScoreOutcome(outcome.title);
             const displayStats      = isCurrentScoreRow
-                ? computeCurrentScoreClassStats(cache, threshold)
+                ? computeCurrentScoreClassStats(cache, threshold, outcome.id)
                 : outcome.classStats;
 
             const controller = mountOutcomeRow({

@@ -113,7 +113,7 @@ function _printHelp(courseId) {
         '  │       the next normal sync treats everyone as needs_sync. Does NOT set',
         '  │       manual_override — safe to re-sync immediately after.',
         '  │',
-        '  ├── powerLawPredict(scores)       Predicted next score from score array',
+        '  ├── powerLawPredict(scores)       Marzano score at the current attempt',
         '  ├── computeStudentOutcome(scores) Full computed object (status, plPrediction, …)',
         '  │',
         '  ├── PL_STATES              State machine state constants',

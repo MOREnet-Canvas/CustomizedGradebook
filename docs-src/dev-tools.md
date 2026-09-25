@@ -106,7 +106,7 @@ No-op when debug mode is not active. Otherwise, populates `window.__CG_DEV` and 
 | `runPLSync(opts)` | `(opts) => Promise<Object>` | Run the full PL sync for one outcome (see below) |
 | `checkSyncNeeded(outcomeId)` | `(string) => Promise<Object>` | Returns `{ hasSetup, predictionCount }` |
 | `resetOutcomeScoresToZero()` | `() => Promise<void>` | Interactive dev utility — lists outcomes, prompts for ID, zeros all students |
-| `powerLawPredict(scores)` | `(number[]) => number` | Raw power-law prediction from score array |
+| `powerLawPredict(scores)` | `(number[]) => number` | Marzano score at the current attempt (curve evaluated at `n`, clamped 0–4) |
 | `computeStudentOutcome(scores)` | `(number[]) => Object` | Full computed object: `{ status, plPrediction, … }` |
 | `PL_STATES` | `Object` | State machine state constants (all valid state names) |
 | `config` | `Object` | Current `window.CG_CONFIG` |
@@ -152,7 +152,7 @@ await __CG_DEV.checkSyncNeeded('598')
 // → { hasSetup: true, predictionCount: 24 }
 
 // Test the power law algorithm in isolation
-__CG_DEV.powerLawPredict([2, 2.5, 3, 3.5])  // → predicted next score
+__CG_DEV.powerLawPredict([2, 2.5, 3, 3.5])  // → Marzano score at the current (4th) attempt
 __CG_DEV.computeStudentOutcome([2, 2.5, 3])  // → { status, plPrediction, … }
 
 // Deactivate debug mode

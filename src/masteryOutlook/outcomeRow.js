@@ -28,7 +28,7 @@ import {
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
+import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats } from './masteryOutlookDataService.js';
 import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
@@ -196,44 +196,60 @@ function renderInitPanel(outcome, open) {
 
 // ─── Per-outcome counts (drive detail-panel tab labels) ──────────────────────
 
-function calculateStudentPLAvg(student, cache, isRegularOutcome) {
-    const regularOutcomes = cache.outcomes.filter(o => isRegularOutcome(o));
-    const preds = student.outcomes
-        .filter(so => {
-            const outcome = regularOutcomes.find(ro => String(ro.id) === String(so.outcomeId));
-            return outcome && so.plPrediction !== null;
-        })
-        .map(so => so.plPrediction);
-    if (preds.length === 0) return null;
-    return preds.reduce((sum, p) => sum + p, 0) / preds.length;
+/** Slope beyond which a student counts as growing / declining (filter and trend arrow agree). */
+export const TREND_SLOPE_THRESHOLD = 0.05;
+
+/**
+ * Filters for the Struggling / Declining / Growing / All Students tabs. Used by
+ * both the tab tables and their tab counts, over the same rows (see
+ * buildOutcomeStudentRows) — so the filtered tabs always match All Students.
+ */
+export const TAB_FILTERS = {
+    struggling: (row, threshold) => row.plPrediction !== null && row.plPrediction !== undefined && row.plPrediction < threshold,
+    declining:  (row) => row.slope !== null && row.slope !== undefined && row.slope < -TREND_SLOPE_THRESHOLD,
+    growing:    (row) => row.slope !== null && row.slope !== undefined && row.slope >  TREND_SLOPE_THRESHOLD,
+    all:        () => true,
+};
+
+/**
+ * Rows for an outcome's student tabs — one per student, from the in-memory cache.
+ * Regular outcomes use the student's Marzano score (plPrediction). The Current
+ * Score row uses the student's Current Score as reported by Canvas.
+ *
+ * @param {Object}  outcome
+ * @param {Object}  cache
+ * @param {Object}  [opts]
+ * @param {boolean} [opts.isCurrentScoreRow=false]
+ * @returns {Object[]} rows: { id, name, sortableName, ...outcomeData }
+ */
+export function buildOutcomeStudentRows(outcome, cache, { isCurrentScoreRow = false } = {}) {
+    return (cache.students || []).map(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        const row = {
+            id: student.id,
+            name: student.name || student.sortableName,
+            sortableName: student.sortableName,
+            plPrediction: null,
+            slope: null,
+            ...od
+        };
+        if (isCurrentScoreRow) row.plPrediction = od?.canvasScore ?? null;
+        return row;
+    });
 }
 
-function countStrugglingStudents(outcome, cache, ctx, isRegularOutcome, isCurrentScoreRow) {
-    const threshold = ctx.getThreshold();
-    return cache.students.filter(student => {
-        let plValue;
-        if (isCurrentScoreRow) {
-            plValue = calculateStudentPLAvg(student, cache, isRegularOutcome);
-        } else {
-            const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-            plValue = od ? od.plPrediction : null;
-        }
-        return plValue !== null && plValue < threshold;
-    }).length;
-}
-
-function countDecliningStudents(outcome, cache) {
-    return cache.students.filter(student => {
-        const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return od && od.slope !== null && od.slope < -0.05;
-    }).length;
-}
-
-function countGrowingStudents(outcome, cache) {
-    return cache.students.filter(student => {
-        const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return od && od.slope !== null && od.slope > 0.05;
-    }).length;
+/**
+ * Number of students on one filtered tab — same rows and filter as its table.
+ * @param {Object} outcome
+ * @param {'struggling'|'declining'|'growing'|'all'} filter
+ * @param {Object} cache
+ * @param {number} threshold
+ * @param {Object} [opts] - { isCurrentScoreRow }
+ * @returns {number}
+ */
+export function countTabStudents(outcome, filter, cache, threshold, opts = {}) {
+    const pred = TAB_FILTERS[filter] ?? TAB_FILTERS.all;
+    return buildOutcomeStudentRows(outcome, cache, opts).filter(row => pred(row, threshold)).length;
 }
 
 function countExceptionStudents(outcome, cache) {
@@ -310,27 +326,12 @@ function buildExceptionsTable(outcome, cache) {
 // ─── Filter tables (Struggling / Declining / Growing) ────────────────────────
 
 function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isRegularOutcome, profColor) {
-    const plConfig = { pl_assignments: cache.pl_assignments ?? {}, sync_state: cache.sync_state ?? {} };
-
-    let students = cache.students.map(student => {
-        const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-        const row = {
-            id: student.id,
-            name: student.name || student.sortableName,
-            sortableName: student.sortableName,
-            ...od
-        };
-        if (isCurrentScoreRow) {
-            row.plPrediction = calculateStudentPLAvg(student, cache, isRegularOutcome);
-        }
-        return row;
-    });
+    // Same rows as All Students; each tab only applies its filter (TAB_FILTERS).
+    let students = buildOutcomeStudentRows(outcome, cache, { isCurrentScoreRow });
 
     const threshold = ctx.getThreshold();
 
-    if      (filter === 'struggling') students = students.filter(s => s.plPrediction !== null && s.plPrediction < threshold);
-    else if (filter === 'declining')  students = students.filter(s => s.slope !== null && s.slope < -0.05);
-    else if (filter === 'growing')    students = students.filter(s => s.slope !== null && s.slope > 0.05);
+    if (TAB_FILTERS[filter]) students = students.filter(s => TAB_FILTERS[filter](s, threshold));
 
     if (filter === 'students' || filter === 'all') {
         // Both Manage Students and All Students sort alphabetically by name
@@ -368,8 +369,8 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
 
         let trendIcon = '→', trendColor = '#999';
         if (s.slope !== null) {
-            if (s.slope > 0.1)       { trendIcon = '▲'; trendColor = '#0F6E56'; }
-            else if (s.slope < -0.1) { trendIcon = '▼'; trendColor = '#A32D2D'; }
+            if (s.slope > TREND_SLOPE_THRESHOLD)       { trendIcon = '▲'; trendColor = '#0F6E56'; }
+            else if (s.slope < -TREND_SLOPE_THRESHOLD) { trendIcon = '▼'; trendColor = '#A32D2D'; }
         }
 
         // Score history — colored chips sorted oldest→newest
@@ -412,7 +413,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             </tr>`;
     }).join('');
 
-    const plColumnHeader = isCurrentScoreRow ? 'PL Avg' : 'Marzano';
+    const plColumnHeader = isCurrentScoreRow ? 'Canvas' : 'Marzano';
 
     return `
         <table class="od-stu-table">
@@ -534,27 +535,9 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
     if (updated > 0) {
         logger.debug(`[MasteryOutlook] Live rollup: updated canvasScore for ${updated} student(s) on outcome ${outcomeId}`);
 
-        // Recalculate outcome average and spread from updated Canvas scores
+        // Row average, spread, and below-threshold follow the updated Canvas scores
         const outcomeObj = cache.outcomes?.find(o => String(o.id) === String(outcomeId));
-        if (outcomeObj?.classStats) {
-            const canvasScores = cache.students
-                .map(s => s.outcomes?.find(o => String(o.outcomeId) === String(outcomeId))?.canvasScore)
-                .filter(s => s != null);
-            if (canvasScores.length > 0) {
-                const avg = canvasScores.reduce((a, b) => a + b, 0) / canvasScores.length;
-                outcomeObj.classStats.plAvg     = parseFloat(avg.toFixed(4));
-                outcomeObj.classStats.classMean = outcomeObj.classStats.plAvg;
-                const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
-                canvasScores.forEach(s => {
-                    if      (s < 1.5) distribution['1']++;
-                    else if (s < 2.5) distribution['2']++;
-                    else if (s < 3.5) distribution['3']++;
-                    else              distribution['4']++;
-                });
-                outcomeObj.classStats.distribution        = distribution;
-                outcomeObj.classStats.belowThresholdCount = canvasScores.filter(s => s < outcomeObj.classStats.computedThreshold).length;
-            }
-        }
+        if (outcomeObj) applyCanvasClassStats(outcomeObj, cache);
     }
 
     return scoreMap;
@@ -572,22 +555,26 @@ function buildOutcomeDetailPanel({
     const tabBar = document.createElement('div');
     tabBar.className = 'od-detail-tabs';
 
-    const strugglingCount  = countStrugglingStudents(outcome, cache, ctx, isRegularOutcome, isCurrentScoreRow);
-    const decliningCount   = countDecliningStudents(outcome, cache);
-    const growingCount     = countGrowingStudents(outcome, cache);
-    const exceptionsCount  = countExceptionStudents(outcome, cache);
-
-    const allStudentsCount = cache.students.length;
-    const tabs = [
-        { id: 'students',   label: `Manage Students (${allStudentsCount})` },
-        { id: 'struggling', label: `Struggling (${strugglingCount})` },
-        { id: 'declining',  label: `Declining (${decliningCount})` },
-        { id: 'growing',    label: `Growing (${growingCount})` },
-        ...(exceptionsCount > 0
-            ? [{ id: 'exceptions', label: `Exceptions (${exceptionsCount})` }]
-            : []),
-        { id: 'all',        label: `All Students (${allStudentsCount})` },
-    ];
+    // Tab labels — counts come from the same rows/filters as the tables and are
+    // recomputed on every renderTable() so they never go stale.
+    const tabLabel = (id) => {
+        const threshold = ctx.getThreshold();
+        const opts = { isCurrentScoreRow };
+        switch (id) {
+            case 'students':   return `Manage Students (${cache.students.length})`;
+            case 'struggling': return `Struggling (${countTabStudents(outcome, 'struggling', cache, threshold, opts)})`;
+            case 'declining':  return `Declining (${countTabStudents(outcome, 'declining', cache, threshold, opts)})`;
+            case 'growing':    return `Growing (${countTabStudents(outcome, 'growing', cache, threshold, opts)})`;
+            case 'exceptions': return `Exceptions (${countExceptionStudents(outcome, cache)})`;
+            default:           return `All Students (${cache.students.length})`;
+        }
+    };
+    const tabs = ['students', 'struggling', 'declining', 'growing',
+        ...(countExceptionStudents(outcome, cache) > 0 ? ['exceptions'] : []), 'all']
+        .map(id => ({ id, label: tabLabel(id) }));
+    const refreshTabLabels = () => {
+        tabBar.querySelectorAll('.od-detail-tab').forEach(btn => { btn.textContent = tabLabel(btn.dataset.tabId); });
+    };
 
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
@@ -638,6 +625,7 @@ function buildOutcomeDetailPanel({
         const savedValue  = isNoteInput ? active.value          : null;
         // ───────────────────────────────────────────────────────────────────
 
+        refreshTabLabels();
         const activeTab = state.activeTabs[outcome.id] ?? 'students';
         if (activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);

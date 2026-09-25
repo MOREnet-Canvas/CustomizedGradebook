@@ -8,12 +8,12 @@
  *
  * Marzano Power Law formula: y = a · x^b
  * Solved via least squares regression on log-transformed values.
- * Predicts what a student would score if assessed at the next time point.
+ * Evaluated at the current attempt n (not n + 1): the student's true score now.
  */
 
 export const MIN_SCORES = 3;
 export const MAX_SCORE = 4;
-export const MIN_SCORE = 1;
+export const MIN_SCORE = 0;   // matches the rating scale (0 = No Evidence)
 export const DECAYING_AVG_WEIGHT = 0.65;
 
 /**
@@ -43,7 +43,7 @@ function clamp(value, min, max) {
  * @param {number[]} scores - Rubric criteria scores for a single outcome,
  *   in chronological order (oldest first). Caller is responsible for
  *   correct ordering. Minimum 3 scores required.
- * @returns {number|null} True score clamped to [MIN_SCORE, MAX_SCORE],
+ * @returns {number|null} True score at attempt n, clamped to [MIN_SCORE, MAX_SCORE] (0–4),
  *   or null if insufficient data (NE status)
  */
 export function powerLawPredict(scores) {

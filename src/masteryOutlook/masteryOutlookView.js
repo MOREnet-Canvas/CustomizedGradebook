@@ -86,7 +86,7 @@ function buildShell(containerEl) {
         <div id="od-header" class="od-header">
             <div>
                 <div id="od-title" class="od-title">Mastery Outlook</div>
-                <div id="od-subtitle">Power Law predictions</div>
+                <div id="od-subtitle">Marzano Power Law scores</div>
             </div>
             <div class="od-header-actions">
                 <span id="od-last-updated"></span>
@@ -230,7 +230,7 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
     shell.subtitleEl.textContent =
         `${cache.meta.studentCount} students ·
          ${cache.meta.outcomeCount} outcomes ·
-         Power Law predictions`;
+         Marzano Power Law scores`;
 
     // Initialize color scheme from localStorage
     const userId = window.ENV?.current_user_id;
@@ -468,7 +468,7 @@ function renderMetricCards(metricsEl, cache) {
 
     const cards = cache ? [
         {
-            label: 'Class PL avg',
+            label: 'Class Canvas avg',
             value: overallPlAvg(cache, regularOutcomes),
             sub:   'across all outcomes',
             color: '#0F6E56'
@@ -494,11 +494,11 @@ function renderMetricCards(metricsEl, cache) {
                 o => o.classStats.avgSlope !== null &&
                     o.classStats.avgSlope > 0.05
             ).length,
-            sub:   'positive PL slope',
+            sub:   'positive Marzano trend',
             color: '#0F6E56'
         }
     ] : [
-        { label: 'Class PL avg',      value: '—', sub: 'no data yet',       color: '#bbb' },
+        { label: 'Class Canvas avg',  value: '—', sub: 'no data yet',       color: '#bbb' },
         { label: 'Re-teach flagged',  value: '—', sub: 'no data yet',       color: '#bbb' },
         { label: 'Intervention',      value: '—', sub: 'no data yet',       color: '#bbb' },
         { label: 'Growing outcomes',  value: '—', sub: 'no data yet',       color: '#bbb' }
@@ -666,14 +666,16 @@ function overallPlAvg(cache, regularOutcomes) {
 }
 
 function countInterventionStudents(cache) {
-    // Count students appearing below threshold on 3+ outcomes
+    // Count students whose Canvas-reported score is below threshold on 3+ regular outcomes
     const threshold = getCurrentThreshold();
     const lowCounts = {};
 
     cache.students.forEach(student => {
         let lowCount = 0;
         student.outcomes.forEach(outcome => {
-            if (outcome.plPrediction !== null && outcome.plPrediction < threshold) {
+            const regular = cache.outcomes.find(o => String(o.id) === String(outcome.outcomeId));
+            if (!regular || !isRegularOutcome(regular)) return;
+            if (outcome.canvasScore !== null && outcome.canvasScore !== undefined && outcome.canvasScore < threshold) {
                 lowCount++;
             }
         });

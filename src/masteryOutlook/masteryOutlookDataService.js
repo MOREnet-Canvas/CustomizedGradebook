@@ -151,6 +151,52 @@ export async function fetchOutcomeRollups(courseId, apiClient) {
     }
 }
 
+/**
+ * Canvas-reported score distribution buckets, matching the spread bar.
+ * @param {number[]} scores
+ * @returns {{ '1': number, '2': number, '3': number, '4': number }}
+ */
+function bucketDistribution(scores) {
+    const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
+    scores.forEach(s => {
+        if      (s < 1.5) distribution['1']++;
+        else if (s < 2.5) distribution['2']++;
+        else if (s < 3.5) distribution['3']++;
+        else              distribution['4']++;
+    });
+    return distribution;
+}
+
+/**
+ * Set an outcome's class stats from the scores **Canvas reports**
+ * (student.outcomes[].canvasScore) so the row average, spread bar, and
+ * "Below threshold" count match what teachers see in Canvas. The Marzano
+ * trend (avgSlope) is left as computed.
+ *
+ * With no Canvas scores yet, plAvg / classMean are null (shown as —) rather
+ * than falling back to Marzano. Mutates outcome.classStats in place.
+ *
+ * @param {Object} outcome  - cache.outcomes entry
+ * @param {Object} cache    - in-memory cache with .students
+ * @param {number} [threshold] - defaults to classStats.computedThreshold
+ * @returns {Object} outcome.classStats
+ */
+export function applyCanvasClassStats(outcome, cache, threshold) {
+    if (!outcome.classStats) outcome.classStats = {};
+    const cs = outcome.classStats;
+    const limit = threshold ?? cs.computedThreshold;
+    const scores = (cache.students || [])
+        .map(s => s.outcomes?.find(o => String(o.outcomeId) === String(outcome.id))?.canvasScore)
+        .filter(v => v !== null && v !== undefined);
+
+    cs.plAvg     = scores.length > 0 ? parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(4)) : null;
+    cs.classMean = cs.plAvg;
+    cs.distribution        = bucketDistribution(scores);
+    cs.belowThresholdCount = limit != null ? scores.filter(v => v < limit).length : 0;
+    if (limit != null) cs.computedThreshold = limit;
+    return cs;
+}
+
 /** Delays between verify polls: quick at first (Canvas usually updates within seconds), then backing off. */
 export const VERIFY_POLL_DELAYS_MS = [1000, 1000, 1000, 2000, 2000, 3000];
 export const VERIFY_POLL_STEADY_MS = 5000;
