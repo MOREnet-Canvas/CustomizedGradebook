@@ -13,6 +13,10 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
     writeMasteryOutlookCache: vi.fn(async () => {}),
 }));
 vi.mock('../plOutlookSync.js', () => ({ runPLSync: vi.fn() }));
+vi.mock('../plOutlookStateHandlers.js', () => ({
+    // Background outcome check — resolves on demand in the tests that care
+    verifyOutcomeRollups: vi.fn(async () => ({ verifiedAt: '2026-09-25T20:00:00Z', mismatchIds: [] })),
+}));
 vi.mock('../masteryOutlookAvgService.js', async (importOriginal) => ({
     ...(await importOriginal()),
     updateAvgAssignmentForStudents: vi.fn(async () => true),
@@ -23,7 +27,8 @@ import { handleSyncStudents } from '../plOutlookActions.js';
 import { runPLSync } from '../plOutlookSync.js';
 import { updateAvgAssignmentForStudents, applyPushedScoresToRollups } from '../masteryOutlookAvgService.js';
 import { writeMasteryOutlookCache } from '../masteryOutlookCacheService.js';
-import { runExclusive, isSaveQueueBusy, rowSavePhase } from '../masteryOutlookState.js';
+import { runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome } from '../masteryOutlookState.js';
+import { verifyOutcomeRollups } from '../plOutlookStateHandlers.js';
 import { getOutcomeSaveSummary } from '../studentSyncTable.js';
 
 function makeCache() {
@@ -97,12 +102,26 @@ describe('handleSyncStudents — work that must not wait for verification', () =
         expect(removeSpy).not.toHaveBeenCalledWith('beforeunload', expect.any(Function));
 
         const writesBeforeVerify = writeMasteryOutlookCache.mock.calls.length;
+        let finishOutcomeCheck;
+        verifyOutcomeRollups.mockImplementationOnce(() => new Promise(r => {
+            finishOutcomeCheck = () => r({ verifiedAt: '2026-09-25T20:00:00Z', mismatchIds: [] });
+        }));
         finishVerify();
         await run;
 
-        expect(entry.last_verify_at).toBeTruthy();
+        // Confirmed on the assignment; the outcome check runs in the background (⏳)
+        expect(verifyOutcomeRollups).toHaveBeenCalledWith(expect.objectContaining({
+            courseId: '566', outcomeId: '599', expected: { '642': 2 },
+        }));
+        expect(rowsAwaitingOutcome.has('599_642')).toBe(true);
+        expect(entry.last_verify_at).toBeUndefined();
         expect(entry.verify_mismatch).toBe(false);
         expect(writeMasteryOutlookCache.mock.calls.length).toBe(writesBeforeVerify + 1);
+
+        finishOutcomeCheck();
+        await vi.waitFor(() => expect(rowsAwaitingOutcome.has('599_642')).toBe(false));
+        expect(entry.last_verify_at).toBe('2026-09-25T20:00:00Z');
+        expect(entry.verify_mismatch).toBe(false);
         expect(updateAvgAssignmentForStudents).toHaveBeenCalledTimes(1);   // not repeated after verify
         await vi.waitFor(() => expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
     });
@@ -120,7 +139,7 @@ describe('handleSyncStudents — work that must not wait for verification', () =
             .toBeLessThan(runPLSync.mock.invocationCallOrder[0]);
     });
 
-    test('verify mismatch is mirrored into memory', async () => {
+    test('assignment confirm failure is mirrored into memory and skips the outcome check', async () => {
         runPLSync.mockImplementation(async ({ onPushed }) => {
             onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
             return { ...DONE, verifyMismatchIds: ['642'] };
@@ -131,6 +150,23 @@ describe('handleSyncStudents — work that must not wait for verification', () =
             studentIds: ['642'], apiClient: {}, cache, onRerender: () => {} });
 
         expect(cache.sync_state['599']['642'].verify_mismatch).toBe(true);
+        expect(verifyOutcomeRollups).not.toHaveBeenCalled();
+        expect(rowsAwaitingOutcome.has('599_642')).toBe(false);
+    });
+
+    test('outcome check that never matches marks verify_mismatch in memory', async () => {
+        verifyOutcomeRollups.mockResolvedValueOnce({ verifiedAt: '2026-09-25T20:05:00Z', mismatchIds: ['642'] });
+        runPLSync.mockImplementation(async ({ onPushed }) => {
+            onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
+            return DONE;
+        });
+        const cache = makeCache();
+
+        await handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642'], apiClient: {}, cache, onRerender: () => {} });
+
+        await vi.waitFor(() => expect(cache.sync_state['599']['642'].verify_mismatch).toBe(true));
+        expect(cache.sync_state['599']['642'].last_verify_at).toBe('2026-09-25T20:05:00Z');
     });
 
     test('runPLSync throws → promise rejects and leave-page warning is removed', async () => {

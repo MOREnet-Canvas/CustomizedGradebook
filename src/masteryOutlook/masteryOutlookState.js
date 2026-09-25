@@ -69,6 +69,26 @@ export function getOutcomeRowPhases(outcomeId) {
 }
 
 /**
+ * Rows ("outcomeId_studentId") whose save is confirmed on the assignment but
+ * whose outcome score Canvas hasn't recalculated yet. The background outcome
+ * check (verifyOutcomeRollups) removes them. Rows show ⏳ beside the Canvas
+ * pill and the chip counts them; the banner and save queue are not blocked.
+ */
+export const rowsAwaitingOutcome = new Set();
+
+/**
+ * Number of rows in one outcome still waiting for Canvas's outcome score.
+ * @param {string|number} outcomeId
+ * @returns {number}
+ */
+export function countRowsAwaitingOutcome(outcomeId) {
+    const prefix = `${outcomeId}_`;
+    let n = 0;
+    for (const k of rowsAwaitingOutcome) if (k.startsWith(prefix)) n++;
+    return n;
+}
+
+/**
  * Set of in-flight sync keys for entire outcomes in format "outcomeId".
  * Used to show an outcome-level "Checking..." indicator before specific
  * students are marked as pushing.

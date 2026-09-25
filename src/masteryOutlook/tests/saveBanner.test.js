@@ -16,7 +16,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
 
 import { renderOutcomeStudentTable, getOutcomeSaveSummary } from '../studentSyncTable.js';
 import { buildSyncChip } from '../outcomeRow.js';
-import { rowSavePhase, syncingOutcomeIds } from '../masteryOutlookState.js';
+import { rowSavePhase, syncingOutcomeIds, rowsAwaitingOutcome } from '../masteryOutlookState.js';
 
 const OID = '600';
 
@@ -51,6 +51,7 @@ function banner(cache) {
 afterEach(() => {
     rowSavePhase.clear();
     syncingOutcomeIds.clear();
+    rowsAwaitingOutcome.clear();
 });
 
 describe('save banner', () => {
@@ -73,12 +74,25 @@ describe('save banner', () => {
         expect(b.button.textContent.trim()).toBe('Save remaining (1)');
     });
 
-    test('verifying with nothing left → disabled Verifying… button', () => {
+    test('confirming with nothing left → disabled Confirming… button', () => {
         for (const id of ['a', 'b', 'c']) rowSavePhase.set(`${OID}_${id}`, 'verifying');
         const b = banner(makeCache());
-        expect(b.text).toBe('Waiting for Canvas to confirm 3 students…');
+        expect(b.text).toBe('Confirming 3 students in Canvas…');
         expect(b.button.disabled).toBe(true);
-        expect(b.button.textContent.trim()).toBe('Verifying…');
+        expect(b.button.textContent.trim()).toBe('Confirming…');
+    });
+
+    test('rows waiting on the outcome score → non-blocking note; row shows ⏳; chip counts them', () => {
+        const cache = makeCache();
+        cache.sync_state[OID] = { a: { last_synced_score: 3, last_synced_at: new Date().toISOString() } };
+        rowsAwaitingOutcome.add(`${OID}_a`);
+        const b = banner(cache);
+        expect(b.cls).toBe('ok');
+        expect(b.text).toBe('✓ Canvas gradebook is up to date · ⏳ 1 outcome score updating');
+        const marker = document.querySelector('tr[data-stu="a"] .os-sync-marker');
+        expect(marker.classList.contains('verifying')).toBe(true);
+        expect(marker.getAttribute('title')).toMatch(/waiting for Canvas to update the outcome score/);
+        expect(buildSyncChip({ id: OID }, cache)).toContain('⏳ 1 verifying');
     });
 
     test('only queued → waiting message and disabled Queued… button', () => {

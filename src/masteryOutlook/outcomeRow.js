@@ -29,7 +29,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -151,8 +151,11 @@ export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     if (needsCount > 0) {
         return `<span class="od-sync-chip needs">↑ ${needsCount} need</span>`;
     }
-    if (counts.verifying > 0) {
-        return `<span class="od-sync-chip verifying" title="${VERIFYING_TIP}">⏳ ${counts.verifying} verifying</span>`;
+    // Rows saved this session and still in the background outcome check, or (after
+    // a reload) rows whose saved score Canvas's outcome hasn't caught up to yet.
+    const verifyingCount = Math.max(countRowsAwaitingOutcome(outcome.id), counts.verifying);
+    if (verifyingCount > 0) {
+        return `<span class="od-sync-chip verifying" title="${VERIFYING_TIP}">⏳ ${verifyingCount} verifying</span>`;
     }
     if (counts.possibleOverride > 0 || counts.manualOverride > 0) {
         const n = counts.possibleOverride + counts.manualOverride;

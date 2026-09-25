@@ -10,6 +10,8 @@ import {
     handleVerifying,
     handleComplete,
     handleError,
+    verifyOutcomeRollups,
+    CONFIRM_POLL_DELAYS_MS,
     VERIFY_NO_PROGRESS_LIMIT_MS
 } from '../plOutlookStateHandlers.js';
 
@@ -900,84 +902,124 @@ function makeVerifyRollup(userId, score) {
     };
 }
 
-describe('handleVerifying', () => {
+describe('handleVerifying (fast assignment confirm)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
-        clearCourseRollupReuse();
     });
     afterEach(() => vi.useRealTimers());
 
-    test('all scores match → returns COMPLETE with empty verifyMismatches', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.5)) });
-        const sm = buildSMAtVerifying(students, { apiClient });
+    /** apiClient whose single-submission GET returns rubric points per user */
+    function makeConfirmClient(pointsByUser) {
+        return {
+            get: vi.fn(async (url) => {
+                const userId = url.match(/submissions\/([^?]+)/)[1];
+                const points = typeof pointsByUser === 'function' ? pointsByUser(userId) : pointsByUser[userId];
+                return { user_id: userId, score: points, rubric_assessment: { 'crit-1': { points } } };
+            }),
+        };
+    }
 
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        const next = await promise;
+    const confirmCtx = { assignmentId: 'asgn-1', rubricCriterionId: 'crit-1' };
 
-        expect(next).toBe(PL_STATES.COMPLETE);
-        expect(sm.getContext().verifyMismatches).toHaveLength(0);
-    });
+    test('rubric points match on the first read → COMPLETE, nothing persisted', async () => {
+        const apiClient = makeConfirmClient({ u1: 3.5 });
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3.5 }], { apiClient, ...confirmCtx });
 
-    test('scores match at hundredths (not exact float) → no mismatch', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        // 3.504 rounds to 350 at hundredths, same as 3.5 → should match
-        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.504)) });
-        const sm = buildSMAtVerifying(students, { apiClient });
-
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        const next = await promise;
+        const next = await handleVerifying(sm);
 
         expect(next).toBe(PL_STATES.COMPLETE);
         expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        expect(apiClient.get).toHaveBeenCalledTimes(1);
+        expect(apiClient.get.mock.calls[0][0])
+            .toBe('/api/v1/courses/100/assignments/asgn-1/submissions/u1?include[]=rubric_assessment');
+        expect(writeSyncState).not.toHaveBeenCalled();   // last_verify_at belongs to the outcome check
     });
 
-    test('persistent mismatches → still returns COMPLETE after maxRetries (does not throw)', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        // Canvas always returns a mismatching score
-        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
-        const sm = buildSMAtVerifying(students, { apiClient });
+    test('points equal at hundredths count as a match', async () => {
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3.5 }],
+            { apiClient: makeConfirmClient({ u1: 3.504 }), ...confirmCtx });
+        await handleVerifying(sm);
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+    });
+
+    test('only unconfirmed students are re-read on later polls', async () => {
+        let reads = 0;
+        const apiClient = makeConfirmClient((uid) => (uid === 'u2' && ++reads < 2 ? 1 : 3));
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3 }, { userId: 'u2', plScore: 3 }],
+            { apiClient, ...confirmCtx });
 
         const promise = handleVerifying(sm);
         await vi.runAllTimersAsync();
-        const next = await promise;
+        await promise;
 
-        expect(next).toBe(PL_STATES.COMPLETE);
-        expect(sm.getContext().verifyMismatches).toHaveLength(1);
-        expect(sm.getContext().verifyMismatches[0].userId).toBe('u1');
-        // Should have retried — get called more than once
-        expect(apiClient.get.mock.calls.length).toBeGreaterThan(1);
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        const urls = apiClient.get.mock.calls.map(c => c[0]);
+        expect(urls.filter(u => u.includes('/submissions/u1'))).toHaveLength(1);
+        expect(urls.filter(u => u.includes('/submissions/u2'))).toHaveLength(2);
     });
 
-    test('persistent mismatch gives up after ~4 minutes without progress', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
-        const sm = buildSMAtVerifying(students, { apiClient });
+    test('never confirmed → gives up after the confirm delays and persists verify_mismatch', async () => {
+        readSyncState.mockResolvedValue({});
+        const apiClient = makeConfirmClient({ u1: 1 });
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3.5 }], { apiClient, ...confirmCtx });
         const start = Date.now();
 
         const promise = handleVerifying(sm);
         await vi.runAllTimersAsync();
         await promise;
 
-        // Poll 1 counts as progress (lastMismatchCount starts at Infinity). Delays are
-        // 1,1,1,2,2,3 s (poll 7 at 10 s) then 5 s, so the first poll at ≥ 240 s is poll 53.
-        expect(Date.now() - start).toBeGreaterThanOrEqual(VERIFY_NO_PROGRESS_LIMIT_MS);
-        expect(apiClient.get.mock.calls.length).toBe(53);
+        expect(sm.getContext().verifyMismatches.map(s => s.userId)).toEqual(['u1']);
+        expect(Date.now() - start).toBe(CONFIRM_POLL_DELAYS_MS.reduce((a, b) => a + b, 0));
+        expect(apiClient.get).toHaveBeenCalledTimes(CONFIRM_POLL_DELAYS_MS.length + 1);
+        expect(writeSyncState.mock.calls.at(-1)[1]['598'].u1).toEqual({ verify_mismatch: true });
     });
 
-    test('first polls are 1 s apart and use the course-wide rollup', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
+    test('a failed read counts as not yet confirmed (no throw)', async () => {
+        const apiClient = { get: vi.fn().mockRejectedValueOnce(new Error('503'))
+            .mockResolvedValue({ rubric_assessment: { 'crit-1': { points: 2 } } }) };
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 2 }], { apiClient, ...confirmCtx });
+
+        const promise = handleVerifying(sm);
+        await vi.runAllTimersAsync();
+        await promise;
+
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        expect(apiClient.get).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('verifyOutcomeRollups (background outcome check)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.useFakeTimers();
+        clearCourseRollupReuse();
+        readSyncState.mockResolvedValue({});
+    });
+    afterEach(() => vi.useRealTimers());
+
+    test('rollup matches → records last_verify_at without a mismatch', async () => {
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.5)) });
+
+        const promise = verifyOutcomeRollups({ courseId: '100', outcomeId: '598', expected: { u1: 3.5 }, apiClient });
+        await vi.runAllTimersAsync();
+        const { mismatchIds, verifiedAt } = await promise;
+
+        expect(mismatchIds).toEqual([]);
+        const written = writeSyncState.mock.calls.at(-1)[1]['598'].u1;
+        expect(written).toEqual({ last_verify_at: verifiedAt, verify_mismatch: false });
+        expect(apiClient.get.mock.calls[0][0]).toContain('/outcome_rollups?include[]=outcomes&include[]=users');
+    });
+
+    test('first polls are 1 s apart; onProgress reports rows as they confirm', async () => {
         const get = vi.fn()
             .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
             .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
             .mockResolvedValue(makeVerifyRollup('u1', 3.5));
         const apiClient = withResponse({ get });
-        const sm = buildSMAtVerifying(students, { apiClient });
+        const onProgress = vi.fn();
 
-        const promise = handleVerifying(sm);
+        const promise = verifyOutcomeRollups({ courseId: '100', outcomeId: '598', expected: { u1: 3.5 }, apiClient, onProgress });
         await vi.advanceTimersByTimeAsync(0);
         expect(get).toHaveBeenCalledTimes(1);
         await vi.advanceTimersByTimeAsync(1000);
@@ -985,50 +1027,21 @@ describe('handleVerifying', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(get).toHaveBeenCalledTimes(3);
         await vi.runAllTimersAsync();
-        const next = await promise;
-
-        expect(next).toBe(PL_STATES.COMPLETE);
-        expect(sm.getContext().verifyMismatches).toHaveLength(0);
-        expect(get.mock.calls[0][0]).toContain('/outcome_rollups?include[]=outcomes&include[]=users');
-        expect(get.mock.calls[0][0]).not.toContain('outcome_ids');
-    });
-
-    test('decreasing mismatch count resets retry counter (more than 3 calls made)', async () => {
-        const students = [
-            { userId: 'u1', plScore: 3.5 },
-            { userId: 'u2', plScore: 3.5 }
-        ];
-        // Call 1: both mismatch (2 mismatches)
-        // Call 2: only u1 mismatches (1 mismatch — count decreased → reset attempt to 1)
-        // Calls 3-5: u1 keeps mismatching (3 more attempts before giving up)
-        const apiClient = withResponse({
-            get: vi.fn()
-                    .mockResolvedValueOnce({ rollups: [
-                        { links: { user: 'u1' }, scores: [{ links: { outcome: '598' }, score: 1.0 }] },
-                        { links: { user: 'u2' }, scores: [{ links: { outcome: '598' }, score: 1.0 }] }
-                    ]})
-                    .mockResolvedValue(makeVerifyRollup('u1', 1.0))   // u2 now matches (missing from rollup = no entry)
-        });
-        const sm = buildSMAtVerifying(students, { apiClient });
-
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
         await promise;
 
-        // Without reset: would be 3 calls. With reset after call 2: at least 4 calls.
-        expect(apiClient.get.mock.calls.length).toBeGreaterThan(3);
+        expect(onProgress).toHaveBeenCalledWith(['u1']);
     });
 
-    test('missing rollup score for a student counts as mismatch', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        // Canvas returns no rollup at all for u1
-        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
-        const sm = buildSMAtVerifying(students, { apiClient });
+    test('never matches → gives up after ~4 minutes and records verify_mismatch', async () => {
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
+        const start = Date.now();
 
-        const promise = handleVerifying(sm);
+        const promise = verifyOutcomeRollups({ courseId: '100', outcomeId: '598', expected: { u1: 3.5 }, apiClient });
         await vi.runAllTimersAsync();
-        await promise;
+        const { mismatchIds } = await promise;
 
-        expect(sm.getContext().verifyMismatches).toHaveLength(1);
+        expect(Date.now() - start).toBeGreaterThanOrEqual(VERIFY_NO_PROGRESS_LIMIT_MS);
+        expect(mismatchIds).toEqual(['u1']);
+        expect(writeSyncState.mock.calls.at(-1)[1]['598'].u1.verify_mismatch).toBe(true);
     });
 });

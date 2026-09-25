@@ -31,7 +31,7 @@ export function scoresMatch(a, b) {
 export const VERIFY_PENDING_WINDOW_MS = 30 * 60 * 1000;
 
 /** Tooltip text for the "verifying" status (chip and row marker). */
-export const VERIFYING_TIP = 'Saved to Canvas; waiting for Canvas to update the score. This clears on its own.';
+export const VERIFYING_TIP = 'Saved to Canvas; waiting for Canvas to update the outcome score. This clears on its own.';
 
 /** Tooltip text for the "possible override" status (chip and row marker). */
 export const POSSIBLE_OVERRIDE_TIP =

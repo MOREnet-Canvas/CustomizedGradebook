@@ -23,8 +23,9 @@ import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
 import {
     syncingOutcomeIds, syncingOutcomePhase, setRowPhase, clearRowPhase,
-    runExclusive, isSaveQueueBusy, queuedOutcomeIds,
+    runExclusive, isSaveQueueBusy, queuedOutcomeIds, rowsAwaitingOutcome,
 } from './masteryOutlookState.js';
+import { verifyOutcomeRollups } from './plOutlookStateHandlers.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -537,6 +538,48 @@ export function handleSyncStudents(opts) {
 }
 
 /**
+ * Start the background outcome-score check for rows just confirmed on the
+ * assignment. Rows sit in rowsAwaitingOutcome (⏳) until Canvas's outcome score
+ * matches; the result is mirrored into the in-memory cache so later
+ * whole-cache writes keep it. Never throws.
+ *
+ * @param {Object} opts
+ * @param {string} opts.courseId
+ * @param {string} opts.outcomeId
+ * @param {Object} opts.expected   - { [studentId]: savedScore }
+ * @param {Object} opts.cache      - in-memory cache
+ * @param {Object} opts.apiClient
+ * @param {Function} [opts.onRerender]
+ * @returns {Promise<void>}
+ */
+export function startOutcomeCheck({ courseId, outcomeId, expected, cache, apiClient, onRerender }) {
+    const keyOf = sid => `${outcomeId}_${sid}`;
+    Object.keys(expected).forEach(sid => rowsAwaitingOutcome.add(keyOf(sid)));
+    onRerender?.();
+
+    return verifyOutcomeRollups({
+        courseId, outcomeId, expected, apiClient,
+        onProgress: (confirmedIds) => {
+            confirmedIds.forEach(sid => rowsAwaitingOutcome.delete(keyOf(sid)));
+            onRerender?.();
+        },
+    })
+        .then(({ verifiedAt, mismatchIds }) => {
+            const mismatch = new Set(mismatchIds.map(String));
+            for (const sid of Object.keys(expected)) {
+                const entry = getOrInitEntry(cache.sync_state, outcomeId, sid);
+                entry.last_verify_at  = verifiedAt;
+                entry.verify_mismatch = mismatch.has(sid);
+            }
+        })
+        .catch(err => logger.warn('[PLActions] Background outcome check failed:', err.message))
+        .finally(() => {
+            Object.keys(expected).forEach(sid => rowsAwaitingOutcome.delete(keyOf(sid)));
+            onRerender?.();
+        });
+}
+
+/**
  * The body of one queued save — see handleSyncStudents.
  * @returns {Promise<{ result: Object, pending: Promise<void> }>} result from runPLSync;
  *   pending settles when the Current Score update started after the push is done.
@@ -722,23 +765,28 @@ async function runSyncStudentsJob({
     clearSyncKeys();
 
     // Scores were pushed: canvasScore, sync_state, and the Current Score update were
-    // already handled in onPushed. Mirror the verify outcome into memory too, then
-    // write the cache once so the in-memory copy doesn't undo the handlers' disk writes.
+    // already handled in onPushed. VERIFYING only confirmed the scores on the
+    // assignment; mirror its failures into memory, then write the cache once.
     if (result.success && result.successCount > 0) {
-        if (result.stateHistory?.includes(PL_STATES.VERIFYING)) {
-            const verifiedAt  = new Date().toISOString();
-            const mismatchIds = new Set(result.verifyMismatchIds ?? []);
-            for (const sid of pushedIds) {
-                const entry = getOrInitEntry(cache.sync_state, outcomeId, sid);
-                entry.last_verify_at  = verifiedAt;
-                entry.verify_mismatch = mismatchIds.has(sid);
-            }
+        const confirmFailed = new Set(result.verifyMismatchIds ?? []);
+        for (const sid of confirmFailed) {
+            getOrInitEntry(cache.sync_state, outcomeId, sid).verify_mismatch = true;
         }
 
         try {
             await writeMasteryOutlookCache(courseId, apiClient, cache);
         } catch (err) {
             logger.error('[PLActions] handleSyncStudents — cache write failed', err);
+        }
+
+        // Canvas recalculates the outcome score after the assignment — check it in
+        // the background (rows show ⏳ meanwhile) so the save queue isn't held up.
+        const expected = {};
+        for (const sid of pushedIds) {
+            if (!confirmFailed.has(sid) && pushedScores[sid] != null) expected[sid] = pushedScores[sid];
+        }
+        if (Object.keys(expected).length > 0) {
+            startOutcomeCheck({ courseId, outcomeId, expected, cache, apiClient, onRerender });
         }
     }
 

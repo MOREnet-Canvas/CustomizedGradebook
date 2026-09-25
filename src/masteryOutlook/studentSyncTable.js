@@ -30,7 +30,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, rowSavePhase, queuedOutcomeIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, rowSavePhase, queuedOutcomeIds, rowsAwaitingOutcome, countRowsAwaitingOutcome } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -127,7 +127,10 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     const syncStatus = plConfig
         ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig).status
         : null;
-    const marker = (syncStatus === 'verifying' || syncStatus === 'possible_override') ? syncStatus : null;
+    // ⏳ while the background outcome check runs (saved on the assignment, Canvas
+    // still recalculating the outcome score), or from saved data after a reload.
+    const marker = rowsAwaitingOutcome.has(`${oidStr}_${sidStr}`) ? 'verifying'
+        : (syncStatus === 'verifying' || syncStatus === 'possible_override') ? syncStatus : null;
 
     return {
         id:           sidStr,
@@ -277,7 +280,7 @@ function renderOutcomeStudentRow(s, oidStr) {
                     : needsSync                    ? 'Push to Canvas'
                     : !hasWP                       ? 'No override set'
                     :                               'Up to date';
-    const phaseLabel = { checking: 'Checking…', pushing: 'Pushing…', verifying: 'Verifying…' }[s.syncPhase];
+    const phaseLabel = { checking: 'Checking…', pushing: 'Pushing…', verifying: 'Confirming…' }[s.syncPhase];
     const saveHtml = s.syncPhase === 'queued'
         ? `<span class="os-posting queued" title="Waiting for the current save to finish">Queued…</span>`
         : s.syncPhase
@@ -417,19 +420,23 @@ export function getOutcomeSaveSummary(outcome, cache) {
 /**
  * Status banner above the student table — mirrors the rows' save state.
  *
- * @param {Object}  summary     - from summarizeSaveStates
- * @param {string}  refreshBtn  - refresh button HTML
+ * @param {Object}  summary       - from summarizeSaveStates
+ * @param {string}  refreshBtn    - refresh button HTML
+ * @param {number}  [awaitingOutcome=0] - rows saved but Canvas still updating the outcome score (non-blocking note)
  * @returns {string} HTML
  */
-function renderSaveBanner(summary, refreshBtn) {
+function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
     const { saving, verifying, queued, remaining } = summary;
+    const awaitingNote = awaitingOutcome > 0
+        ? ` <span class="os-status-banner-note" title="Saved to Canvas; waiting for Canvas to update the outcome score. This clears on its own.">· ⏳ ${awaitingOutcome} outcome score${awaitingOutcome !== 1 ? 's' : ''} updating</span>`
+        : '';
     const inProgress = saving > 0 || verifying > 0 || queued > 0;
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
     if (!inProgress && remaining === 0) {
         return `<div class="os-status-banner ok">
              <div class="os-status-banner-left">
-               ✓ Canvas gradebook is up to date
+               ✓ Canvas gradebook is up to date${awaitingNote}
              </div>
              ${refreshBtn}
            </div>`;
@@ -438,7 +445,7 @@ function renderSaveBanner(summary, refreshBtn) {
     if (!inProgress) {
         return `<div class="os-status-banner warn">
              <div class="os-status-banner-left">
-               ⬆ <b>${remaining}</b> student${remaining !== 1 ? 's' : ''} need${remaining === 1 ? 's' : ''} updating
+               ⬆ <b>${remaining}</b> student${remaining !== 1 ? 's' : ''} need${remaining === 1 ? 's' : ''} updating${awaitingNote}
              </div>
              <div class="os-status-banner-actions">
                ${refreshBtn}
@@ -451,21 +458,21 @@ function renderSaveBanner(summary, refreshBtn) {
 
     const parts = [];
     if (saving > 0)    parts.push(`Saving ${plural(saving, 'student', 'students')} to Canvas…`);
-    if (verifying > 0) parts.push(`Waiting for Canvas to confirm ${plural(verifying, 'student', 'students')}…`);
+    if (verifying > 0) parts.push(`Confirming ${plural(verifying, 'student', 'students')} in Canvas…`);
     if (queued > 0)    parts.push(saving || verifying
         ? `${queued} queued`
         : `${plural(queued, 'student', 'students')} queued — waiting for the current save to finish`);
     if (remaining > 0) parts.push(`${remaining} still to save`);
 
     const lead = (saving > 0 || verifying > 0) ? '<span class="spinner"></span>' : '⏳';
-    const phaseLabel = saving > 0 ? 'Saving…' : verifying > 0 ? 'Verifying…' : 'Queued…';
+    const phaseLabel = saving > 0 ? 'Saving…' : verifying > 0 ? 'Confirming…' : 'Queued…';
     const button = remaining > 0
         ? `<button class="btn btn-sm btn-primary" data-action="os-post-all">Save remaining (${remaining})</button>`
         : `<button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>${phaseLabel}</button>`;
 
     return `<div class="os-status-banner syncing">
          <div class="os-status-banner-left">
-           ${lead} ${parts.join(' · ')}
+           ${lead} ${parts.join(' · ')}${awaitingNote}
          </div>
          <div class="os-status-banner-actions">
            ${refreshBtn}
@@ -484,7 +491,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
             title="Refresh scores from Canvas"
             aria-label="Refresh scores from Canvas">↻</button>`;
 
-    const toolbarHtml = renderSaveBanner(summary, refreshOutcomeBtn);
+    const toolbarHtml = renderSaveBanner(summary, refreshOutcomeBtn, countRowsAwaitingOutcome(outcome.id));
 
     // Legend commented out — color coding is self-evident from the dot colors
     // const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
