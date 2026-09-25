@@ -23,6 +23,7 @@ import { refreshMasteryForAssignment } from '../services/masteryRefreshService.j
 import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
 import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
 import { fetchCourseRollupsForVerify, verifyPollDelayMs, VERIFY_NO_PROGRESS_LIMIT_MS } from './masteryOutlookDataService.js';
+import { rowsAwaitingOutcome, notifySaveStatus } from './masteryOutlookState.js';
 
 /**
  * Replace one outcome's score in an outcome_rollups response with scores that
@@ -235,8 +236,29 @@ export async function updateAvgAssignmentForStudents({
             // Step 8: Verify avg scores were accepted by Canvas — in the background.
             // Not awaited: the save queue only waits for the push above. Step 8 reads
             // the shared rollups and records avg_verify_* via the merge-safe writer.
-            verifyAvgScores({ courseId, apiClient, avgOutcomeId: avg_outcome_id, averages })
-                .catch(err => logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message));
+            // Current Score rows show ⏳ until Canvas's Current Score outcome matches.
+            const failedIds = new Set((result.errors ?? []).map(e => String(e.userId)));
+            const pushedAverages = averages.filter(a => !failedIds.has(String(a.userId)));
+            const avgKey = uid => `${avg_outcome_id}_${uid}`;
+            const expectedAvg = new Map(pushedAverages.map(a => [String(a.userId), a.average]));
+            pushedAverages.forEach(a => rowsAwaitingOutcome.add(avgKey(a.userId)));
+            notifySaveStatus(avg_outcome_id);
+
+            verifyAvgScores({
+                courseId, apiClient, avgOutcomeId: avg_outcome_id, averages: pushedAverages,
+                onProgress: (confirmedIds) => {
+                    for (const uid of confirmedIds) {
+                        rowsAwaitingOutcome.delete(avgKey(uid));
+                        setInMemoryCanvasScore(cache, avg_outcome_id, uid, expectedAvg.get(String(uid)));
+                    }
+                    notifySaveStatus(avg_outcome_id);
+                },
+            })
+                .catch(err => logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message))
+                .finally(() => {
+                    pushedAverages.forEach(a => rowsAwaitingOutcome.delete(avgKey(a.userId)));
+                    notifySaveStatus(avg_outcome_id);
+                });
         }
 
         return result.errors.length === 0;
@@ -245,6 +267,22 @@ export async function updateAvgAssignmentForStudents({
         logger.error('[MOAvgService] Avg update failed (non-critical):', err.message);
         return false;
     }
+}
+
+/**
+ * Set one student's in-memory Canvas score for an outcome (e.g. the confirmed
+ * Current Score) so the row shows the new value without a refresh.
+ *
+ * @param {Object} cache - in-memory Mastery Outlook cache
+ * @param {string|number} outcomeId
+ * @param {string|number} userId
+ * @param {number|undefined} score
+ */
+function setInMemoryCanvasScore(cache, outcomeId, userId, score) {
+    if (score == null) return;
+    const od = cache?.students?.find(s => String(s.id) === String(userId))
+        ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+    if (od) od.canvasScore = score;
 }
 
 /**
@@ -258,13 +296,14 @@ export async function updateAvgAssignmentForStudents({
  * @param {Object}        opts.apiClient
  * @param {string|number} opts.avgOutcomeId - Current Score outcome ID
  * @param {Array<{userId: string|number, average: number}>} opts.averages - expected scores
+ * @param {Function}      [opts.onProgress] - (confirmedUserIds: string[]) => void, as students confirm
  * @returns {Promise<string[]>} user IDs that still didn't match when polling stopped
  */
-export async function verifyAvgScores({ courseId, apiClient, avgOutcomeId, averages }) {
+export async function verifyAvgScores({ courseId, apiClient, avgOutcomeId, averages, onProgress = null }) {
     const verifyUserIds   = averages.map(a => String(a.userId));
     const expectedByUser  = new Map(averages.map(a => [String(a.userId), a.average]));
 
-    let avgMismatches     = [];
+    let avgMismatches     = [...verifyUserIds];
     let lastMismatchCount = Infinity;
     let lastProgressAt    = Date.now();
     let attempt           = 1;
@@ -283,11 +322,14 @@ export async function verifyAvgScores({ courseId, apiClient, avgOutcomeId, avera
             if (score !== undefined) actualAvg.set(uid, score);
         });
 
+        const before = avgMismatches;
         avgMismatches = verifyUserIds.filter(uid => {
             const actual   = actualAvg.get(uid);
             const expected = expectedByUser.get(uid);
             return actual === undefined || Math.abs(actual - expected) >= 0.005;
         });
+        const newlyConfirmed = before.filter(uid => !avgMismatches.includes(uid));
+        if (newlyConfirmed.length > 0) onProgress?.(newlyConfirmed);
 
         if (avgMismatches.length === 0) {
             logger.info(`[MOAvgService] Avg scores verified on poll ${attempt}`);

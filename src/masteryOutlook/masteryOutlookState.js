@@ -88,6 +88,33 @@ export function countRowsAwaitingOutcome(outcomeId) {
     return n;
 }
 
+/** Listeners for save-status changes — see subscribeSaveStatus(). */
+const _saveStatusListeners = new Set();
+
+/**
+ * Listen for save-status changes (row phases, ⏳ waiting rows) on any outcome.
+ * Lets an outcome row redraw when background work for *its* outcome changes —
+ * e.g. the Current Score check running after a save on another outcome.
+ *
+ * @param {(outcomeId: string) => void} listener
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeSaveStatus(listener) {
+    _saveStatusListeners.add(listener);
+    return () => _saveStatusListeners.delete(listener);
+}
+
+/**
+ * Tell listeners that save status changed for one outcome. Listener errors are
+ * swallowed so one broken row can't stop the others from updating.
+ * @param {string|number} outcomeId
+ */
+export function notifySaveStatus(outcomeId) {
+    for (const listener of [..._saveStatusListeners]) {
+        try { listener(String(outcomeId)); } catch { /* keep notifying the rest */ }
+    }
+}
+
 /**
  * Set of in-flight sync keys for entire outcomes in format "outcomeId".
  * Used to show an outcome-level "Checking..." indicator before specific

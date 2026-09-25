@@ -145,6 +145,24 @@ describe('buildSyncChip', () => {
         expect(buildSyncChip({ id: OID }, makeCache())).toContain('Syncing…');
     });
 
+    test('Current Score (special) chip shows ⏳ N verifying instead of — while rows update', () => {
+        const cs = { id: '603', title: 'Current Score' };
+        const cache = {
+            students: [{ id: 'a', name: 'Student a', sortableName: 'Student a',
+                outcomes: [{ outcomeId: '603', plPrediction: null, canvasScore: 1, attempts: [] }] }],
+            sync_state: {}, pl_assignments: {}, ignored_alignments: [],
+        };
+        expect(buildSyncChip(cs, cache, { isSpecial: true })).toContain('—');
+
+        rowsAwaitingOutcome.add('603_a');
+        expect(buildSyncChip(cs, cache, { isSpecial: true })).toContain('⏳ 1 verifying');
+
+        document.body.innerHTML = renderOutcomeStudentTable(cs, cache);
+        const marker = document.querySelector('tr[data-stu="a"] .os-sync-marker');
+        expect(marker.classList.contains('verifying')).toBe(true);
+        expect(marker.getAttribute('title')).toMatch(/waiting for Canvas to update the outcome score/);
+    });
+
     test('no queued rows → not Queued', () => {
         expect(buildSyncChip({ id: OID }, makeCache())).not.toContain('Queued…');
     });

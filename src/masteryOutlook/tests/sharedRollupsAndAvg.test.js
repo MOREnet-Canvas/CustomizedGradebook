@@ -25,6 +25,7 @@ import { updateAvgAssignmentForStudents } from '../masteryOutlookAvgService.js';
 import { calculateStudentAverages } from '../../services/gradeCalculator.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
 import { writeSyncState } from '../masteryOutlookCacheService.js';
+import { rowsAwaitingOutcome, subscribeSaveStatus, notifySaveStatus } from '../masteryOutlookState.js';
 
 /** apiClient whose getWithResponse serves the given pages in order, following Link: rel="next". */
 function makePagedClient(pages) {
@@ -175,5 +176,102 @@ describe('updateAvgAssignmentForStudents — Current Score check runs in the bac
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe('Current Score rows show ⏳ while Canvas updates them', () => {
+    beforeEach(() => { vi.clearAllMocks(); clearCourseRollupReuse(); rowsAwaitingOutcome.clear(); });
+
+    function csCache() {
+        return {
+            students: [{ id: '642', outcomes: [{ outcomeId: '603', canvasScore: 1 }] }],
+            sync_state: {},
+            avg_assignment: {
+                assignment_id: 'a', criterion_id: 'c', rubric_association_id: 'r',
+                avg_outcome_id: '603', submission_ids: { '642': 'sub-642' },
+            },
+        };
+    }
+
+    test('rows are marked after the push; a confirmed student clears and shows the new Current Score', async () => {
+        vi.useFakeTimers();
+        try {
+            const pages = [{
+                rollups: [{ links: { user: '642' }, scores: [{ score: 1, links: { outcome: '603' } }] }],
+                linked: { outcomes: [{ id: 603, title: 'Current Score' }] },
+            }];
+            const client = makePagedClient(pages);
+            calculateStudentAverages.mockResolvedValue([{ userId: '642', average: 2.5 }]);
+            const cache = csCache();
+            const notified = [];
+            const unsubscribe = subscribeSaveStatus(id => notified.push(id));
+
+            await updateAvgAssignmentForStudents({
+                courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+                studentIds: ['642'], pushedScores: { '642': 2 }, cache, apiClient: client,
+            });
+            expect(rowsAwaitingOutcome.has('603_642')).toBe(true);
+            expect(notified).toContain('603');
+
+            // Canvas's Current Score catches up on a later poll
+            pages[0].rollups[0].scores[0].score = 2.5;
+            await vi.advanceTimersByTimeAsync(2000);
+
+            expect(rowsAwaitingOutcome.has('603_642')).toBe(false);
+            expect(cache.students[0].outcomes[0].canvasScore).toBe(2.5);
+            unsubscribe();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    test('Step 8 gives up → keys cleared anyway; failed pushes are never marked', async () => {
+        vi.useFakeTimers();
+        try {
+            const client = makePagedClient([{
+                rollups: [
+                    { links: { user: '642' }, scores: [{ score: 1, links: { outcome: '603' } }] },
+                    { links: { user: '643' }, scores: [{ score: 1, links: { outcome: '603' } }] },
+                ],
+                linked: { outcomes: [{ id: 603, title: 'Current Score' }] },
+            }]);
+            calculateStudentAverages.mockResolvedValue([
+                { userId: '642', average: 2.5 }, { userId: '643', average: 3 },
+            ]);
+            submitRubricAssessmentBatch.mockResolvedValueOnce({ successCount: 1, errors: [{ userId: '643', error: 'x' }] });
+            const cache = csCache();
+            cache.avg_assignment.submission_ids['643'] = 'sub-643';
+
+            await updateAvgAssignmentForStudents({
+                courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+                studentIds: ['642', '643'], pushedScores: { '642': 2, '643': 3 }, cache, apiClient: client,
+            });
+            expect(rowsAwaitingOutcome.has('603_642')).toBe(true);
+            expect(rowsAwaitingOutcome.has('603_643')).toBe(false);   // its push failed
+
+            await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+            expect(rowsAwaitingOutcome.size).toBe(0);
+            expect(cache.students[0].outcomes[0].canvasScore).toBe(1);  // never confirmed → unchanged
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('subscribeSaveStatus / notifySaveStatus', () => {
+    test('delivers the outcome ID to listeners until unsubscribed; a throwing listener does not stop others', () => {
+        const a = vi.fn(() => { throw new Error('broken row'); });
+        const b = vi.fn();
+        const unA = subscribeSaveStatus(a);
+        const unB = subscribeSaveStatus(b);
+
+        notifySaveStatus(603);
+        expect(a).toHaveBeenCalledWith('603');
+        expect(b).toHaveBeenCalledWith('603');
+
+        unB();
+        notifySaveStatus('599');
+        expect(b).toHaveBeenCalledTimes(1);
+        unA();
     });
 });

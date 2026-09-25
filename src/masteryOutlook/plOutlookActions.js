@@ -23,7 +23,7 @@ import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
 import {
     syncingOutcomeIds, syncingOutcomePhase, setRowPhase, clearRowPhase,
-    runExclusive, isSaveQueueBusy, queuedOutcomeIds, rowsAwaitingOutcome,
+    runExclusive, isSaveQueueBusy, queuedOutcomeIds, rowsAwaitingOutcome, notifySaveStatus,
 } from './masteryOutlookState.js';
 import { verifyOutcomeRollups } from './plOutlookStateHandlers.js';
 
@@ -556,12 +556,14 @@ export function startOutcomeCheck({ courseId, outcomeId, expected, cache, apiCli
     const keyOf = sid => `${outcomeId}_${sid}`;
     Object.keys(expected).forEach(sid => rowsAwaitingOutcome.add(keyOf(sid)));
     onRerender?.();
+    notifySaveStatus(outcomeId);
 
     return verifyOutcomeRollups({
         courseId, outcomeId, expected, apiClient,
         onProgress: (confirmedIds) => {
             confirmedIds.forEach(sid => rowsAwaitingOutcome.delete(keyOf(sid)));
             onRerender?.();
+            notifySaveStatus(outcomeId);
         },
     })
         .then(({ verifiedAt, mismatchIds }) => {
@@ -576,6 +578,7 @@ export function startOutcomeCheck({ courseId, outcomeId, expected, cache, apiCli
         .finally(() => {
             Object.keys(expected).forEach(sid => rowsAwaitingOutcome.delete(keyOf(sid)));
             onRerender?.();
+            notifySaveStatus(outcomeId);
         });
 }
 

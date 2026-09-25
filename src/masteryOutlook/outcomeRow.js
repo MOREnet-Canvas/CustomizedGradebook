@@ -29,7 +29,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -810,7 +810,19 @@ function buildOutcomeDetailPanel({
 
     panel.appendChild(content);
 
-    return { panel, detailTeardown };
+    // Redraw this panel when background save work for *this* outcome changes —
+    // e.g. the Current Score check after a save on another outcome.
+    const unsubscribe = subscribeSaveStatus((changedOutcomeId) => {
+        if (changedOutcomeId === String(outcome.id)) renderTable();
+    });
+
+    return {
+        panel,
+        detailTeardown: () => {
+            unsubscribe();
+            detailTeardown?.();
+        },
+    };
 }
 
 // ─── Initialize flow (CHECKING_SETUP → CREATING_ASSIGNMENT → ...) ────────────
@@ -1067,20 +1079,26 @@ export function mountOutcomeRow({
         });
     }
 
-    function teardown() {
-        if (typeof detailTeardown === 'function') {
-            try { detailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
-            detailTeardown = null;
-        }
-    }
-
     /**
      * Refresh the sync chip in-place without a full row re-render.
-     * Called by the background canvas score refresh in outcomeSyncView.js.
+     * Called by the background canvas score refresh in outcomeSyncView.js,
+     * and when save status changes for this outcome (subscribeSaveStatus).
      */
     function refreshChip() {
         const syncCellEl = outcomeContainer.querySelector('.od-sync-cell');
         if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+    }
+
+    const unsubscribeChip = subscribeSaveStatus((changedOutcomeId) => {
+        if (changedOutcomeId === String(outcome.id)) refreshChip();
+    });
+
+    function teardown() {
+        unsubscribeChip();
+        if (typeof detailTeardown === 'function') {
+            try { detailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
+            detailTeardown = null;
+        }
     }
 
     return { rootEl: outcomeContainer, teardown, refreshChip };
