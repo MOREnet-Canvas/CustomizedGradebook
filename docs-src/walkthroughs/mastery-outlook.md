@@ -63,6 +63,20 @@ Click an outcome row to expand it. The detail panel has these tabs:
 
 The tab counts come from the same rows and filters as the tables and update whenever the table redraws.
 
+#### Current Score
+
+The Current Score row expands to its own read-only table (`currentScoreTable.js`) — no tabs and no Override:
+
+| Column | Shows |
+|--------|-------|
+| Student | Name |
+| Outcomes | One chip per outcome in the average (every outcome except Current Score and `EXCLUDED_OUTCOME_KEYWORDS` matches), in the same order as the outcome rows on the page. Each chip is the student's Canvas score; hover for the full outcome name; grey "—" = no score |
+| Canvas | The Current Score Canvas reports |
+
+**Sort by** orders students by name, Current Score, or any one outcome; ↑ / ↓ switches direction. Students with no score always sort last.
+
+**⏳ while a save is in progress:** when Save is clicked on another outcome, ⏳ appears straight away on that student's chip for the outcome and beside their Current Score. The chip shows the new score once it is published and loses its ⏳ when Canvas's outcome score confirms it. The Current Score keeps Canvas's value until Canvas confirms the new average, then updates and loses its ⏳.
+
 ### Step 3 — Adjust the re-teach threshold (optional)
 
 The threshold slider controls the "below threshold" count and the Struggling tab (both compare the Canvas-reported score). Stored in `localStorage` per teacher per course (`cg_threshold_{courseId}_{userId}`). Default: `2.2`.

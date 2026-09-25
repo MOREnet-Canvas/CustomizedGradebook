@@ -28,8 +28,9 @@ import {
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
+import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats, fetchCourseRollupsForVerify, clearCourseRollupReuse } from './masteryOutlookDataService.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome } from './masteryOutlookState.js';
+import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT } from './currentScoreTable.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -566,12 +567,117 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
     return scoreMap;
 }
 
+/**
+ * Fetch course-wide rollups once and update every outcome's in-memory
+ * canvasScore — for the Current Score table, which shows all averaged outcomes.
+ * Rows with a save in progress keep their published value until it confirms.
+ * Silent fail: cached scores remain on error.
+ *
+ * @param {Object} cache - In-memory cache (mutated in place)
+ * @param {Object} ctx   - Contains courseId and apiClient
+ * @returns {Promise<void>}
+ */
+async function refreshAllCanvasScores(cache, ctx) {
+    let data;
+    try {
+        data = await fetchCourseRollupsForVerify(ctx.courseId, ctx.apiClient);
+    } catch (err) {
+        logger.warn('[MasteryOutlook] course rollup refresh failed', err);
+        return;
+    }
+    const studentsById = new Map((cache.students ?? []).map(s => [String(s.id), s]));
+    const changedOutcomes = new Set();
+    for (const rollup of data?.rollups ?? []) {
+        const sid = String(rollup.links?.user);
+        const student = studentsById.get(sid);
+        if (!student) continue;
+        for (const s of rollup.scores ?? []) {
+            const oid = String(s.links?.outcome);
+            if (s.score === null || s.score === undefined) continue;
+            if (rowSavePhase.has(`${oid}_${sid}`) || rowsAwaitingOutcome.has(`${oid}_${sid}`)) continue;
+            const od = student.outcomes?.find(o => String(o.outcomeId) === oid);
+            if (od && od.canvasScore !== s.score) {
+                od.canvasScore = s.score;
+                changedOutcomes.add(oid);
+            }
+        }
+    }
+    for (const oid of changedOutcomes) {
+        const outcomeObj = cache.outcomes?.find(o => String(o.id) === oid);
+        if (outcomeObj) applyCanvasClassStats(outcomeObj, cache);
+    }
+}
+
+// ─── Detail panel (Current Score) ────────────────────────────────────────────
+
+/**
+ * Current Score detail panel — no tabs, no overrides: a sortable table of each
+ * student's averaged-outcome chips and Current Score (currentScoreTable.js).
+ * Redraws on save activity for *any* outcome, since a save anywhere changes
+ * a chip and the Current Score.
+ */
+function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial }) {
+    const panel = document.createElement('div');
+    panel.className = 'od-detail-panel';
+
+    const content = document.createElement('div');
+    content.className = 'od-detail-content';
+    panel.appendChild(content);
+
+    if (!state.currentScoreSort) state.currentScoreSort = { ...DEFAULT_CURRENT_SCORE_SORT };
+
+    const renderTable = () => {
+        content.innerHTML = renderCurrentScoreTable(outcome, cache, state.currentScoreSort);
+        const syncCellEl = content.closest('.od-outcome-container')?.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+    };
+    renderTable();
+
+    // Coalesce bursts of save-status changes into one redraw per frame.
+    let pendingRender = null;
+    const scheduleRender = () => {
+        if (pendingRender != null) return;
+        pendingRender = requestAnimationFrame(() => {
+            pendingRender = null;
+            renderTable();
+        });
+    };
+
+    let torn = false;
+    refreshAllCanvasScores(cache, ctx).then(() => { if (!torn) renderTable(); });
+
+    const unwire = wireCurrentScoreTable({
+        contentEl: content,
+        state,
+        renderTable,
+        onRefreshOutcome: async () => {
+            clearCourseRollupReuse();
+            await refreshAllCanvasScores(cache, ctx);
+            renderTable();
+        },
+    });
+
+    const unsubscribe = subscribeSaveStatus(() => scheduleRender());
+
+    return {
+        panel,
+        detailTeardown: () => {
+            torn = true;
+            if (pendingRender != null) cancelAnimationFrame(pendingRender);
+            unsubscribe();
+            unwire();
+        },
+    };
+}
+
 // ─── Detail panel (tabs + content) ───────────────────────────────────────────
 
-function buildOutcomeDetailPanel({
-    outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-    profColor, rerender, isSpecial,
-}) {
+function buildOutcomeDetailPanel(args) {
+    if (args.isCurrentScoreRow) return buildCurrentScoreDetailPanel(args);
+    const {
+        outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
+        profColor, rerender, isSpecial,
+    } = args;
     const panel = document.createElement('div');
     panel.className = 'od-detail-panel';
 

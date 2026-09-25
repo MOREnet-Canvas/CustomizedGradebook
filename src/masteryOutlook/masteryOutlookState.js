@@ -41,11 +41,12 @@ export const rowSavePhase = new Map();
  * @returns {boolean} true if any row changed
  */
 export function setRowPhase(keys, phase) {
-    let changed = false;
+    const changedOutcomes = new Set();
     for (const k of keys) {
-        if (rowSavePhase.get(k) !== phase) { rowSavePhase.set(k, phase); changed = true; }
+        if (rowSavePhase.get(k) !== phase) { rowSavePhase.set(k, phase); changedOutcomes.add(outcomeIdOfKey(k)); }
     }
-    return changed;
+    changedOutcomes.forEach(notifySaveStatus);
+    return changedOutcomes.size > 0;
 }
 
 /**
@@ -53,7 +54,16 @@ export function setRowPhase(keys, phase) {
  * @param {string[]} keys - "outcomeId_studentId"
  */
 export function clearRowPhase(keys) {
-    for (const k of keys) rowSavePhase.delete(k);
+    const changedOutcomes = new Set();
+    for (const k of keys) {
+        if (rowSavePhase.delete(k)) changedOutcomes.add(outcomeIdOfKey(k));
+    }
+    changedOutcomes.forEach(notifySaveStatus);
+}
+
+/** "outcomeId_studentId" → "outcomeId" */
+function outcomeIdOfKey(key) {
+    return String(key).split('_')[0];
 }
 
 /**

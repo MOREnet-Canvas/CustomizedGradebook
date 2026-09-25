@@ -27,38 +27,12 @@ import { scoresMatch, getSyncStatus, describeOverrideException } from './plOutlo
 import { fetchOutcomeNames, fetchOutcomeRollups } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
-import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
+import {
+    isCurrentScoreOutcome, isSpecialOutcome, isRegularOutcome, orderOutcomesForPage
+} from './outcomeTypes.js';
 
-// ─── Outcome Type Helpers ────────────────────────────────────────────────────
-
-/**
- * Check if an outcome title matches the configured Current Score outcome name.
- *
- * @param {string} title - Outcome title to test
- * @returns {boolean} true if the title equals `AVG_OUTCOME_NAME`
- */
-export function isCurrentScoreOutcome(title) {
-    return title === AVG_OUTCOME_NAME;
-}
-
-function isExcludedOutcome(title) {
-    return EXCLUDED_OUTCOME_KEYWORDS.some(kw => title.includes(kw));
-}
-
-function isSpecialOutcome(title) {
-    return isCurrentScoreOutcome(title) || isExcludedOutcome(title);
-}
-
-/**
- * Check whether an outcome is a regular (gradable) outcome.
- * Returns false for the Current Score outcome and any excluded-keyword outcomes.
- *
- * @param {{ title: string }} outcome - Outcome object with a title property
- * @returns {boolean} true if the outcome should be included in Power Law calculations
- */
-export function isRegularOutcome(outcome) {
-    return !isSpecialOutcome(outcome.title);
-}
+// Outcome type helpers live in outcomeTypes.js; re-exported for existing importers.
+export { isCurrentScoreOutcome, isRegularOutcome };
 
 /**
  * Compute class stats for the Current Score row from each student's Current
@@ -459,36 +433,15 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
 
         const threshold = ctx.getThreshold();
 
-        // Sort outcomes: Current Score → Excluded → Regular
-        const currentScore = cache.outcomes.find(o => isCurrentScoreOutcome(o.title));
-        const excluded = cache.outcomes.filter(o => isExcludedOutcome(o.title) && !isCurrentScoreOutcome(o.title));
-        const regular  = cache.outcomes.filter(o => isRegularOutcome(o));
+        // Current Score → Excluded → Regular (teacher order)
+        const sortedOutcomes = orderOutcomesForPage(cache);
 
-        if (!currentScore) {
+        if (!sortedOutcomes.some(o => isCurrentScoreOutcome(o.title))) {
             const noCurrentScore = document.createElement('div');
             noCurrentScore.className = 'od-no-current-score';
             noCurrentScore.textContent = 'No Current Score found';
             outcomesEl.appendChild(noCurrentScore);
         }
-
-        // Apply persisted custom regular-outcome order. Wiki page stores IDs as
-        // strings; outcome.id from cache is a number — coerce to string.
-        if (cache.meta.customOutcomeOrder && Array.isArray(cache.meta.customOutcomeOrder)) {
-            regular.sort((a, b) => {
-                const indexA = cache.meta.customOutcomeOrder.indexOf(String(a.id));
-                const indexB = cache.meta.customOutcomeOrder.indexOf(String(b.id));
-                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                if (indexA !== -1) return -1;
-                if (indexB !== -1) return 1;
-                return 0;
-            });
-        }
-
-        const sortedOutcomes = [
-            ...(currentScore ? [currentScore] : []),
-            ...excluded,
-            ...regular
-        ];
 
         let regularIndex = 0;
 

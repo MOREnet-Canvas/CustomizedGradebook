@@ -640,6 +640,11 @@ tr.os-needs-row td { background:#FFFDF7; }
 .os-status-banner.syncing { background:var(--bg-secondary); border-color:var(--border-tertiary); color:var(--text-tertiary); }
 .os-status-banner-actions { display:flex; align-items:center; gap:0.538em; }
 
+/* Current Score table */
+.cs-toolbar select { margin-left:0.385em; font-size:inherit; }
+.cs-chips { line-height:2; }
+.cs-chips .os-pill { margin:0.1em 0.15em; cursor:default; }
+
 /* Per-outcome refresh button (#54 manual rollup re-pull) */
 .os-refresh-outcome-btn { background:none; border:none; color:inherit; cursor:pointer; font-size:1.077em; line-height:1; padding:0 0.2em; opacity:0.65; transition:opacity 0.15s; }
 .os-refresh-outcome-btn:hover { opacity:1; }
