@@ -26,6 +26,8 @@ import {
     runExclusive, isSaveQueueBusy, queuedOutcomeIds, rowsAwaitingOutcome, notifySaveStatus,
 } from './masteryOutlookState.js';
 import { verifyOutcomeRollups } from './plOutlookStateHandlers.js';
+import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
+import { PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../config.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -53,6 +55,50 @@ function getOrInitEntry(syncState, outcomeId, studentId) {
     };
 
     return syncState[oId][sId];
+}
+
+/** "courseId_assignmentId" → { running: Promise, rerun: boolean } */
+const _labelRefreshes = new Map();
+
+/**
+ * Refresh the mastery labels on a Projected Score assignment so students see
+ * e.g. "Approaching Target" instead of "No Evidence" (Canvas mislabels grades
+ * on points_possible = 0 assignments until points are toggled — see
+ * masteryRefreshService.js). Covers every student on the assignment.
+ *
+ * A call while a refresh for the same assignment is running doesn't hit the
+ * service's "already in progress" lock — it schedules one more run after it.
+ * Never rejects; failures are logged.
+ *
+ * @param {string|number} courseId
+ * @param {string|number} assignmentId - Projected Score assignment
+ * @returns {Promise<void>} settles when no more runs are pending
+ */
+export function refreshProjectedScoreLabels(courseId, assignmentId) {
+    const key = `${courseId}_${assignmentId}`;
+    const existing = _labelRefreshes.get(key);
+    if (existing) {
+        existing.rerun = true;
+        return existing.running;
+    }
+
+    const entry = { rerun: false, running: null };
+    entry.running = (async () => {
+        do {
+            entry.rerun = false;
+            try {
+                await refreshMasteryForAssignment(String(courseId), String(assignmentId), {
+                    gradingType:       PL_GRADING_TYPE,
+                    gradingStandardId: PL_GRADING_SCHEME_ID,
+                });
+            } catch (err) {
+                logger.warn('[PLActions] Projected Score label refresh failed (non-critical):', err?.message);
+            }
+        } while (entry.rerun);
+        _labelRefreshes.delete(key);
+    })();
+    _labelRefreshes.set(key, entry);
+    return entry.running;
 }
 
 /**
@@ -723,6 +769,10 @@ async function runSyncStudentsJob({
                 ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
             if (od) od.canvasScore = pushed;
         }
+
+        // Fix the Projected Score assignment's mastery labels (background — not part of the queue)
+        const plAssignmentId = cache.pl_assignments?.[String(outcomeId)]?.assignment_id;
+        if (plAssignmentId && pushedUserIds.length > 0) refreshProjectedScoreLabels(courseId, plAssignmentId);
 
         // Only the students actually pushed — not every student in the outcome.
         avgPromise = updateAvgAssignmentForStudents({

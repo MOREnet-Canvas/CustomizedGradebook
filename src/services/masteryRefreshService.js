@@ -92,18 +92,23 @@ function deriveTempPoints(assignment) {
  * @param {string} assignmentId - Assignment ID
  * @param {number} points - Points value to set
  * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @param {Object} [grading] - grading scheme to (re)apply; defaults to the gradebook's
+ * @param {number|string|null} [grading.gradingStandardId=DEFAULT_GRADING_SCHEME_ID]
+ * @param {string} [grading.gradingType=DEFAULT_GRADING_TYPE]
  * @returns {Promise<object>} Updated assignment object
  */
-async function updateAssignmentPoints(courseId, assignmentId, points, apiClient) {
+async function updateAssignmentPoints(courseId, assignmentId, points, apiClient, grading = {}) {
+    const gradingStandardId = grading.gradingStandardId !== undefined ? grading.gradingStandardId : DEFAULT_GRADING_SCHEME_ID;
+    const gradingType       = grading.gradingType ?? DEFAULT_GRADING_TYPE;
     const assignmentData = {
         points_possible: points
     };
 
     // Only include grading scheme fields if a grading scheme is selected
-    if (DEFAULT_GRADING_SCHEME_ID !== null && DEFAULT_GRADING_SCHEME_ID !== undefined) {
-        assignmentData.grading_standard_id = DEFAULT_GRADING_SCHEME_ID;
-        assignmentData.grading_type = DEFAULT_GRADING_TYPE;
-        logger.debug(`[RefreshMastery] Including grading scheme in assignment update: grading_standard_id=${DEFAULT_GRADING_SCHEME_ID}, grading_type=${DEFAULT_GRADING_TYPE}`);
+    if (gradingStandardId !== null && gradingStandardId !== undefined) {
+        assignmentData.grading_standard_id = gradingStandardId;
+        assignmentData.grading_type = gradingType;
+        logger.debug(`[RefreshMastery] Including grading scheme in assignment update: grading_standard_id=${gradingStandardId}, grading_type=${gradingType}`);
     }
 
     const assignment = await apiClient.put(
@@ -126,6 +131,9 @@ async function updateAssignmentPoints(courseId, assignmentId, points, apiClient)
  * @param {Object} options - Options for the refresh operation
  * @param {number} [options.delay] - Delay in milliseconds (default: MASTERY_REFRESH_DELAY_MS)
  * @param {boolean} [options.skipRevert] - Skip reverting to 0 (for future SpeedGrader toggle mode)
+ * @param {number|string|null} [options.gradingStandardId] - grading scheme to keep on the
+ *   assignment (default DEFAULT_GRADING_SCHEME_ID) — pass PL_GRADING_SCHEME_ID for Projected Score assignments
+ * @param {string} [options.gradingType] - grading type sent with the scheme (default DEFAULT_GRADING_TYPE)
  * @returns {Promise<void>}
  * @throws {Error} If refresh fails
  */
@@ -144,6 +152,7 @@ export async function refreshMasteryForAssignment(courseId, assignmentId, option
         const apiClient = new CanvasApiClient();
         const delay = options.delay ?? MASTERY_REFRESH_DELAY_MS;
         const skipRevert = options.skipRevert ?? false;
+        const grading = { gradingStandardId: options.gradingStandardId, gradingType: options.gradingType };
 
         logger.info(`[RefreshMastery] Starting refresh for assignment ${assignmentId} in course ${courseId}`);
 
@@ -159,7 +168,7 @@ export async function refreshMasteryForAssignment(courseId, assignmentId, option
 
         // Step 2: Update to TEMP_POINTS
         logger.debug(`[RefreshMastery] Setting points_possible to ${tempPoints}`);
-        await updateAssignmentPoints(courseId, assignmentId, tempPoints, apiClient);
+        await updateAssignmentPoints(courseId, assignmentId, tempPoints, apiClient, grading);
 
         // Step 3: Wait for propagation
         logger.debug(`[RefreshMastery] Waiting ${delay}ms for Canvas to propagate changes`);
@@ -168,7 +177,7 @@ export async function refreshMasteryForAssignment(courseId, assignmentId, option
         // Step 4: Revert to 0 (unless skipRevert is true)
         if (!skipRevert) {
             logger.debug(`[RefreshMastery] Reverting points_possible to 0`);
-            await updateAssignmentPoints(courseId, assignmentId, 0, apiClient);
+            await updateAssignmentPoints(courseId, assignmentId, 0, apiClient, grading);
         }
 
         logger.info(`[RefreshMastery] Successfully refreshed mastery for assignment ${assignmentId}`);

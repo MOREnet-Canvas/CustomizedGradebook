@@ -13,6 +13,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
     writeMasteryOutlookCache: vi.fn(async () => {}),
 }));
 vi.mock('../plOutlookSync.js', () => ({ runPLSync: vi.fn() }));
+vi.mock('../../services/masteryRefreshService.js', () => ({ refreshMasteryForAssignment: vi.fn(async () => {}) }));
 vi.mock('../plOutlookStateHandlers.js', () => ({
     // Background outcome check — resolves on demand in the tests that care
     verifyOutcomeRollups: vi.fn(async () => ({ verifiedAt: '2026-09-25T20:00:00Z', mismatchIds: [] })),
@@ -23,7 +24,9 @@ vi.mock('../masteryOutlookAvgService.js', async (importOriginal) => ({
     postNoteToAvgAssignment:        vi.fn(async () => true),
 }));
 
-import { handleSyncStudents } from '../plOutlookActions.js';
+import { handleSyncStudents, refreshProjectedScoreLabels } from '../plOutlookActions.js';
+import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
+import { PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../../config.js';
 import { runPLSync } from '../plOutlookSync.js';
 import { updateAvgAssignmentForStudents, applyPushedScoresToRollups } from '../masteryOutlookAvgService.js';
 import { writeMasteryOutlookCache } from '../masteryOutlookCacheService.js';
@@ -285,5 +288,50 @@ describe('handleSyncStudents — one row phase from click to done', () => {
         await vi.waitFor(() => expect(release).toBeTypeOf('function'));
         release();
         await run;
+    });
+});
+
+describe('Projected Score mastery labels', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    test('after a push, the Projected Score assignment is refreshed with the PL grading scheme', async () => {
+        runPLSync.mockImplementation(async ({ onPushed }) => {
+            onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
+            return { success: true, successCount: 1, errors: [], verifyMismatchIds: [], stateHistory: ['SYNCING', 'VERIFYING', 'COMPLETE'] };
+        });
+        await handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642'], apiClient: {}, cache: makeCache(), onRerender: () => {} });
+        await vi.waitFor(() => expect(refreshMasteryForAssignment).toHaveBeenCalledWith('566', 'a1', {
+            gradingType: PL_GRADING_TYPE, gradingStandardId: PL_GRADING_SCHEME_ID,
+        }));
+    });
+
+    test('nothing pushed → no refresh', async () => {
+        runPLSync.mockImplementation(async ({ onPushed }) => {
+            onPushed({ successCount: 0, errors: [], pushedUserIds: [] });
+            return { success: true, successCount: 0, errors: [], verifyMismatchIds: [], stateHistory: ['COMPLETE'] };
+        });
+        await handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642'], apiClient: {}, cache: makeCache(), onRerender: () => {} });
+        expect(refreshMasteryForAssignment).not.toHaveBeenCalled();
+    });
+
+    test('calls during a running refresh coalesce into exactly one follow-up run', async () => {
+        let finishFirst;
+        refreshMasteryForAssignment
+            .mockImplementationOnce(() => new Promise(r => { finishFirst = r; }))
+            .mockImplementation(async () => {});
+        const first = refreshProjectedScoreLabels('566', 'b1');
+        refreshProjectedScoreLabels('566', 'b1');
+        refreshProjectedScoreLabels('566', 'b1');
+        expect(refreshMasteryForAssignment).toHaveBeenCalledTimes(1);
+        finishFirst();
+        await first;
+        expect(refreshMasteryForAssignment).toHaveBeenCalledTimes(2);
+    });
+
+    test('a failed refresh is logged, not thrown', async () => {
+        refreshMasteryForAssignment.mockRejectedValueOnce(new Error('403'));
+        await expect(refreshProjectedScoreLabels('566', 'c1')).resolves.toBeUndefined();
     });
 });
