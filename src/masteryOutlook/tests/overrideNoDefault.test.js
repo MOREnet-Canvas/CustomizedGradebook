@@ -226,3 +226,20 @@ describe('Publishing wording', () => {
         }
     });
 });
+
+describe('Override padlock is hidden', () => {
+    test.each(['unlocked', 'locked'])('override with will_post_lock "%s" renders no padlock', (lock) => {
+        const row = rowFor(renderOutcomeStudentTable({ id: '101' },
+            makeCache({ will_post: 2.5, will_post_lock: lock })));
+        expect(row.querySelector('.os-wp-lock')).toBeNull();
+        // Highlight + note prompt still follow the override
+        expect(row.querySelector('.os-wp-box-wrap').classList.contains('differs')).toBe(true);
+        expect(row.querySelector('.os-comment-input').getAttribute('placeholder')).toBe('Reason for override…');
+    });
+
+    test('footer hint no longer mentions the padlock', () => {
+        document.body.innerHTML = renderOutcomeStudentTable({ id: '101' }, makeCache());
+        expect(document.body.textContent).not.toMatch(/Padlock/);
+        expect(document.body.textContent).toMatch(/Click Override box to type/);
+    });
+});

@@ -235,6 +235,9 @@ function renderOutcomeStudentRow(s, oidStr) {
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
         : `<span style="font-size:10px;color:var(--text-tertiary);">—</span>`;
 
+    // Padlock hidden — overrides are never auto-overwritten now that Override
+    // doesn't default to Marzano, so locking had no effect. Kept for reference:
+    /*
     const lockHtml = s.lock !== 'none' ? `
         <button class="os-wp-lock ${s.lock}"
                 data-action="${s.lock === 'locked' ? 'os-unlock' : 'os-lock'}"
@@ -247,6 +250,8 @@ function renderOutcomeStudentRow(s, oidStr) {
                   : 'Score differs from Marzano. Click to lock this value.'
           }</span>
         </button>` : '';
+    */
+    const lockHtml = '';
 
     const markerHtml = s.marker === 'verifying'
         ? `<span class="os-sync-marker verifying" title="${VERIFYING_TIP}" aria-label="${VERIFYING_TIP}">⏳</span>`
@@ -525,7 +530,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </table>
         </div>
         <div class="os-table-hint">
-          Click Canvas / Marzano / Last Override to copy to Override · Click Override box to type · Padlock locks an override
+          Click Canvas / Marzano / Last Override to copy to Override · Click Override box to type
         </div>`;
 }
 
@@ -660,6 +665,8 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             return;
         }
 
+        // Padlock button is hidden (see renderOutcomeStudentRow); these handlers are
+        // kept for older locked entries / re-enabling it.
         // ── Padlock → lock ────────────────────────────────────────────────
         if (action === 'os-lock') {
             await handleLockWillPost({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
