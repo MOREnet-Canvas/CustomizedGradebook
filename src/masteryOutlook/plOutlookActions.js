@@ -22,8 +22,8 @@ import { computeStudentOutcome, roundToHalf } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
 import {
-    syncingStudentIds, syncStudentPhase, syncingOutcomeIds, syncingOutcomePhase,
-    runExclusive, isSaveQueueBusy, queuedSyncKeys, queuedOutcomeIds,
+    syncingOutcomeIds, syncingOutcomePhase, setRowPhase, clearRowPhase,
+    runExclusive, isSaveQueueBusy, queuedOutcomeIds,
 } from './masteryOutlookState.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -504,27 +504,29 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
 export function handleSyncStudents(opts) {
     const { outcomeId, studentIds, onRerender } = opts;
 
-    // Show "Queued…" while an earlier save is still running.
-    const queuedKeys = studentIds ? studentIds.map(sid => `${outcomeId}_${String(sid)}`) : [];
+    // Every requested row gets a save phase immediately — 'queued' behind an
+    // earlier save, otherwise 'checking' — so rows, banner, and chip never see a
+    // requested row as idle (which let "Save grades to Canvas" re-send it).
+    const requestedKeys = studentIds ? studentIds.map(sid => `${outcomeId}_${String(sid)}`) : [];
     const queuedOutcome = studentIds ? null : String(outcomeId);
-    if (isSaveQueueBusy()) {
-        queuedKeys.forEach(k => queuedSyncKeys.add(k));
-        if (queuedOutcome) queuedOutcomeIds.add(queuedOutcome);
-        onRerender?.();
-    }
+    const busy = isSaveQueueBusy();
+    setRowPhase(requestedKeys, busy ? 'queued' : 'checking');
+    if (busy && queuedOutcome) queuedOutcomeIds.add(queuedOutcome);
+    onRerender?.();
     window.addEventListener('beforeunload', warnBeforeUnload);
 
     let resolveResult, rejectResult;
     const resultPromise = new Promise((resolve, reject) => { resolveResult = resolve; rejectResult = reject; });
 
     runExclusive(async () => {
-        queuedKeys.forEach(k => queuedSyncKeys.delete(k));
         if (queuedOutcome) queuedOutcomeIds.delete(queuedOutcome);
+        if (setRowPhase(requestedKeys, 'checking')) onRerender?.();
         try {
             const { result, pending } = await runSyncStudentsJob(opts);
             resolveResult(result);
-            await pending;   // hold the queue until the Current Score update finishes
+            await pending;   // hold the queue until the Current Score push finishes
         } catch (err) {
+            clearRowPhase(requestedKeys);
             rejectResult(err);
         }
     }).finally(() => {
@@ -603,63 +605,43 @@ async function runSyncStudentsJob({
         if (entry.will_post_note?.trim()) notes[String(sid)] = entry.will_post_note.trim();
     }
 
-    // F6 Option 2: Mark the outcome as "Checking..." instead of spinning all rows
-    // up front. Students will only show spinners after CALCULATING_CHANGES
-    // resolves which rows actually need a push.
+    // Row phases: explicitly requested rows are already 'checking' (set by
+    // handleSyncStudents). For an all-students run (studentIds null), rows only
+    // get a phase once CALCULATING_CHANGES resolves which ones need a push.
+    // The outcome-level markers remain for the chip's all-students fallback.
     const syncKeys = effectiveIds.map(sid => `${outcomeId}_${String(sid)}`);
+    let resolvedKeys = [];
     syncingOutcomeIds.add(String(outcomeId));
     syncingOutcomePhase.set(String(outcomeId), 'checking');
     onRerender?.();
 
-    // Wrap onProgress to flip the row phase when the state machine enters
-    // SYNCING (pushing) and VERIFYING (verifying), re-rendering only on change.
+    // Advance resolved rows to 'verifying' when the state machine gets there.
     const phaseProgress = (state, oName, message, done, total) => {
-        const phase = state === PL_STATES.SYNCING   ? 'pushing'
-                    : state === PL_STATES.VERIFYING ? 'verifying'
-                    : null;
-        if (phase) {
-            let changed = false;
-            for (const k of syncKeys) {
-                if (syncStudentPhase.get(k) !== phase) { syncStudentPhase.set(k, phase); changed = true; }
-            }
-            if (changed) onRerender?.();
-        }
+        if (state === PL_STATES.VERIFYING && setRowPhase(resolvedKeys, 'verifying')) onRerender?.();
         onProgress?.(state, oName, message, done, total);
     };
 
-    // Clear in-flight markers for every targeted row. Defined as a helper so the
-    // error path and the normal path share identical cleanup.
+    // Clear every targeted row and the outcome markers — shared by the error
+    // path and the normal path.
     const clearSyncKeys = () => {
         syncingOutcomeIds.delete(String(outcomeId));
         syncingOutcomePhase.delete(String(outcomeId));
-        for (const k of syncKeys) {
-            syncingStudentIds.delete(k);
-            syncStudentPhase.delete(k);
-        }
+        clearRowPhase(syncKeys);
     };
 
-    // After CALCULATING_CHANGES resolves the final sync list, advance the outcome
-    // chip from "Checking…" to "Syncing…" (#55) and add per-row spinners ONLY for
-    // students actually being pushed. (Post-push updates use onPushed's IDs.)
+    // After CALCULATING_CHANGES resolves the final sync list: rows being pushed
+    // go to 'pushing'; requested rows with nothing to push are done right away.
     const onStudentsResolved = (resolvedUserIds) => {
-        const resolvedKeys = new Set(resolvedUserIds.map(id => `${outcomeId}_${id}`));
+        resolvedKeys = resolvedUserIds.map(id => `${outcomeId}_${id}`);
+        const resolvedSet = new Set(resolvedKeys);
 
-        // #55: keep the outcome in an active state for the whole run. Advance the
-        // chip from "Checking…" to "Syncing…" instead of clearing it here — if we
-        // dropped syncingOutcomeIds now, buildSyncChip would briefly fall back to
-        // "N need" (canvasScore hasn't been updated until the push completes).
-        // Cleared in clearSyncKeys on completion/error, so the chip then jumps
-        // straight to "✓ Synced". Guard on a non-empty resolved set so the
-        // zero-updates path (COMPLETE without SYNCING) doesn't flash "Syncing…".
+        // #55: keep the outcome active for the whole run so the chip goes
+        // "Checking…" → "Syncing…" → "✓ Synced" without flashing "N need".
         if (resolvedUserIds.length > 0) {
             syncingOutcomePhase.set(String(outcomeId), 'syncing');
         }
-        for (const k of syncKeys) {
-            if (resolvedKeys.has(k)) {
-                syncingStudentIds.add(k);
-                syncStudentPhase.set(k, 'pushing');
-            }
-        }
+        setRowPhase(resolvedKeys, 'pushing');
+        clearRowPhase(syncKeys.filter(k => !resolvedSet.has(k)));
         onRerender?.();
     };
 

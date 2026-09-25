@@ -23,7 +23,8 @@ import { handleSyncStudents } from '../plOutlookActions.js';
 import { runPLSync } from '../plOutlookSync.js';
 import { updateAvgAssignmentForStudents, applyPushedScoresToRollups } from '../masteryOutlookAvgService.js';
 import { writeMasteryOutlookCache } from '../masteryOutlookCacheService.js';
-import { runExclusive, isSaveQueueBusy, queuedSyncKeys } from '../masteryOutlookState.js';
+import { runExclusive, isSaveQueueBusy, rowSavePhase } from '../masteryOutlookState.js';
+import { getOutcomeSaveSummary } from '../studentSyncTable.js';
 
 function makeCache() {
     return {
@@ -164,18 +165,18 @@ describe('handleSyncStudents — course-wide save queue', () => {
 
         const second = handleSyncStudents({ courseId: '566', outcomeId: '600', outcomeName: 'Outcome 3',
             studentIds: ['643'], apiClient: {}, cache, onRerender: () => {} });
-        expect(queuedSyncKeys.has('600_643')).toBe(true);
+        expect(rowSavePhase.get('600_643')).toBe('queued');
 
         finishFirstVerify();
         await first;                                   // first save's result is available…
         expect(runPLSync).toHaveBeenCalledTimes(1);    // …but the queue waits for its Current Score update
-        expect(queuedSyncKeys.has('600_643')).toBe(true);
+        expect(rowSavePhase.get('600_643')).toBe('queued');
 
         finishFirstAvg();
         await second;
         expect(runPLSync).toHaveBeenCalledTimes(2);
         expect(runPLSync.mock.calls[1][0].outcomeId).toBe('600');
-        expect(queuedSyncKeys.has('600_643')).toBe(false);
+        expect(rowSavePhase.has('600_643')).toBe(false);
     });
 });
 
@@ -195,5 +196,58 @@ describe('runExclusive', () => {
         await expect(c).resolves.toBe('c-result');
         expect(order).toEqual(['a-start', 'a-end', 'b', 'c']);
         expect(isSaveQueueBusy()).toBe(false);
+    });
+});
+
+describe('handleSyncStudents — one row phase from click to done', () => {
+    beforeEach(() => { vi.clearAllMocks(); rowSavePhase.clear(); });
+
+    test('requested rows go checking → pushing → verifying → cleared; rows with nothing to push clear at resolve', async () => {
+        const seen = [];
+        let finishVerify;
+        runPLSync.mockImplementationOnce(async ({ onStudentsResolved, onProgress, onPushed }) => {
+            seen.push(['start', rowSavePhase.get('599_642'), rowSavePhase.get('599_643')]);
+            onStudentsResolved(['642']);                          // 643 has nothing to push
+            seen.push(['resolved', rowSavePhase.get('599_642'), rowSavePhase.get('599_643')]);
+            onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
+            onProgress('VERIFYING', 'Outcome 2', 'Verifying…');
+            seen.push(['verifying', rowSavePhase.get('599_642'), rowSavePhase.get('599_643')]);
+            await new Promise(r => { finishVerify = r; });
+            return { success: true, successCount: 1, errors: [], verifyMismatchIds: [], stateHistory: ['VERIFYING'] };
+        });
+        const cache = makeCache();
+        cache.students.push({ id: '643', outcomes: [{ outcomeId: '599', plPrediction: 2, canvasScore: 2 }] });
+
+        const run = handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642', '643'], apiClient: {}, cache, onRerender: () => {} });
+        // Marked the moment the save is requested — never idle between click and push
+        expect(rowSavePhase.get('599_642')).toBe('checking');
+        expect(rowSavePhase.get('599_643')).toBe('checking');
+
+        await vi.waitFor(() => expect(finishVerify).toBeTypeOf('function'));
+        expect(seen).toEqual([
+            ['start',     'checking',  'checking'],
+            ['resolved',  'pushing',   undefined],
+            ['verifying', 'verifying', undefined],
+        ]);
+
+        finishVerify();
+        await run;
+        expect(rowSavePhase.size).toBe(0);
+    });
+
+    test('a second Save-all while rows are checking has nothing left to send', async () => {
+        let release;
+        runPLSync.mockImplementationOnce(() => new Promise(r => { release = () => r({ success: true, successCount: 0, errors: [], stateHistory: [] }); }));
+        const cache = makeCache();
+        const outcome = { id: '599' };
+
+        const run = handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642'], apiClient: {}, cache, onRerender: () => {} });
+        expect(getOutcomeSaveSummary(outcome, cache).remainingIds).toEqual([]);
+
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+        release();
+        await run;
     });
 });

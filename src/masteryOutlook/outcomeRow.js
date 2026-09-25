@@ -29,7 +29,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, queuedSyncKeys, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -106,12 +106,16 @@ export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         return `<span class="od-sync-chip setup">⚙ Setup</span>`;
     }
 
-    const oidPrefix = `${outcome.id}_`;
-    const hasQueuedRows = [...queuedSyncKeys].some(k => k.startsWith(oidPrefix));
-    if ((queuedOutcomeIds.has(String(outcome.id)) || hasQueuedRows) && !syncingOutcomeIds.has(String(outcome.id))) {
-        return `<span class="od-sync-chip checking" title="Waiting for the current save to finish verifying">Queued…</span>`;
+    // Same per-row save phases the rows and the Save banner read.
+    const rowPhases = getOutcomeRowPhases(outcome.id);
+    if (rowPhases.some(p => p !== 'queued')) {
+        return `<span class="od-sync-chip checking"><span class="spinner"></span> Syncing…</span>`;
+    }
+    if (rowPhases.length > 0 || (queuedOutcomeIds.has(String(outcome.id)) && !syncingOutcomeIds.has(String(outcome.id)))) {
+        return `<span class="od-sync-chip checking" title="Waiting for the current save to finish">Queued…</span>`;
     }
 
+    // Fallback for all-students runs (studentIds null), which mark rows only once resolved.
     if (syncingOutcomeIds.has(String(outcome.id))) {
         // #55: hold an active state for the whole run so the chip never flashes
         // back to "N need" between calculation and completion.

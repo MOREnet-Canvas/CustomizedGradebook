@@ -9,10 +9,10 @@
  *   fetchingStudentIds — tracks in-flight per-student refreshes so the
  *   lazy background fetch (outcomeRow.js) and per-student refresh button
  *   (studentSyncTable.js) don't race on the same student.
- *   syncingStudentIds / syncStudentPhase — track in-flight score pushes so
- *   each student row can show a live "Pushing…" / "Verifying…" spinner.
- *   runExclusive / queuedSyncKeys / queuedOutcomeIds — course-wide save queue
- *   so only one save runs at a time; waiting rows show "Queued…".
+ *   rowSavePhase / setRowPhase / clearRowPhase — the one per-row save status
+ *   (queued → checking → pushing → verifying) read by rows, banner, and chip.
+ *   runExclusive / queuedOutcomeIds — course-wide save queue so only one save
+ *   runs at a time.
  */
 
 /**
@@ -23,19 +23,50 @@
 export const fetchingStudentIds = new Set();
 
 /**
- * Set of in-flight sync keys in format "outcomeId_studentId".
- * Written by handleSyncStudents (plOutlookActions.js) for the duration of a
- * score push; read by buildOutcomeStudentRow (studentSyncTable.js) to show a
- * per-row spinner. Always cleared in a finally so a row can't get stuck.
+ * The one per-row save status: "outcomeId_studentId" → phase.
+ *   'queued'    — save requested, waiting for an earlier save to finish
+ *   'checking'  — save running, working out whether this row needs a push
+ *   'pushing'   — score being written to Canvas
+ *   'verifying' — waiting for Canvas to show the new score
+ * Set by handleSyncStudents (plOutlookActions.js) the moment a save is requested
+ * and cleared when that row is done; read by the student rows, the Save banner,
+ * and the outcome chip so all three always agree. Rows without an entry are idle.
  */
-export const syncingStudentIds = new Set();
+export const rowSavePhase = new Map();
 
 /**
- * Map of sync key → current phase ('pushing' | 'verifying') for keys present
- * in syncingStudentIds. Advances as the sync state machine progresses so the
- * row can distinguish the push from the Canvas verification step.
+ * Set the save phase for several rows.
+ * @param {string[]} keys  - "outcomeId_studentId"
+ * @param {'queued'|'checking'|'pushing'|'verifying'} phase
+ * @returns {boolean} true if any row changed
  */
-export const syncStudentPhase = new Map();
+export function setRowPhase(keys, phase) {
+    let changed = false;
+    for (const k of keys) {
+        if (rowSavePhase.get(k) !== phase) { rowSavePhase.set(k, phase); changed = true; }
+    }
+    return changed;
+}
+
+/**
+ * Clear the save phase for several rows (row is idle again).
+ * @param {string[]} keys - "outcomeId_studentId"
+ */
+export function clearRowPhase(keys) {
+    for (const k of keys) rowSavePhase.delete(k);
+}
+
+/**
+ * Save phases of the rows in one outcome that are currently not idle.
+ * @param {string|number} outcomeId
+ * @returns {string[]} phases for that outcome's rows (unordered)
+ */
+export function getOutcomeRowPhases(outcomeId) {
+    const prefix = `${outcomeId}_`;
+    const phases = [];
+    for (const [k, v] of rowSavePhase) if (k.startsWith(prefix)) phases.push(v);
+    return phases;
+}
 
 /**
  * Set of in-flight sync keys for entire outcomes in format "outcomeId".
@@ -52,12 +83,6 @@ export const syncingOutcomeIds = new Set();
  */
 export const syncingOutcomePhase = new Map();
 
-
-/**
- * Sync keys ("outcomeId_studentId") for row saves waiting in the save queue.
- * Rendered as "Queued…" in the Save column; removed when the job starts.
- */
-export const queuedSyncKeys = new Set();
 
 /**
  * Outcome IDs with a queued "save all" (or other outcome-wide job) waiting

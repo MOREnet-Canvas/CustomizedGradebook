@@ -30,7 +30,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingStudentIds, syncStudentPhase, syncingOutcomeIds, queuedSyncKeys, queuedOutcomeIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, rowSavePhase, queuedOutcomeIds } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -150,14 +150,12 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
                 note:  syncEntry.last_synced_note ?? null,
             }
             : null,
-        // Live sync phase for this row ('queued' | 'pushing' | 'verifying' | null) —
-        // driven by syncingStudentIds/syncStudentPhase while a push is in flight, and
-        // by the save queue while this row (or its outcome's "save all") is waiting.
-        syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
-            ? (syncStudentPhase.get(`${oidStr}_${sidStr}`) ?? 'pushing')
-            : (queuedSyncKeys.has(`${oidStr}_${sidStr}`) || (queuedOutcomeIds.has(oidStr) && willPost !== null))
-                ? 'queued'
-                : null
+        // Save phase for this row ('queued' | 'checking' | 'pushing' | 'verifying' | null)
+        // from the shared rowSavePhase map — the same source the banner and chip read.
+        // queuedOutcomeIds covers queued all-students runs (dev tools), which don't
+        // mark individual rows until they start.
+        syncPhase: rowSavePhase.get(`${oidStr}_${sidStr}`)
+            ?? ((queuedOutcomeIds.has(oidStr) && willPost !== null) ? 'queued' : null)
     };
 }
 
@@ -279,10 +277,11 @@ function renderOutcomeStudentRow(s, oidStr) {
                     : needsSync                    ? 'Push to Canvas'
                     : !hasWP                       ? 'No override set'
                     :                               'Up to date';
+    const phaseLabel = { checking: 'Checking…', pushing: 'Pushing…', verifying: 'Verifying…' }[s.syncPhase];
     const saveHtml = s.syncPhase === 'queued'
-        ? `<span class="os-posting queued" title="Waiting for the current save to finish verifying">Queued…</span>`
+        ? `<span class="os-posting queued" title="Waiting for the current save to finish">Queued…</span>`
         : s.syncPhase
-        ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
+        ? `<span class="os-posting"><span class="spinner"></span> ${phaseLabel ?? 'Pushing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
                ${!needsSync ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -394,7 +393,8 @@ function summarizeSaveStates(studentStates) {
     const remainingRows = studentStates.filter(s =>
         !s.syncPhase && (s.status === 'needs' || s.status === 'verify_failed'));
     return {
-        saving:       studentStates.filter(s => s.syncPhase === 'pushing').length,
+        // 'checking' (save started, push not yet decided) counts as saving
+        saving:       studentStates.filter(s => s.syncPhase === 'pushing' || s.syncPhase === 'checking').length,
         verifying:    studentStates.filter(s => s.syncPhase === 'verifying').length,
         queued:       studentStates.filter(s => s.syncPhase === 'queued').length,
         remaining:    remainingRows.length,
@@ -418,13 +418,12 @@ export function getOutcomeSaveSummary(outcome, cache) {
  * Status banner above the student table — mirrors the rows' save state.
  *
  * @param {Object}  summary     - from summarizeSaveStates
- * @param {boolean} isChecking  - outcome save started but rows not resolved yet
  * @param {string}  refreshBtn  - refresh button HTML
  * @returns {string} HTML
  */
-function renderSaveBanner(summary, isChecking, refreshBtn) {
+function renderSaveBanner(summary, refreshBtn) {
     const { saving, verifying, queued, remaining } = summary;
-    const inProgress = saving > 0 || verifying > 0 || queued > 0 || isChecking;
+    const inProgress = saving > 0 || verifying > 0 || queued > 0;
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
     if (!inProgress && remaining === 0) {
@@ -456,11 +455,10 @@ function renderSaveBanner(summary, isChecking, refreshBtn) {
     if (queued > 0)    parts.push(saving || verifying
         ? `${queued} queued`
         : `${plural(queued, 'student', 'students')} queued — waiting for the current save to finish`);
-    if (isChecking && parts.length === 0) parts.push('Checking which students need saving…');
     if (remaining > 0) parts.push(`${remaining} still to save`);
 
-    const lead = (saving > 0 || verifying > 0 || isChecking) ? '<span class="spinner"></span>' : '⏳';
-    const phaseLabel = saving > 0 || isChecking ? 'Saving…' : verifying > 0 ? 'Verifying…' : 'Queued…';
+    const lead = (saving > 0 || verifying > 0) ? '<span class="spinner"></span>' : '⏳';
+    const phaseLabel = saving > 0 ? 'Saving…' : verifying > 0 ? 'Verifying…' : 'Queued…';
     const button = remaining > 0
         ? `<button class="btn btn-sm btn-primary" data-action="os-post-all">Save remaining (${remaining})</button>`
         : `<button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>${phaseLabel}</button>`;
@@ -486,10 +484,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
             title="Refresh scores from Canvas"
             aria-label="Refresh scores from Canvas">↻</button>`;
 
-    // Outcome save started but CALCULATING_CHANGES hasn't marked rows yet
-    const isChecking = syncingOutcomeIds.has(oidStr)
-        && summary.saving === 0 && summary.verifying === 0;
-    const toolbarHtml = renderSaveBanner(summary, isChecking, refreshOutcomeBtn);
+    const toolbarHtml = renderSaveBanner(summary, refreshOutcomeBtn);
 
     // Legend commented out — color coding is self-evident from the dot colors
     // const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];

@@ -16,9 +16,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
 
 import { renderOutcomeStudentTable, getOutcomeSaveSummary } from '../studentSyncTable.js';
 import { buildSyncChip } from '../outcomeRow.js';
-import {
-    syncingStudentIds, syncStudentPhase, syncingOutcomeIds, queuedSyncKeys,
-} from '../masteryOutlookState.js';
+import { rowSavePhase, syncingOutcomeIds } from '../masteryOutlookState.js';
 
 const OID = '600';
 
@@ -51,10 +49,8 @@ function banner(cache) {
 }
 
 afterEach(() => {
-    syncingStudentIds.clear();
-    syncStudentPhase.clear();
+    rowSavePhase.clear();
     syncingOutcomeIds.clear();
-    queuedSyncKeys.clear();
 });
 
 describe('save banner', () => {
@@ -67,10 +63,8 @@ describe('save banner', () => {
     });
 
     test('one pushing, one queued, one remaining → combined status and Save remaining (1)', () => {
-        syncingOutcomeIds.add(OID);
-        syncingStudentIds.add(`${OID}_a`);
-        syncStudentPhase.set(`${OID}_a`, 'pushing');
-        queuedSyncKeys.add(`${OID}_b`);
+        rowSavePhase.set(`${OID}_a`, 'pushing');
+        rowSavePhase.set(`${OID}_b`, 'queued');
 
         const b = banner(makeCache());
         expect(b.cls).toBe('syncing');
@@ -80,11 +74,7 @@ describe('save banner', () => {
     });
 
     test('verifying with nothing left → disabled Verifying… button', () => {
-        syncingOutcomeIds.add(OID);
-        for (const id of ['a', 'b', 'c']) {
-            syncingStudentIds.add(`${OID}_${id}`);
-            syncStudentPhase.set(`${OID}_${id}`, 'verifying');
-        }
+        for (const id of ['a', 'b', 'c']) rowSavePhase.set(`${OID}_${id}`, 'verifying');
         const b = banner(makeCache());
         expect(b.text).toBe('Waiting for Canvas to confirm 3 students…');
         expect(b.button.disabled).toBe(true);
@@ -92,7 +82,7 @@ describe('save banner', () => {
     });
 
     test('only queued → waiting message and disabled Queued… button', () => {
-        for (const id of ['a', 'b', 'c']) queuedSyncKeys.add(`${OID}_${id}`);
+        for (const id of ['a', 'b', 'c']) rowSavePhase.set(`${OID}_${id}`, 'queued');
         const b = banner(makeCache());
         expect(b.cls).toBe('syncing');
         expect(b.text).toBe('⏳ 3 students queued — waiting for the current save to finish');
@@ -100,10 +90,12 @@ describe('save banner', () => {
         expect(b.button.textContent.trim()).toBe('Queued…');
     });
 
-    test('save started but rows not resolved yet → checking message', () => {
-        syncingOutcomeIds.add(OID);
+    test('save just started (rows checking) → counted as saving; button disabled, nothing to re-send', () => {
+        for (const id of ['a', 'b', 'c']) rowSavePhase.set(`${OID}_${id}`, 'checking');
         const b = banner(makeCache());
-        expect(b.text).toBe('Checking which students need saving… · 3 still to save');
+        expect(b.text).toBe('Saving 3 students to Canvas…');
+        expect(b.button.disabled).toBe(true);
+        expect(b.button.textContent.trim()).toBe('Saving…');
     });
 
     test('nothing pending → up to date', () => {
@@ -118,9 +110,8 @@ describe('save banner', () => {
 
 describe('getOutcomeSaveSummary', () => {
     test('remainingIds excludes queued and in-flight rows', () => {
-        syncingStudentIds.add(`${OID}_a`);
-        syncStudentPhase.set(`${OID}_a`, 'pushing');
-        queuedSyncKeys.add(`${OID}_b`);
+        rowSavePhase.set(`${OID}_a`, 'checking');
+        rowSavePhase.set(`${OID}_b`, 'queued');
 
         expect(getOutcomeSaveSummary({ id: OID }, makeCache())).toEqual({
             saving: 1, verifying: 0, queued: 1, remaining: 1, remainingIds: ['c'],
@@ -130,8 +121,14 @@ describe('getOutcomeSaveSummary', () => {
 
 describe('buildSyncChip', () => {
     test('shows Queued… when a row-level save for the outcome is queued', () => {
-        queuedSyncKeys.add(`${OID}_b`);
+        rowSavePhase.set(`${OID}_b`, 'queued');
         expect(buildSyncChip({ id: OID }, makeCache())).toContain('Queued…');
+    });
+
+    test('shows Syncing… when any row of the outcome is checking, pushing, or verifying', () => {
+        rowSavePhase.set(`${OID}_a`, 'checking');
+        rowSavePhase.set(`${OID}_b`, 'queued');
+        expect(buildSyncChip({ id: OID }, makeCache())).toContain('Syncing…');
     });
 
     test('no queued rows → not Queued', () => {

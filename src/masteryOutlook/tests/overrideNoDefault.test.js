@@ -14,7 +14,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
 
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from '../studentSyncTable.js';
 import { handleMarzanoPillClick, handleClearWillPost } from '../plOutlookActions.js';
-import { queuedSyncKeys } from '../masteryOutlookState.js';
+import { rowSavePhase } from '../masteryOutlookState.js';
 
 function makeCache(syncEntry = {}) {
     return {
@@ -114,16 +114,16 @@ describe('Override does not default to Marzano', () => {
     });
 
     test('a row waiting in the save queue shows Queued… in the Save column', () => {
-        queuedSyncKeys.add('101_s2');
+        rowSavePhase.set('101_s2', 'queued');
         try {
             const row = rowFor(renderOutcomeStudentTable({ id: '101' },
                 makeCache({ will_post: 2.5, will_post_lock: 'unlocked' })));
             const queued = row.querySelector('.os-posting.queued');
             expect(queued.textContent.trim()).toBe('Queued…');
-            expect(queued.getAttribute('title')).toMatch(/current save to finish verifying/);
+            expect(queued.getAttribute('title')).toMatch(/current save to finish/);
             expect(row.querySelector('[data-action="os-save"]')).toBeNull();
         } finally {
-            queuedSyncKeys.delete('101_s2');
+            rowSavePhase.delete('101_s2');
         }
     });
 

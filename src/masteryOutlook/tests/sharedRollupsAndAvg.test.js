@@ -24,6 +24,7 @@ import { fetchCourseRollupsForVerify, clearCourseRollupReuse, COURSE_ROLLUP_REUS
 import { updateAvgAssignmentForStudents } from '../masteryOutlookAvgService.js';
 import { calculateStudentAverages } from '../../services/gradeCalculator.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
+import { writeSyncState } from '../masteryOutlookCacheService.js';
 
 /** apiClient whose getWithResponse serves the given pages in order, following Link: rel="next". */
 function makePagedClient(pages) {
@@ -138,5 +139,41 @@ describe('updateAvgAssignmentForStudents — only the saved students', () => {
         // The shared result itself was not mutated
         const shared = await fetchCourseRollupsForVerify('566', client);
         expect(shared.rollups[0].scores[0].score).toBe(1.5);
+    });
+});
+
+describe('updateAvgAssignmentForStudents — Current Score check runs in the background', () => {
+    beforeEach(() => { vi.clearAllMocks(); clearCourseRollupReuse(); });
+
+    test('resolves after the push without waiting for Step 8; Step 8 still records avg_verify_*', async () => {
+        vi.useFakeTimers();
+        try {
+            // The rollup keeps the old Current Score, so Step 8 keeps polling.
+            const client = makePagedClient([{
+                rollups: [{ links: { user: '642' }, scores: [
+                    { score: 1.5, links: { outcome: '599' } }, { score: 1, links: { outcome: '603' } },
+                ] }],
+                linked: { outcomes: [{ id: 599, title: 'Outcome 2' }, { id: 603, title: 'Current Score' }] },
+            }]);
+            calculateStudentAverages.mockResolvedValue([{ userId: '642', average: 2.5 }]);
+            const cache = { students: [], sync_state: {}, avg_assignment: {
+                assignment_id: 'a', criterion_id: 'c', rubric_association_id: 'r',
+                avg_outcome_id: '603', submission_ids: { '642': 'sub-642' },
+            } };
+
+            const done = await updateAvgAssignmentForStudents({
+                courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+                studentIds: ['642'], pushedScores: { '642': 2 }, cache, apiClient: client,
+            });
+            expect(done).toBe(true);                         // resolved while Step 8 is still polling
+            expect(writeSyncState).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(5 * 60 * 1000); // Step 8 gives up after 4 min without progress
+            expect(writeSyncState).toHaveBeenCalledTimes(1);
+            const written = writeSyncState.mock.calls[0][1];
+            expect(written['603']['642']).toEqual(expect.objectContaining({ avg_verify_mismatch: true }));
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
