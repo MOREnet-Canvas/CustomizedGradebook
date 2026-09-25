@@ -151,6 +151,82 @@ export async function fetchOutcomeRollups(courseId, apiClient) {
     }
 }
 
+/** Delays between verify polls: quick at first (Canvas usually updates within seconds), then backing off. */
+export const VERIFY_POLL_DELAYS_MS = [1000, 1000, 1000, 2000, 2000, 3000];
+export const VERIFY_POLL_STEADY_MS = 5000;
+/** Give up verifying after this long with no reduction in mismatches. */
+export const VERIFY_NO_PROGRESS_LIMIT_MS = 4 * 60 * 1000;
+
+/**
+ * Reuse window for fetchCourseRollupsForVerify — polls this close together share
+ * one request. Kept just under the 1 s minimum poll delay so a loop's own next
+ * poll always refetches.
+ */
+export const COURSE_ROLLUP_REUSE_MS = 900;
+
+/** courseId → { promise, at } for the most recent course-wide rollup fetch. */
+const _courseRollupFetches = new Map();
+
+/** Forget any reusable course-wide rollup result (tests; or to force a fresh read). */
+export function clearCourseRollupReuse() {
+    _courseRollupFetches.clear();
+}
+
+/**
+ * Delay before the next verify poll, following VERIFY_POLL_DELAYS_MS then VERIFY_POLL_STEADY_MS.
+ * @param {number} attempt - 1-based poll number that just finished
+ * @returns {number} milliseconds
+ */
+export function verifyPollDelayMs(attempt) {
+    return VERIFY_POLL_DELAYS_MS[attempt - 1] ?? VERIFY_POLL_STEADY_MS;
+}
+
+/**
+ * Fetch course-wide outcome rollups (every student, every outcome) for the
+ * post-save verification polls — the override check and the Current Score check.
+ *
+ * Follows the Link: rel="next" cursor (this endpoint ignores ?page=N) and merges
+ * pages into one { rollups, linked: { outcomes, users } } response. A call made
+ * while a fetch for the same course is in flight, or within COURSE_ROLLUP_REUSE_MS
+ * of the last one finishing, reuses that result, so concurrent polls share one
+ * request stream. Treat the result as read-only.
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient - must support getWithResponse()
+ * @returns {Promise<{ rollups: Array, linked: { outcomes: Array, users: Array } }>}
+ */
+export function fetchCourseRollupsForVerify(courseId, apiClient) {
+    const key    = String(courseId);
+    const recent = _courseRollupFetches.get(key);
+    if (recent && (recent.at === null || Date.now() - recent.at < COURSE_ROLLUP_REUSE_MS)) {
+        return recent.promise;
+    }
+
+    const entry = { at: null, promise: null };
+    entry.promise = (async () => {
+        const merged = { rollups: [], linked: { outcomes: [], users: [] } };
+        const seenOutcomes = new Set();
+        let url = `/api/v1/courses/${courseId}/outcome_rollups?include[]=outcomes&include[]=users&per_page=100`;
+        while (url) {
+            const response = await apiClient.getWithResponse(url, {}, 'fetchCourseRollupsForVerify');
+            const data     = await response.json();
+            merged.rollups.push(...(data?.rollups ?? []));
+            for (const o of (data?.linked?.outcomes ?? [])) {
+                if (!seenOutcomes.has(String(o.id))) { seenOutcomes.add(String(o.id)); merged.linked.outcomes.push(o); }
+            }
+            merged.linked.users.push(...(data?.linked?.users ?? []));
+            const next = response.headers.get('Link')?.match(/<([^>]+)>;\s*rel="next"/);
+            url = next ? next[1] : null;
+        }
+        return merged;
+    })();
+    entry.promise
+        .then(() => { entry.at = Date.now(); })
+        .catch(() => { _courseRollupFetches.delete(key); });   // never reuse a failure
+    _courseRollupFetches.set(key, entry);
+    return entry.promise;
+}
+
 /**
  * Fetch Canvas rollup scores for a single outcome across all students.
  *

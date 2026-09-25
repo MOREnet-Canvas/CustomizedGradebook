@@ -23,6 +23,7 @@ import { handleSyncStudents } from '../plOutlookActions.js';
 import { runPLSync } from '../plOutlookSync.js';
 import { updateAvgAssignmentForStudents, applyPushedScoresToRollups } from '../masteryOutlookAvgService.js';
 import { writeMasteryOutlookCache } from '../masteryOutlookCacheService.js';
+import { runExclusive, isSaveQueueBusy, queuedSyncKeys } from '../masteryOutlookState.js';
 
 function makeCache() {
     return {
@@ -64,23 +65,24 @@ describe('handleSyncStudents — work that must not wait for verification', () =
         removeSpy.mockRestore();
     });
 
+    const DONE = { success: true, successCount: 1, errors: [], verifyMismatchIds: [], stateHistory: ['SYNCING', 'VERIFYING', 'COMPLETE'] };
+
     test('push done, verify still running → Current Score update + in-memory mirror already happened', async () => {
         let finishVerify;
         runPLSync.mockImplementation(async ({ onPushed }) => {
             onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
             await new Promise(r => { finishVerify = r; });   // verification "hangs"
-            return { success: true, successCount: 1, errors: [], verifyMismatchIds: [], stateHistory: ['SYNCING', 'VERIFYING', 'COMPLETE'] };
+            return DONE;
         });
         const cache = makeCache();
 
         const run = handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
             studentIds: ['642'], apiClient: {}, cache, onRerender: () => {} });
-        await Promise.resolve();
 
-        // Current Score update started with the pushed score, not waiting on Canvas
-        expect(updateAvgAssignmentForStudents).toHaveBeenCalledWith(expect.objectContaining({
-            outcomeId: '599', pushedScores: { '642': 2 }, notes: { '642': 'retest' },
-        }));
+        // Current Score update started with the pushed score — only for the pushed student
+        await vi.waitFor(() => expect(updateAvgAssignmentForStudents).toHaveBeenCalledWith(expect.objectContaining({
+            outcomeId: '599', studentIds: ['642'], pushedScores: { '642': 2 }, notes: { '642': 'retest' },
+        })));
         // In-memory sync_state mirrors the push (so later whole-cache writes don't undo it)
         const entry = cache.sync_state['599']['642'];
         expect(entry.last_synced_score).toBe(2);
@@ -93,20 +95,34 @@ describe('handleSyncStudents — work that must not wait for verification', () =
         expect(addSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
         expect(removeSpy).not.toHaveBeenCalledWith('beforeunload', expect.any(Function));
 
+        const writesBeforeVerify = writeMasteryOutlookCache.mock.calls.length;
         finishVerify();
         await run;
 
         expect(entry.last_verify_at).toBeTruthy();
         expect(entry.verify_mismatch).toBe(false);
-        expect(writeMasteryOutlookCache).toHaveBeenCalledTimes(1);
+        expect(writeMasteryOutlookCache.mock.calls.length).toBe(writesBeforeVerify + 1);
         expect(updateAvgAssignmentForStudents).toHaveBeenCalledTimes(1);   // not repeated after verify
-        expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+        await vi.waitFor(() => expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
+    });
+
+    test('pending typed edits are written to the cache file before the save reads it', async () => {
+        runPLSync.mockResolvedValue(DONE);
+        const cache = makeCache();
+        cache.sync_state['599']['642'].will_post = 3;   // typed just now, debounced write not yet run
+
+        await handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642'], apiClient: {}, cache, onRerender: () => {} });
+
+        expect(writeMasteryOutlookCache).toHaveBeenCalled();
+        expect(writeMasteryOutlookCache.mock.invocationCallOrder[0])
+            .toBeLessThan(runPLSync.mock.invocationCallOrder[0]);
     });
 
     test('verify mismatch is mirrored into memory', async () => {
         runPLSync.mockImplementation(async ({ onPushed }) => {
             onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
-            return { success: true, successCount: 1, errors: [], verifyMismatchIds: ['642'], stateHistory: ['SYNCING', 'VERIFYING', 'COMPLETE'] };
+            return { ...DONE, verifyMismatchIds: ['642'] };
         });
         const cache = makeCache();
 
@@ -116,10 +132,68 @@ describe('handleSyncStudents — work that must not wait for verification', () =
         expect(cache.sync_state['599']['642'].verify_mismatch).toBe(true);
     });
 
-    test('runPLSync throws → leave-page warning removed', async () => {
-        runPLSync.mockRejectedValue(new Error('network'));
+    test('runPLSync throws → promise rejects and leave-page warning is removed', async () => {
+        runPLSync.mockRejectedValueOnce(new Error('network'));
         await expect(handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
             studentIds: ['642'], apiClient: {}, cache: makeCache(), onRerender: () => {} })).rejects.toThrow('network');
-        expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+        await vi.waitFor(() => expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
+    });
+});
+
+describe('handleSyncStudents — course-wide save queue', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    test('a second save waits for the first save and its Current Score update, showing Queued meanwhile', async () => {
+        let finishFirstVerify, finishFirstAvg;
+        updateAvgAssignmentForStudents.mockImplementationOnce(() => new Promise(r => { finishFirstAvg = () => r(true); }));
+        runPLSync
+            .mockImplementationOnce(async ({ onPushed }) => {
+                onPushed({ successCount: 1, errors: [], pushedUserIds: ['642'] });
+                await new Promise(r => { finishFirstVerify = r; });
+                return { success: true, successCount: 1, errors: [], verifyMismatchIds: [], stateHistory: ['VERIFYING'] };
+            })
+            .mockResolvedValueOnce({ success: true, successCount: 0, errors: [], stateHistory: [] });
+
+        const cache = makeCache();
+        cache.students.push({ id: '643', outcomes: [{ outcomeId: '600', plPrediction: 2, canvasScore: 2 }] });
+        cache.sync_state['600'] = { '643': { will_post: 3, will_post_lock: 'unlocked' } };
+
+        const first  = handleSyncStudents({ courseId: '566', outcomeId: '599', outcomeName: 'Outcome 2',
+            studentIds: ['642'], apiClient: {}, cache, onRerender: () => {} });
+        await vi.waitFor(() => expect(runPLSync).toHaveBeenCalledTimes(1));
+
+        const second = handleSyncStudents({ courseId: '566', outcomeId: '600', outcomeName: 'Outcome 3',
+            studentIds: ['643'], apiClient: {}, cache, onRerender: () => {} });
+        expect(queuedSyncKeys.has('600_643')).toBe(true);
+
+        finishFirstVerify();
+        await first;                                   // first save's result is available…
+        expect(runPLSync).toHaveBeenCalledTimes(1);    // …but the queue waits for its Current Score update
+        expect(queuedSyncKeys.has('600_643')).toBe(true);
+
+        finishFirstAvg();
+        await second;
+        expect(runPLSync).toHaveBeenCalledTimes(2);
+        expect(runPLSync.mock.calls[1][0].outcomeId).toBe('600');
+        expect(queuedSyncKeys.has('600_643')).toBe(false);
+    });
+});
+
+describe('runExclusive', () => {
+    test('runs jobs one at a time in order; a failed job does not block the next', async () => {
+        const order = [];
+        let release;
+        const a = runExclusive(async () => { order.push('a-start'); await new Promise(r => { release = r; }); order.push('a-end'); });
+        const b = runExclusive(async () => { order.push('b'); throw new Error('b failed'); });
+        const c = runExclusive(async () => { order.push('c'); return 'c-result'; });
+
+        await vi.waitFor(() => expect(order).toEqual(['a-start']));
+        expect(isSaveQueueBusy()).toBe(true);
+        release();
+        await a;
+        await expect(b).rejects.toThrow('b failed');
+        await expect(c).resolves.toBe('c-result');
+        expect(order).toEqual(['a-start', 'a-end', 'b', 'c']);
+        expect(isSaveQueueBusy()).toBe(false);
     });
 });

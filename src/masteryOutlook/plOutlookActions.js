@@ -21,7 +21,10 @@ import { PL_STATES } from './plOutlookStateMachine.js';
 import { computeStudentOutcome, roundToHalf } from './powerLaw.js';
 import { logger } from '../utils/logger.js';
 import { updateAvgAssignmentForStudents, postNoteToAvgAssignment } from './masteryOutlookAvgService.js';
-import { syncingStudentIds, syncStudentPhase, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
+import {
+    syncingStudentIds, syncStudentPhase, syncingOutcomeIds, syncingOutcomePhase,
+    runExclusive, isSaveQueueBusy, queuedSyncKeys, queuedOutcomeIds,
+} from './masteryOutlookState.js';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -53,7 +56,7 @@ function getOrInitEntry(syncState, outcomeId, studentId) {
 
 /**
  * beforeunload handler — shows the browser's "Leave site?" prompt while a push
- * is in flight. Registered by handleSyncStudents; removed once no outcome is syncing.
+ * is queued or in flight. Registered by handleSyncStudents; removed once the save queue is idle.
  * @param {BeforeUnloadEvent} e
  */
 function warnBeforeUnload(e) {
@@ -211,23 +214,26 @@ export async function handleConfirmOverride({ courseId, outcomeId, studentId, no
 export async function handleDismissOverride({ courseId, outcomeId, studentId, outcomeName, cache, apiClient, onRerender }) {
     logger.info(`[PLActions] Dismissing override: outcome ${outcomeId}, student ${studentId}`);
 
-    await mutateSyncEntry(
-        { courseId, outcomeId, studentId, cache, apiClient, onRerender },
-        (entry) => {
-            entry.manual_override   = false;
-            entry.last_synced_score = null;   // force re-sync on next run
-            entry.last_synced_at    = null;
-            entry.will_post_note    = null;
-        }
-    );
+    // Queued with other saves — it writes the cache file and pushes to Canvas.
+    return runExclusive(async () => {
+        await mutateSyncEntry(
+            { courseId, outcomeId, studentId, cache, apiClient, onRerender },
+            (entry) => {
+                entry.manual_override   = false;
+                entry.last_synced_score = null;   // force re-sync on next run
+                entry.last_synced_at    = null;
+                entry.will_post_note    = null;
+            }
+        );
 
-    // Ensure the cache mutation is on disk before runPLSync (which reads from disk)
-    await flushCacheWrite(courseId, cache, apiClient);
+        // Ensure the cache mutation is on disk before runPLSync (which reads from disk)
+        await flushCacheWrite(courseId, cache, apiClient);
 
-    // Re-push PL prediction to Canvas for this student only
-    await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId] });
+        // Re-push PL prediction to Canvas for this student only
+        await runPLSync({ courseId, outcomeId, outcomeName, apiClient, targetUserIds: [studentId] });
 
-    onRerender?.();
+        onRerender?.();
+    });
 }
 
 // ─── Revert Override (reset to PL, clear manual flag) ────────────────────────
@@ -470,7 +476,12 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
  *   5. Writes the full cache to disk once (persists ignored_alignments and
  *      any other pending in-memory mutations)
  *   6. Calls onRerender
- * A beforeunload prompt is active while the push is in flight.
+ * Saves are queued course-wide (runExclusive): a save clicked while another is
+ * running shows "Queued…" and starts only after the previous save — including
+ * its verification and Current Score update — has finished. The returned
+ * promise resolves once this save's push and verification are done; the queue
+ * slot is held until its Current Score update also finishes.
+ * A beforeunload prompt is active while anything is queued or running.
  *
  * Guards:
  *   - cachedPLEntry prevents a Canvas Files race condition after Initialize
@@ -488,14 +499,56 @@ export function handleNoteChanged({ courseId, outcomeId, studentId, noteValue, c
  * @param {Object}        opts.cache         - In-memory cache (required)
  * @param {Function}      [opts.onProgress]
  * @param {Function}      [opts.onRerender]
- * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
+ * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>} runPLSync result
  */
-export async function handleSyncStudents({
+export function handleSyncStudents(opts) {
+    const { outcomeId, studentIds, onRerender } = opts;
+
+    // Show "Queued…" while an earlier save is still running.
+    const queuedKeys = studentIds ? studentIds.map(sid => `${outcomeId}_${String(sid)}`) : [];
+    const queuedOutcome = studentIds ? null : String(outcomeId);
+    if (isSaveQueueBusy()) {
+        queuedKeys.forEach(k => queuedSyncKeys.add(k));
+        if (queuedOutcome) queuedOutcomeIds.add(queuedOutcome);
+        onRerender?.();
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload);
+
+    let resolveResult, rejectResult;
+    const resultPromise = new Promise((resolve, reject) => { resolveResult = resolve; rejectResult = reject; });
+
+    runExclusive(async () => {
+        queuedKeys.forEach(k => queuedSyncKeys.delete(k));
+        if (queuedOutcome) queuedOutcomeIds.delete(queuedOutcome);
+        try {
+            const { result, pending } = await runSyncStudentsJob(opts);
+            resolveResult(result);
+            await pending;   // hold the queue until the Current Score update finishes
+        } catch (err) {
+            rejectResult(err);
+        }
+    }).finally(() => {
+        if (!isSaveQueueBusy()) window.removeEventListener('beforeunload', warnBeforeUnload);
+    });
+
+    return resultPromise;
+}
+
+/**
+ * The body of one queued save — see handleSyncStudents.
+ * @returns {Promise<{ result: Object, pending: Promise<void> }>} result from runPLSync;
+ *   pending settles when the Current Score update started after the push is done.
+ */
+async function runSyncStudentsJob({
     courseId, outcomeId, outcomeName,
     studentIds, apiClient, cache, onProgress, onRerender
 }) {
     logger.info(`[PLActions] handleSyncStudents — outcome ${outcomeId}, ` +
         `students: ${studentIds ? studentIds.join(',') : 'all'}`);
+
+    // Persist any override typed a moment ago (debounced write) before
+    // CALCULATING_CHANGES reads sync_state from disk.
+    await flushCacheWrite(courseId, cache, apiClient);
 
     // In-memory pl_assignments entry — prevents Canvas Files race condition
     const cachedPLEntry = cache?.pl_assignments?.[outcomeId]
@@ -556,7 +609,6 @@ export async function handleSyncStudents({
     const syncKeys = effectiveIds.map(sid => `${outcomeId}_${String(sid)}`);
     syncingOutcomeIds.add(String(outcomeId));
     syncingOutcomePhase.set(String(outcomeId), 'checking');
-    window.addEventListener('beforeunload', warnBeforeUnload);
     onRerender?.();
 
     // Wrap onProgress to flip the row phase when the state machine enters
@@ -584,7 +636,6 @@ export async function handleSyncStudents({
             syncingStudentIds.delete(k);
             syncStudentPhase.delete(k);
         }
-        if (syncingOutcomeIds.size === 0) window.removeEventListener('beforeunload', warnBeforeUnload);
     };
 
     // After CALCULATING_CHANGES resolves the final sync list, advance the outcome
@@ -617,6 +668,7 @@ export async function handleSyncStudents({
     // sync_state changes into the in-memory cache (so later whole-cache writes
     // don't undo them) and starts the Current Score update from the pushed scores.
     let pushedIds = [];
+    let avgPromise = Promise.resolve();
     const onPushed = ({ pushedUserIds }) => {
         pushedIds = pushedUserIds;
         const now = new Date().toISOString();
@@ -644,11 +696,12 @@ export async function handleSyncStudents({
             if (od) od.canvasScore = pushed;
         }
 
-        updateAvgAssignmentForStudents({
+        // Only the students actually pushed — not every student in the outcome.
+        avgPromise = updateAvgAssignmentForStudents({
             courseId,
             outcomeId,
             outcomeName,
-            studentIds:   effectiveIds.filter(Boolean),
+            studentIds:   pushedUserIds,
             notes,
             pushedScores: avgPushedScores,
             cache,
@@ -736,12 +789,12 @@ export async function handleSyncStudents({
                 apiClient,
             }).catch(err => logger.warn('[PLActions] Note post failed:', err.message));
             onRerender?.();
-            return result;
+            return { result, pending: avgPromise };
         }
     }
 
     onRerender?.();
-    return result;
+    return { result, pending: avgPromise };
 }
 
 // ─── Local PL recompute (ignore/unignore path) ───────────────────────────────

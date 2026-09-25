@@ -54,6 +54,7 @@ vi.mock('../../config.js', () => ({
 import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState, writeSyncState } from '../masteryOutlookCacheService.js';
 import { fetchCourseStudents } from '../../services/enrollmentService.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
+import { clearCourseRollupReuse } from '../masteryOutlookDataService.js';
 
 /**
  * Add a getWithResponse() to a mock client that wraps its get() mock — rollup
@@ -903,6 +904,7 @@ describe('handleVerifying', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
+        clearCourseRollupReuse();
     });
     afterEach(() => vi.useRealTimers());
 
@@ -966,7 +968,7 @@ describe('handleVerifying', () => {
         expect(apiClient.get.mock.calls.length).toBe(53);
     });
 
-    test('first polls are 1 s apart and filtered to the outcome', async () => {
+    test('first polls are 1 s apart and use the course-wide rollup', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
         const get = vi.fn()
             .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
@@ -987,7 +989,8 @@ describe('handleVerifying', () => {
 
         expect(next).toBe(PL_STATES.COMPLETE);
         expect(sm.getContext().verifyMismatches).toHaveLength(0);
-        expect(get.mock.calls[0][0]).toContain('outcome_ids[]=598');
+        expect(get.mock.calls[0][0]).toContain('/outcome_rollups?include[]=outcomes&include[]=users');
+        expect(get.mock.calls[0][0]).not.toContain('outcome_ids');
     });
 
     test('decreasing mismatch count resets retry counter (more than 3 calls made)', async () => {

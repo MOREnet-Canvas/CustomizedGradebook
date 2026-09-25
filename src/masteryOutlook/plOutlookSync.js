@@ -24,6 +24,7 @@ import { PL_STATE_HANDLERS }                from './plOutlookStateHandlers.js';
 import { readMasteryOutlookCache, readPLAssignments, readSyncState } from './masteryOutlookCacheService.js';
 import { aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import { logger } from '../utils/logger.js';
+import { runExclusive } from './masteryOutlookState.js';
 
 // ─── Run a full sync for one outcome ─────────────────────────────────────────
 
@@ -182,26 +183,29 @@ export async function checkSyncNeeded({ courseId, outcomeId, apiClient }) {
  * @returns {Promise<Object[]>} Array of per-outcome results
  */
 export async function runPLSyncForAllOutcomes({ courseId, apiClient, onProgress = null, onOutcomeDone = null }) {
-    const cache = await readMasteryOutlookCache(courseId, apiClient);
-    if (!cache?.outcomes?.length) {
-        logger.warn('[PLSync] No outcomes in cache — run Refresh Data first');
-        return [];
-    }
+    // One queued job for the whole loop so it never overlaps a teacher's save.
+    return runExclusive(async () => {
+        const cache = await readMasteryOutlookCache(courseId, apiClient);
+        if (!cache?.outcomes?.length) {
+            logger.warn('[PLSync] No outcomes in cache — run Refresh Data first');
+            return [];
+        }
 
-    const results = [];
-    for (const outcome of cache.outcomes) {
-        const result = await runPLSync({
-            courseId,
-            outcomeId:    String(outcome.id),
-            outcomeName:  outcome.name || String(outcome.id),
-            apiClient,
-            onProgress
-        });
-        results.push({ outcomeId: String(outcome.id), outcomeName: outcome.name, ...result });
-        if (onOutcomeDone) onOutcomeDone(String(outcome.id), result);
-    }
+        const results = [];
+        for (const outcome of cache.outcomes) {
+            const result = await runPLSync({
+                courseId,
+                outcomeId:    String(outcome.id),
+                outcomeName:  outcome.name || String(outcome.id),
+                apiClient,
+                onProgress
+            });
+            results.push({ outcomeId: String(outcome.id), outcomeName: outcome.name, ...result });
+            if (onOutcomeDone) onOutcomeDone(String(outcome.id), result);
+        }
 
-    return results;
+        return results;
+    });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

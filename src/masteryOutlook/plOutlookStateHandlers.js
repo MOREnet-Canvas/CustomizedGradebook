@@ -21,6 +21,10 @@ import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX, PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { findExistingPLAssignment } from './plOutlookSetup.js';
+import {
+    fetchCourseRollupsForVerify, verifyPollDelayMs,
+    VERIFY_POLL_DELAYS_MS, VERIFY_POLL_STEADY_MS, VERIFY_NO_PROGRESS_LIMIT_MS,
+} from './masteryOutlookDataService.js';
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -668,16 +672,14 @@ export async function handleSyncing(sm) {
 
 // ─── VERIFYING ────────────────────────────────────────────────────────────────
 
-/** Delays between verify polls: quick at first, then backing off to 5 s. */
-export const VERIFY_POLL_DELAYS_MS = [1000, 1000, 1000, 2000, 2000, 3000];
-export const VERIFY_POLL_STEADY_MS = 5000;
-/** Give up verifying after this long with no reduction in mismatches. */
-export const VERIFY_NO_PROGRESS_LIMIT_MS = 4 * 60 * 1000;
+// Poll timing lives with the shared rollup fetch; re-exported for existing importers.
+export { VERIFY_POLL_DELAYS_MS, VERIFY_POLL_STEADY_MS, VERIFY_NO_PROGRESS_LIMIT_MS };
 
 /**
  * Re-fetch outcome rollups for synced students and confirm scores match PL predictions.
- * Polls quickly at first (Canvas usually updates within seconds), then backs off;
- * gives up after VERIFY_NO_PROGRESS_LIMIT_MS without progress.
+ * Uses the shared course-wide rollup fetch (one request stream shared with the
+ * Current Score check). Polls quickly at first, then backs off; gives up after
+ * VERIFY_NO_PROGRESS_LIMIT_MS without progress.
  */
 export async function handleVerifying(sm) {
     const { courseId, outcomeId, studentsToSync, apiClient } = sm.getContext();
@@ -693,21 +695,7 @@ export async function handleVerifying(sm) {
     while (true) {
         sm.progress(`Verifying... (poll ${attempt}, ${mismatches.length || '?'} remaining)`);
 
-        // outcome_rollups returns { rollups: [], linked: {} } — not a flat array —
-        // so apiClient.getAllPages() exits after page 1. Manual Link-header pagination
-        // required. NOTE: this endpoint does NOT support ?page=N (returns the same
-        // first page on every request); must follow the Link: rel="next" cursor instead.
-        const rollups = [];
-        // outcome_ids[] keeps each poll to one score per student (user_ids[] returns 400 here).
-        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=users&per_page=100`;
-        while (rollupUrl) {
-            const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:verifyRollups');
-            const data     = await response.json();
-            rollups.push(...(data?.rollups ?? []));
-            const link     = response.headers.get('Link');
-            const next     = link?.match(/<([^>]+)>;\s*rel="next"/);
-            rollupUrl      = next ? next[1] : null;
-        }
+        const { rollups } = await fetchCourseRollupsForVerify(courseId, apiClient);
 
         const actualScores = new Map();
         rollups.forEach(rollup => {
@@ -750,7 +738,7 @@ export async function handleVerifying(sm) {
             break;
         }
 
-        const delayMs = VERIFY_POLL_DELAYS_MS[attempt - 1] ?? VERIFY_POLL_STEADY_MS;
+        const delayMs = verifyPollDelayMs(attempt);
         attempt++;
         await new Promise(r => setTimeout(r, delayMs));
     }

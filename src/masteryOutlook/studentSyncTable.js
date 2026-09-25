@@ -29,7 +29,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingStudentIds, syncStudentPhase, syncingOutcomeIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingStudentIds, syncStudentPhase, syncingOutcomeIds, queuedSyncKeys, queuedOutcomeIds } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -149,11 +149,14 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
                 note:  syncEntry.last_synced_note ?? null,
             }
             : null,
-        // Live sync phase for this row ('pushing' | 'verifying' | null) — driven
-        // by syncingStudentIds/syncStudentPhase while a push is in flight.
+        // Live sync phase for this row ('queued' | 'pushing' | 'verifying' | null) —
+        // driven by syncingStudentIds/syncStudentPhase while a push is in flight, and
+        // by the save queue while this row (or its outcome's "save all") is waiting.
         syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
             ? (syncStudentPhase.get(`${oidStr}_${sidStr}`) ?? 'pushing')
-            : null
+            : (queuedSyncKeys.has(`${oidStr}_${sidStr}`) || (queuedOutcomeIds.has(oidStr) && willPost !== null))
+                ? 'queued'
+                : null
     };
 }
 
@@ -275,7 +278,9 @@ function renderOutcomeStudentRow(s, oidStr) {
                     : needsSync                    ? 'Push to Canvas'
                     : !hasWP                       ? 'No override set'
                     :                               'Up to date';
-    const saveHtml = s.syncPhase
+    const saveHtml = s.syncPhase === 'queued'
+        ? `<span class="os-posting queued" title="Waiting for the current save to finish verifying">Queued…</span>`
+        : s.syncPhase
         ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
                ${!needsSync ? 'disabled' : ''} title="${saveTitle}">

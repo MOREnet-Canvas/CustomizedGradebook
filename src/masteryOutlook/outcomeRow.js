@@ -28,7 +28,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -103,6 +103,10 @@ function makeRenderers(ctx) {
 function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     if (!isOutcomeInitialized(outcome, cache, { isSpecial })) {
         return `<span class="od-sync-chip setup">⚙ Setup</span>`;
+    }
+
+    if (queuedOutcomeIds.has(String(outcome.id)) && !syncingOutcomeIds.has(String(outcome.id))) {
+        return `<span class="od-sync-chip checking" title="Waiting for the current save to finish verifying">Queued…</span>`;
     }
 
     if (syncingOutcomeIds.has(String(outcome.id))) {
@@ -844,10 +848,13 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
             if (cancelBtn) cancelBtn.disabled = true;
             if (progressEl) {
                 progressEl.style.display = '';
-                progressEl.textContent = 'Starting…';
+                progressEl.textContent = isSaveQueueBusy()
+                    ? 'Queued — waiting for the current save to finish…'
+                    : 'Starting…';
             }
             try {
-                const result = await runPLSync({
+                // Queued with saves — Initialize also writes the shared cache file.
+                const result = await runExclusive(() => runPLSync({
                     courseId:    ctx.courseId,
                     outcomeId:   outcome.id,
                     outcomeName: outcome.title || String(outcome.id),
@@ -856,7 +863,7 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
                     onProgress:  (_state, _name, msg) => {
                         if (progressEl && msg) progressEl.textContent = msg;
                     },
-                });
+                }));
                 // runPLSync reports handler errors via its result rather than throwing
                 if (!result?.success) throw new Error(result?.error || 'Setup did not complete');
                 if (result.warning) logger.warn(`[MasteryOutlook] Initialize: ${result.warning}`);
