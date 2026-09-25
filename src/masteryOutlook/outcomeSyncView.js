@@ -346,6 +346,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
                     typeClass:   'override',
                     canvas:      od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—',
                     marzano:     od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE',
+                    recent:      od?.mostRecent != null ? Number(od.mostRecent).toFixed(2) : '—',
                     willPost:    ex.score != null ? ex.score.toFixed(2) : '—',
                     note:        ex.note,
                     date:        ex.date ?? '',
@@ -367,6 +368,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
                 typeClass:   'ignored',
                 canvas:      '—',
                 marzano:     '—',
+                recent:      '—',
                 willPost:    '—',
                 note:        ia.reason ?? '',
                 date:        ia.ignored_at ?? '',
@@ -388,6 +390,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
             <td><span class="od-ex-pill ${pillClass}">${escapeHtml(r.type)}</span></td>
             <td class="od-center">${r.canvas}</td>
             <td class="od-center">${r.marzano}</td>
+            <td class="od-center">${r.recent}</td>
             <td class="od-center">${r.willPost}</td>
             <td><div class="od-note-clip">${escapeHtml(r.note)}</div></td>
             <td class="od-date od-nowrap">${dateDisp}</td>
@@ -401,6 +404,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
             <th>Type</th>
             <th class="od-center">Canvas</th>
             <th class="od-center">Marzano</th>
+            <th class="od-center">Most recent</th>
             <th class="od-center">Override</th>
             <th>Note</th>
             <th>Date</th>

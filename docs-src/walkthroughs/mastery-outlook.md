@@ -51,11 +51,21 @@ Each outcome row shows:
 | Learning direction — Marzano trend | `classStats.avgSlope` (positive = class improving) |
 | NE count | `classStats.neCount` |
 
-Click an outcome row to expand it and see the **All Students** tab.
+Click an outcome row to expand it. The detail panel has these tabs:
+
+| Tab | Shows |
+|-----|-------|
+| Manage Scores | Override editing and publishing (see Step 4) |
+| Struggling | Students whose **Canvas-reported** score is below the re-teach threshold — the same count as the row's "Below threshold" |
+| Declining / Growing | Students whose **Marzano trend** (Power Law slope) is below −0.05 / above 0.05 |
+| Exceptions | Pending, saved, locked, and Canvas overrides plus ignored alignments, with each student's Canvas, Marzano, and **Most recent** score |
+| All Students | Every student with Marzano, Canvas, decaying average, mean, most recent, trend, and score history |
+
+The tab counts come from the same rows and filters as the tables and update whenever the table redraws.
 
 ### Step 3 — Adjust the re-teach threshold (optional)
 
-The threshold slider controls the "below threshold" count. Stored in `localStorage` per teacher per course (`cg_threshold_{courseId}_{userId}`). Default: `2.2`.
+The threshold slider controls the "below threshold" count and the Struggling tab (both compare the Canvas-reported score). Stored in `localStorage` per teacher per course (`cg_threshold_{courseId}_{userId}`). Default: `2.2`.
 
 ### Step 4 — Review individual student rows
 
@@ -67,7 +77,8 @@ Each student row in the expanded table shows:
 | Alignments | Score dots for each rubric attempt (color-coded) |
 | Canvas | Current Canvas rollup score |
 | Marzano | `roundToHalf(plPrediction)` — the regression output |
-| Override | Teacher-set value (`will_post`), or auto-tracks Marzano |
+| Override | Teacher-set value (`will_post`); blank until a teacher sets one |
+| Last Override | Last score published to Canvas, with its date and note |
 | Note | `will_post_note` — shown as submission comment on push |
 | Save | Sync status button |
 

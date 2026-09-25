@@ -131,7 +131,7 @@ export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     };
     const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
 
-    // Count students whose row would be amber in the Manage Students tab —
+    // Count students whose row would be amber in the Manage Scores tab —
     // matches buildOutcomeStudentRow status logic exactly so the badge stays
     // in sync with what the teacher actually sees as needing action.
     const needsCount = (cache.students || []).filter(student => {
@@ -196,6 +196,17 @@ function renderInitPanel(outcome, open) {
 
 // ─── Per-outcome counts (drive detail-panel tab labels) ──────────────────────
 
+/**
+ * True when the student's Canvas-reported score for the outcome is below the
+ * re-teach threshold. Shared by the Struggling tab, its count, and the row flag.
+ * @param {{ canvasScore?: number|null }} row
+ * @param {number} threshold
+ * @returns {boolean}
+ */
+export function isBelowThresholdInCanvas(row, threshold) {
+    return row.canvasScore !== null && row.canvasScore !== undefined && row.canvasScore < threshold;
+}
+
 /** Slope beyond which a student counts as growing / declining (filter and trend arrow agree). */
 export const TREND_SLOPE_THRESHOLD = 0.05;
 
@@ -205,7 +216,8 @@ export const TREND_SLOPE_THRESHOLD = 0.05;
  * buildOutcomeStudentRows) — so the filtered tabs always match All Students.
  */
 export const TAB_FILTERS = {
-    struggling: (row, threshold) => row.plPrediction !== null && row.plPrediction !== undefined && row.plPrediction < threshold,
+    // Same test as the row's "Below threshold" (applyCanvasClassStats): the score Canvas reports.
+    struggling: (row, threshold) => isBelowThresholdInCanvas(row, threshold),
     declining:  (row) => row.slope !== null && row.slope !== undefined && row.slope < -TREND_SLOPE_THRESHOLD,
     growing:    (row) => row.slope !== null && row.slope !== undefined && row.slope >  TREND_SLOPE_THRESHOLD,
     all:        () => true,
@@ -289,6 +301,7 @@ function buildExceptionsTable(outcome, cache) {
         const od         = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
         const marzDisp   = od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE';
+        const recentDisp = od?.mostRecent != null ? Number(od.mostRecent).toFixed(2) : '—';
         const wpDisp     = ex?.score != null ? ex.score.toFixed(2) : '—';
         const note       = escapeHtml(ex?.note ?? '');
         const dateRaw    = ex?.date ?? '';
@@ -303,6 +316,7 @@ function buildExceptionsTable(outcome, cache) {
             <td>${types.join(' ')}</td>
             <td class="od-center">${canvasDisp}</td>
             <td class="od-center">${marzDisp}</td>
+            <td class="od-center">${recentDisp}</td>
             <td class="od-center">${wpDisp}</td>
             <td class="od-note">${note}</td>
             <td class="od-date">${dateFmt}</td>
@@ -315,6 +329,7 @@ function buildExceptionsTable(outcome, cache) {
             <th>Type</th>
             <th class="od-center">Canvas</th>
             <th class="od-center">Marzano</th>
+            <th class="od-center">Most recent</th>
             <th class="od-center">Override</th>
             <th>Note</th>
             <th>Date</th>
@@ -334,7 +349,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
     if (TAB_FILTERS[filter]) students = students.filter(s => TAB_FILTERS[filter](s, threshold));
 
     if (filter === 'students' || filter === 'all') {
-        // Both Manage Students and All Students sort alphabetically by name
+        // Both Manage Scores and All Students sort alphabetically by name
         students.sort((a, b) => {
             const nameA = (a.sortableName || a.name || '').toLowerCase();
             const nameB = (b.sortableName || b.name || '').toLowerCase();
@@ -345,6 +360,14 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             if (a.slope === null) return 1;
             if (b.slope === null) return -1;
             return a.slope - b.slope;
+        });
+    } else if (filter === 'struggling') {
+        // Lowest Canvas score first; students with no Canvas score last
+        const canvasOf = s => (s.canvasScore === null || s.canvasScore === undefined) ? null : s.canvasScore;
+        students.sort((a, b) => {
+            if (canvasOf(a) === null) return 1;
+            if (canvasOf(b) === null) return -1;
+            return canvasOf(a) - canvasOf(b);
         });
     } else {
         students.sort((a, b) => {
@@ -385,7 +408,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             .filter(Boolean)
             .join(' ');
 
-        const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
+        const isFlagged = isBelowThresholdInCanvas(s, threshold);
 
         const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
 
@@ -561,7 +584,7 @@ function buildOutcomeDetailPanel({
         const threshold = ctx.getThreshold();
         const opts = { isCurrentScoreRow };
         switch (id) {
-            case 'students':   return `Manage Students (${cache.students.length})`;
+            case 'students':   return `Manage Scores (${cache.students.length})`;
             case 'struggling': return `Struggling (${countTabStudents(outcome, 'struggling', cache, threshold, opts)})`;
             case 'declining':  return `Declining (${countTabStudents(outcome, 'declining', cache, threshold, opts)})`;
             case 'growing':    return `Growing (${countTabStudents(outcome, 'growing', cache, threshold, opts)})`;

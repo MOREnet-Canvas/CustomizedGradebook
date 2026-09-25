@@ -14,7 +14,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
     readPLAssignments:        vi.fn(async () => ({})),
 }));
 
-import { buildOutcomeStudentRows, countTabStudents, TAB_FILTERS, TREND_SLOPE_THRESHOLD } from '../outcomeRow.js';
+import { buildOutcomeStudentRows, countTabStudents, TAB_FILTERS, TREND_SLOPE_THRESHOLD, mountOutcomeRow } from '../outcomeRow.js';
 import { applyCanvasClassStats } from '../masteryOutlookDataService.js';
 import { computeCurrentScoreClassStats } from '../outcomeSyncView.js';
 
@@ -42,16 +42,25 @@ describe('tabs share the All Students rows', () => {
             const expected = rows.filter(r => TAB_FILTERS[tab](r, 3)).length;
             expect(countTabStudents({ id: OID }, tab, cache, 3)).toBe(expected);
         }
-        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(3);
+        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(1);   // Canvas 2.5 < 3 (Canvas 3 / 3.5 / none are not)
         expect(countTabStudents({ id: OID }, 'declining',  cache, 3)).toBe(2);
         expect(countTabStudents({ id: OID }, 'growing',    cache, 3)).toBe(1);
     });
 
     test('counts follow the data when it changes (no stale snapshot)', () => {
         const cache = makeCache();
-        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(3);
-        cache.students[1].outcomes[0].plPrediction = 3.2;
-        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(2);
+        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(1);
+        cache.students[1].outcomes[0].canvasScore = 3.2;
+        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(0);
+    });
+
+    test("Struggling uses the Canvas score and equals the row's Below threshold", () => {
+        // Test Student001 case: Marzano 1.50 but Canvas 3.00 → not struggling at threshold 3
+        const cache = makeCache();
+        const rows = buildOutcomeStudentRows({ id: OID }, cache);
+        expect(TAB_FILTERS.struggling(rows[0], 3)).toBe(false);
+        const cs = applyCanvasClassStats(cache.outcomes[0], cache, 3);
+        expect(countTabStudents({ id: OID }, 'struggling', cache, 3)).toBe(cs.belowThresholdCount);
     });
 
     test('trend threshold is shared: slope 0.07 is growing and would show ▲', () => {
@@ -66,6 +75,51 @@ describe('tabs share the All Students rows', () => {
             { id: 'a', outcomes: [{ outcomeId: '603', canvasScore: 2.3, plPrediction: 3.9 }] },
         ] };
         expect(buildOutcomeStudentRows({ id: '603' }, cache, { isCurrentScoreRow: true })[0].plPrediction).toBe(2.3);
+    });
+});
+
+describe('outcome detail panel', () => {
+    function mountExpanded(activeTab, prepare = () => {}) {
+        const cache = { ...makeCache(), sync_state: {}, ignored_alignments: [],
+            pl_assignments: { [OID]: { assignment_id: 'x' } }, meta: { courseId: '566' } };
+        prepare(cache);
+        const outcome = cache.outcomes[0];
+        applyCanvasClassStats(outcome, cache, 3);   // as Refresh Data does
+        const ctx = {
+            courseId: '566',
+            apiClient: { get: vi.fn(async () => ({ rollups: [] })), getAllPages: vi.fn(async () => []) },
+            getThreshold: () => 3,
+            getColorScheme: () => 'soft',
+        };
+        const state = { expandedOutcomeIds: new Set([OID]), activeTabs: { [OID]: activeTab } };
+        const { rootEl, teardown } = mountOutcomeRow({
+            outcome, cache, ctx, state, displayStats: outcome.classStats,
+            displayNumber: 1, isSpecial: false, isCurrentScoreRow: false,
+            isRegularOutcome: () => true, rerender: () => {},
+        });
+        document.body.replaceChildren(rootEl);
+        return { rootEl, teardown };
+    }
+
+    test('first tab reads "Manage Scores"; Struggling count equals the Canvas below-threshold count', () => {
+        const { rootEl, teardown } = mountExpanded('students');
+        const labels = [...rootEl.querySelectorAll('.od-detail-tab')].map(b => b.textContent);
+        expect(labels[0]).toBe('Manage Scores (4)');
+        expect(labels).toContain('Struggling (1)');
+        teardown();
+    });
+
+    test('Exceptions tab shows a Most recent column with the latest alignment score', () => {
+        const { rootEl, teardown } = mountExpanded('exceptions', (cache) => {
+            cache.students[0].outcomes[0].mostRecent = 1.5;
+            cache.sync_state = { [OID]: { '1': { last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53Z' } } };
+        });
+        const headers = [...rootEl.querySelectorAll('.od-ex-table th')].map(th => th.textContent.trim());
+        const i = headers.indexOf('Most recent');
+        expect(i).toBeGreaterThan(-1);
+        const cells = [...rootEl.querySelectorAll('.od-ex-table tbody tr:first-child td')].map(td => td.textContent.trim());
+        expect(cells[i]).toBe('1.50');
+        teardown();
     });
 });
 

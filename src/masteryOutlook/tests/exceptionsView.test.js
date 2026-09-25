@@ -19,7 +19,7 @@ function makeCache(syncState) {
     return {
         outcomes: [{ id: 599, title: 'Outcome 2' }],
         students: [
-            { id: '642', name: 'Test Student001', outcomes: [{ outcomeId: '599', plPrediction: 1.5, canvasScore: 2 }] },
+            { id: '642', name: 'Test Student001', outcomes: [{ outcomeId: '599', plPrediction: 1.5, canvasScore: 2, mostRecent: 1.5 }] },
             { id: '643', name: 'Test Student002', outcomes: [{ outcomeId: '599', plPrediction: 2.6, canvasScore: 3 }] },
         ],
         sync_state: { '599': syncState },
@@ -39,10 +39,11 @@ describe('buildCrossOutcomeExceptionsView — overrides', () => {
                      last_synced_at: '2026-09-25T16:10:53Z', last_synced_note: 'retest' },
         })));
         expect(rows).toHaveLength(1);
-        const [outcome, student, type, , , override, note, date] = rows[0];
+        const [outcome, student, type, , , recent, override, note, date] = rows[0];
         expect(outcome).toBe('Outcome 2');
         expect(student).toBe('Test Student001');
         expect(type).toBe('Saved Override');
+        expect(recent).toBe('1.50');                     // most recent alignment score
         expect(override).toBe('2.00');
         expect(note).toBe('retest');
         expect(date).toBe(new Date('2026-09-25T16:10:53Z').toLocaleDateString());
@@ -54,7 +55,8 @@ describe('buildCrossOutcomeExceptionsView — overrides', () => {
         })));
         expect(rows).toHaveLength(1);
         expect(rows[0][2]).toBe('Pending Override');
-        expect(rows[0][5]).toBe('2.50');
+        expect(rows[0][5]).toBe('—');                   // no mostRecent on this student
+        expect(rows[0][6]).toBe('2.50');
     });
 
     test('students with no override history are not listed', () => {
