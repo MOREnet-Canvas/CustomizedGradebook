@@ -24,12 +24,44 @@ export function scoresMatch(a, b) {
 }
 
 /**
+ * How long after a push an unconfirmed Canvas score counts as "still verifying"
+ * rather than a possible manual override. Canvas can take a while to update the
+ * rollup after a rubric assessment.
+ */
+export const VERIFY_PENDING_WINDOW_MS = 30 * 60 * 1000;
+
+/** Tooltip text for the "verifying" status (chip and row marker). */
+export const VERIFYING_TIP = 'Saved to Canvas; waiting for Canvas to update the score. This clears on its own.';
+
+/** Tooltip text for the "possible override" status (chip and row marker). */
+export const POSSIBLE_OVERRIDE_TIP =
+    'Canvas score no longer matches the score Mastery Outlook last saved — ' +
+    'it may have been changed directly in Canvas. Open the outcome to review.';
+
+/**
+ * True when a push happened but no verify pass completed after it, and the
+ * push is recent enough that Canvas may simply not have caught up yet.
+ *
+ * @param {Object} state - sync_state entry
+ * @param {number} now   - epoch ms
+ * @returns {boolean}
+ */
+function isVerifyPending(state, now) {
+    const syncedAt = state?.last_synced_at ? Date.parse(state.last_synced_at) : NaN;
+    if (Number.isNaN(syncedAt)) return false;
+    const verifiedAt = state?.last_verify_at ? Date.parse(state.last_verify_at) : NaN;
+    const verifiedSincePush = !Number.isNaN(verifiedAt) && verifiedAt >= syncedAt;
+    return !verifiedSincePush && (now - syncedAt) < VERIFY_PENDING_WINDOW_MS;
+}
+
+/**
  * Derive the sync status for one student × outcome cell.
  *
  * Priority order (first match wins):
  *  1. NE         — student has no PL prediction (not enough attempts)
  *  2. not_setup  — no PL assignment exists for this outcome yet
  *  3. manual_override — teacher has confirmed Canvas score should be kept
+ *  3b. verifying — pushed recently, Canvas not yet showing it, no verify pass since
  *  4. possible_override — Canvas score changed AFTER the last PL push
  *  5. needs_sync — teacher-set will_post differs from Canvas score (or never pushed)
  *  6. synced     — Canvas score matches last pushed PL prediction
@@ -39,9 +71,10 @@ export function scoresMatch(a, b) {
  * @param {number|null}   plPrediction  - computed Power Law score (null → NE)
  * @param {number|null}   canvasScore   - current Canvas rollup score (null = not set)
  * @param {Object}        plConfig      - { pl_assignments, sync_state } from cache
+ * @param {number}        [now=Date.now()] - current time in epoch ms (injectable for tests)
  * @returns {{ status: string, label: string, cssClass: string, [extra]: * }}
  */
-export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, plConfig) {
+export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, plConfig, now = Date.now()) {
     const oId = String(outcomeId);
     const sId = String(studentId);
 
@@ -71,6 +104,21 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
     }
 
     const lastSyncedScore = state?.last_synced_score ?? null;
+
+    // 3b. verifying — the push hasn't shown up in Canvas yet (e.g. page reloaded
+    //     mid-verify). Not a manual override until the pending window passes.
+    if (lastSyncedScore !== null && canvasScore !== null
+        && !scoresMatch(canvasScore, lastSyncedScore)
+        && isVerifyPending(state, now)) {
+        return {
+            status:          'verifying',
+            label:           '⏳ Verifying',
+            cssClass:        'sb-verifying',
+            canvasScore,
+            plPrediction,
+            lastSyncedScore,
+        };
+    }
 
     // 4. possible_override — Canvas changed AFTER the last PL push
     //    (lastSyncedScore exists but canvasScore no longer matches it)
@@ -116,11 +164,11 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
  * @param {Object[]} students      - cache.students (must already have .name attached by enrichCache)
  * @param {string|number} outcomeId
  * @param {Object} plConfig        - { pl_assignments, sync_state }
- * @returns {{ total, synced, needsSync, possibleOverride, manualOverride, ne, notSetup }}
+ * @returns {{ total, synced, needsSync, verifying, possibleOverride, manualOverride, ne, notSetup }}
  */
 export function aggregateSyncStatus(students, outcomeId, plConfig) {
     const counts = {
-        total: 0, synced: 0, needsSync: 0,
+        total: 0, synced: 0, needsSync: 0, verifying: 0,
         possibleOverride: 0, manualOverride: 0, ne: 0, notSetup: 0,
     };
 
@@ -138,6 +186,7 @@ export function aggregateSyncStatus(students, outcomeId, plConfig) {
         switch (status) {
             case 'synced':            counts.synced++;           break;
             case 'needs_sync':        counts.needsSync++;        break;
+            case 'verifying':         counts.verifying++;        break;
             case 'possible_override': counts.possibleOverride++; break;
             case 'manual_override':   counts.manualOverride++;   break;
             case 'ne':                counts.ne++;               break;

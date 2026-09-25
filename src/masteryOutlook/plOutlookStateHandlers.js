@@ -651,21 +651,26 @@ export async function handleSyncing(sm) {
 
 // ─── VERIFYING ────────────────────────────────────────────────────────────────
 
+/** Delays between verify polls: quick at first, then backing off to 5 s. */
+export const VERIFY_POLL_DELAYS_MS = [1000, 1000, 1000, 2000, 2000, 3000];
+export const VERIFY_POLL_STEADY_MS = 5000;
+/** Give up verifying after this long with no reduction in mismatches. */
+export const VERIFY_NO_PROGRESS_LIMIT_MS = 4 * 60 * 1000;
+
 /**
  * Re-fetch outcome rollups for synced students and confirm scores match PL predictions.
- * Retries up to 3 times with 2 s delay — mirrors handleVerifyingOverrides pattern.
+ * Polls quickly at first (Canvas usually updates within seconds), then backs off;
+ * gives up after VERIFY_NO_PROGRESS_LIMIT_MS without progress.
  */
 export async function handleVerifying(sm) {
     const { courseId, outcomeId, studentsToSync, apiClient } = sm.getContext();
     sm.progress('Verifying scores...');
     logger.debug('[PLSync] VERIFYING');
 
-    const noProgressLimit   = 50;
-    const retryDelayMs      = 5000;
     const userIds           = studentsToSync.map(s => s.userId);
     let mismatches          = [];
     let lastMismatchCount   = Infinity;
-    let noProgressCount     = 0;
+    let lastProgressAt      = Date.now();
     let attempt             = 1;
 
     while (true) {
@@ -676,7 +681,8 @@ export async function handleVerifying(sm) {
         // required. NOTE: this endpoint does NOT support ?page=N (returns the same
         // first page on every request); must follow the Link: rel="next" cursor instead.
         const rollups = [];
-        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100`;
+        // outcome_ids[] keeps each poll to one score per student (user_ids[] returns 400 here).
+        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?outcome_ids[]=${outcomeId}&include[]=users&per_page=100`;
         while (rollupUrl) {
             const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:verifyRollups');
             const data     = await response.json();
@@ -721,18 +727,15 @@ export async function handleVerifying(sm) {
         if (mismatches.length < lastMismatchCount) {
             logger.info(`[PLSync] Still verifying ${mismatches.length} student(s)...`);
             lastMismatchCount = mismatches.length;
-            noProgressCount   = 0;
-        } else {
-            noProgressCount++;
-        }
-
-        if (noProgressCount >= noProgressLimit) {
-            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — no progress for ${noProgressLimit} polls, giving up`);
+            lastProgressAt    = Date.now();
+        } else if (Date.now() - lastProgressAt >= VERIFY_NO_PROGRESS_LIMIT_MS) {
+            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — no progress for ${VERIFY_NO_PROGRESS_LIMIT_MS / 1000}s, giving up`);
             break;
         }
 
+        const delayMs = VERIFY_POLL_DELAYS_MS[attempt - 1] ?? VERIFY_POLL_STEADY_MS;
         attempt++;
-        await new Promise(r => setTimeout(r, retryDelayMs));
+        await new Promise(r => setTimeout(r, delayMs));
     }
 
     sm.updateContext({ verifyMismatches: mismatches });

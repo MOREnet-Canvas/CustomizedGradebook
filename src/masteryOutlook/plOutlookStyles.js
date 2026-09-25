@@ -916,6 +916,10 @@ tr.os-needs-row td { background:#FFFDF7; }
 .mo-shell .od-sync-chip.synced  { background:#E8F2EC; color:#276749; }
 .mo-shell .od-sync-chip.needs   { background:var(--amber-bg); color:var(--amber); }
 .mo-shell .od-sync-chip.override{ background:#FCEBEB; color:#791F1F; }
+.mo-shell .od-sync-chip.verifying{ background:var(--blue-bg); color:var(--blue-ink); cursor:help; }
+.mo-shell .od-sync-chip.override[title] { cursor:help; }
+.os-sync-marker { display:inline-block; margin-left:0.308em; font-size:0.846em; cursor:help; vertical-align:middle; }
+.os-sync-marker.override { color:#791F1F; }
 .mo-shell .od-sync-chip.setup   { background:var(--blue-bg); color:var(--blue-ink); }
 .mo-shell .od-sync-chip.checking{ background:var(--blue-bg); color:var(--blue-ink); }
 .mo-shell .od-sync-chip.none    { background:transparent; color:var(--text-tertiary); font-weight:500; }

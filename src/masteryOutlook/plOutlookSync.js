@@ -130,6 +130,7 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
  *   total:            number,
  *   synced:           number,
  *   needsSync:        number,
+ *   verifying:        number,
  *   possibleOverride: number,
  *   manualOverride:   number,
  *   ne:               number,

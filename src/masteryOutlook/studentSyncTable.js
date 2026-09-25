@@ -18,7 +18,7 @@
 
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
-import { scoresMatch } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
@@ -69,11 +69,13 @@ function formatDateShort(iso) {
  * @param {Object}   syncEntry           - sync_state[outcomeId][studentId] (may be {})
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
- * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, syncPhase}}
+ * @param {Object}   [plConfig]          - { pl_assignments, sync_state } for the Canvas-sync marker
+ * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, marker, syncPhase}}
  *   status: 'ne' | 'none' | 'synced' | 'verify_failed' | 'needs'
  *   'none' = no teacher-set override; nothing will be pushed for this row.
+ *   marker: 'verifying' | 'possible_override' | null — from getSyncStatus(), shown beside the Canvas pill
  */
-function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
+function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId, plConfig = null) {
     const canvas  = outcomeData?.canvasScore  ?? null;
     const marzano = outcomeData?.plPrediction ?? null;
 
@@ -121,6 +123,11 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         status = 'needs';
     }
 
+    const syncStatus = plConfig
+        ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig).status
+        : null;
+    const marker = (syncStatus === 'verifying' || syncStatus === 'possible_override') ? syncStatus : null;
+
     return {
         id:           sidStr,
         name:         student.name ?? student.sortableName ?? sidStr,
@@ -132,6 +139,7 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         note,
         dots,
         status,
+        marker,
         // Live sync phase for this row ('pushing' | 'verifying' | null) — driven
         // by syncingStudentIds/syncStudentPhase while a push is in flight.
         syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
@@ -226,6 +234,12 @@ function renderOutcomeStudentRow(s, oidStr) {
           }</span>
         </button>` : '';
 
+    const markerHtml = s.marker === 'verifying'
+        ? `<span class="os-sync-marker verifying" title="${VERIFYING_TIP}" aria-label="${VERIFYING_TIP}">⏳</span>`
+        : s.marker === 'possible_override'
+            ? `<span class="os-sync-marker override" title="${POSSIBLE_OVERRIDE_TIP}" aria-label="${POSSIBLE_OVERRIDE_TIP}">⚑</span>`
+            : '';
+
     const saveMod   = needsSync ? 'needs' : 'synced';
     const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
                     : needsSync                    ? `Push ${wpDisp} to Canvas`
@@ -255,7 +269,7 @@ function renderOutcomeStudentRow(s, oidStr) {
                 data-stu="${s.id}" data-oid="${oidStr}" data-canvas="${s.canvas ?? ''}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
           <span class="os-pill-tip">Set Override = ${canvasDisp}</span>
-        </button>
+        </button>${markerHtml}
       </td>
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
@@ -317,13 +331,14 @@ export function renderOutcomeStudentTable(outcome, cache) {
     const outcomeSync = syncState[String(outcome.id)] ?? {};
     const ignored     = cache.ignored_alignments ?? [];
     const oidStr      = String(outcome.id);
+    const plConfig    = { pl_assignments: cache.pl_assignments ?? {}, sync_state: syncState };
 
     const studentStates = cache.students
         .map(student => {
             const sId         = String(student.id);
             const outcomeData = student.outcomes.find(o => String(o.outcomeId) === oidStr);
             const entry       = outcomeSync[sId] ?? {};
-            return buildOutcomeStudentRow(student, outcomeData, entry, ignored, outcome.id);
+            return buildOutcomeStudentRow(student, outcomeData, entry, ignored, outcome.id, plConfig);
         })
         .sort((a, b) => a.sortableName.localeCompare(b.sortableName));
 

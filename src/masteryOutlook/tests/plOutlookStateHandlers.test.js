@@ -9,7 +9,8 @@ import {
     handleSyncing,
     handleVerifying,
     handleComplete,
-    handleError
+    handleError,
+    VERIFY_NO_PROGRESS_LIMIT_MS
 } from '../plOutlookStateHandlers.js';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
@@ -903,18 +904,44 @@ describe('handleVerifying', () => {
         expect(apiClient.get.mock.calls.length).toBeGreaterThan(1);
     });
 
-    test('persistent mismatch gives up after 50 no-progress polls (51 total API calls)', async () => {
+    test('persistent mismatch gives up after ~4 minutes without progress', async () => {
         const students = [{ userId: 'u1', plScore: 3.5 }];
         const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
         const sm = buildSMAtVerifying(students, { apiClient });
+        const start = Date.now();
 
         const promise = handleVerifying(sm);
         await vi.runAllTimersAsync();
         await promise;
 
-        // lastMismatchCount starts at Infinity, so poll 1 counts as progress. Polls 2-51
-        // make no progress; handleVerifying gives up at noProgressLimit (50).
-        expect(apiClient.get.mock.calls.length).toBe(51);
+        // Poll 1 counts as progress (lastMismatchCount starts at Infinity). Delays are
+        // 1,1,1,2,2,3 s (poll 7 at 10 s) then 5 s, so the first poll at ≥ 240 s is poll 53.
+        expect(Date.now() - start).toBeGreaterThanOrEqual(VERIFY_NO_PROGRESS_LIMIT_MS);
+        expect(apiClient.get.mock.calls.length).toBe(53);
+    });
+
+    test('first polls are 1 s apart and filtered to the outcome', async () => {
+        const students = [{ userId: 'u1', plScore: 3.5 }];
+        const get = vi.fn()
+            .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
+            .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
+            .mockResolvedValue(makeVerifyRollup('u1', 3.5));
+        const apiClient = withResponse({ get });
+        const sm = buildSMAtVerifying(students, { apiClient });
+
+        const promise = handleVerifying(sm);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(get).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(get).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(get).toHaveBeenCalledTimes(3);
+        await vi.runAllTimersAsync();
+        const next = await promise;
+
+        expect(next).toBe(PL_STATES.COMPLETE);
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        expect(get.mock.calls[0][0]).toContain('outcome_ids[]=598');
     });
 
     test('decreasing mismatch count resets retry counter (more than 3 calls made)', async () => {

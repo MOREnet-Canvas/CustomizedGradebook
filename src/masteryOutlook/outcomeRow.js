@@ -20,7 +20,7 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
 import { roundToHalf } from './powerLaw.js';
-import { getSyncStatus, aggregateSyncStatus, scoresMatch } from './plOutlookSyncStatus.js';
+import { getSyncStatus, aggregateSyncStatus, scoresMatch, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import {
     handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
 } from './plOutlookActions.js';
@@ -140,9 +140,12 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     if (needsCount > 0) {
         return `<span class="od-sync-chip needs">↑ ${needsCount} need</span>`;
     }
+    if (counts.verifying > 0) {
+        return `<span class="od-sync-chip verifying" title="${VERIFYING_TIP}">⏳ ${counts.verifying} verifying</span>`;
+    }
     if (counts.possibleOverride > 0 || counts.manualOverride > 0) {
         const n = counts.possibleOverride + counts.manualOverride;
-        return `<span class="od-sync-chip override">⚑ ${n}</span>`;
+        return `<span class="od-sync-chip override" title="${POSSIBLE_OVERRIDE_TIP}">⚑ ${n}</span>`;
     }
     // Use needsCount (scoresMatch-based) as the source of truth for synced status.
     // counts.synced from aggregateSyncStatus requires last_synced_score to be set,

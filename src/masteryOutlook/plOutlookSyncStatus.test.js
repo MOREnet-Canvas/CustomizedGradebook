@@ -109,6 +109,49 @@ describe('getSyncStatus', () => {
         const result = getSyncStatus('s1', '101', 2.5, 3.0, config);
         expect(result.status).toBe('possible_override');
     });
+
+    describe('verifying (push not yet reflected in Canvas)', () => {
+        const NOW      = Date.parse('2026-09-25T16:20:00Z');
+        const minsAgo  = (m) => new Date(NOW - m * 60 * 1000).toISOString();
+        const configFor = (entry) => ({
+            pl_assignments: { '599': { assignment_id: 'a1' } },
+            sync_state: { '599': { '642': { last_synced_score: 2, manual_override: false, ...entry } } },
+        });
+
+        it('unverified push 5 min ago with Canvas still old → verifying', () => {
+            const result = getSyncStatus('642', '599', 1.5, 1.5, configFor({ last_synced_at: minsAgo(5) }), NOW);
+            expect(result.status).toBe('verifying');
+        });
+
+        it('unverified push 40 min ago with Canvas still old → possible_override', () => {
+            const result = getSyncStatus('642', '599', 1.5, 1.5, configFor({ last_synced_at: minsAgo(40) }), NOW);
+            expect(result.status).toBe('possible_override');
+        });
+
+        it('verified after the push, then Canvas changed → possible_override', () => {
+            const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(4) });
+            const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW);
+            expect(result.status).toBe('possible_override');
+        });
+
+        it('verify pass older than the push does not count as verified → verifying', () => {
+            const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(60) });
+            const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW);
+            expect(result.status).toBe('verifying');
+        });
+
+        it('Canvas caught up to the pushed score → synced', () => {
+            const result = getSyncStatus('642', '599', 1.5, 2, configFor({ last_synced_at: minsAgo(5) }), NOW);
+            expect(result.status).toBe('synced');
+        });
+
+        it('aggregateSyncStatus counts verifying separately from possibleOverride', () => {
+            const students = [{ id: '642', outcomes: [{ outcomeId: '599', plPrediction: 1.5, canvasScore: 1.5 }] }];
+            const counts = aggregateSyncStatus(students, '599', configFor({ last_synced_at: new Date().toISOString() }));
+            expect(counts.verifying).toBe(1);
+            expect(counts.possibleOverride).toBe(0);
+        });
+    });
 });
 
 describe('aggregateSyncStatus', () => {

@@ -59,6 +59,36 @@ describe('Override does not default to Marzano', () => {
         expect(cache.sync_state['101']['s2'].will_post_lock).toBe('unlocked');
     });
 
+    test('push not yet reflected in Canvas → ⏳ marker beside the Canvas pill, not ⚑', () => {
+        const cache = makeCache({ last_synced_score: 2.0, last_synced_at: new Date().toISOString() });
+        cache.pl_assignments = { '101': { assignment_id: 'a1' } };
+        const row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+        const marker = row.querySelector('.os-sync-marker');
+        expect(marker.classList.contains('verifying')).toBe(true);
+        expect(marker.textContent).toBe('⏳');
+        expect(marker.getAttribute('title')).toMatch(/waiting for Canvas/);
+    });
+
+    test('Canvas changed after a verified push → ⚑ marker with explanation', () => {
+        const pushedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        const cache = makeCache({
+            last_synced_score: 2.0, last_synced_at: pushedAt,
+            last_verify_at: new Date(Date.now() - 9 * 60 * 1000).toISOString(),
+        });
+        cache.pl_assignments = { '101': { assignment_id: 'a1' } };
+        const row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+        const marker = row.querySelector('.os-sync-marker');
+        expect(marker.classList.contains('override')).toBe(true);
+        expect(marker.getAttribute('title')).toMatch(/changed directly in Canvas/);
+    });
+
+    test('no push history → no marker', () => {
+        const cache = makeCache();
+        cache.pl_assignments = { '101': { assignment_id: 'a1' } };
+        const row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+        expect(row.querySelector('.os-sync-marker')).toBeNull();
+    });
+
     test('clearing an override (blank input) returns the row to no-override', async () => {
         const cache = makeCache({ will_post: 3.0, will_post_lock: 'unlocked', will_post_note: 'why' });
         await handleClearWillPost({
