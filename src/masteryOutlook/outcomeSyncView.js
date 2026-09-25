@@ -225,7 +225,7 @@ function renderCourseSyncStrip(cache) {
         </div>
         <div class="cs-progress">
             <span class="spinner"></span>
-            <span>Pushing scores to Canvas…</span>
+            <span>Publishing scores to Canvas…</span>
             <div class="ps-bar"><div class="ps-bar-fill"></div></div>
         </div>
     `;

@@ -273,18 +273,18 @@ function renderOutcomeStudentRow(s, oidStr) {
 
     const saveMod   = needsSync ? 'needs' : 'synced';
     const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
-                    : needsSync                    ? `Push ${wpDisp} to Canvas`
+                    : needsSync                    ? `Publish ${wpDisp} to Canvas`
                     : !hasWP                       ? 'No override set'
                     :                               'Synced with Canvas';
     const saveTip   = s.status === 'verify_failed' ? 'Verify failed — re-sync'
-                    : needsSync                    ? 'Push to Canvas'
+                    : needsSync                    ? 'Publish to Canvas'
                     : !hasWP                       ? 'No override set'
                     :                               'Up to date';
-    const phaseLabel = { checking: 'Checking…', pushing: 'Pushing…', verifying: 'Confirming…' }[s.syncPhase];
+    const phaseLabel = { checking: 'Checking…', pushing: 'Publishing…', verifying: 'Confirming…' }[s.syncPhase];
     const saveHtml = s.syncPhase === 'queued'
         ? `<span class="os-posting queued" title="Waiting for the current save to finish">Queued…</span>`
         : s.syncPhase
-        ? `<span class="os-posting"><span class="spinner"></span> ${phaseLabel ?? 'Pushing…'}</span>`
+        ? `<span class="os-posting"><span class="spinner"></span> ${phaseLabel ?? 'Publishing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
                ${!needsSync ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -621,6 +621,7 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             input.value = (curVal !== 'NE' && curVal !== '—') ? curVal : '';
 
             boxEl?.replaceWith(input);
+            input.focus();   // explicit — when opened by ↓/↑ there's no mouse click to focus it
             input.select();
 
             const commitEdit = async () => {
@@ -635,10 +636,26 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
                     renderTable();
                 }
             };
+            // ↓ / ↑ — save this box (same as Enter) and open the next / previous
+            // student's Override box. The commit re-renders the table, so the
+            // target is looked up again afterwards by its outcome + student IDs.
+            const moveToRow = async (step) => {
+                const boxes  = [...contentEl.querySelectorAll('[data-action="os-wp-click"]')];
+                const target = boxes[boxes.indexOf(wrap) + step];
+                input.removeEventListener('blur', commitEdit);
+                await commitEdit();
+                if (!target) return;
+                contentEl.querySelector(
+                    `[data-action="os-wp-click"][data-oid="${target.dataset.oid}"][data-stu="${target.dataset.stu}"]`
+                )?.click();
+            };
+
             input.addEventListener('blur',   commitEdit);
             input.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
-                if (ev.key === 'Escape') { input.removeEventListener('blur', commitEdit); renderTable(); }
+                if (ev.key === 'Enter')     { ev.preventDefault(); input.blur(); }
+                if (ev.key === 'Escape')    { input.removeEventListener('blur', commitEdit); renderTable(); }
+                if (ev.key === 'ArrowDown') { ev.preventDefault(); moveToRow(1); }
+                if (ev.key === 'ArrowUp')   { ev.preventDefault(); moveToRow(-1); }
             });
             return;
         }

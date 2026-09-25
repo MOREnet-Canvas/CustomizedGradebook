@@ -149,3 +149,80 @@ describe('Override does not default to Marzano', () => {
         expect(row.querySelector('.os-wp-box').textContent.trim()).toBe('');
     });
 });
+
+describe('Override box keyboard navigation', () => {
+    /** Three students on outcome 101, rendered and wired like the live table. */
+    function mountTable() {
+        const stu = (id) => ({
+            id, name: `Student ${id}`, sortableName: `Student ${id}`,
+            outcomes: [{ outcomeId: '101', plPrediction: 2, canvasScore: 2, attempts: [] }],
+        });
+        const cache = {
+            students: [stu('a'), stu('b'), stu('c')],
+            sync_state: { '101': {} },
+            ignored_alignments: [],
+        };
+        const contentEl = document.createElement('div');
+        const renderTable = () => { contentEl.innerHTML = renderOutcomeStudentTable({ id: '101' }, cache); };
+        renderTable();
+        document.body.replaceChildren(contentEl);
+        wireOutcomeStudentTable({ contentEl, outcome: { id: '101' }, cache, courseId: '1',
+            apiClient: {}, renderTable });
+        return { cache, contentEl };
+    }
+
+    const openBox = (contentEl, stu) =>
+        contentEl.querySelector(`[data-action="os-wp-click"][data-stu="${stu}"]`).click();
+    const openInput = (contentEl) => contentEl.querySelector('.os-wp-input');
+    const press = (el, key) => el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+
+    test('↓ saves the value and opens the next student\'s Override box', async () => {
+        const { cache, contentEl } = mountTable();
+        openBox(contentEl, 'a');
+        const input = openInput(contentEl);
+        input.value = '2.5';
+        press(input, 'ArrowDown');
+
+        await vi.waitFor(() => expect(openInput(contentEl)?.closest('tr')?.dataset.stu).toBe('b'));
+        expect(cache.sync_state['101'].a.will_post).toBe(2.5);
+        expect(document.activeElement).toBe(openInput(contentEl));
+    });
+
+    test('↑ goes back to the previous student', async () => {
+        const { cache, contentEl } = mountTable();
+        openBox(contentEl, 'b');
+        const input = openInput(contentEl);
+        input.value = '3';
+        press(input, 'ArrowUp');
+
+        await vi.waitFor(() => expect(openInput(contentEl)?.closest('tr')?.dataset.stu).toBe('a'));
+        expect(cache.sync_state['101'].b.will_post).toBe(3);
+    });
+
+    test('↓ on the last student saves and opens nothing else', async () => {
+        const { cache, contentEl } = mountTable();
+        openBox(contentEl, 'c');
+        const input = openInput(contentEl);
+        input.value = '1';
+        press(input, 'ArrowDown');
+
+        await vi.waitFor(() => expect(cache.sync_state['101'].c?.will_post).toBe(1));
+        expect(openInput(contentEl)).toBeNull();
+    });
+});
+
+describe('Publishing wording', () => {
+    test('row in the pushing phase reads Publishing…; Save tooltip says Publish … to Canvas', () => {
+        const cache = makeCache({ will_post: 2.5, will_post_lock: 'unlocked' });
+        let row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+        expect(row.querySelector('[data-action="os-save"]').getAttribute('title')).toBe('Publish 2.50 to Canvas');
+
+        rowSavePhase.set('101_s2', 'pushing');
+        try {
+            row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
+            expect(row.querySelector('.os-posting').textContent.trim()).toBe('Publishing…');
+        } finally {
+            rowSavePhase.delete('101_s2');
+        }
+    });
+});
