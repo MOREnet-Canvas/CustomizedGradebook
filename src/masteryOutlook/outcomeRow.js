@@ -7,6 +7,7 @@
  *
  * Public surface:
  *   - isOutcomeInitialized(outcome, cache, { isSpecial }) → boolean
+ *   - buildSyncChip(outcome, cache, { isSpecial }) → HTML string (collapsed-row Canvas sync chip)
  *   - mountOutcomeRow({ outcome, cache, ctx, state, displayStats,
  *                       displayNumber, isSpecial, isCurrentScoreRow,
  *                       rerender, onReorderCommit }) → { rootEl, teardown }
@@ -28,7 +29,7 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, queuedSyncKeys, runExclusive, isSaveQueueBusy } from './masteryOutlookState.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -100,12 +101,14 @@ function makeRenderers(ctx) {
  * @param {boolean} [opts.isSpecial]
  * @returns {string} HTML
  */
-function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
+export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     if (!isOutcomeInitialized(outcome, cache, { isSpecial })) {
         return `<span class="od-sync-chip setup">⚙ Setup</span>`;
     }
 
-    if (queuedOutcomeIds.has(String(outcome.id)) && !syncingOutcomeIds.has(String(outcome.id))) {
+    const oidPrefix = `${outcome.id}_`;
+    const hasQueuedRows = [...queuedSyncKeys].some(k => k.startsWith(oidPrefix));
+    if ((queuedOutcomeIds.has(String(outcome.id)) || hasQueuedRows) && !syncingOutcomeIds.has(String(outcome.id))) {
         return `<span class="od-sync-chip checking" title="Waiting for the current save to finish verifying">Queued…</span>`;
     }
 

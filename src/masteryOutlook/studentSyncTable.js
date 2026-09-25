@@ -9,6 +9,7 @@
  *
  * Public surface:
  *   - renderOutcomeStudentTable(outcome, cache) → HTML string
+ *   - getOutcomeSaveSummary(outcome, cache) → { saving, verifying, queued, remaining, remainingIds }
  *   - wireOutcomeStudentTable({ contentEl, outcome, cache, courseId,
  *                               apiClient, renderTable }) → teardown fn
  *
@@ -358,14 +359,20 @@ function renderOutcomeStudentRow(s, oidStr) {
  * @param {Object} cache
  * @returns {string} HTML string
  */
-export function renderOutcomeStudentTable(outcome, cache) {
+/**
+ * Build the row state for every student in one outcome, sorted by name.
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {Object[]} rows from buildOutcomeStudentRow
+ */
+function buildOutcomeStudentStates(outcome, cache) {
     const syncState   = cache.sync_state ?? {};
     const outcomeSync = syncState[String(outcome.id)] ?? {};
     const ignored     = cache.ignored_alignments ?? [];
     const oidStr      = String(outcome.id);
     const plConfig    = { pl_assignments: cache.pl_assignments ?? {}, sync_state: syncState };
 
-    const studentStates = cache.students
+    return cache.students
         .map(student => {
             const sId         = String(student.id);
             const outcomeData = student.outcomes.find(o => String(o.outcomeId) === oidStr);
@@ -373,45 +380,116 @@ export function renderOutcomeStudentTable(outcome, cache) {
             return buildOutcomeStudentRow(student, outcomeData, entry, ignored, outcome.id, plConfig);
         })
         .sort((a, b) => a.sortableName.localeCompare(b.sortableName));
+}
 
-    const needsCount = studentStates.filter(s => s.status === 'needs').length;
+/**
+ * Summarize row save state for the outcome banner and "Save grades to Canvas".
+ * `remaining` rows need saving and are not already queued or in flight — the
+ * only rows the banner button sends.
+ *
+ * @param {Object[]} studentStates - rows from buildOutcomeStudentRow
+ * @returns {{ saving: number, verifying: number, queued: number, remaining: number, remainingIds: string[] }}
+ */
+function summarizeSaveStates(studentStates) {
+    const remainingRows = studentStates.filter(s =>
+        !s.syncPhase && (s.status === 'needs' || s.status === 'verify_failed'));
+    return {
+        saving:       studentStates.filter(s => s.syncPhase === 'pushing').length,
+        verifying:    studentStates.filter(s => s.syncPhase === 'verifying').length,
+        queued:       studentStates.filter(s => s.syncPhase === 'queued').length,
+        remaining:    remainingRows.length,
+        remainingIds: remainingRows.map(s => s.id),
+    };
+}
+
+/**
+ * Save-state summary for one outcome — counts of rows saving, verifying,
+ * queued, and still to save, plus the IDs "Save grades to Canvas" should send.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {{ saving: number, verifying: number, queued: number, remaining: number, remainingIds: string[] }}
+ */
+export function getOutcomeSaveSummary(outcome, cache) {
+    return summarizeSaveStates(buildOutcomeStudentStates(outcome, cache));
+}
+
+/**
+ * Status banner above the student table — mirrors the rows' save state.
+ *
+ * @param {Object}  summary     - from summarizeSaveStates
+ * @param {boolean} isChecking  - outcome save started but rows not resolved yet
+ * @param {string}  refreshBtn  - refresh button HTML
+ * @returns {string} HTML
+ */
+function renderSaveBanner(summary, isChecking, refreshBtn) {
+    const { saving, verifying, queued, remaining } = summary;
+    const inProgress = saving > 0 || verifying > 0 || queued > 0 || isChecking;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+    if (!inProgress && remaining === 0) {
+        return `<div class="os-status-banner ok">
+             <div class="os-status-banner-left">
+               ✓ Canvas gradebook is up to date
+             </div>
+             ${refreshBtn}
+           </div>`;
+    }
+
+    if (!inProgress) {
+        return `<div class="os-status-banner warn">
+             <div class="os-status-banner-left">
+               ⬆ <b>${remaining}</b> student${remaining !== 1 ? 's' : ''} need${remaining === 1 ? 's' : ''} updating
+             </div>
+             <div class="os-status-banner-actions">
+               ${refreshBtn}
+               <button class="btn btn-sm btn-primary" data-action="os-post-all">
+                 Save grades to Canvas
+               </button>
+             </div>
+           </div>`;
+    }
+
+    const parts = [];
+    if (saving > 0)    parts.push(`Saving ${plural(saving, 'student', 'students')} to Canvas…`);
+    if (verifying > 0) parts.push(`Waiting for Canvas to confirm ${plural(verifying, 'student', 'students')}…`);
+    if (queued > 0)    parts.push(saving || verifying
+        ? `${queued} queued`
+        : `${plural(queued, 'student', 'students')} queued — waiting for the current save to finish`);
+    if (isChecking && parts.length === 0) parts.push('Checking which students need saving…');
+    if (remaining > 0) parts.push(`${remaining} still to save`);
+
+    const lead = (saving > 0 || verifying > 0 || isChecking) ? '<span class="spinner"></span>' : '⏳';
+    const phaseLabel = saving > 0 || isChecking ? 'Saving…' : verifying > 0 ? 'Verifying…' : 'Queued…';
+    const button = remaining > 0
+        ? `<button class="btn btn-sm btn-primary" data-action="os-post-all">Save remaining (${remaining})</button>`
+        : `<button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>${phaseLabel}</button>`;
+
+    return `<div class="os-status-banner syncing">
+         <div class="os-status-banner-left">
+           ${lead} ${parts.join(' · ')}
+         </div>
+         <div class="os-status-banner-actions">
+           ${refreshBtn}
+           ${button}
+         </div>
+       </div>`;
+}
+
+export function renderOutcomeStudentTable(outcome, cache) {
+    const oidStr        = String(outcome.id);
+    const studentStates = buildOutcomeStudentStates(outcome, cache);
+    const summary       = summarizeSaveStates(studentStates);
 
     const refreshOutcomeBtn =
         `<button class="os-refresh-outcome-btn" data-action="os-refresh-outcome"
             title="Refresh scores from Canvas"
             aria-label="Refresh scores from Canvas">↻</button>`;
 
-    const isSyncing = syncingOutcomeIds.has(oidStr);
-    const toolbarHtml = needsCount > 0
-        ? isSyncing
-            ? `<div class="os-status-banner syncing">
-                 <div class="os-status-banner-left">
-                   <span class="spinner"></span> <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-                 </div>
-                 <div class="os-status-banner-actions">
-                   ${refreshOutcomeBtn}
-                   <button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>
-                     Save grades to Canvas
-                   </button>
-                 </div>
-               </div>`
-            : `<div class="os-status-banner warn">
-                 <div class="os-status-banner-left">
-                   ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-                 </div>
-                 <div class="os-status-banner-actions">
-                   ${refreshOutcomeBtn}
-                   <button class="btn btn-sm btn-primary" data-action="os-post-all">
-                     Save grades to Canvas
-                   </button>
-                 </div>
-               </div>`
-        : `<div class="os-status-banner ok">
-             <div class="os-status-banner-left">
-               ✓ Canvas gradebook is up to date
-             </div>
-             ${refreshOutcomeBtn}
-           </div>`;
+    // Outcome save started but CALCULATING_CHANGES hasn't marked rows yet
+    const isChecking = syncingOutcomeIds.has(oidStr)
+        && summary.saving === 0 && summary.verifying === 0;
+    const toolbarHtml = renderSaveBanner(summary, isChecking, refreshOutcomeBtn);
 
     // Legend commented out — color coding is self-evident from the dot colors
     // const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
@@ -631,10 +709,13 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         // ── Save all ──────────────────────────────────────────────────────
         if (action === 'os-post-all') {
             if (el.disabled) return;
+            // Only rows that need saving and aren't already queued or in flight.
+            const { remainingIds } = getOutcomeSaveSummary(outcome, cache);
+            if (remainingIds.length === 0) return;
             el.disabled = true;
             try {
                 await handleSyncStudents({ courseId, outcomeId: String(outcome.id), outcomeName,
-                    studentIds: null, apiClient, cache, onRerender: renderTable });
+                    studentIds: remainingIds, apiClient, cache, onRerender: renderTable });
                 onChipUpdate?.();
             } catch (err) {
                 logger.error('[MasteryOutlook] os-post-all failed', err);
