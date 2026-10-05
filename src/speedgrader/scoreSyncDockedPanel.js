@@ -24,7 +24,6 @@ const STORAGE_KEYS = {
 };
 
 const SESSION_KEYS = {
-    HIDDEN: 'cg_scoresync_hidden',
     EXPANDED: 'cg_scoresync_expanded'
 };
 
@@ -33,7 +32,6 @@ const DEFAULTS = {
     SIDE: 'right',
     TEXT_ORIENTATION: 'horizontal',
     POSITION: 50, // percentage from top
-    HIDDEN: false,
     EXPANDED: false
 };
 
@@ -45,8 +43,7 @@ const COLORS = {
     TEXT_DARK: '#2D3B45',
     TEXT_MEDIUM: '#6B7780',
     BORDER_LIGHT: '#E5E5E5',
-    BORDER_MEDIUM: '#C7CDD1',
-    GRAY_LIGHT: '#F5F5F5'
+    BORDER_MEDIUM: '#C7CDD1'
 };
 
 // State
@@ -54,7 +51,6 @@ let panelState = {
     side: DEFAULTS.SIDE,
     textOrientation: DEFAULTS.TEXT_ORIENTATION,
     position: DEFAULTS.POSITION,
-    hidden: DEFAULTS.HIDDEN,
     expanded: DEFAULTS.EXPANDED,
     isDragging: false,
     dragStartY: 0,
@@ -300,24 +296,6 @@ function injectStyles() {
             padding-top: 0.75rem;
             border-top: 1px solid ${COLORS.BORDER_LIGHT};
         }
-
-        /* Hide button */
-        .cg-scoresync-hide-btn {
-            width: 100%;
-            padding: 0.5rem;
-            background: ${COLORS.GRAY_LIGHT};
-            border: 1px solid ${COLORS.BORDER_MEDIUM};
-            border-radius: 0.25rem;
-            color: ${COLORS.TEXT_MEDIUM};
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: background 0.2s ease, color 0.2s ease;
-        }
-
-        .cg-scoresync-hide-btn:hover {
-            background: #E5E5E5;
-            color: ${COLORS.TEXT_DARK};
-        }
     `;
 
     document.head.appendChild(style);
@@ -333,7 +311,6 @@ function loadSettings() {
     panelState.side = localStorage.getItem(STORAGE_KEYS.SIDE) || DEFAULTS.SIDE;
     panelState.textOrientation = localStorage.getItem(STORAGE_KEYS.TEXT_ORIENTATION) || DEFAULTS.TEXT_ORIENTATION;
     panelState.position = parseFloat(localStorage.getItem(STORAGE_KEYS.POSITION)) || DEFAULTS.POSITION;
-    panelState.hidden = sessionStorage.getItem(SESSION_KEYS.HIDDEN) === 'true';
     panelState.expanded = sessionStorage.getItem(SESSION_KEYS.EXPANDED) === 'true';
 
     logger.trace('[DockedPanel] Settings loaded:', panelState);
@@ -348,7 +325,6 @@ function saveSettings() {
     localStorage.setItem(STORAGE_KEYS.SIDE, panelState.side);
     localStorage.setItem(STORAGE_KEYS.TEXT_ORIENTATION, panelState.textOrientation);
     localStorage.setItem(STORAGE_KEYS.POSITION, panelState.position.toString());
-    sessionStorage.setItem(SESSION_KEYS.HIDDEN, panelState.hidden.toString());
     sessionStorage.setItem(SESSION_KEYS.EXPANDED, panelState.expanded.toString());
 }
 
@@ -431,10 +407,6 @@ function createRoot() {
     root.className = `side-${panelState.side}`;
     root.style.top = `${panelState.position}%`;
     root.style.transform = 'translateY(-50%)';
-
-    if (panelState.hidden) {
-        root.style.display = 'none';
-    }
 
     return root;
 }
@@ -533,26 +505,6 @@ function setSide(side) {
     tabElement.className = `orientation-${panelState.textOrientation} side-${side}`;
     saveSettings();
     logger.info('[DockedPanel] Side changed to:', side);
-}
-
-/**
- * Hide panel for this session
- */
-function hideForSession() {
-    panelState.hidden = true;
-    rootElement.style.display = 'none';
-    saveSettings();
-    logger.info('[DockedPanel] Hidden for session');
-}
-
-/**
- * Show panel
- */
-function showPanel() {
-    panelState.hidden = false;
-    rootElement.style.display = 'block';
-    saveSettings();
-    logger.info('[DockedPanel] Panel shown');
 }
 
 /**
@@ -716,13 +668,6 @@ function addPanelSettingsSection() {
     orientationControl.appendChild(orientationSelect);
     section.appendChild(orientationControl);
 
-    // Hide for session button
-    const hideBtn = document.createElement('button');
-    hideBtn.className = 'cg-scoresync-hide-btn';
-    hideBtn.textContent = 'Hide for This Session';
-    hideBtn.addEventListener('click', hideForSession);
-    section.appendChild(hideBtn);
-
     content.appendChild(section);
 }
 
@@ -814,8 +759,6 @@ export {
     updatePanelScore,
     setTextOrientation,
     setSide,
-    hideForSession,
-    showPanel,
     getPanelContent,
     togglePanel,
     addSyncControlsSection,

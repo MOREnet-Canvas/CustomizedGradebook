@@ -17,7 +17,8 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { getCourseSnapshot, populateCourseSnapshot } from '../services/courseSnapshotService.js';
+import { getCourseSnapshot, populateCourseSnapshot, clearCourseSnapshot } from '../services/courseSnapshotService.js';
+import { fetchCourseName } from '../services/courseService.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import {
     initDockedPanel,
@@ -892,10 +893,19 @@ export async function initSpeedGraderAutoGrade() {
     let snapshot = getCourseSnapshot(courseId);
     logger.trace(`[ScoreSync] Course snapshot from cache: ${snapshot ? 'FOUND' : 'NOT FOUND'}`);
 
-    if (!snapshot) {
+    if (!snapshot || snapshot.model !== 'standards') {
+        // A cached 'traditional' may have been classified from a bad course name
+        // (e.g. SpeedGrader's document.title) — clear it and re-check once
+        if (snapshot) {
+            logger.trace(`[ScoreSync] Cached model is ${snapshot.model}, re-checking with real course name...`);
+            clearCourseSnapshot(courseId);
+        }
+
         logger.trace('[ScoreSync] Populating course snapshot...');
-        const courseName = document.title.split(':')[0]?.trim() || 'Unknown Course';
-        logger.trace(`[ScoreSync] Course name from title: "${courseName}"`);
+        const courseName = await fetchCourseName(courseId, apiClient)
+            || document.title.split(':')[0]?.trim()
+            || 'Unknown Course';
+        logger.trace(`[ScoreSync] Course name: "${courseName}"`);
         snapshot = await populateCourseSnapshot(courseId, courseName, apiClient);
         logger.trace(`[ScoreSync] Snapshot population result: ${snapshot ? 'SUCCESS' : 'FAILED'}`);
     }
