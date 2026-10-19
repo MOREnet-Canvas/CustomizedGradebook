@@ -100,6 +100,7 @@ function parseConfigFromSectionB(sectionB) {
         channel: managed.release.channel || 'prod',
         source: managed.release.source || 'github_release',
         versionTrack: managed.release.versionTrack || null,
+        pilotCourseIds: managed.release.pilotCourseIds || [],
         enableStudentGradeCustomization: managed.config.ENABLE_STUDENT_GRADE_CUSTOMIZATION !== false,
         enableGradeOverride: managed.config.ENABLE_GRADE_OVERRIDE !== false,
         enforceCourseOverride: managed.config.ENFORCE_COURSE_OVERRIDE === true,
@@ -1672,7 +1673,9 @@ function generateCombinedLoader(baseTA, controls, configTA, outTA, dlBtn, copyBt
         allowedAccountIds: window.CG_MANAGED?.config?.ALLOWED_ACCOUNT_IDS || [],
         defaultCustomStatusId: window.CG_MANAGED?.config?.DEFAULT_CUSTOM_STATUS_ID || null,
         enableGradeCustomStatus: window.CG_MANAGED?.config?.ENABLE_GRADE_CUSTOM_STATUS || false,
-        enableNegativeZeroCount: window.CG_MANAGED?.config?.ENABLE_NEGATIVE_ZERO_COUNT || false
+        enableNegativeZeroCount: window.CG_MANAGED?.config?.ENABLE_NEGATIVE_ZERO_COUNT || false,
+        // Hand-edited in Section B (no UI) — carried forward like ALLOWED_ACCOUNT_IDS
+        pilotCourseIds: window.CG_MANAGED?.release?.pilotCourseIds || []
     });
 
     // Update config preview textarea (C)

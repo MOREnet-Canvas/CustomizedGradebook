@@ -21,7 +21,10 @@ import { logger } from '../utils/logger.js';
 import { DEFAULT_MAX_POINTS, OUTCOME_AND_RUBRIC_RATINGS, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX, PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../config.js';
 import { scoresMatch } from './plOutlookSyncStatus.js';
 import { findExistingPLAssignment } from './plOutlookSetup.js';
-import { roundToHalf } from './powerLaw.js';
+import {
+    fetchCourseRollupsForVerify, verifyPollDelayMs,
+    VERIFY_POLL_DELAYS_MS, VERIFY_POLL_STEADY_MS, VERIFY_NO_PROGRESS_LIMIT_MS,
+} from './masteryOutlookDataService.js';
 
 // ─── CHECKING_SETUP ──────────────────────────────────────────────────────────
 
@@ -59,8 +62,82 @@ export async function handleCheckingSetup(sm) {
 // ─── CREATING_ASSIGNMENT ─────────────────────────────────────────────────────
 
 /**
+ * Read an outcome's calculation_method as the current user sees it.
+ *
+ * Tries the course's outcome links first (always readable by the course's
+ * teachers), then falls back to /api/v1/outcomes/:id. Returns null when
+ * neither read yields a value.
+ *
+ * @param {string|number} courseId
+ * @param {string|number} outcomeId
+ * @param {Object} apiClient - CanvasApiClient instance
+ * @returns {Promise<string|null>} e.g. 'latest', 'decaying_average', or null
+ */
+export async function readOutcomeCalculationMethod(courseId, outcomeId, apiClient) {
+    try {
+        const links = await apiClient.getAllPages(
+            `/api/v1/courses/${courseId}/outcome_group_links?outcome_style=full`,
+            {}, 'PLSync:readOutcomeLinks'
+        );
+        const link = (links ?? []).find(l => String(l?.outcome?.id) === String(outcomeId));
+        if (link?.outcome?.calculation_method) return link.outcome.calculation_method;
+    } catch (err) {
+        logger.warn(`[PLSync] Could not read course outcome links: ${err.message}`);
+    }
+
+    try {
+        const outcome = await apiClient.get(`/api/v1/outcomes/${outcomeId}`, {}, 'PLSync:readOutcome');
+        return outcome?.calculation_method ?? null;
+    } catch (err) {
+        logger.warn(`[PLSync] Could not read outcome ${outcomeId} calculation_method: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * Make sure the outcome uses the 'latest' (Most Recent Score) calculation method
+ * so the pushed PL score becomes the Canvas rollup score.
+ *
+ * Skips the PUT when the outcome already reads as 'latest'. Teachers cannot edit
+ * account-level (district) outcomes, and the method may be managed at the
+ * account level where the outcome's own field is unreliable — so a 403 on the
+ * PUT does not block setup. It records `calcMethodWarning` on the state machine
+ * context instead; a wrong method still surfaces later as "verify failed".
+ *
+ * @param {PLOutlookStateMachine} sm - reads courseId, outcomeId, outcomeName, apiClient
+ * @returns {Promise<void>}
+ */
+export async function ensureLatestCalculationMethod(sm) {
+    const { courseId, outcomeId, outcomeName, apiClient } = sm.getContext();
+
+    const currentMethod = await readOutcomeCalculationMethod(courseId, outcomeId, apiClient);
+    if (currentMethod === 'latest') {
+        logger.debug(`[PLSync] Outcome ${outcomeId} already uses latest — skipping update`);
+        return;
+    }
+
+    try {
+        await apiClient.put(
+            `/api/v1/outcomes/${outcomeId}`,
+            { calculation_method: 'latest' },
+            {}, 'PLSync:setCalculationMethod'
+        );
+        logger.debug(`[PLSync] Outcome ${outcomeId} calculation_method set to latest`);
+    } catch (err) {
+        if (err?.statusCode !== 403) throw err;
+
+        const warning =
+            `Couldn't confirm "${outcomeName}" uses Most Recent Score` +
+            `${currentMethod ? ` (reads as ${currentMethod})` : ''}. ` +
+            `If Canvas scores don't match after saving, ask an admin to check its calculation method.`;
+        logger.warn(`[PLSync] Outcome ${outcomeId}: calculation_method update forbidden — continuing setup. ${warning}`);
+        sm.updateContext({ calcMethodWarning: warning });
+    }
+}
+
+/**
  * One-time setup per outcome:
- *   1. Set outcome calculation_method to 'latest' so PL override always wins
+ *   1. Ensure outcome calculation_method is 'latest' so PL override always wins
  *   2. Create assignment visible to everyone (Canvas creates submission records)
  *   3. Create rubric linked to the outcome
  *   4. Wait 3 s for Canvas to generate submission records
@@ -158,13 +235,8 @@ export async function handleCreatingAssignment(sm) {
     }
     // ── End safeguard — no existing assignment found, proceed with creation ──
 
-    // Step 1: Set outcome calculation_method to 'latest'
-    await apiClient.put(
-        `/api/v1/outcomes/${outcomeId}`,
-        { calculation_method: 'latest' },
-        {}, 'PLSync:setCalculationMethod'
-    );
-    logger.debug(`[PLSync] Outcome ${outcomeId} calculation_method set to latest`);
+    // Step 1: Ensure outcome calculation_method is 'latest' (runs before any Canvas writes)
+    await ensureLatestCalculationMethod(sm);
 
     // Step 2: Create assignment visible to everyone
     // Assignment name uses PL_ASSIGNMENT_SUFFIX from config.js (default: 'Projected Score')
@@ -379,16 +451,14 @@ export async function handleFetchingSubmissions(sm) {
 // ─── CALCULATING_CHANGES ──────────────────────────────────────────────────────
 
 /**
- * Compare PL predictions (from mastery_outlook_cache.json) vs current Canvas
- * outcome rollup scores. Builds list of students who need syncing.
- *
- * PL predictions are read directly from cache.students[n].outcomes[n].plPrediction
- * — no separate lookup table needed.
+ * Compare teacher-set will_post overrides (from sync_state) vs current Canvas
+ * outcome rollup scores. Builds list of students who need syncing. Students
+ * with no will_post are skipped — the PL prediction is never pushed implicitly.
  */
 export async function handleCalculatingChanges(sm) {
     const { courseId, outcomeId, outcomeName, submissionIdByUserId,
             rubricAssociationId, rubricCriterionId, effectiveTargetIds,
-            plScoreOverrides, canvasScoreOverrides, apiClient } = sm.getContext();
+            canvasScoreOverrides, apiClient } = sm.getContext();
 
     sm.progress('Calculating changes...');
     logger.debug(`[PLSync] CALCULATING_CHANGES for outcome ${outcomeId}`);
@@ -398,16 +468,6 @@ export async function handleCalculatingChanges(sm) {
     if (!cache) {
         throw new Error('[PLSync] No mastery outlook cache found — run Refresh Data first');
     }
-
-    // Build userId → plPrediction map from cache.students
-    const plPredictionByUserId = new Map();
-    (cache.students || []).forEach(student => {
-        const outcomeData = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
-        if (outcomeData?.plPrediction !== null && outcomeData?.plPrediction !== undefined && outcomeData?.status !== 'NE') {
-            plPredictionByUserId.set(String(student.id), outcomeData.plPrediction);
-        }
-    });
-    logger.debug(`[PLSync] ${plPredictionByUserId.size} student(s) have PL predictions for outcome ${outcomeId}`);
 
     // Resolve current Canvas rollup scores. Fast-path (#54): when the caller
     // supplies in-memory canvasScore values (kept current by outcome expansion +
@@ -448,7 +508,7 @@ export async function handleCalculatingChanges(sm) {
     const studentsToSync          = [];
     let skippedNoChange           = 0;
     let skippedNoSubmission       = 0;
-    let skippedNoPrediction       = 0;
+    let skippedNoOverride         = 0;
     let skippedManualOverride     = 0;
 
     for (const userId of effectiveTargetIds) {
@@ -464,14 +524,10 @@ export async function handleCalculatingChanges(sm) {
         const submissionId = submissionIdByUserId?.get(userId);
         if (!submissionId) { skippedNoSubmission++; logger.warn(`[PLSync] No submission ID for student ${userId} — skipping`); continue; }
 
-        // Prefer in-memory override (post-recompute value) over stale disk value
-        const rawPlScore = plScoreOverrides?.[userId] ?? plPredictionByUserId.get(userId);
-        if (rawPlScore === undefined) { skippedNoPrediction++; logger.debug(`[PLSync] No PL prediction for student ${userId} — skipping`); continue; }
-
-        // 3b — use teacher-set will_post value when provided (will_post_lock: "unlocked"),
-        // otherwise fall back to the Power Law prediction rounded to nearest 0.5.
-        // Teacher-set will_post values are NOT rounded — they are intentional.
-        const plScore = (entry?.will_post != null) ? entry.will_post : roundToHalf(rawPlScore);
+        // 3b — only teacher-set will_post overrides are pushed; there is no
+        // fallback to the Power Law prediction. Values are NOT rounded — they are intentional.
+        if (entry?.will_post == null) { skippedNoOverride++; continue; }
+        const plScore = entry.will_post;
 
         const canvasScore = canvasScoreByUserId.get(userId);
         if (canvasScore !== undefined && scoresMatch(plScore, canvasScore)) { skippedNoChange++; continue; }
@@ -492,7 +548,7 @@ export async function handleCalculatingChanges(sm) {
     const numberOfUpdates = studentsToSync.length;
     logger.info(
         `[PLSync] ${outcomeName}: ${numberOfUpdates} need sync, ` +
-        `${skippedNoChange} no change, ${skippedNoPrediction} no prediction, ` +
+        `${skippedNoChange} no change, ${skippedNoOverride} no override, ` +
         `${skippedNoSubmission} no submission, ${skippedManualOverride} manual_override skipped`
     );
 
@@ -500,7 +556,7 @@ export async function handleCalculatingChanges(sm) {
 
     // Notify the UI so it can trim spinners to only the students actually being synced.
     // Students in effectiveTargetIds that aren't in studentsToSync (skipped for no-change,
-    // no submission, no prediction, or manual_override) should have their spinners cleared.
+    // no submission, no override, or manual_override) should have their spinners cleared.
     const { onStudentsResolved } = sm.getContext();
     onStudentsResolved?.(studentsToSync.map(s => String(s.userId)));
 
@@ -567,6 +623,8 @@ export async function handleSyncing(sm) {
             ...existing,
             last_synced_score: s.plScore,
             last_synced_at:    now,
+            // Kept after will_post_note is cleared so the "Last Override" column can show it
+            last_synced_note:  s.will_post_note?.trim() || null,
             // Optimistically clear any previous verify failure — handleVerifying will
             // set it back to true if the rollup still doesn't match after retries.
             verify_mismatch:   false,
@@ -594,46 +652,147 @@ export async function handleSyncing(sm) {
     logger.debug(`[PLSync] sync_state updated for ${successCount} student(s) on outcome ${outcomeId}`);
 
     sm.updateContext({ successCount, errors, retryCounts });
+
+    // Hand off post-push work now rather than after VERIFYING, which can take
+    // minutes and is lost if the teacher leaves the page mid-verify.
+    const { onPushed } = sm.getContext();
+    if (onPushed && successCount > 0) {
+        const pushedUserIds = studentsToSync
+            .map(s => String(s.userId))
+            .filter(id => !errorUserIds.has(id));
+        try {
+            onPushed({ successCount, errors, pushedUserIds });
+        } catch (err) {
+            logger.warn('[PLSync] onPushed callback failed:', err.message);
+        }
+    }
+
     return PL_STATES.VERIFYING;
 }
 
 // ─── VERIFYING ────────────────────────────────────────────────────────────────
 
+// Poll timing lives with the shared rollup fetch; re-exported for existing importers.
+export { VERIFY_POLL_DELAYS_MS, VERIFY_POLL_STEADY_MS, VERIFY_NO_PROGRESS_LIMIT_MS };
+
 /**
- * Re-fetch outcome rollups for synced students and confirm scores match PL predictions.
- * Retries up to 3 times with 2 s delay — mirrors handleVerifyingOverrides pattern.
+ * Delays between assignment-confirm polls (~12 s total). The rubric assessment
+ * shows up on the assignment almost immediately; still missing after this means
+ * the write didn't take.
+ */
+export const CONFIRM_POLL_DELAYS_MS = [1000, 1000, 2000, 3000, 5000];
+
+/**
+ * Read the rubric points Canvas has on one student's PL assignment submission.
+ * Uses the single-submission endpoint — the list endpoints return nothing for
+ * the PL assignment because it is only_visible_to_overrides.
+ *
+ * @param {Object} opts
+ * @param {string|number} opts.courseId
+ * @param {string|number} opts.assignmentId
+ * @param {string|number} opts.userId
+ * @param {string}        [opts.criterionId] - rubric criterion ID (e.g. "_606"); falls back to submission score
+ * @param {Object}        opts.apiClient
+ * @returns {Promise<number|null>}
+ */
+export async function readPushedRubricScore({ courseId, assignmentId, userId, criterionId, apiClient }) {
+    const sub = await apiClient.get(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${userId}?include[]=rubric_assessment`,
+        {}, 'PLSync:confirmSubmission'
+    );
+    const points = criterionId ? sub?.rubric_assessment?.[criterionId]?.points : undefined;
+    return points ?? sub?.score ?? null;
+}
+
+/**
+ * VERIFYING — fast confirmation that the pushed scores landed on the PL
+ * assignment (rubric assessment). Canvas recalculates the outcome rollup later;
+ * that slower check runs in the background (verifyOutcomeRollups) so it doesn't
+ * hold up the row, banner, or save queue.
+ *
+ * Students still unconfirmed after CONFIRM_POLL_DELAYS_MS are a real write
+ * failure: verify_mismatch is persisted and COMPLETE raises the alert.
  */
 export async function handleVerifying(sm) {
-    const { courseId, outcomeId, studentsToSync, apiClient } = sm.getContext();
-    sm.progress('Verifying scores...');
-    logger.debug('[PLSync] VERIFYING');
+    const { courseId, outcomeId, studentsToSync, assignmentId, rubricCriterionId, apiClient } = sm.getContext();
+    sm.progress('Confirming scores in Canvas...');
+    logger.debug('[PLSync] VERIFYING (assignment confirm)');
 
-    const noProgressLimit   = 50;
-    const retryDelayMs      = 5000;
-    const userIds           = studentsToSync.map(s => s.userId);
-    let mismatches          = [];
-    let lastMismatchCount   = Infinity;
-    let noProgressCount     = 0;
-    let attempt             = 1;
+    let pending = [...studentsToSync];
+    for (let attempt = 0; ; attempt++) {
+        const stillPending = [];
+        for (const s of pending) {
+            let actual = null;
+            try {
+                actual = await readPushedRubricScore({
+                    courseId, assignmentId, userId: s.userId, criterionId: rubricCriterionId, apiClient,
+                });
+            } catch (err) {
+                logger.debug(`[PLSync] Confirm read failed for ${s.userId}: ${err.message}`);
+            }
+            if (!scoresMatch(actual, s.plScore)) stillPending.push(s);
+        }
+        pending = stillPending;
+        if (pending.length === 0) {
+            logger.info(`[PLSync] All scores confirmed on the assignment (poll ${attempt + 1})`);
+            break;
+        }
+        if (attempt >= CONFIRM_POLL_DELAYS_MS.length) {
+            logger.warn(`[PLSync] ${pending.length} score(s) not confirmed on the assignment — giving up`);
+            break;
+        }
+        sm.progress(`Confirming... (${pending.length} remaining)`);
+        await new Promise(r => setTimeout(r, CONFIRM_POLL_DELAYS_MS[attempt]));
+    }
+
+    sm.updateContext({ verifyMismatches: pending });
+
+    // Persist only confirm failures here. last_verify_at means "outcome score
+    // confirmed" and is written by the background outcome check.
+    if (pending.length > 0) {
+        try {
+            const syncState = await readSyncState(courseId, apiClient);
+            const oId       = String(outcomeId);
+            if (!syncState[oId]) syncState[oId] = {};
+            for (const s of pending) {
+                const sId = String(s.userId);
+                syncState[oId][sId] = { ...(syncState[oId][sId] ?? {}), verify_mismatch: true };
+            }
+            await writeSyncState(courseId, syncState, apiClient);
+        } catch (err) {
+            logger.warn('[PLSync] handleVerifying — could not persist confirm failures:', err.message);
+        }
+    }
+
+    return PL_STATES.COMPLETE;
+}
+
+/**
+ * Background outcome check: poll the shared course-wide rollups until Canvas's
+ * outcome score matches each saved score, then record last_verify_at /
+ * verify_mismatch (merge-safe write). Polls quickly at first, then backs off;
+ * gives up after VERIFY_NO_PROGRESS_LIMIT_MS without progress.
+ *
+ * Catches what the assignment confirm can't: an outcome not on Most Recent,
+ * a rubric criterion not linked to the outcome, or another result counted as latest.
+ *
+ * @param {Object} opts
+ * @param {string|number} opts.courseId
+ * @param {string|number} opts.outcomeId
+ * @param {Object}        opts.expected     - { [userId]: savedScore }
+ * @param {Object}        opts.apiClient
+ * @param {Function}      [opts.onProgress] - (confirmedUserIds: string[]) => void, as rows confirm
+ * @returns {Promise<{ verifiedAt: string, mismatchIds: string[] }>}
+ */
+export async function verifyOutcomeRollups({ courseId, outcomeId, expected, apiClient, onProgress = null }) {
+    const userIds = Object.keys(expected).map(String);
+    let mismatches        = [...userIds];
+    let lastMismatchCount = Infinity;
+    let lastProgressAt    = Date.now();
+    let attempt           = 1;
 
     while (true) {
-        sm.progress(`Verifying... (poll ${attempt}, ${mismatches.length || '?'} remaining)`);
-
-        // outcome_rollups returns { rollups: [], linked: {} } — not a flat array —
-        // so apiClient.getAllPages() exits after page 1. Manual Link-header pagination
-        // required. NOTE: this endpoint does NOT support ?page=N (returns the same
-        // first page on every request); must follow the Link: rel="next" cursor instead.
-        const rollups = [];
-        let rollupUrl = `/api/v1/courses/${courseId}/outcome_rollups?include[]=users&per_page=100`;
-        while (rollupUrl) {
-            const response = await apiClient.getWithResponse(rollupUrl, {}, 'PLSync:verifyRollups');
-            const data     = await response.json();
-            rollups.push(...(data?.rollups ?? []));
-            const link     = response.headers.get('Link');
-            const next     = link?.match(/<([^>]+)>;\s*rel="next"/);
-            rollupUrl      = next ? next[1] : null;
-        }
-
+        const { rollups } = await fetchCourseRollupsForVerify(courseId, apiClient);
         const actualScores = new Map();
         rollups.forEach(rollup => {
             const userId = String(rollup.links?.user);
@@ -642,74 +801,46 @@ export async function handleVerifying(sm) {
             if (score !== undefined) actualScores.set(userId, score);
         });
 
-        // If no scores found at all, log a sample rollup to expose outcome IDs and structure
-        if (attempt === 1 && actualScores.size === 0 && rollups.length > 0) {
-            const sample = rollups.find(r => userIds.includes(String(r.links?.user))) ?? rollups[0];
-            const sampleUser = String(sample.links?.user);
-            const sampleOutcomeIds = (sample.scores ?? []).map(s => s.links?.outcome);
-            logger.debug(`[PLSync] Sample rollup — user: ${sampleUser}, in userIds: ${userIds.includes(sampleUser)}, outcomeIds in scores: [${sampleOutcomeIds.join(', ')}], looking for: ${outcomeId}`);
-        }
-
-        mismatches = studentsToSync.filter(s => {
-            const actual = actualScores.get(s.userId);
-            return actual === undefined || !scoresMatch(actual, s.plScore);
-        });
-
-        if (attempt === 1 && mismatches.length > 0) {
-            const first  = mismatches[0];
-            const actual = actualScores.get(first.userId);
-            logger.debug(`[PLSync] First mismatch — user: ${first.userId}, actual rollup: ${actual}, plScore: ${first.plScore}, actualScores total: ${actualScores.size}`);
-        }
+        const before = mismatches;
+        mismatches = userIds.filter(id => !scoresMatch(actualScores.get(id), expected[id]));
+        const newlyConfirmed = before.filter(id => !mismatches.includes(id));
+        if (newlyConfirmed.length > 0) onProgress?.(newlyConfirmed);
 
         if (mismatches.length === 0) {
-            logger.info(`[PLSync] All scores verified on poll ${attempt}`);
+            logger.info(`[PLSync] Outcome ${outcomeId} scores confirmed in rollups (poll ${attempt})`);
             break;
         }
-
         if (mismatches.length < lastMismatchCount) {
-            logger.info(`[PLSync] Still verifying ${mismatches.length} student(s)...`);
             lastMismatchCount = mismatches.length;
-            noProgressCount   = 0;
-        } else {
-            noProgressCount++;
-        }
-
-        if (noProgressCount >= noProgressLimit) {
-            logger.warn(`[PLSync] ${mismatches.length} mismatch(es) — no progress for ${noProgressLimit} polls, giving up`);
+            lastProgressAt    = Date.now();
+        } else if (Date.now() - lastProgressAt >= VERIFY_NO_PROGRESS_LIMIT_MS) {
+            logger.warn(`[PLSync] Outcome ${outcomeId}: ${mismatches.length} outcome score(s) never matched — flagging verify_mismatch`);
             break;
         }
-
+        const delayMs = verifyPollDelayMs(attempt);
         attempt++;
-        await new Promise(r => setTimeout(r, retryDelayMs));
+        await new Promise(r => setTimeout(r, delayMs));
     }
 
-    sm.updateContext({ verifyMismatches: mismatches });
-
-    // Persist per-student verify outcome so accurate status survives navigation/reload.
-    // verify_mismatch: true  → score didn't confirm after all retries (partial update).
-    // verify_mismatch: false → score confirmed; clears any stale flag from a prior sync.
-    // Wrapped in try/catch so a disk-write failure doesn't block the rest of the sync flow.
-    const mismatchIds = new Set(mismatches.map(m => String(m.userId)));
-    const verifyAt    = new Date().toISOString();
+    const verifiedAt  = new Date().toISOString();
+    const mismatchSet = new Set(mismatches);
     try {
         const syncState = await readSyncState(courseId, apiClient);
         const oId       = String(outcomeId);
         if (!syncState[oId]) syncState[oId] = {};
-        for (const s of studentsToSync) {
-            const sId = String(s.userId);
-            syncState[oId][sId] = {
-                ...(syncState[oId][sId] ?? {}),
-                last_verify_at:  verifyAt,
-                verify_mismatch: mismatchIds.has(sId),
+        for (const id of userIds) {
+            syncState[oId][id] = {
+                ...(syncState[oId][id] ?? {}),
+                last_verify_at:  verifiedAt,
+                verify_mismatch: mismatchSet.has(id),
             };
         }
         await writeSyncState(courseId, syncState, apiClient);
-        logger.debug(`[PLSync] verify results persisted for ${studentsToSync.length} student(s) on outcome ${outcomeId}`);
     } catch (err) {
-        logger.warn('[PLSync] handleVerifying — could not persist verify results:', err.message);
+        logger.warn('[PLSync] verifyOutcomeRollups — could not persist results:', err.message);
     }
 
-    return PL_STATES.COMPLETE;
+    return { verifiedAt, mismatchIds: mismatches };
 }
 
 // ─── COMPLETE ─────────────────────────────────────────────────────────────────

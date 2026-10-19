@@ -77,11 +77,35 @@ export const CG_LOADER_TEMPLATE = `
     // ========================================================================
 
     // Read release configuration from managed block
-    const release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
+    let release = (window.CG_MANAGED && window.CG_MANAGED.release) || {
         channel: "prod",
         version: "v1.0.3",
         source: "github_release"
     };
+
+    // ========================================================================
+    // CG LOADER - PILOT COURSES
+    // ========================================================================
+
+    // Teacher-like users inside a pilot course load the pilot build; students,
+    // observers, and all non-pilot pages keep the configured channel.
+    // Role list mirrors getUserRoleGroup() in src/utils/canvas.js.
+    const pilotCourseIds = (release.pilotCourseIds || []).map(String);
+    if (pilotCourseIds.length && release.channel !== "dev") {
+        const courseMatch = window.location.pathname.match(/^\\/courses\\/(\\d+)/);
+        const courseId = courseMatch ? courseMatch[1]
+            : (window.ENV && window.ENV.COURSE_ID ? String(window.ENV.COURSE_ID) : null);
+        const roles = new Set(
+            [...((window.ENV && window.ENV.current_user_roles) || []),
+             ...((window.ENV && window.ENV.current_user_types) || [])].map(r => String(r).toLowerCase())
+        );
+        if (window.ENV && window.ENV.current_user_is_admin) roles.add("admin");
+        const teacherLike = ["teacher", "admin", "root_admin", "designer", "ta", "accountadmin"].some(r => roles.has(r));
+        if (courseId && pilotCourseIds.includes(courseId) && teacherLike) {
+            console.log(\`[CG] Pilot course \${courseId} — loading PILOT build instead of \${release.channel.toUpperCase()} \${release.version}\`);
+            release = Object.assign({}, release, { channel: "pilot", version: "pilot" });
+        }
+    }
 
     // Prevent duplicate loading
     const bundleId = "cg_" + release.channel + "_bundle";
@@ -110,6 +134,9 @@ export const CG_LOADER_TEMPLATE = `
                 // This automatically fetches the most recent production release without version pinning
                 // WARNING: May receive breaking changes without notice - use for testing only
                 script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/latest/download/customGradebookInit.js\`;
+            } else if (release.channel === "pilot") {
+                // Pilot channel: rolling "pilot" release (minified, no cache-buster — like prod)
+                script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/pilot/customGradebookInit.js\`;
             } else {
                 // Prod channel: use version tag
                 script.src = \`https://github.com/morenet-canvas/CustomizedGradebook/releases/download/\${release.version}/customGradebookInit.js\`;

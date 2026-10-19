@@ -1,6 +1,39 @@
 // src/masteryOutlook/plOutlookSyncStatus.test.js
 import { describe, it, expect } from 'vitest';
-import { scoresMatch, getSyncStatus, aggregateSyncStatus } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, aggregateSyncStatus, describeOverrideException } from './plOutlookSyncStatus.js';
+
+describe('describeOverrideException', () => {
+    it('returns null when there is nothing to report', () => {
+        expect(describeOverrideException(undefined)).toBeNull();
+        expect(describeOverrideException({})).toBeNull();
+        expect(describeOverrideException({ will_post: null, will_post_lock: 'none', manual_override: false })).toBeNull();
+    });
+
+    it('pending override → Pending Override with its value and note', () => {
+        const ex = describeOverrideException({ will_post: 2.5, will_post_lock: 'unlocked', will_post_note: 'retest' });
+        expect(ex).toEqual({ types: ['Pending Override'], score: 2.5, note: 'retest', date: null });
+    });
+
+    it('saved override (Override box cleared after save) → Saved Override with saved score, note, date', () => {
+        const ex = describeOverrideException({
+            will_post: null, will_post_lock: 'none',
+            last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53Z', last_synced_note: 'retest',
+        });
+        expect(ex).toEqual({ types: ['Saved Override'], score: 2, note: 'retest', date: '2026-09-25T16:10:53Z' });
+    });
+
+    it('pending takes precedence over an older saved override', () => {
+        const ex = describeOverrideException({ will_post: 3, last_synced_score: 2, last_synced_at: '2026-09-25T16:10:53Z' });
+        expect(ex.types).toEqual(['Pending Override']);
+        expect(ex.score).toBe(3);
+    });
+
+    it('adds Locked and Canvas Override labels', () => {
+        expect(describeOverrideException({ will_post: 3, will_post_lock: 'locked' }).types)
+            .toEqual(['Pending Override', 'Locked']);
+        expect(describeOverrideException({ manual_override: true }).types).toEqual(['Canvas Override']);
+    });
+});
 
 describe('scoresMatch', () => {
     it('returns false when either value is null or undefined', () => {
@@ -67,13 +100,28 @@ describe('getSyncStatus', () => {
         expect(result.status).toBe('synced');
     });
 
-    it('returns needs_sync when prediction differs from canvas score', () => {
+    it('returns needs_sync when the teacher override differs from canvas score', () => {
+        const config = {
+            pl_assignments: { '101': { assignment_id: 'a1' } },
+            sync_state: { '101': { 's1': { last_synced_score: 2.5, will_post: 3.0, manual_override: false } } },
+        };
+        const result = getSyncStatus('s1', '101', 3.0, 2.5, config);
+        expect(result.status).toBe('needs_sync');
+    });
+
+    it('does not return needs_sync when prediction differs but no override is set', () => {
         const config = {
             pl_assignments: { '101': { assignment_id: 'a1' } },
             sync_state: { '101': { 's1': { last_synced_score: 2.5, manual_override: false } } },
         };
         const result = getSyncStatus('s1', '101', 3.0, 2.5, config);
-        expect(result.status).toBe('needs_sync');
+        expect(result.status).not.toBe('needs_sync');
+    });
+
+    it('does not return needs_sync for a never-pushed student with no override', () => {
+        const config = { pl_assignments: { '101': { assignment_id: 'a1' } }, sync_state: {} };
+        const result = getSyncStatus('s1', '101', 3.0, 1.0, config);
+        expect(result.status).not.toBe('needs_sync');
     });
 
     it('returns manual_override when state has manual_override flag', () => {
@@ -94,6 +142,49 @@ describe('getSyncStatus', () => {
         const result = getSyncStatus('s1', '101', 2.5, 3.0, config);
         expect(result.status).toBe('possible_override');
     });
+
+    describe('verifying (push not yet reflected in Canvas)', () => {
+        const NOW      = Date.parse('2026-09-25T16:20:00Z');
+        const minsAgo  = (m) => new Date(NOW - m * 60 * 1000).toISOString();
+        const configFor = (entry) => ({
+            pl_assignments: { '599': { assignment_id: 'a1' } },
+            sync_state: { '599': { '642': { last_synced_score: 2, manual_override: false, ...entry } } },
+        });
+
+        it('unverified push 5 min ago with Canvas still old → verifying', () => {
+            const result = getSyncStatus('642', '599', 1.5, 1.5, configFor({ last_synced_at: minsAgo(5) }), NOW);
+            expect(result.status).toBe('verifying');
+        });
+
+        it('unverified push 40 min ago with Canvas still old → possible_override', () => {
+            const result = getSyncStatus('642', '599', 1.5, 1.5, configFor({ last_synced_at: minsAgo(40) }), NOW);
+            expect(result.status).toBe('possible_override');
+        });
+
+        it('verified after the push, then Canvas changed → possible_override', () => {
+            const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(4) });
+            const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW);
+            expect(result.status).toBe('possible_override');
+        });
+
+        it('verify pass older than the push does not count as verified → verifying', () => {
+            const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(60) });
+            const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW);
+            expect(result.status).toBe('verifying');
+        });
+
+        it('Canvas caught up to the pushed score → synced', () => {
+            const result = getSyncStatus('642', '599', 1.5, 2, configFor({ last_synced_at: minsAgo(5) }), NOW);
+            expect(result.status).toBe('synced');
+        });
+
+        it('aggregateSyncStatus counts verifying separately from possibleOverride', () => {
+            const students = [{ id: '642', outcomes: [{ outcomeId: '599', plPrediction: 1.5, canvasScore: 1.5 }] }];
+            const counts = aggregateSyncStatus(students, '599', configFor({ last_synced_at: new Date().toISOString() }));
+            expect(counts.verifying).toBe(1);
+            expect(counts.possibleOverride).toBe(0);
+        });
+    });
 });
 
 describe('aggregateSyncStatus', () => {
@@ -111,7 +202,7 @@ describe('aggregateSyncStatus', () => {
             sync_state: {
                 '101': {
                     's1': { last_synced_score: 2.5, manual_override: false },
-                    's2': { last_synced_score: 3.0, manual_override: false },
+                    's2': { last_synced_score: 3.0, will_post: 3.5, manual_override: false },
                 },
             },
         };

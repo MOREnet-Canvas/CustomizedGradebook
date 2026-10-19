@@ -9,6 +9,7 @@
  *
  * Public surface:
  *   - renderOutcomeStudentTable(outcome, cache) → HTML string
+ *   - getOutcomeSaveSummary(outcome, cache) → { saving, verifying, queued, remaining, remainingIds }
  *   - wireOutcomeStudentTable({ contentEl, outcome, cache, courseId,
  *                               apiClient, renderTable }) → teardown fn
  *
@@ -18,18 +19,18 @@
 
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
-import { scoresMatch } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
     handleSyncStudents,
-    handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped,
+    handleMarzanoPillClick, handleCanvasPillClick, handleCustomValueTyped, handleClearWillPost,
     handleLockWillPost, handleUnlockWillPost, handleNoteChanged,
     handleIgnoreAlignment, handleUnignoreAlignment,
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingStudentIds, syncStudentPhase, syncingOutcomeIds } from './masteryOutlookState.js';
+import { fetchingStudentIds, rowSavePhase, queuedOutcomeIds, rowsAwaitingOutcome, countRowsAwaitingOutcome } from './masteryOutlookState.js';
 
 /**
  * Build plAssignmentIds Set from in-memory cache for PL result filtering.
@@ -69,15 +70,18 @@ function formatDateShort(iso) {
  * @param {Object}   syncEntry           - sync_state[outcomeId][studentId] (may be {})
  * @param {Object[]} ignoredAlignments   - cache.ignored_alignments array
  * @param {string|number} outcomeId
- * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, syncPhase}}
- *   status: 'ne' | 'synced' | 'verify_failed' | 'needs'
+ * @param {Object}   [plConfig]          - { pl_assignments, sync_state } for the Canvas-sync marker
+ * @returns {{id, name, sortableName, canvas, marzano, willPost, lock, note, dots, status, marker, lastOverride, syncPhase}}
+ *   status: 'ne' | 'none' | 'synced' | 'verify_failed' | 'needs'
+ *   'none' = no teacher-set override; nothing will be pushed for this row.
+ *   marker: 'verifying' | 'possible_override' | null — from getSyncStatus(), shown beside the Canvas pill
  */
-function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId) {
+function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignments, outcomeId, plConfig = null) {
     const canvas  = outcomeData?.canvasScore  ?? null;
     const marzano = outcomeData?.plPrediction ?? null;
 
-    const storedWP = syncEntry?.will_post ?? null;
-    const willPost = storedWP ?? (marzano !== null ? roundToHalf(marzano) : null);
+    // Override is blank until a teacher sets it — no Marzano fallback.
+    const willPost = syncEntry?.will_post ?? null;
 
     const wpLock = syncEntry?.will_post_lock;
     const lock = wpLock === 'locked' ? 'locked'
@@ -106,12 +110,11 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     const noteIsPending     = pendingNote !== null && pendingNote !== lastSubmittedNote;
 
     let status;
-    if (marzano === null) {
-        status = 'ne';
-    } else if (canvas !== null && scoresMatch(willPost ?? marzano, canvas)
+    if (willPost === null) {
+        status = marzano === null ? 'ne' : 'none';
+    } else if (canvas !== null && scoresMatch(willPost, canvas)
             && !noteIsPending) {
-        // synced when score matches Canvas AND no unsubmitted note exists.
-        // willPost ?? marzano: use teacher override if set, else PL prediction.
+        // synced when the override matches Canvas AND no unsubmitted note exists.
         status = 'synced';
     } else if (syncEntry?.verify_mismatch === true) {
         // Score was pushed but Canvas rollup didn't confirm after all retries.
@@ -120,6 +123,14 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     } else {
         status = 'needs';
     }
+
+    const syncStatus = plConfig
+        ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig).status
+        : null;
+    // ⏳ while the background outcome check runs (saved on the assignment, Canvas
+    // still recalculating the outcome score), or from saved data after a reload.
+    const marker = rowsAwaitingOutcome.has(`${oidStr}_${sidStr}`) ? 'verifying'
+        : (syncStatus === 'verifying' || syncStatus === 'possible_override') ? syncStatus : null;
 
     return {
         id:           sidStr,
@@ -132,11 +143,22 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
         note,
         dots,
         status,
-        // Live sync phase for this row ('pushing' | 'verifying' | null) — driven
-        // by syncingStudentIds/syncStudentPhase while a push is in flight.
-        syncPhase: syncingStudentIds.has(`${oidStr}_${sidStr}`)
-            ? (syncStudentPhase.get(`${oidStr}_${sidStr}`) ?? 'pushing')
-            : null
+        marker,
+        // Last score pushed to Canvas (only teacher overrides are pushed) — survives
+        // the Override box being cleared after a successful save.
+        lastOverride: syncEntry?.last_synced_score != null
+            ? {
+                score: Number(syncEntry.last_synced_score),
+                at:    syncEntry.last_synced_at   ?? null,
+                note:  syncEntry.last_synced_note ?? null,
+            }
+            : null,
+        // Save phase for this row ('queued' | 'checking' | 'pushing' | 'verifying' | null)
+        // from the shared rowSavePhase map — the same source the banner and chip read.
+        // queuedOutcomeIds covers queued all-students runs (dev tools), which don't
+        // mark individual rows until they start.
+        syncPhase: rowSavePhase.get(`${oidStr}_${sidStr}`)
+            ?? ((queuedOutcomeIds.has(oidStr) && willPost !== null) ? 'queued' : null)
     };
 }
 
@@ -203,14 +225,19 @@ function renderOutcomeStudentRow(s, oidStr) {
 
     const canvasDisp  = s.canvas  != null ? s.canvas.toFixed(2)  : '—';
     const marzDisp    = s.marzano != null ? roundToHalf(s.marzano).toFixed(2) : 'NE';
-    const wpDisp      = s.willPost != null ? s.willPost.toFixed(2) : marzDisp;
-    const canvasFaded = scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
-    const marzFaded   = scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
+    const hasWP       = s.willPost != null;
+    const wpDisp      = hasWP ? s.willPost.toFixed(2) : '';
+    // With no override set, neither pill is faded — neither is "chosen".
+    const canvasFaded = !hasWP || scoresMatch(s.canvas,  s.willPost) ? '' : 'faded';
+    const marzFaded   = !hasWP || scoresMatch(s.marzano != null ? roundToHalf(s.marzano) : null, s.willPost) ? '' : 'faded';
 
     const dotsHtml = s.dots.length
         ? s.dots.map((dot, i) => renderDot(dot, oidStr, s.id, i)).join('')
         : `<span style="font-size:10px;color:var(--text-tertiary);">—</span>`;
 
+    // Padlock hidden — overrides are never auto-overwritten now that Override
+    // doesn't default to Marzano, so locking had no effect. Kept for reference:
+    /*
     const lockHtml = s.lock !== 'none' ? `
         <button class="os-wp-lock ${s.lock}"
                 data-action="${s.lock === 'locked' ? 'os-unlock' : 'os-lock'}"
@@ -223,16 +250,46 @@ function renderOutcomeStudentRow(s, oidStr) {
                   : 'Score differs from Marzano. Click to lock this value.'
           }</span>
         </button>` : '';
+    */
+    const lockHtml = '';
+
+    const markerHtml = s.marker === 'verifying'
+        ? `<span class="os-sync-marker verifying" title="${VERIFYING_TIP}" aria-label="${VERIFYING_TIP}">⏳</span>`
+        : s.marker === 'possible_override'
+            ? `<span class="os-sync-marker override" title="${POSSIBLE_OVERRIDE_TIP}" aria-label="${POSSIBLE_OVERRIDE_TIP}">⚑</span>`
+            : '';
+
+    const last     = s.lastOverride;
+    const lastHtml = last
+        ? (() => {
+            const scoreStr = last.score.toFixed(2);
+            const when     = last.at ? new Date(last.at) : null;
+            const whenStr  = when && !isNaN(when.getTime())
+                ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                : 'unknown date';
+            const tip = `Saved to Canvas ${whenStr}${last.note ? ` · Note: ${last.note}` : ''}. Click to copy to Override.`;
+            return `<button class="os-last-btn" data-action="os-use-last" data-stu="${s.id}" data-oid="${oidStr}"
+                     data-last="${last.score}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(`Last override ${scoreStr}. ${tip}`)}">
+                  <span class="os-last-score">${scoreStr}</span>
+                  <span class="os-last-date">${escapeHtml(formatDateShort(last.at))}</span>
+                </button>`;
+        })()
+        : `<span class="os-last-none">—</span>`;
 
     const saveMod   = needsSync ? 'needs' : 'synced';
     const saveTitle = s.status === 'verify_failed' ? `Verify failed — re-sync ${wpDisp}`
-                    : needsSync                    ? `Push ${wpDisp} to Canvas`
+                    : needsSync                    ? `Publish ${wpDisp} to Canvas`
+                    : !hasWP                       ? 'No override set'
                     :                               'Synced with Canvas';
     const saveTip   = s.status === 'verify_failed' ? 'Verify failed — re-sync'
-                    : needsSync                    ? 'Push to Canvas'
+                    : needsSync                    ? 'Publish to Canvas'
+                    : !hasWP                       ? 'No override set'
                     :                               'Up to date';
-    const saveHtml = s.syncPhase
-        ? `<span class="os-posting"><span class="spinner"></span> ${s.syncPhase === 'verifying' ? 'Verifying…' : 'Pushing…'}</span>`
+    const phaseLabel = { checking: 'Checking…', pushing: 'Publishing…', verifying: 'Confirming…' }[s.syncPhase];
+    const saveHtml = s.syncPhase === 'queued'
+        ? `<span class="os-posting queued" title="Waiting for the current save to finish">Queued…</span>`
+        : s.syncPhase
+        ? `<span class="os-posting"><span class="spinner"></span> ${phaseLabel ?? 'Publishing…'}</span>`
         : `<button class="os-save-row-btn ${saveMod}" data-action="os-save" data-stu="${s.id}" data-oid="${oidStr}"
                ${!needsSync ? 'disabled' : ''} title="${saveTitle}">
              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -251,11 +308,11 @@ function renderOutcomeStudentRow(s, oidStr) {
                 data-stu="${s.id}" data-oid="${oidStr}" data-canvas="${s.canvas ?? ''}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.canvas))}">${canvasDisp}</span>
           <span class="os-pill-tip">Set Override = ${canvasDisp}</span>
-        </button>
+        </button>${markerHtml}
       </td>
       <td class="c">
         <button class="os-pill-btn ${marzFaded}" data-action="os-use-marzano"
-                data-stu="${s.id}" data-oid="${oidStr}">
+                data-stu="${s.id}" data-oid="${oidStr}" data-marzano="${s.marzano ?? ''}">
           <span class="os-pill" style="${scoreToneStyle(scoreTone(s.marzano !== null ? roundToHalf(s.marzano) : null))}">${marzDisp}</span>
           <span class="os-pill-tip">Set Override = ${marzDisp} (Marzano)</span>
         </button>
@@ -264,12 +321,13 @@ function renderOutcomeStudentRow(s, oidStr) {
         <div class="os-wp-outer">
           <div class="os-wp-box-wrap ${differsCls}" data-action="os-wp-click"
                data-stu="${s.id}" data-oid="${oidStr}" tabindex="0" role="button"
-               aria-label="Override: ${wpDisp}">
+               aria-label="Override: ${hasWP ? wpDisp : 'not set'}">
             <div class="os-wp-box">${wpDisp}</div>
             ${lockHtml}
           </div>
         </div>
       </td>
+      <td class="c">${lastHtml}</td>
       <td class="os-td-comment">
         <div class="os-note-wrap" style="position:relative; display:flex; align-items:center;">
           <input class="os-comment-input${s.lock !== 'none' ? ' override-prompted' : ''}${s.note ? ' has-note' : ''}"
@@ -308,59 +366,137 @@ function renderOutcomeStudentRow(s, oidStr) {
  * @param {Object} cache
  * @returns {string} HTML string
  */
-export function renderOutcomeStudentTable(outcome, cache) {
+/**
+ * Build the row state for every student in one outcome, sorted by name.
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {Object[]} rows from buildOutcomeStudentRow
+ */
+function buildOutcomeStudentStates(outcome, cache) {
     const syncState   = cache.sync_state ?? {};
     const outcomeSync = syncState[String(outcome.id)] ?? {};
     const ignored     = cache.ignored_alignments ?? [];
     const oidStr      = String(outcome.id);
+    const plConfig    = { pl_assignments: cache.pl_assignments ?? {}, sync_state: syncState };
 
-    const studentStates = cache.students
+    return cache.students
         .map(student => {
             const sId         = String(student.id);
             const outcomeData = student.outcomes.find(o => String(o.outcomeId) === oidStr);
             const entry       = outcomeSync[sId] ?? {};
-            return buildOutcomeStudentRow(student, outcomeData, entry, ignored, outcome.id);
+            return buildOutcomeStudentRow(student, outcomeData, entry, ignored, outcome.id, plConfig);
         })
         .sort((a, b) => a.sortableName.localeCompare(b.sortableName));
+}
 
-    const needsCount = studentStates.filter(s => s.status === 'needs').length;
+/**
+ * Summarize row save state for the outcome banner and "Save grades to Canvas".
+ * `remaining` rows need saving and are not already queued or in flight — the
+ * only rows the banner button sends.
+ *
+ * @param {Object[]} studentStates - rows from buildOutcomeStudentRow
+ * @returns {{ saving: number, verifying: number, queued: number, remaining: number, remainingIds: string[] }}
+ */
+function summarizeSaveStates(studentStates) {
+    const remainingRows = studentStates.filter(s =>
+        !s.syncPhase && (s.status === 'needs' || s.status === 'verify_failed'));
+    return {
+        // 'checking' (save started, push not yet decided) counts as saving
+        saving:       studentStates.filter(s => s.syncPhase === 'pushing' || s.syncPhase === 'checking').length,
+        verifying:    studentStates.filter(s => s.syncPhase === 'verifying').length,
+        queued:       studentStates.filter(s => s.syncPhase === 'queued').length,
+        remaining:    remainingRows.length,
+        remainingIds: remainingRows.map(s => s.id),
+    };
+}
+
+/**
+ * Save-state summary for one outcome — counts of rows saving, verifying,
+ * queued, and still to save, plus the IDs "Save grades to Canvas" should send.
+ *
+ * @param {Object} outcome
+ * @param {Object} cache
+ * @returns {{ saving: number, verifying: number, queued: number, remaining: number, remainingIds: string[] }}
+ */
+export function getOutcomeSaveSummary(outcome, cache) {
+    return summarizeSaveStates(buildOutcomeStudentStates(outcome, cache));
+}
+
+/**
+ * Status banner above the student table — mirrors the rows' save state.
+ *
+ * @param {Object}  summary       - from summarizeSaveStates
+ * @param {string}  refreshBtn    - refresh button HTML
+ * @param {number}  [awaitingOutcome=0] - rows saved but Canvas still updating the outcome score (non-blocking note)
+ * @returns {string} HTML
+ */
+function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
+    const { saving, verifying, queued, remaining } = summary;
+    const awaitingNote = awaitingOutcome > 0
+        ? ` <span class="os-status-banner-note" title="Saved to Canvas; waiting for Canvas to update the outcome score. This clears on its own.">· ⏳ ${awaitingOutcome} outcome score${awaitingOutcome !== 1 ? 's' : ''} updating</span>`
+        : '';
+    const inProgress = saving > 0 || verifying > 0 || queued > 0;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+    if (!inProgress && remaining === 0) {
+        return `<div class="os-status-banner ok">
+             <div class="os-status-banner-left">
+               ✓ Canvas gradebook is up to date${awaitingNote}
+             </div>
+             ${refreshBtn}
+           </div>`;
+    }
+
+    if (!inProgress) {
+        return `<div class="os-status-banner warn">
+             <div class="os-status-banner-left">
+               ⬆ <b>${remaining}</b> student${remaining !== 1 ? 's' : ''} need${remaining === 1 ? 's' : ''} updating${awaitingNote}
+             </div>
+             <div class="os-status-banner-actions">
+               ${refreshBtn}
+               <button class="btn btn-sm btn-primary" data-action="os-post-all">
+                 Save grades to Canvas
+               </button>
+             </div>
+           </div>`;
+    }
+
+    const parts = [];
+    if (saving > 0)    parts.push(`Saving ${plural(saving, 'student', 'students')} to Canvas…`);
+    if (verifying > 0) parts.push(`Confirming ${plural(verifying, 'student', 'students')} in Canvas…`);
+    if (queued > 0)    parts.push(saving || verifying
+        ? `${queued} queued`
+        : `${plural(queued, 'student', 'students')} queued — waiting for the current save to finish`);
+    if (remaining > 0) parts.push(`${remaining} still to save`);
+
+    const lead = (saving > 0 || verifying > 0) ? '<span class="spinner"></span>' : '⏳';
+    const phaseLabel = saving > 0 ? 'Saving…' : verifying > 0 ? 'Confirming…' : 'Queued…';
+    const button = remaining > 0
+        ? `<button class="btn btn-sm btn-primary" data-action="os-post-all">Save remaining (${remaining})</button>`
+        : `<button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>${phaseLabel}</button>`;
+
+    return `<div class="os-status-banner syncing">
+         <div class="os-status-banner-left">
+           ${lead} ${parts.join(' · ')}${awaitingNote}
+         </div>
+         <div class="os-status-banner-actions">
+           ${refreshBtn}
+           ${button}
+         </div>
+       </div>`;
+}
+
+export function renderOutcomeStudentTable(outcome, cache) {
+    const oidStr        = String(outcome.id);
+    const studentStates = buildOutcomeStudentStates(outcome, cache);
+    const summary       = summarizeSaveStates(studentStates);
 
     const refreshOutcomeBtn =
         `<button class="os-refresh-outcome-btn" data-action="os-refresh-outcome"
             title="Refresh scores from Canvas"
             aria-label="Refresh scores from Canvas">↻</button>`;
 
-    const isSyncing = syncingOutcomeIds.has(oidStr);
-    const toolbarHtml = needsCount > 0
-        ? isSyncing
-            ? `<div class="os-status-banner syncing">
-                 <div class="os-status-banner-left">
-                   <span class="spinner"></span> <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-                 </div>
-                 <div class="os-status-banner-actions">
-                   ${refreshOutcomeBtn}
-                   <button class="btn btn-sm btn-primary" data-action="os-post-all" disabled>
-                     Save grades to Canvas
-                   </button>
-                 </div>
-               </div>`
-            : `<div class="os-status-banner warn">
-                 <div class="os-status-banner-left">
-                   ⬆ <b>${needsCount}</b> student${needsCount !== 1 ? 's' : ''} need${needsCount === 1 ? 's' : ''} updating
-                 </div>
-                 <div class="os-status-banner-actions">
-                   ${refreshOutcomeBtn}
-                   <button class="btn btn-sm btn-primary" data-action="os-post-all">
-                     Save grades to Canvas
-                   </button>
-                 </div>
-               </div>`
-        : `<div class="os-status-banner ok">
-             <div class="os-status-banner-left">
-               ✓ Canvas gradebook is up to date
-             </div>
-             ${refreshOutcomeBtn}
-           </div>`;
+    const toolbarHtml = renderSaveBanner(summary, refreshOutcomeBtn, countRowsAwaitingOutcome(outcome.id));
 
     // Legend commented out — color coding is self-evident from the dot colors
     // const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
@@ -386,6 +522,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
               <th class="c">Canvas</th>
               <th class="c">Marzano</th>
               <th class="c">Override</th>
+              <th class="c">Last Override</th>
               <th>Note</th>
               <th class="c">Save</th>
             </tr></thead>
@@ -393,7 +530,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
           </table>
         </div>
         <div class="os-table-hint">
-          Click Canvas / Marzano pills to copy to Override · Click Override box to type · Padlock locks an override
+          Click Canvas / Marzano / Last Override to copy to Override · Click Override box to type
         </div>`;
 }
 
@@ -402,7 +539,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
 /**
  * Attach all event listeners for the student sync table.
  *
- * Owns: os-use-canvas, os-use-marzano, os-wp-click (inline edit), os-lock,
+ * Owns: os-use-canvas, os-use-marzano, os-use-last, os-wp-click (inline edit), os-lock,
  * os-unlock, os-save, os-post-all, os-refresh-outcome, dot-toggle,
  * dot-ignore-toggle, os-note input, and a document-level "click outside dot to
  * close popover" listener.
@@ -461,9 +598,19 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             return;
         }
 
-        // ── Marzano pill → revert Will Post to auto-track ─────────────────
+        // ── Marzano pill → set Will Post = rounded Marzano score ──────────
         if (action === 'os-use-marzano') {
-            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
+            const mz = parseFloat(el.dataset.marzano);
+            if (isNaN(mz)) return;
+            await handleMarzanoPillClick({ courseId, outcomeId: oId, studentId: stuId, plPrediction: mz, cache, apiClient, onRerender: renderTable });
+            return;
+        }
+
+        // ── Last Override → set Will Post = last score pushed to Canvas ───
+        if (action === 'os-use-last') {
+            const last = parseFloat(el.dataset.last);
+            if (isNaN(last)) return;
+            await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: last, cache, apiClient, onRerender: renderTable });
             return;
         }
 
@@ -479,25 +626,47 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
             input.value = (curVal !== 'NE' && curVal !== '—') ? curVal : '';
 
             boxEl?.replaceWith(input);
+            input.focus();   // explicit — when opened by ↓/↑ there's no mouse click to focus it
             input.select();
 
             const commitEdit = async () => {
                 const raw = parseFloat(input.value);
-                if (!isNaN(raw)) {
+                if (input.value.trim() === '') {
+                    // Blank input → remove the override (nothing will be pushed)
+                    await handleClearWillPost({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
+                } else if (!isNaN(raw)) {
                     const clamped = Math.max(0, Math.min(4, raw));
                     await handleCustomValueTyped({ courseId, outcomeId: oId, studentId: stuId, value: clamped, cache, apiClient, onRerender: renderTable });
                 } else {
                     renderTable();
                 }
             };
+            // ↓ / ↑ — save this box (same as Enter) and open the next / previous
+            // student's Override box. The commit re-renders the table, so the
+            // target is looked up again afterwards by its outcome + student IDs.
+            const moveToRow = async (step) => {
+                const boxes  = [...contentEl.querySelectorAll('[data-action="os-wp-click"]')];
+                const target = boxes[boxes.indexOf(wrap) + step];
+                input.removeEventListener('blur', commitEdit);
+                await commitEdit();
+                if (!target) return;
+                contentEl.querySelector(
+                    `[data-action="os-wp-click"][data-oid="${target.dataset.oid}"][data-stu="${target.dataset.stu}"]`
+                )?.click();
+            };
+
             input.addEventListener('blur',   commitEdit);
             input.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
-                if (ev.key === 'Escape') { input.removeEventListener('blur', commitEdit); renderTable(); }
+                if (ev.key === 'Enter')     { ev.preventDefault(); input.blur(); }
+                if (ev.key === 'Escape')    { input.removeEventListener('blur', commitEdit); renderTable(); }
+                if (ev.key === 'ArrowDown') { ev.preventDefault(); moveToRow(1); }
+                if (ev.key === 'ArrowUp')   { ev.preventDefault(); moveToRow(-1); }
             });
             return;
         }
 
+        // Padlock button is hidden (see renderOutcomeStudentRow); these handlers are
+        // kept for older locked entries / re-enabling it.
         // ── Padlock → lock ────────────────────────────────────────────────
         if (action === 'os-lock') {
             await handleLockWillPost({ courseId, outcomeId: oId, studentId: stuId, cache, apiClient, onRerender: renderTable });
@@ -566,10 +735,13 @@ export function wireOutcomeStudentTable({ contentEl, outcome, cache, courseId, a
         // ── Save all ──────────────────────────────────────────────────────
         if (action === 'os-post-all') {
             if (el.disabled) return;
+            // Only rows that need saving and aren't already queued or in flight.
+            const { remainingIds } = getOutcomeSaveSummary(outcome, cache);
+            if (remainingIds.length === 0) return;
             el.disabled = true;
             try {
                 await handleSyncStudents({ courseId, outcomeId: String(outcome.id), outcomeName,
-                    studentIds: null, apiClient, cache, onRerender: renderTable });
+                    studentIds: remainingIds, apiClient, cache, onRerender: renderTable });
                 onChipUpdate?.();
             } catch (err) {
                 logger.error('[MasteryOutlook] os-post-all failed', err);

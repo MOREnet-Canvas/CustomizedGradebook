@@ -557,6 +557,19 @@ export async function refreshCourseSnapshot(courseId, courseName, apiClient, pag
 }
 
 /**
+ * Clear a single course snapshot from sessionStorage
+ *
+ * Needed to force re-classification: determineCourseModel() returns the cached
+ * model whenever a snapshot exists, so a re-check must clear it first.
+ *
+ * @param {string} courseId - Course ID
+ */
+export function clearCourseSnapshot(courseId) {
+    sessionStorage.removeItem(`${SNAPSHOT_KEY_PREFIX}${courseId}`);
+    logger.trace(`[Snapshot] Cleared snapshot for course ${courseId}`);
+}
+
+/**
  * Clear all course snapshots from sessionStorage
  *
  * Removes all keys with cg_ prefix (including user ID tracking).

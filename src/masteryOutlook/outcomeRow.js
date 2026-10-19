@@ -7,6 +7,7 @@
  *
  * Public surface:
  *   - isOutcomeInitialized(outcome, cache, { isSpecial }) → boolean
+ *   - buildSyncChip(outcome, cache, { isSpecial }) → HTML string (collapsed-row Canvas sync chip)
  *   - mountOutcomeRow({ outcome, cache, ctx, state, displayStats,
  *                       displayNumber, isSpecial, isCurrentScoreRow,
  *                       rerender, onReorderCommit }) → { rootEl, teardown }
@@ -20,15 +21,16 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
 import { roundToHalf } from './powerLaw.js';
-import { getSyncStatus, aggregateSyncStatus, scoresMatch } from './plOutlookSyncStatus.js';
+import { getSyncStatus, aggregateSyncStatus, scoresMatch, describeOverrideException, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import {
     handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
 } from './plOutlookActions.js';
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase } from './masteryOutlookState.js';
+import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats, fetchCourseRollupsForVerify, clearCourseRollupReuse } from './masteryOutlookDataService.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome } from './masteryOutlookState.js';
+import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT } from './currentScoreTable.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -92,7 +94,7 @@ function makeRenderers(ctx) {
  * collapsed outcome row. Returns a single span chip whose modifier reflects
  * the worst-priority state across the student cohort.
  *
- * Priority: needs > override > setup > synced > none.
+ * Priority: setup > syncing > needs > verifying > override > synced (special outcomes: none).
  *
  * @param {Object} outcome
  * @param {Object} cache
@@ -100,11 +102,21 @@ function makeRenderers(ctx) {
  * @param {boolean} [opts.isSpecial]
  * @returns {string} HTML
  */
-function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
+export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     if (!isOutcomeInitialized(outcome, cache, { isSpecial })) {
         return `<span class="od-sync-chip setup">⚙ Setup</span>`;
     }
 
+    // Same per-row save phases the rows and the Save banner read.
+    const rowPhases = getOutcomeRowPhases(outcome.id);
+    if (rowPhases.some(p => p !== 'queued')) {
+        return `<span class="od-sync-chip checking"><span class="spinner"></span> Syncing…</span>`;
+    }
+    if (rowPhases.length > 0 || (queuedOutcomeIds.has(String(outcome.id)) && !syncingOutcomeIds.has(String(outcome.id)))) {
+        return `<span class="od-sync-chip checking" title="Waiting for the current save to finish">Queued…</span>`;
+    }
+
+    // Fallback for all-students runs (studentIds null), which mark rows only once resolved.
     if (syncingOutcomeIds.has(String(outcome.id))) {
         // #55: hold an active state for the whole run so the chip never flashes
         // back to "N need" between calculation and completion.
@@ -120,7 +132,7 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     };
     const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
 
-    // Count students whose row would be amber in the Manage Students tab —
+    // Count students whose row would be amber in the Manage Scores tab —
     // matches buildOutcomeStudentRow status logic exactly so the badge stays
     // in sync with what the teacher actually sees as needing action.
     const needsCount = (cache.students || []).filter(student => {
@@ -129,35 +141,35 @@ function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const syncEntry     = ((cache.sync_state ?? {})[String(outcome.id)] ?? {})[String(student.id)] ?? {};
         const willPost      = syncEntry.will_post ?? null;
         const canvas        = od.canvasScore;
-        const marzano       = od.plPrediction;
         const pendingNote   = syncEntry.will_post_note ?? null;
         const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
         const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
-        if (marzano === null) return false;
-        if (canvas === null)  return false;
-        return !scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending;
+        if (willPost === null) return false;   // no teacher override → nothing to push
+        if (canvas === null)   return true;    // override set, nothing in Canvas yet (row is amber too)
+        return !scoresMatch(willPost, canvas) || noteIsPending;
     }).length;
 
     if (needsCount > 0) {
         return `<span class="od-sync-chip needs">↑ ${needsCount} need</span>`;
     }
+    // Rows saved this session and still in the background outcome check, or (after
+    // a reload) rows whose saved score Canvas's outcome hasn't caught up to yet.
+    const verifyingCount = Math.max(countRowsAwaitingOutcome(outcome.id), counts.verifying);
+    if (verifyingCount > 0) {
+        return `<span class="od-sync-chip verifying" title="${VERIFYING_TIP}">⏳ ${verifyingCount} verifying</span>`;
+    }
     if (counts.possibleOverride > 0 || counts.manualOverride > 0) {
         const n = counts.possibleOverride + counts.manualOverride;
-        return `<span class="od-sync-chip override">⚑ ${n}</span>`;
+        return `<span class="od-sync-chip override" title="${POSSIBLE_OVERRIDE_TIP}">⚑ ${n}</span>`;
     }
-    // Use needsCount (scoresMatch-based) as the source of truth for synced status.
-    // counts.synced from aggregateSyncStatus requires last_synced_score to be set,
-    // so it returns 0 for students whose scores match but were never explicitly tracked —
-    // causing "—" even when every row is up to date. If needsCount === 0 and at least
-    // one student has both a prediction and a Canvas score, all of them are synced.
-    const hasActiveStu = (cache.students || []).some(student => {
-        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
-        return od?.plPrediction != null && od?.canvasScore != null;
-    });
-    if (hasActiveStu) {
-        return `<span class="od-sync-chip synced">✓ Synced</span>`;
+    // Special outcomes (Current Score, excluded) are not managed by overrides.
+    if (isSpecial) {
+        return `<span class="od-sync-chip none">—</span>`;
     }
-    return `<span class="od-sync-chip none">—</span>`;
+    // Only teacher-set overrides are ever pushed, so a set-up outcome with no
+    // pending override, verification, or flag is up to date — even when every
+    // student is still NE (fewer than 3 attempts) and has no Marzano score.
+    return `<span class="od-sync-chip synced" title="No overrides waiting to be saved to Canvas">✓ Synced</span>`;
 }
 
 // ─── Initialize panel (handoff sec. "initialize panel") ──────────────────────
@@ -185,44 +197,72 @@ function renderInitPanel(outcome, open) {
 
 // ─── Per-outcome counts (drive detail-panel tab labels) ──────────────────────
 
-function calculateStudentPLAvg(student, cache, isRegularOutcome) {
-    const regularOutcomes = cache.outcomes.filter(o => isRegularOutcome(o));
-    const preds = student.outcomes
-        .filter(so => {
-            const outcome = regularOutcomes.find(ro => String(ro.id) === String(so.outcomeId));
-            return outcome && so.plPrediction !== null;
-        })
-        .map(so => so.plPrediction);
-    if (preds.length === 0) return null;
-    return preds.reduce((sum, p) => sum + p, 0) / preds.length;
+/**
+ * True when the student's Canvas-reported score for the outcome is below the
+ * re-teach threshold. Shared by the Struggling tab, its count, and the row flag.
+ * @param {{ canvasScore?: number|null }} row
+ * @param {number} threshold
+ * @returns {boolean}
+ */
+export function isBelowThresholdInCanvas(row, threshold) {
+    return row.canvasScore !== null && row.canvasScore !== undefined && row.canvasScore < threshold;
 }
 
-function countStrugglingStudents(outcome, cache, ctx, isRegularOutcome, isCurrentScoreRow) {
-    const threshold = ctx.getThreshold();
-    return cache.students.filter(student => {
-        let plValue;
-        if (isCurrentScoreRow) {
-            plValue = calculateStudentPLAvg(student, cache, isRegularOutcome);
-        } else {
-            const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-            plValue = od ? od.plPrediction : null;
-        }
-        return plValue !== null && plValue < threshold;
-    }).length;
+/** Slope beyond which a student counts as growing / declining (filter and trend arrow agree). */
+export const TREND_SLOPE_THRESHOLD = 0.05;
+
+/**
+ * Filters for the Struggling / Declining / Growing / All Students tabs. Used by
+ * both the tab tables and their tab counts, over the same rows (see
+ * buildOutcomeStudentRows) — so the filtered tabs always match All Students.
+ */
+export const TAB_FILTERS = {
+    // Same test as the row's "Below threshold" (applyCanvasClassStats): the score Canvas reports.
+    struggling: (row, threshold) => isBelowThresholdInCanvas(row, threshold),
+    declining:  (row) => row.slope !== null && row.slope !== undefined && row.slope < -TREND_SLOPE_THRESHOLD,
+    growing:    (row) => row.slope !== null && row.slope !== undefined && row.slope >  TREND_SLOPE_THRESHOLD,
+    all:        () => true,
+};
+
+/**
+ * Rows for an outcome's student tabs — one per student, from the in-memory cache.
+ * Regular outcomes use the student's Marzano score (plPrediction). The Current
+ * Score row uses the student's Current Score as reported by Canvas.
+ *
+ * @param {Object}  outcome
+ * @param {Object}  cache
+ * @param {Object}  [opts]
+ * @param {boolean} [opts.isCurrentScoreRow=false]
+ * @returns {Object[]} rows: { id, name, sortableName, ...outcomeData }
+ */
+export function buildOutcomeStudentRows(outcome, cache, { isCurrentScoreRow = false } = {}) {
+    return (cache.students || []).map(student => {
+        const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        const row = {
+            id: student.id,
+            name: student.name || student.sortableName,
+            sortableName: student.sortableName,
+            plPrediction: null,
+            slope: null,
+            ...od
+        };
+        if (isCurrentScoreRow) row.plPrediction = od?.canvasScore ?? null;
+        return row;
+    });
 }
 
-function countDecliningStudents(outcome, cache) {
-    return cache.students.filter(student => {
-        const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return od && od.slope !== null && od.slope < -0.05;
-    }).length;
-}
-
-function countGrowingStudents(outcome, cache) {
-    return cache.students.filter(student => {
-        const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-        return od && od.slope !== null && od.slope > 0.05;
-    }).length;
+/**
+ * Number of students on one filtered tab — same rows and filter as its table.
+ * @param {Object} outcome
+ * @param {'struggling'|'declining'|'growing'|'all'} filter
+ * @param {Object} cache
+ * @param {number} threshold
+ * @param {Object} [opts] - { isCurrentScoreRow }
+ * @returns {number}
+ */
+export function countTabStudents(outcome, filter, cache, threshold, opts = {}) {
+    const pred = TAB_FILTERS[filter] ?? TAB_FILTERS.all;
+    return buildOutcomeStudentRows(outcome, cache, opts).filter(row => pred(row, threshold)).length;
 }
 
 function countExceptionStudents(outcome, cache) {
@@ -233,13 +273,8 @@ function countExceptionStudents(outcome, cache) {
     const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
     return cache.students.filter(student => {
-        const sId   = String(student.id);
-        const entry = outcomeSync[sId];
-        return (
-            entry?.will_post_lock === 'locked' ||
-            entry?.manual_override === true     ||
-            ignoredIds.has(sId)
-        );
+        const sId = String(student.id);
+        return describeOverrideException(outcomeSync[sId]) !== null || ignoredIds.has(sId);
     }).length;
 }
 
@@ -253,13 +288,8 @@ function buildExceptionsTable(outcome, cache) {
     const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
     const exceptionStudents = cache.students.filter(student => {
-        const sId   = String(student.id);
-        const entry = outcomeSync[sId];
-        return (
-            entry?.will_post_lock === 'locked' ||
-            entry?.manual_override === true     ||
-            ignoredIds.has(sId)
-        );
+        const sId = String(student.id);
+        return describeOverrideException(outcomeSync[sId]) !== null || ignoredIds.has(sId);
     });
 
     if (exceptionStudents.length === 0) {
@@ -267,26 +297,27 @@ function buildExceptionsTable(outcome, cache) {
     }
 
     const rows = exceptionStudents.map(student => {
-        const sId       = String(student.id);
-        const entry     = outcomeSync[sId] ?? {};
-        const od        = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
+        const sId        = String(student.id);
+        const ex         = describeOverrideException(outcomeSync[sId]);
+        const od         = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         const canvasDisp = od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—';
         const marzDisp   = od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE';
-        const wpDisp     = entry.will_post != null ? entry.will_post.toFixed(2) : '—';
-        const note       = escapeHtml(entry.will_post_note ?? '');
-        const dateRaw    = entry.override_at ?? entry.last_synced_at ?? '';
+        const recentDisp = od?.mostRecent != null ? Number(od.mostRecent).toFixed(2) : '—';
+        const wpDisp     = ex?.score != null ? ex.score.toFixed(2) : '—';
+        const note       = escapeHtml(ex?.note ?? '');
+        const dateRaw    = ex?.date ?? '';
         const dateFmt    = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
 
-        const types = [];
-        if (entry.manual_override)             types.push('<span class="od-ex-pill override">Override</span>');
-        if (entry.will_post_lock === 'locked') types.push('<span class="od-ex-pill locked">Locked Override</span>');
-        if (ignoredIds.has(sId))               types.push('<span class="od-ex-pill ignored">Ignored</span>');
+        const types = (ex?.types ?? []).map(t =>
+            `<span class="od-ex-pill ${t === 'Locked' ? 'locked' : 'override'}">${escapeHtml(t)}</span>`);
+        if (ignoredIds.has(sId)) types.push('<span class="od-ex-pill ignored">Ignored</span>');
 
         return `<tr>
             <td class="od-name">${escapeHtml(student.name || `Student ${student.id}`)}</td>
             <td>${types.join(' ')}</td>
             <td class="od-center">${canvasDisp}</td>
             <td class="od-center">${marzDisp}</td>
+            <td class="od-center">${recentDisp}</td>
             <td class="od-center">${wpDisp}</td>
             <td class="od-note">${note}</td>
             <td class="od-date">${dateFmt}</td>
@@ -299,6 +330,7 @@ function buildExceptionsTable(outcome, cache) {
             <th>Type</th>
             <th class="od-center">Canvas</th>
             <th class="od-center">Marzano</th>
+            <th class="od-center">Most recent</th>
             <th class="od-center">Override</th>
             <th>Note</th>
             <th>Date</th>
@@ -310,30 +342,15 @@ function buildExceptionsTable(outcome, cache) {
 // ─── Filter tables (Struggling / Declining / Growing) ────────────────────────
 
 function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isRegularOutcome, profColor) {
-    const plConfig = { pl_assignments: cache.pl_assignments ?? {}, sync_state: cache.sync_state ?? {} };
-
-    let students = cache.students.map(student => {
-        const od = student.outcomes.find(o => o.outcomeId === outcome.id);
-        const row = {
-            id: student.id,
-            name: student.name || student.sortableName,
-            sortableName: student.sortableName,
-            ...od
-        };
-        if (isCurrentScoreRow) {
-            row.plPrediction = calculateStudentPLAvg(student, cache, isRegularOutcome);
-        }
-        return row;
-    });
+    // Same rows as All Students; each tab only applies its filter (TAB_FILTERS).
+    let students = buildOutcomeStudentRows(outcome, cache, { isCurrentScoreRow });
 
     const threshold = ctx.getThreshold();
 
-    if      (filter === 'struggling') students = students.filter(s => s.plPrediction !== null && s.plPrediction < threshold);
-    else if (filter === 'declining')  students = students.filter(s => s.slope !== null && s.slope < -0.05);
-    else if (filter === 'growing')    students = students.filter(s => s.slope !== null && s.slope > 0.05);
+    if (TAB_FILTERS[filter]) students = students.filter(s => TAB_FILTERS[filter](s, threshold));
 
     if (filter === 'students' || filter === 'all') {
-        // Both Manage Students and All Students sort alphabetically by name
+        // Both Manage Scores and All Students sort alphabetically by name
         students.sort((a, b) => {
             const nameA = (a.sortableName || a.name || '').toLowerCase();
             const nameB = (b.sortableName || b.name || '').toLowerCase();
@@ -344,6 +361,14 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             if (a.slope === null) return 1;
             if (b.slope === null) return -1;
             return a.slope - b.slope;
+        });
+    } else if (filter === 'struggling') {
+        // Lowest Canvas score first; students with no Canvas score last
+        const canvasOf = s => (s.canvasScore === null || s.canvasScore === undefined) ? null : s.canvasScore;
+        students.sort((a, b) => {
+            if (canvasOf(a) === null) return 1;
+            if (canvasOf(b) === null) return -1;
+            return canvasOf(a) - canvasOf(b);
         });
     } else {
         students.sort((a, b) => {
@@ -368,8 +393,8 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
 
         let trendIcon = '→', trendColor = '#999';
         if (s.slope !== null) {
-            if (s.slope > 0.1)       { trendIcon = '▲'; trendColor = '#0F6E56'; }
-            else if (s.slope < -0.1) { trendIcon = '▼'; trendColor = '#A32D2D'; }
+            if (s.slope > TREND_SLOPE_THRESHOLD)       { trendIcon = '▲'; trendColor = '#0F6E56'; }
+            else if (s.slope < -TREND_SLOPE_THRESHOLD) { trendIcon = '▼'; trendColor = '#A32D2D'; }
         }
 
         // Score history — colored chips sorted oldest→newest
@@ -384,7 +409,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             .filter(Boolean)
             .join(' ');
 
-        const isFlagged = s.plPrediction !== null && s.plPrediction < threshold;
+        const isFlagged = isBelowThresholdInCanvas(s, threshold);
 
         const masteryDashboardUrl = cache.meta.masteryDashboardUrl || 'mastery-dashboard';
 
@@ -412,7 +437,7 @@ function buildStudentTable(outcome, filter, cache, ctx, isCurrentScoreRow, isReg
             </tr>`;
     }).join('');
 
-    const plColumnHeader = isCurrentScoreRow ? 'PL Avg' : 'Marzano';
+    const plColumnHeader = isCurrentScoreRow ? 'Canvas' : 'Marzano';
 
     return `
         <table class="od-stu-table">
@@ -534,60 +559,151 @@ async function refreshCanvasScoresForOutcome(outcomeId, cache, ctx) {
     if (updated > 0) {
         logger.debug(`[MasteryOutlook] Live rollup: updated canvasScore for ${updated} student(s) on outcome ${outcomeId}`);
 
-        // Recalculate outcome average and spread from updated Canvas scores
+        // Row average, spread, and below-threshold follow the updated Canvas scores
         const outcomeObj = cache.outcomes?.find(o => String(o.id) === String(outcomeId));
-        if (outcomeObj?.classStats) {
-            const canvasScores = cache.students
-                .map(s => s.outcomes?.find(o => String(o.outcomeId) === String(outcomeId))?.canvasScore)
-                .filter(s => s != null);
-            if (canvasScores.length > 0) {
-                const avg = canvasScores.reduce((a, b) => a + b, 0) / canvasScores.length;
-                outcomeObj.classStats.plAvg     = parseFloat(avg.toFixed(4));
-                outcomeObj.classStats.classMean = outcomeObj.classStats.plAvg;
-                const distribution = { '1': 0, '2': 0, '3': 0, '4': 0 };
-                canvasScores.forEach(s => {
-                    if      (s < 1.5) distribution['1']++;
-                    else if (s < 2.5) distribution['2']++;
-                    else if (s < 3.5) distribution['3']++;
-                    else              distribution['4']++;
-                });
-                outcomeObj.classStats.distribution        = distribution;
-                outcomeObj.classStats.belowThresholdCount = canvasScores.filter(s => s < outcomeObj.classStats.computedThreshold).length;
-            }
-        }
+        if (outcomeObj) applyCanvasClassStats(outcomeObj, cache);
     }
 
     return scoreMap;
 }
 
+/**
+ * Fetch course-wide rollups once and update every outcome's in-memory
+ * canvasScore — for the Current Score table, which shows all averaged outcomes.
+ * Rows with a save in progress keep their published value until it confirms.
+ * Silent fail: cached scores remain on error.
+ *
+ * @param {Object} cache - In-memory cache (mutated in place)
+ * @param {Object} ctx   - Contains courseId and apiClient
+ * @returns {Promise<void>}
+ */
+async function refreshAllCanvasScores(cache, ctx) {
+    let data;
+    try {
+        data = await fetchCourseRollupsForVerify(ctx.courseId, ctx.apiClient);
+    } catch (err) {
+        logger.warn('[MasteryOutlook] course rollup refresh failed', err);
+        return;
+    }
+    const studentsById = new Map((cache.students ?? []).map(s => [String(s.id), s]));
+    const changedOutcomes = new Set();
+    for (const rollup of data?.rollups ?? []) {
+        const sid = String(rollup.links?.user);
+        const student = studentsById.get(sid);
+        if (!student) continue;
+        for (const s of rollup.scores ?? []) {
+            const oid = String(s.links?.outcome);
+            if (s.score === null || s.score === undefined) continue;
+            if (rowSavePhase.has(`${oid}_${sid}`) || rowsAwaitingOutcome.has(`${oid}_${sid}`)) continue;
+            const od = student.outcomes?.find(o => String(o.outcomeId) === oid);
+            if (od && od.canvasScore !== s.score) {
+                od.canvasScore = s.score;
+                changedOutcomes.add(oid);
+            }
+        }
+    }
+    for (const oid of changedOutcomes) {
+        const outcomeObj = cache.outcomes?.find(o => String(o.id) === oid);
+        if (outcomeObj) applyCanvasClassStats(outcomeObj, cache);
+    }
+}
+
+// ─── Detail panel (Current Score) ────────────────────────────────────────────
+
+/**
+ * Current Score detail panel — no tabs, no overrides: a sortable table of each
+ * student's averaged-outcome chips and Current Score (currentScoreTable.js).
+ * Redraws on save activity for *any* outcome, since a save anywhere changes
+ * a chip and the Current Score.
+ */
+function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial }) {
+    const panel = document.createElement('div');
+    panel.className = 'od-detail-panel';
+
+    const content = document.createElement('div');
+    content.className = 'od-detail-content';
+    panel.appendChild(content);
+
+    if (!state.currentScoreSort) state.currentScoreSort = { ...DEFAULT_CURRENT_SCORE_SORT };
+
+    const renderTable = () => {
+        content.innerHTML = renderCurrentScoreTable(outcome, cache, state.currentScoreSort);
+        const syncCellEl = content.closest('.od-outcome-container')?.querySelector('.od-sync-cell');
+        if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+    };
+    renderTable();
+
+    // Coalesce bursts of save-status changes into one redraw per frame.
+    let pendingRender = null;
+    const scheduleRender = () => {
+        if (pendingRender != null) return;
+        pendingRender = requestAnimationFrame(() => {
+            pendingRender = null;
+            renderTable();
+        });
+    };
+
+    let torn = false;
+    refreshAllCanvasScores(cache, ctx).then(() => { if (!torn) renderTable(); });
+
+    const unwire = wireCurrentScoreTable({
+        contentEl: content,
+        state,
+        renderTable,
+        onRefreshOutcome: async () => {
+            clearCourseRollupReuse();
+            await refreshAllCanvasScores(cache, ctx);
+            renderTable();
+        },
+    });
+
+    const unsubscribe = subscribeSaveStatus(() => scheduleRender());
+
+    return {
+        panel,
+        detailTeardown: () => {
+            torn = true;
+            if (pendingRender != null) cancelAnimationFrame(pendingRender);
+            unsubscribe();
+            unwire();
+        },
+    };
+}
+
 // ─── Detail panel (tabs + content) ───────────────────────────────────────────
 
-function buildOutcomeDetailPanel({
-    outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
-    profColor, rerender, isSpecial,
-}) {
+function buildOutcomeDetailPanel(args) {
+    if (args.isCurrentScoreRow) return buildCurrentScoreDetailPanel(args);
+    const {
+        outcome, cache, ctx, state, isCurrentScoreRow, isRegularOutcome,
+        profColor, rerender, isSpecial,
+    } = args;
     const panel = document.createElement('div');
     panel.className = 'od-detail-panel';
 
     const tabBar = document.createElement('div');
     tabBar.className = 'od-detail-tabs';
 
-    const strugglingCount  = countStrugglingStudents(outcome, cache, ctx, isRegularOutcome, isCurrentScoreRow);
-    const decliningCount   = countDecliningStudents(outcome, cache);
-    const growingCount     = countGrowingStudents(outcome, cache);
-    const exceptionsCount  = countExceptionStudents(outcome, cache);
-
-    const allStudentsCount = cache.students.length;
-    const tabs = [
-        { id: 'students',   label: `Manage Students (${allStudentsCount})` },
-        { id: 'struggling', label: `Struggling (${strugglingCount})` },
-        { id: 'declining',  label: `Declining (${decliningCount})` },
-        { id: 'growing',    label: `Growing (${growingCount})` },
-        ...(exceptionsCount > 0
-            ? [{ id: 'exceptions', label: `Exceptions (${exceptionsCount})` }]
-            : []),
-        { id: 'all',        label: `All Students (${allStudentsCount})` },
-    ];
+    // Tab labels — counts come from the same rows/filters as the tables and are
+    // recomputed on every renderTable() so they never go stale.
+    const tabLabel = (id) => {
+        const threshold = ctx.getThreshold();
+        const opts = { isCurrentScoreRow };
+        switch (id) {
+            case 'students':   return `Manage Scores (${cache.students.length})`;
+            case 'struggling': return `Struggling (${countTabStudents(outcome, 'struggling', cache, threshold, opts)})`;
+            case 'declining':  return `Declining (${countTabStudents(outcome, 'declining', cache, threshold, opts)})`;
+            case 'growing':    return `Growing (${countTabStudents(outcome, 'growing', cache, threshold, opts)})`;
+            case 'exceptions': return `Exceptions (${countExceptionStudents(outcome, cache)})`;
+            default:           return `All Students (${cache.students.length})`;
+        }
+    };
+    const tabs = ['students', 'struggling', 'declining', 'growing',
+        ...(countExceptionStudents(outcome, cache) > 0 ? ['exceptions'] : []), 'all']
+        .map(id => ({ id, label: tabLabel(id) }));
+    const refreshTabLabels = () => {
+        tabBar.querySelectorAll('.od-detail-tab').forEach(btn => { btn.textContent = tabLabel(btn.dataset.tabId); });
+    };
 
     tabs.forEach(tab => {
         const tabBtn = document.createElement('button');
@@ -638,6 +754,7 @@ function buildOutcomeDetailPanel({
         const savedValue  = isNoteInput ? active.value          : null;
         // ───────────────────────────────────────────────────────────────────
 
+        refreshTabLabels();
         const activeTab = state.activeTabs[outcome.id] ?? 'students';
         if (activeTab === 'exceptions') {
             content.innerHTML = buildExceptionsTable(outcome, cache);
@@ -810,7 +927,19 @@ function buildOutcomeDetailPanel({
 
     panel.appendChild(content);
 
-    return { panel, detailTeardown };
+    // Redraw this panel when background save work for *this* outcome changes —
+    // e.g. the Current Score check after a save on another outcome.
+    const unsubscribe = subscribeSaveStatus((changedOutcomeId) => {
+        if (changedOutcomeId === String(outcome.id)) renderTable();
+    });
+
+    return {
+        panel,
+        detailTeardown: () => {
+            unsubscribe();
+            detailTeardown?.();
+        },
+    };
 }
 
 // ─── Initialize flow (CHECKING_SETUP → CREATING_ASSIGNMENT → ...) ────────────
@@ -858,10 +987,13 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
             if (cancelBtn) cancelBtn.disabled = true;
             if (progressEl) {
                 progressEl.style.display = '';
-                progressEl.textContent = 'Starting…';
+                progressEl.textContent = isSaveQueueBusy()
+                    ? 'Queued — waiting for the current save to finish…'
+                    : 'Starting…';
             }
             try {
-                await runPLSync({
+                // Queued with saves — Initialize also writes the shared cache file.
+                const result = await runExclusive(() => runPLSync({
                     courseId:    ctx.courseId,
                     outcomeId:   outcome.id,
                     outcomeName: outcome.title || String(outcome.id),
@@ -870,7 +1002,10 @@ function wireInitFlow(rootEl, outcome, cache, ctx, rerender) {
                     onProgress:  (_state, _name, msg) => {
                         if (progressEl && msg) progressEl.textContent = msg;
                     },
-                });
+                }));
+                // runPLSync reports handler errors via its result rather than throwing
+                if (!result?.success) throw new Error(result?.error || 'Setup did not complete');
+                if (result.warning) logger.warn(`[MasteryOutlook] Initialize: ${result.warning}`);
                 await refreshCacheConfigInPlace(cache, ctx);
                 rerender();
             } catch (err) {
@@ -1061,20 +1196,26 @@ export function mountOutcomeRow({
         });
     }
 
-    function teardown() {
-        if (typeof detailTeardown === 'function') {
-            try { detailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
-            detailTeardown = null;
-        }
-    }
-
     /**
      * Refresh the sync chip in-place without a full row re-render.
-     * Called by the background canvas score refresh in outcomeSyncView.js.
+     * Called by the background canvas score refresh in outcomeSyncView.js,
+     * and when save status changes for this outcome (subscribeSaveStatus).
      */
     function refreshChip() {
         const syncCellEl = outcomeContainer.querySelector('.od-sync-cell');
         if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
+    }
+
+    const unsubscribeChip = subscribeSaveStatus((changedOutcomeId) => {
+        if (changedOutcomeId === String(outcome.id)) refreshChip();
+    });
+
+    function teardown() {
+        unsubscribeChip();
+        if (typeof detailTeardown === 'function') {
+            try { detailTeardown(); } catch (err) { logger.warn('[MasteryOutlook] detail teardown failed', err); }
+            detailTeardown = null;
+        }
     }
 
     return { rootEl: outcomeContainer, teardown, refreshChip };

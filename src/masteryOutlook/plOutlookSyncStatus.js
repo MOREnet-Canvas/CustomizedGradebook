@@ -8,7 +8,6 @@
  *   - plOutlookSync.js       → checkSyncNeeded counts
  *   - plOutlookActions.js    → deciding what chain step to run next
  */
-import { roundToHalf } from './powerLaw.js';
 
 
 /**
@@ -25,14 +24,80 @@ export function scoresMatch(a, b) {
 }
 
 /**
+ * How long after a push an unconfirmed Canvas score counts as "still verifying"
+ * rather than a possible manual override. Canvas can take a while to update the
+ * rollup after a rubric assessment.
+ */
+export const VERIFY_PENDING_WINDOW_MS = 30 * 60 * 1000;
+
+/** Tooltip text for the "verifying" status (chip and row marker). */
+export const VERIFYING_TIP = 'Saved to Canvas; waiting for Canvas to update the outcome score. This clears on its own.';
+
+/** Tooltip text for the "possible override" status (chip and row marker). */
+export const POSSIBLE_OVERRIDE_TIP =
+    'Canvas score no longer matches the score Mastery Outlook last saved — ' +
+    'it may have been changed directly in Canvas. Open the outcome to review.';
+
+/**
+ * Describe a sync_state entry as an override "exception" for the exceptions
+ * views, or return null when there is nothing to report.
+ *
+ * Covers teacher overrides waiting to be saved (will_post), overrides already
+ * saved to Canvas (last_synced_score — only teacher overrides are pushed),
+ * locked overrides, and confirmed manual Canvas overrides.
+ *
+ * @param {Object|undefined} entry - sync_state[outcomeId][studentId]
+ * @returns {{ types: string[], score: number|null, note: string, date: string|null }|null}
+ *   types: display labels, e.g. ['Saved Override'] or ['Pending Override', 'Locked']
+ */
+export function describeOverrideException(entry) {
+    if (!entry) return null;
+    const pending = entry.will_post != null;
+    const saved   = entry.last_synced_score != null;
+    const locked  = entry.will_post_lock === 'locked';
+    const manual  = entry.manual_override === true;
+    if (!pending && !saved && !locked && !manual) return null;
+
+    const types = [];
+    if (pending)    types.push('Pending Override');
+    else if (saved) types.push('Saved Override');
+    if (locked) types.push('Locked');
+    if (manual) types.push('Canvas Override');
+
+    return {
+        types,
+        score: pending ? Number(entry.will_post) : (saved ? Number(entry.last_synced_score) : null),
+        note:  (pending ? entry.will_post_note : entry.last_synced_note) ?? entry.will_post_note ?? '',
+        date:  pending ? (entry.override_at ?? null) : (entry.last_synced_at ?? entry.override_at ?? null),
+    };
+}
+
+/**
+ * True when a push happened but no verify pass completed after it, and the
+ * push is recent enough that Canvas may simply not have caught up yet.
+ *
+ * @param {Object} state - sync_state entry
+ * @param {number} now   - epoch ms
+ * @returns {boolean}
+ */
+function isVerifyPending(state, now) {
+    const syncedAt = state?.last_synced_at ? Date.parse(state.last_synced_at) : NaN;
+    if (Number.isNaN(syncedAt)) return false;
+    const verifiedAt = state?.last_verify_at ? Date.parse(state.last_verify_at) : NaN;
+    const verifiedSincePush = !Number.isNaN(verifiedAt) && verifiedAt >= syncedAt;
+    return !verifiedSincePush && (now - syncedAt) < VERIFY_PENDING_WINDOW_MS;
+}
+
+/**
  * Derive the sync status for one student × outcome cell.
  *
  * Priority order (first match wins):
  *  1. NE         — student has no PL prediction (not enough attempts)
  *  2. not_setup  — no PL assignment exists for this outcome yet
  *  3. manual_override — teacher has confirmed Canvas score should be kept
+ *  3b. verifying — pushed recently, Canvas not yet showing it, no verify pass since
  *  4. possible_override — Canvas score changed AFTER the last PL push
- *  5. needs_sync — plPrediction differs from Canvas score (or never pushed)
+ *  5. needs_sync — teacher-set will_post differs from Canvas score (or never pushed)
  *  6. synced     — Canvas score matches last pushed PL prediction
  *
  * @param {string|number} studentId
@@ -40,9 +105,10 @@ export function scoresMatch(a, b) {
  * @param {number|null}   plPrediction  - computed Power Law score (null → NE)
  * @param {number|null}   canvasScore   - current Canvas rollup score (null = not set)
  * @param {Object}        plConfig      - { pl_assignments, sync_state } from cache
+ * @param {number}        [now=Date.now()] - current time in epoch ms (injectable for tests)
  * @returns {{ status: string, label: string, cssClass: string, [extra]: * }}
  */
-export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, plConfig) {
+export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, plConfig, now = Date.now()) {
     const oId = String(outcomeId);
     const sId = String(studentId);
 
@@ -73,6 +139,21 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
 
     const lastSyncedScore = state?.last_synced_score ?? null;
 
+    // 3b. verifying — the push hasn't shown up in Canvas yet (e.g. page reloaded
+    //     mid-verify). Not a manual override until the pending window passes.
+    if (lastSyncedScore !== null && canvasScore !== null
+        && !scoresMatch(canvasScore, lastSyncedScore)
+        && isVerifyPending(state, now)) {
+        return {
+            status:          'verifying',
+            label:           '⏳ Verifying',
+            cssClass:        'sb-verifying',
+            canvasScore,
+            plPrediction,
+            lastSyncedScore,
+        };
+    }
+
     // 4. possible_override — Canvas changed AFTER the last PL push
     //    (lastSyncedScore exists but canvasScore no longer matches it)
     if (lastSyncedScore !== null && canvasScore !== null
@@ -88,8 +169,9 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
     }
 
     // 5. needs_sync — never pushed (no lastSyncedScore) OR prediction has drifted
-    const targetScore = state?.will_post ?? roundToHalf(plPrediction);
-    if (lastSyncedScore === null || !scoresMatch(targetScore, canvasScore)) {
+    // Only a teacher-set override is ever pushed — no override means nothing to sync.
+    const targetScore = state?.will_post ?? null;
+    if (targetScore !== null && (lastSyncedScore === null || !scoresMatch(targetScore, canvasScore))) {
         return {
             status:   'needs_sync',
             label:    '↑ Needs sync',
@@ -116,11 +198,11 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
  * @param {Object[]} students      - cache.students (must already have .name attached by enrichCache)
  * @param {string|number} outcomeId
  * @param {Object} plConfig        - { pl_assignments, sync_state }
- * @returns {{ total, synced, needsSync, possibleOverride, manualOverride, ne, notSetup }}
+ * @returns {{ total, synced, needsSync, verifying, possibleOverride, manualOverride, ne, notSetup }}
  */
 export function aggregateSyncStatus(students, outcomeId, plConfig) {
     const counts = {
-        total: 0, synced: 0, needsSync: 0,
+        total: 0, synced: 0, needsSync: 0, verifying: 0,
         possibleOverride: 0, manualOverride: 0, ne: 0, notSetup: 0,
     };
 
@@ -138,6 +220,7 @@ export function aggregateSyncStatus(students, outcomeId, plConfig) {
         switch (status) {
             case 'synced':            counts.synced++;           break;
             case 'needs_sync':        counts.needsSync++;        break;
+            case 'verifying':         counts.verifying++;        break;
             case 'possible_override': counts.possibleOverride++; break;
             case 'manual_override':   counts.manualOverride++;   break;
             case 'ne':                counts.ne++;               break;

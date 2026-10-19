@@ -14,6 +14,7 @@
 
 import { logger } from "../utils/logger.js";
 import { ENABLE_GRADE_CUSTOM_STATUS, DEFAULT_CUSTOM_STATUS_ID } from "../config.js";
+import { getEffectiveValue } from "./districtConfigService.js";
 
 /**
  * Submit a unified grade update via GraphQL
@@ -73,7 +74,11 @@ export async function submitUnifiedGrade(params, apiClient) {
     let assignmentCustomStatusId = null;
     let overrideCustomStatusId = null;
 
-    if (ENABLE_GRADE_CUSTOM_STATUS) {
+    const enableGradeCustomStatus = await getEffectiveValue(
+        'ENABLE_GRADE_CUSTOM_STATUS', undefined, ENABLE_GRADE_CUSTOM_STATUS, apiClient
+    );
+
+    if (enableGradeCustomStatus) {
         if (action === "IE") {
             // IE case: Set both to DEFAULT_CUSTOM_STATUS_ID
             assignmentCustomStatusId = DEFAULT_CUSTOM_STATUS_ID;

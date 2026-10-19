@@ -1,4 +1,4 @@
-// src/masteryOutlook/plOutlookStateHandlers.test.js
+// src/masteryOutlook/tests/plOutlookStateHandlers.test.js
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PLOutlookStateMachine, PL_STATES } from '../plOutlookStateMachine.js';
 import {
@@ -9,30 +9,39 @@ import {
     handleSyncing,
     handleVerifying,
     handleComplete,
-    handleError
+    handleError,
+    verifyOutcomeRollups,
+    CONFIRM_POLL_DELAYS_MS,
+    VERIFY_NO_PROGRESS_LIMIT_MS
 } from '../plOutlookStateHandlers.js';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
-vi.mock('../utils/logger.js', () => ({
+vi.mock('../../utils/logger.js', () => ({
     logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }));
 
-vi.mock('./masteryOutlookCacheService.js', () => ({
+vi.mock('../masteryOutlookCacheService.js', () => ({
     readMasteryOutlookCache: vi.fn(),
     readPLAssignments:       vi.fn(),
-    writePLAssignments:      vi.fn()
+    writePLAssignments:      vi.fn(),
+    readSyncState:           vi.fn(async () => ({})),
+    writeSyncState:          vi.fn()
 }));
 
-vi.mock('../services/enrollmentService.js', () => ({
+vi.mock('../../services/enrollmentService.js', () => ({
     fetchCourseStudents: vi.fn()
 }));
 
-vi.mock('../services/graphqlGradingService.js', () => ({
+vi.mock('../../services/graphqlGradingService.js', () => ({
     submitRubricAssessmentBatch: vi.fn()
 }));
 
-vi.mock('../config.js', () => ({
+vi.mock('../../config.js', () => ({
+    PL_ASSIGNMENT_SUFFIX:        'Projected Score',
+    PL_RUBRIC_SUFFIX:            'Projected Score Rubric',
+    PL_GRADING_TYPE:             'gpa_scale',
+    PL_GRADING_SCHEME_ID:        null,
     DEFAULT_MAX_POINTS:          4,
     OUTCOME_AND_RUBRIC_RATINGS: [
         { description: 'Exemplary',  points: 4 },
@@ -44,9 +53,22 @@ vi.mock('../config.js', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-import { readMasteryOutlookCache, readPLAssignments, writePLAssignments } from '../masteryOutlookCacheService.js';
+import { readMasteryOutlookCache, readPLAssignments, writePLAssignments, readSyncState, writeSyncState } from '../masteryOutlookCacheService.js';
 import { fetchCourseStudents } from '../../services/enrollmentService.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
+import { clearCourseRollupReuse } from '../masteryOutlookDataService.js';
+
+/**
+ * Add a getWithResponse() to a mock client that wraps its get() mock — rollup
+ * fetches use getWithResponse for Link-header pagination (single page here).
+ */
+function withResponse(client) {
+    client.getWithResponse = vi.fn(async (...args) => {
+        const data = await client.get(...args);
+        return { json: async () => data, headers: { get: () => null } };
+    });
+    return client;
+}
 
 /** Build a state machine pre-populated with the given context */
 function buildSM(extraContext = {}) {
@@ -171,7 +193,15 @@ describe('handleCheckingStudents', () => {
 // ── handleCalculatingChanges ──────────────────────────────────────────────────
 
 describe('handleCalculatingChanges', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        readSyncState.mockResolvedValue({});
+    });
+
+    /** Teacher-set Override (will_post) for u1 on outcome 598 */
+    function setOverride(willPost) {
+        readSyncState.mockResolvedValue({ '598': { u1: { will_post: willPost, will_post_lock: 'unlocked' } } });
+    }
 
     /** Minimal cache with one student who has a PL prediction */
     function makeCache(plPrediction, status = 'active') {
@@ -195,7 +225,8 @@ describe('handleCalculatingChanges', () => {
 
     test('student needs sync → returns SYNCING and sets studentsToSync', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) });
 
         const sm = buildSM({
             apiClient,
@@ -215,8 +246,9 @@ describe('handleCalculatingChanges', () => {
 
     test('scores match at hundredths → returns COMPLETE with zero studentsToSync', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
+        setOverride(3.5);
         // 3.5 rounds to 350 at hundredths — exact match, no sync needed
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 3.5)) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 3.5)) });
 
         const sm = buildSM({
             apiClient,
@@ -231,9 +263,9 @@ describe('handleCalculatingChanges', () => {
         expect(sm.getContext().studentsToSync).toHaveLength(0);
     });
 
-    test('student with status NE is skipped', async () => {
+    test('student with status NE and no override is skipped', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5, 'NE'));
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
 
         const sm = buildSM({
             apiClient,
@@ -250,7 +282,8 @@ describe('handleCalculatingChanges', () => {
 
     test('student with no submission ID is skipped', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
 
         const sm = buildSM({
             apiClient,
@@ -267,7 +300,7 @@ describe('handleCalculatingChanges', () => {
 
     test('throws when cache is missing', async () => {
         readMasteryOutlookCache.mockResolvedValue(null);
-        const apiClient = { get: vi.fn() };
+        const apiClient = withResponse({ get: vi.fn() });
 
         const sm = buildSM({ apiClient, effectiveTargetIds: new Set() });
         await expect(handleCalculatingChanges(sm)).rejects.toThrow(/run Refresh Data/);
@@ -277,7 +310,8 @@ describe('handleCalculatingChanges', () => {
         // PL=3.50, Canvas=3.30 — rounds to 350 vs 330, different → needs sync
         // Under old SYNC_THRESHOLD=0.25, diff=0.2 would have been skipped
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 3.3)) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 3.3)) });
 
         const sm = buildSM({
             apiClient,
@@ -295,7 +329,8 @@ describe('handleCalculatingChanges', () => {
     test('floating-point scores equal at hundredths are treated as matching', async () => {
         // 3.500 and 3.504 both round to 350 at hundredths → no sync needed
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.500));
-        const apiClient = { get: vi.fn().mockResolvedValue(makeRollup('u1', 3.504)) };
+        setOverride(3.5);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 3.504)) });
 
         const sm = buildSM({
             apiClient,
@@ -312,8 +347,9 @@ describe('handleCalculatingChanges', () => {
 
     test('student with no canvas rollup score is included in sync', async () => {
         readMasteryOutlookCache.mockResolvedValue(makeCache(3.0));
+        setOverride(3.0);
         // Rollup has no score for this outcome
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue({ rollups: [] }) });
 
         const sm = buildSM({
             apiClient,
@@ -326,6 +362,41 @@ describe('handleCalculatingChanges', () => {
 
         expect(next).toBe(PL_STATES.SYNCING);
         expect(sm.getContext().studentsToSync[0].canvasScore).toBeNull();
+    });
+
+    test('no override → PL prediction is NOT pushed even when it differs from Canvas', async () => {
+        readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) });
+
+        const sm = buildSM({
+            apiClient,
+            submissionIdByUserId: new Map([['u1', 'sub-1']]),
+            effectiveTargetIds:   new Set(['u1']),
+            rubricAssociationId:  'assoc-1',
+            rubricCriterionId:    'crit-1'
+        });
+        const next = await handleCalculatingChanges(sm);
+
+        expect(next).toBe(PL_STATES.COMPLETE);
+        expect(sm.getContext().studentsToSync).toHaveLength(0);
+    });
+
+    test('teacher override is pushed as-is, not the PL prediction', async () => {
+        readMasteryOutlookCache.mockResolvedValue(makeCache(3.5));
+        setOverride(2.0);
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeRollup('u1', 1.0)) });
+
+        const sm = buildSM({
+            apiClient,
+            submissionIdByUserId: new Map([['u1', 'sub-1']]),
+            effectiveTargetIds:   new Set(['u1']),
+            rubricAssociationId:  'assoc-1',
+            rubricCriterionId:    'crit-1'
+        });
+        const next = await handleCalculatingChanges(sm);
+
+        expect(next).toBe(PL_STATES.SYNCING);
+        expect(sm.getContext().studentsToSync[0].plScore).toBe(2.0);
     });
 });
 
@@ -507,7 +578,7 @@ describe('handleCreatingAssignment', () => {
         expect(hideCall).toBeDefined();
 
         // getAllPages (submission fetch) must be called between create and hide
-        const getAllPagesCallOrder  = apiClient.getAllPages.mock.invocationCallOrder[0];
+        const getAllPagesCallOrder  = apiClient.getAllPages.mock.invocationCallOrder.at(-1);  // submissions fetch (after outcome-link read)
         const putHideCallOrder     = apiClient.put.mock.invocationCallOrder[putCalls.indexOf(hideCall)];
         expect(getAllPagesCallOrder).toBeLessThan(putHideCallOrder);
     });
@@ -558,6 +629,95 @@ describe('handleCreatingAssignment', () => {
         const sm = buildSMAtCreating({ apiClient: makeFailingClient() });
 
         await expect(handleCreatingAssignment(sm)).rejects.toThrow(/Failed to create rubric/);
+        expect(writePLAssignments).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Happy-path client whose calculation_method reads are controlled per test.
+     * @param {Object} opts
+     * @param {string|null} [opts.linkMethod]    - method on the course outcome link (null = outcome not linked)
+     * @param {string|null} [opts.outcomeMethod] - method from /api/v1/outcomes/598 (null = read fails)
+     */
+    function makeCalcClient({ linkMethod = null, outcomeMethod = null } = {}) {
+        const apiClient = makeApiClient();
+        apiClient.getAllPages.mockImplementation(async (url) => url.includes('outcome_group_links')
+            ? (linkMethod ? [{ outcome: { id: 598, calculation_method: linkMethod } }] : [])
+            : [{ id: 'sub-1', user_id: 'u1' }]);
+        apiClient.get.mockImplementation(async (url) => {
+            if (url === '/api/v1/outcomes/598') {
+                if (outcomeMethod === null) throw Object.assign(new Error('HTTP 403'), { statusCode: 403 });
+                return { calculation_method: outcomeMethod };
+            }
+            return { rubric: [{ id: 'crit-1' }] };
+        });
+        return apiClient;
+    }
+
+    const outcomePutCalls = (apiClient) => apiClient.put.mock.calls.filter(([url]) => url === '/api/v1/outcomes/598');
+
+    async function runCreating(apiClient) {
+        const sm = buildSMAtCreating({ apiClient });
+        const promise = handleCreatingAssignment(sm);
+        await vi.runAllTimersAsync();
+        const next = await promise;
+        return { sm, next };
+    }
+
+    test('course outcome link reads latest → skips calculation_method PUT', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: 'latest' });
+
+        await runCreating(apiClient);
+
+        expect(outcomePutCalls(apiClient)).toHaveLength(0);
+        expect(apiClient.get).not.toHaveBeenCalledWith('/api/v1/outcomes/598', expect.anything(), expect.anything());
+        expect(writePLAssignments).toHaveBeenCalled();
+    });
+
+    test('outcome not in course links, /outcomes/:id reads latest → skips PUT', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: null, outcomeMethod: 'latest' });
+
+        await runCreating(apiClient);
+
+        expect(outcomePutCalls(apiClient)).toHaveLength(0);
+        expect(writePLAssignments).toHaveBeenCalled();
+    });
+
+    test('outcome not latest → PUTs calculation_method before creating the assignment', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: 'decaying_average' });
+
+        const { sm } = await runCreating(apiClient);
+
+        const putIdx = apiClient.put.mock.calls.findIndex(([url]) => url === '/api/v1/outcomes/598');
+        expect(putIdx).toBeGreaterThanOrEqual(0);
+        expect(apiClient.put.mock.calls[putIdx][1]).toEqual({ calculation_method: 'latest' });
+        expect(apiClient.put.mock.invocationCallOrder[putIdx]).toBeLessThan(apiClient.post.mock.invocationCallOrder[0]);
+        expect(sm.getContext().calcMethodWarning).toBeUndefined();
+    });
+
+    test('PUT forbidden (district outcome) → continues setup and records calcMethodWarning', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: null, outcomeMethod: null });
+        apiClient.put.mockRejectedValueOnce(Object.assign(new Error('HTTP 403'), { name: 'CanvasApiError', statusCode: 403 }));
+
+        const { sm, next } = await runCreating(apiClient);
+
+        expect(next).toBe(PL_STATES.CHECKING_STUDENTS);
+        expect(apiClient.post).toHaveBeenCalledTimes(2);   // assignment + rubric created
+        expect(writePLAssignments).toHaveBeenCalled();
+        expect(sm.getContext().calcMethodWarning).toMatch(/Couldn't confirm "Algebra" uses Most Recent Score/);
+    });
+
+    test('PUT fails with a non-403 error → throws before anything is created', async () => {
+        readPLAssignments.mockResolvedValue({});
+        const apiClient = makeCalcClient({ linkMethod: 'decaying_average' });
+        apiClient.put.mockRejectedValueOnce(Object.assign(new Error('HTTP 500'), { name: 'CanvasApiError', statusCode: 500 }));
+        const sm = buildSMAtCreating({ apiClient });
+
+        await expect(handleCreatingAssignment(sm)).rejects.toThrow(/HTTP 500/);
+        expect(apiClient.post).not.toHaveBeenCalled();
         expect(writePLAssignments).not.toHaveBeenCalled();
     });
 
@@ -613,7 +773,8 @@ describe('handleSyncing', () => {
         await handleSyncing(sm);
 
         expect(submitRubricAssessmentBatch).toHaveBeenCalledWith(
-            sm.getContext().studentsToSync,
+            // handleSyncing adds a per-student comment field to each batch param
+            sm.getContext().studentsToSync.map(s => expect.objectContaining(s)),
             apiClient,
             expect.objectContaining({ concurrency: 5, maxAttempts: 3 })
         );
@@ -625,6 +786,52 @@ describe('handleSyncing', () => {
 
         const next = await handleSyncing(sm);
         expect(next).toBe(PL_STATES.VERIFYING);
+    });
+
+    test('calls onPushed with pushed (non-failed) students before verification', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({ successCount: 1, errors: [], retryCounts: [] });
+        const onPushed = vi.fn();
+        const sm = buildSMAtSyncing({ onPushed });
+
+        const next = await handleSyncing(sm);
+
+        expect(next).toBe(PL_STATES.VERIFYING);
+        expect(onPushed).toHaveBeenCalledTimes(1);
+        expect(onPushed).toHaveBeenCalledWith(expect.objectContaining({ successCount: 1, pushedUserIds: ['u1'] }));
+    });
+
+    test('records last_synced_note with the pushed score (kept after will_post_note is cleared)', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({ successCount: 1, errors: [], retryCounts: [] });
+        readSyncState.mockResolvedValue({});
+        const sm = buildSMAtSyncing({
+            studentsToSync: [{ userId: 'u1', submissionId: 'sub-1', rubricAssociationId: 'assoc-1',
+                rubricCriterionId: 'crit-1', points: 2, score: 2, plScore: 2, will_post_note: ' retest ' }],
+        });
+
+        await handleSyncing(sm);
+
+        const written = writeSyncState.mock.calls.at(-1)[1]['598']['u1'];
+        expect(written.last_synced_score).toBe(2);
+        expect(written.last_synced_note).toBe('retest');
+        expect(written.will_post_note).toBeNull();
+    });
+
+    test('does not call onPushed when nothing was pushed', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({
+            successCount: 0, errors: [{ userId: 'u1', error: 'timeout' }], retryCounts: []
+        });
+        const onPushed = vi.fn();
+        const sm = buildSMAtSyncing({ onPushed });
+
+        await handleSyncing(sm);
+        expect(onPushed).not.toHaveBeenCalled();
+    });
+
+    test('a throwing onPushed does not break the sync', async () => {
+        submitRubricAssessmentBatch.mockResolvedValue({ successCount: 1, errors: [], retryCounts: [] });
+        const sm = buildSMAtSyncing({ onPushed: () => { throw new Error('boom'); } });
+
+        await expect(handleSyncing(sm)).resolves.toBe(PL_STATES.VERIFYING);
     });
 
     test('batch errors are stored in context', async () => {
@@ -695,107 +902,146 @@ function makeVerifyRollup(userId, score) {
     };
 }
 
-describe('handleVerifying', () => {
+describe('handleVerifying (fast assignment confirm)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
     });
     afterEach(() => vi.useRealTimers());
 
-    test('all scores match → returns COMPLETE with empty verifyMismatches', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.5)) };
-        const sm = buildSMAtVerifying(students, { apiClient });
-
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        const next = await promise;
-
-        expect(next).toBe(PL_STATES.COMPLETE);
-        expect(sm.getContext().verifyMismatches).toHaveLength(0);
-    });
-
-    test('scores match at hundredths (not exact float) → no mismatch', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        // 3.504 rounds to 350 at hundredths, same as 3.5 → should match
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.504)) };
-        const sm = buildSMAtVerifying(students, { apiClient });
-
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        const next = await promise;
-
-        expect(next).toBe(PL_STATES.COMPLETE);
-        expect(sm.getContext().verifyMismatches).toHaveLength(0);
-    });
-
-    test('persistent mismatches → still returns COMPLETE after maxRetries (does not throw)', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        // Canvas always returns a mismatching score
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) };
-        const sm = buildSMAtVerifying(students, { apiClient });
-
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        const next = await promise;
-
-        expect(next).toBe(PL_STATES.COMPLETE);
-        expect(sm.getContext().verifyMismatches).toHaveLength(1);
-        expect(sm.getContext().verifyMismatches[0].userId).toBe('u1');
-        // Should have retried — get called more than once
-        expect(apiClient.get.mock.calls.length).toBeGreaterThan(1);
-    });
-
-    test('mismatches capped: 4 total API calls (1 initial Infinity-reset + 3 retry attempts)', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        const apiClient = { get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) };
-        const sm = buildSMAtVerifying(students, { apiClient });
-
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        await promise;
-
-        // previousMismatchCount starts at Infinity, so call 1 (1 mismatch < Infinity) always
-        // resets attempt to 1. Then calls 2, 3, 4 are the 3 real retry attempts.
-        expect(apiClient.get.mock.calls.length).toBe(4);
-    });
-
-    test('decreasing mismatch count resets retry counter (more than 3 calls made)', async () => {
-        const students = [
-            { userId: 'u1', plScore: 3.5 },
-            { userId: 'u2', plScore: 3.5 }
-        ];
-        // Call 1: both mismatch (2 mismatches)
-        // Call 2: only u1 mismatches (1 mismatch — count decreased → reset attempt to 1)
-        // Calls 3-5: u1 keeps mismatching (3 more attempts before giving up)
-        const apiClient = {
-            get: vi.fn()
-                    .mockResolvedValueOnce({ rollups: [
-                        { links: { user: 'u1' }, scores: [{ links: { outcome: '598' }, score: 1.0 }] },
-                        { links: { user: 'u2' }, scores: [{ links: { outcome: '598' }, score: 1.0 }] }
-                    ]})
-                    .mockResolvedValue(makeVerifyRollup('u1', 1.0))   // u2 now matches (missing from rollup = no entry)
+    /** apiClient whose single-submission GET returns rubric points per user */
+    function makeConfirmClient(pointsByUser) {
+        return {
+            get: vi.fn(async (url) => {
+                const userId = url.match(/submissions\/([^?]+)/)[1];
+                const points = typeof pointsByUser === 'function' ? pointsByUser(userId) : pointsByUser[userId];
+                return { user_id: userId, score: points, rubric_assessment: { 'crit-1': { points } } };
+            }),
         };
-        const sm = buildSMAtVerifying(students, { apiClient });
+    }
 
-        const promise = handleVerifying(sm);
-        await vi.runAllTimersAsync();
-        await promise;
+    const confirmCtx = { assignmentId: 'asgn-1', rubricCriterionId: 'crit-1' };
 
-        // Without reset: would be 3 calls. With reset after call 2: at least 4 calls.
-        expect(apiClient.get.mock.calls.length).toBeGreaterThan(3);
+    test('rubric points match on the first read → COMPLETE, nothing persisted', async () => {
+        const apiClient = makeConfirmClient({ u1: 3.5 });
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3.5 }], { apiClient, ...confirmCtx });
+
+        const next = await handleVerifying(sm);
+
+        expect(next).toBe(PL_STATES.COMPLETE);
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        expect(apiClient.get).toHaveBeenCalledTimes(1);
+        expect(apiClient.get.mock.calls[0][0])
+            .toBe('/api/v1/courses/100/assignments/asgn-1/submissions/u1?include[]=rubric_assessment');
+        expect(writeSyncState).not.toHaveBeenCalled();   // last_verify_at belongs to the outcome check
     });
 
-    test('missing rollup score for a student counts as mismatch', async () => {
-        const students = [{ userId: 'u1', plScore: 3.5 }];
-        // Canvas returns no rollup at all for u1
-        const apiClient = { get: vi.fn().mockResolvedValue({ rollups: [] }) };
-        const sm = buildSMAtVerifying(students, { apiClient });
+    test('points equal at hundredths count as a match', async () => {
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3.5 }],
+            { apiClient: makeConfirmClient({ u1: 3.504 }), ...confirmCtx });
+        await handleVerifying(sm);
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+    });
+
+    test('only unconfirmed students are re-read on later polls', async () => {
+        let reads = 0;
+        const apiClient = makeConfirmClient((uid) => (uid === 'u2' && ++reads < 2 ? 1 : 3));
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3 }, { userId: 'u2', plScore: 3 }],
+            { apiClient, ...confirmCtx });
 
         const promise = handleVerifying(sm);
         await vi.runAllTimersAsync();
         await promise;
 
-        expect(sm.getContext().verifyMismatches).toHaveLength(1);
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        const urls = apiClient.get.mock.calls.map(c => c[0]);
+        expect(urls.filter(u => u.includes('/submissions/u1'))).toHaveLength(1);
+        expect(urls.filter(u => u.includes('/submissions/u2'))).toHaveLength(2);
+    });
+
+    test('never confirmed → gives up after the confirm delays and persists verify_mismatch', async () => {
+        readSyncState.mockResolvedValue({});
+        const apiClient = makeConfirmClient({ u1: 1 });
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 3.5 }], { apiClient, ...confirmCtx });
+        const start = Date.now();
+
+        const promise = handleVerifying(sm);
+        await vi.runAllTimersAsync();
+        await promise;
+
+        expect(sm.getContext().verifyMismatches.map(s => s.userId)).toEqual(['u1']);
+        expect(Date.now() - start).toBe(CONFIRM_POLL_DELAYS_MS.reduce((a, b) => a + b, 0));
+        expect(apiClient.get).toHaveBeenCalledTimes(CONFIRM_POLL_DELAYS_MS.length + 1);
+        expect(writeSyncState.mock.calls.at(-1)[1]['598'].u1).toEqual({ verify_mismatch: true });
+    });
+
+    test('a failed read counts as not yet confirmed (no throw)', async () => {
+        const apiClient = { get: vi.fn().mockRejectedValueOnce(new Error('503'))
+            .mockResolvedValue({ rubric_assessment: { 'crit-1': { points: 2 } } }) };
+        const sm = buildSMAtVerifying([{ userId: 'u1', plScore: 2 }], { apiClient, ...confirmCtx });
+
+        const promise = handleVerifying(sm);
+        await vi.runAllTimersAsync();
+        await promise;
+
+        expect(sm.getContext().verifyMismatches).toHaveLength(0);
+        expect(apiClient.get).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('verifyOutcomeRollups (background outcome check)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.useFakeTimers();
+        clearCourseRollupReuse();
+        readSyncState.mockResolvedValue({});
+    });
+    afterEach(() => vi.useRealTimers());
+
+    test('rollup matches → records last_verify_at without a mismatch', async () => {
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 3.5)) });
+
+        const promise = verifyOutcomeRollups({ courseId: '100', outcomeId: '598', expected: { u1: 3.5 }, apiClient });
+        await vi.runAllTimersAsync();
+        const { mismatchIds, verifiedAt } = await promise;
+
+        expect(mismatchIds).toEqual([]);
+        const written = writeSyncState.mock.calls.at(-1)[1]['598'].u1;
+        expect(written).toEqual({ last_verify_at: verifiedAt, verify_mismatch: false });
+        expect(apiClient.get.mock.calls[0][0]).toContain('/outcome_rollups?include[]=outcomes&include[]=users');
+    });
+
+    test('first polls are 1 s apart; onProgress reports rows as they confirm', async () => {
+        const get = vi.fn()
+            .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
+            .mockResolvedValueOnce(makeVerifyRollup('u1', 1.0))
+            .mockResolvedValue(makeVerifyRollup('u1', 3.5));
+        const apiClient = withResponse({ get });
+        const onProgress = vi.fn();
+
+        const promise = verifyOutcomeRollups({ courseId: '100', outcomeId: '598', expected: { u1: 3.5 }, apiClient, onProgress });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(get).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(get).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(get).toHaveBeenCalledTimes(3);
+        await vi.runAllTimersAsync();
+        await promise;
+
+        expect(onProgress).toHaveBeenCalledWith(['u1']);
+    });
+
+    test('never matches → gives up after ~4 minutes and records verify_mismatch', async () => {
+        const apiClient = withResponse({ get: vi.fn().mockResolvedValue(makeVerifyRollup('u1', 1.0)) });
+        const start = Date.now();
+
+        const promise = verifyOutcomeRollups({ courseId: '100', outcomeId: '598', expected: { u1: 3.5 }, apiClient });
+        await vi.runAllTimersAsync();
+        const { mismatchIds } = await promise;
+
+        expect(Date.now() - start).toBeGreaterThanOrEqual(VERIFY_NO_PROGRESS_LIMIT_MS);
+        expect(mismatchIds).toEqual(['u1']);
+        expect(writeSyncState.mock.calls.at(-1)[1]['598'].u1.verify_mismatch).toBe(true);
     });
 });

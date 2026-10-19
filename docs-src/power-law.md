@@ -32,7 +32,7 @@ ln(y) = ln(a) + b·ln(x)
 
 This converts the power-law fit into a standard linear regression problem on the log-logged data, making it solvable with the standard formulas for slope and intercept.
 
-**Prediction:** Once `a` and `b` are determined from the score history, the next score is predicted by evaluating `a · (n+1)^b`, where `n` is the number of existing scores.
+**Marzano score:** Once `a` and `b` are determined from the score history, the student's current true score is the curve evaluated at the **current attempt**, `a · n^b`, where `n` is the number of existing scores. It is **not** a forecast of the next attempt (`n+1`).
 
 ---
 
@@ -41,8 +41,8 @@ This converts the power-law fit into a standard linear regression problem on the
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MIN_SCORES` | `3` | Minimum attempts required to run Power Law. Fewer → `NE` status. |
-| `MAX_SCORE` | `4` | Upper clamp on predictions |
-| `MIN_SCORE` | `1` | Lower clamp on predictions |
+| `MAX_SCORE` | `4` | Upper clamp on the Marzano score |
+| `MIN_SCORE` | `0` | Lower clamp on the Marzano score — matches the rating scale (0 = No Evidence) |
 | `DECAYING_AVG_WEIGHT` | `0.65` | Default weight applied to each new score in `decayingAverage` |
 
 ---
@@ -51,19 +51,19 @@ This converts the power-law fit into a standard linear regression problem on the
 
 ### `powerLawPredict(scores)` → `number|null`
 
-Predicts the student's next score using the Power Law regression.
+Returns the student's Marzano score: the Power Law curve evaluated at the current attempt `n`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `scores` | `number[]` | Rubric criterion scores in **chronological order, oldest first** |
 
-Returns the predicted score clamped to `[MIN_SCORE, MAX_SCORE]`, or `null` if `scores.length < MIN_SCORES`.
+Returns the score clamped to `[MIN_SCORE, MAX_SCORE]` (0–4), or `null` if `scores.length < MIN_SCORES`.
 
 **Implementation steps:**
 
 1. Map `x = [1, 2, ..., n]` and `y = scores` to log space: `lnX[i] = ln(i+1)`, `lnY[i] = ln(max(score, 0.01))`
 2. Compute OLS regression coefficients `b` (slope) and `a = exp(intercept)`
-3. Predict at `n+1`: `clamp(a · (n+1)^b, MIN_SCORE, MAX_SCORE)`
+3. Evaluate at the current attempt `n`: `clamp(a · n^b, MIN_SCORE, MAX_SCORE)`
 
 The `max(y, 0.01)` guard prevents `ln(0)` for zero scores.
 
@@ -176,7 +176,8 @@ Returns:
 ## Gotchas
 
 - **Input order is the caller's responsibility** — `powerLaw.js` trusts that scores are chronological, oldest first. Passing scores in the wrong order produces a valid but incorrect regression. The caller (`outcomesDataService`) is responsible for sorting by attempt timestamp before calling.
-- **`MIN_SCORE = 1` clamp, not 0** — A predicted score below 1.0 is clamped to 1.0, not 0. This reflects the Marzano scale (0 = "Not Attempted", 1 = "Beginning"). Scores below 1 in raw Canvas rubric data should be treated as 0.01 for regression purposes to avoid `ln(0)`.
+- **`MIN_SCORE = 0` clamp** — Scores are clamped to `[0, 4]`, the full rating scale. A history ending in 0 can produce a Marzano score below 1 (e.g. `[2.5, 2, 3, 0]` → ≈ 0.11, shown as 0.00 after `roundToHalf`); it is no longer raised to 1.0. Zero scores are still treated as 0.01 inside the regression to avoid `ln(0)`.
+- **Evaluated at `n`, not `n+1`** — `powerLawPredict` estimates where the student is now (the curve at the last attempt), not a forecast of their next attempt.
 - **`roundToHalf` at sync time** — The Will Post value shown in the UI and sent to Canvas is `roundToHalf(plPrediction)`. The raw `plPrediction` in the cache is the unrounded float. If you compare cached values to Canvas values you may see rounding differences; use `scoresMatch()` from `plOutlookSyncStatus.js` for comparison.
 - **Degenerate regression** — If all log-x values are identical (impossible with 1-based indexing and ≥3 scores, but guarded by `Math.abs(denom) < 1e-9`), both `powerLawPredict` and `powerLawSlope` return `null` rather than producing an infinity or NaN.
 - **`decayingAverage` is seeded by the first score** — The first score is returned as-is (no weighting). For a student with exactly one score, `decayingAverage([3])` returns `3`, not `0.65 × 3 = 1.95`.

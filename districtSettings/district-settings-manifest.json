@@ -1,0 +1,5 @@
+{
+  "version": "2026.08.26-1",
+  "url": "https://raw.githubusercontent.com/MOREnet-Canvas/CustomizedGradebook/main/districtSettings/districtSettings.html",
+  "notes": "Initial release: per-key lock model (toggle + padlock), Files API storage with visibility_level: institution."
+}

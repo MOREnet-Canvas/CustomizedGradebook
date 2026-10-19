@@ -22,6 +22,31 @@ import { getAllEnrollmentIds } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
 import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
 import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
+import { fetchCourseRollupsForVerify, verifyPollDelayMs, VERIFY_NO_PROGRESS_LIMIT_MS } from './masteryOutlookDataService.js';
+import { rowsAwaitingOutcome, notifySaveStatus } from './masteryOutlookState.js';
+
+/**
+ * Replace one outcome's score in an outcome_rollups response with scores that
+ * were just pushed to Canvas, so averages don't depend on Canvas having
+ * finished recalculating the rollup. Mutates and returns `rollupResponse`.
+ *
+ * @param {Object} rollupResponse - { rollups: [{ links: { user }, scores: [{ score, links: { outcome } }] }] }
+ * @param {string|number} outcomeId
+ * @param {Object} pushedScores   - { [userId]: score }
+ * @returns {Object} rollupResponse
+ */
+export function applyPushedScoresToRollups(rollupResponse, outcomeId, pushedScores = {}) {
+    const oId = String(outcomeId);
+    for (const rollup of (rollupResponse?.rollups ?? [])) {
+        const pushed = pushedScores[String(rollup.links?.user)];
+        if (pushed == null) continue;
+        rollup.scores = rollup.scores ?? [];
+        const existing = rollup.scores.find(s => String(s.links?.outcome) === oId);
+        if (existing) existing.score = pushed;
+        else rollup.scores.push({ score: pushed, links: { outcome: oId } });
+    }
+    return rollupResponse;
+}
 
 /**
  * Update the Current Score (avg) assignment for students whose Marzano score
@@ -36,12 +61,14 @@ import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './maste
  * @param {string}   opts.outcomeName  - Used to prefix the comment
  * @param {string[]} opts.studentIds   - Students whose scores were updated
  * @param {Object}   opts.notes        - Map of { [studentId]: noteText }
+ * @param {Object}   [opts.pushedScores] - { [studentId]: score } just pushed for outcomeId; used in
+ *                                         place of the (possibly not yet updated) Canvas rollup score
  * @param {Object}   opts.cache        - In-memory Mastery Outlook cache
  * @param {Object}   opts.apiClient
  * @returns {Promise<boolean>}
  */
 export async function updateAvgAssignmentForStudents({
-    courseId, outcomeId, outcomeName, studentIds, notes = {}, cache, apiClient
+    courseId, outcomeId, outcomeName, studentIds, notes = {}, pushedScores = {}, cache, apiClient
 }) {
     if (!studentIds?.length) return false;
 
@@ -63,25 +90,27 @@ export async function updateAvgAssignmentForStudents({
             return false;
         }
 
-        // Step 2: Fetch fresh rollup for all students — outcome_rollups does not support
-        // user_ids[] filtering (returns 400); JS filtering against studentIds below.
-        const rollupResponse = await apiClient.get(
-            `/api/v1/courses/${courseId}/outcome_rollups`
-                + `?include[]=outcomes&include[]=users&per_page=100`,
-            {},
-            'MOAvgService:fetchRollup'
-        );
+        // Step 2: Fetch the course-wide rollup (shared with the override verify poll).
+        // outcome_rollups does not support user_ids[] filtering (returns 400); the
+        // averages are filtered to studentIds below. Cloned because the shared
+        // result is read-only and the pushed scores are substituted in place.
+        const rollupResponse = structuredClone(await fetchCourseRollupsForVerify(courseId, apiClient));
 
         if (!rollupResponse?.rollups?.length) {
             logger.warn('[MOAvgService] No rollup data for affected students');
             return false;
         }
 
+        // Canvas may not have recalculated the rollup yet — use the scores we just pushed
+        applyPushedScoresToRollups(rollupResponse, outcomeId, pushedScores);
+
         // Step 3: Calculate new averages — only students whose avg changed are returned.
-        // Students with no avg change get no call; notes-only handling is a future prompt.
-        const averages = await calculateStudentAverages(
+        // Limited to the students just saved: other students' Current Scores are not
+        // touched by this save (and may depend on scores still settling in Canvas).
+        const savedIds = new Set(studentIds.map(String));
+        const averages = (await calculateStudentAverages(
             rollupResponse, avg_outcome_id, courseId, apiClient
-        );
+        )).filter(a => savedIds.has(String(a.userId)));
 
         if (!averages.length) {
             logger.info('[MOAvgService] No avg updates needed');
@@ -114,9 +143,9 @@ export async function updateAvgAssignmentForStudents({
 
             const enrollmentId = enrollmentMap.get(String(userId));
             const noteText     = notes[String(userId)];
-            // Use will_post if set (teacher override) otherwise fall back to plPrediction
+            // Prefer the score actually pushed, then will_post (teacher override), then plPrediction
             const syncEntry  = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(userId)] ?? {};
-            const plScore    = syncEntry.will_post ?? plScoreByUserId.get(userId);
+            const plScore    = pushedScores[String(userId)] ?? syncEntry.will_post ?? plScoreByUserId.get(String(userId));
             const plScoreStr = plScore != null ? Number(plScore).toFixed(2) : '—';
             const avgStr       = Number(average).toFixed(2);
 
@@ -204,93 +233,32 @@ export async function updateAvgAssignmentForStudents({
                 logger.warn('[MOAvgService] Mastery refresh failed (non-critical):', err.message);
             }
 
-            // Step 8: Verify avg scores were accepted by Canvas — no-progress-in-10-polls loop.
-            // Never throws; a failure here does not block COMPLETE.
-            try {
-                const noProgressLimit = 50;
-                const retryDelayMs    = 5000;
-                const verifyUserIds   = averages.map(a => String(a.userId));
-                const expectedByUser  = new Map(averages.map(a => [String(a.userId), a.average]));
+            // Step 8: Verify avg scores were accepted by Canvas — in the background.
+            // Not awaited: the save queue only waits for the push above. Step 8 reads
+            // the shared rollups and records avg_verify_* via the merge-safe writer.
+            // Current Score rows show ⏳ until Canvas's Current Score outcome matches.
+            const failedIds = new Set((result.errors ?? []).map(e => String(e.userId)));
+            const pushedAverages = averages.filter(a => !failedIds.has(String(a.userId)));
+            const avgKey = uid => `${avg_outcome_id}_${uid}`;
+            const expectedAvg = new Map(pushedAverages.map(a => [String(a.userId), a.average]));
+            pushedAverages.forEach(a => rowsAwaitingOutcome.add(avgKey(a.userId)));
+            notifySaveStatus(avg_outcome_id);
 
-                let avgMismatches    = [];
-                let lastMismatchCount = Infinity;
-                let noProgressCount  = 0;
-                let attempt          = 1;
-
-                while (true) {
-                    logger.debug(`[MOAvgService] Step 8 avg verify poll ${attempt} (noProgressCount=${noProgressCount})`);
-                    // outcome_rollups does not support user_ids[] (400) — fetch all, filter in JS.
-                    const verifyResponse = await apiClient.get(
-                        `/api/v1/courses/${courseId}/outcome_rollups`
-                            + `?outcome_ids[]=${avg_outcome_id}&include[]=outcomes&include[]=users`
-                            + `&per_page=100`,
-                        {},
-                        'MOAvgService:verifyAvgRollup'
-                    );
-                    const verifyRollups = verifyResponse?.rollups || [];
-
-                    const actualAvg = new Map();
-                    verifyRollups.forEach(rollup => {
-                        const uid = String(rollup.links?.user);
-                        if (!verifyUserIds.includes(uid)) return;
-                        const score = rollup.scores?.find(
-                            s => String(s.links?.outcome) === String(avg_outcome_id)
-                        )?.score;
-                        if (score !== undefined) actualAvg.set(uid, score);
-                    });
-
-                    avgMismatches = verifyUserIds.filter(uid => {
-                        const actual   = actualAvg.get(uid);
-                        const expected = expectedByUser.get(uid);
-                        return actual === undefined || Math.abs(actual - expected) >= 0.005;
-                    });
-
-                    if (avgMismatches.length === 0) {
-                        logger.info(`[MOAvgService] Avg scores verified on poll ${attempt}`);
-                        break;
+            verifyAvgScores({
+                courseId, apiClient, avgOutcomeId: avg_outcome_id, averages: pushedAverages,
+                onProgress: (confirmedIds) => {
+                    for (const uid of confirmedIds) {
+                        rowsAwaitingOutcome.delete(avgKey(uid));
+                        setInMemoryCanvasScore(cache, avg_outcome_id, uid, expectedAvg.get(String(uid)));
                     }
-
-                    if (avgMismatches.length < lastMismatchCount) {
-                        lastMismatchCount = avgMismatches.length;
-                        noProgressCount   = 0;
-                    } else {
-                        noProgressCount++;
-                    }
-
-                    if (noProgressCount >= noProgressLimit) {
-                        logger.warn(
-                            `[MOAvgService] ${avgMismatches.length} avg mismatch(es) — no progress for `
-                            + `${noProgressLimit} polls, giving up. `
-                            + 'There was an issue verifying all grades were updated. Try checking back in a few minutes — '
-                            + 'if grades show as synced, run the Current Score (avg) update from the Learning Mastery Gradebook '
-                            + 'to ensure averages are updated. If students still show as not synced after 15+ minutes, '
-                            + 're-run the Mastery Outlook sync.'
-                        );
-                        break;
-                    }
-
-                    attempt++;
-                    await new Promise(r => setTimeout(r, retryDelayMs));
-                }
-
-                // Persist avg_verify_at / avg_verify_mismatch so status survives reload
-                const syncState = await readSyncState(courseId, apiClient);
-                const oId       = String(avg_outcome_id);
-                if (!syncState[oId]) syncState[oId] = {};
-                const mismatchSet = new Set(avgMismatches);
-                const verifyAt    = new Date().toISOString();
-                for (const uid of verifyUserIds) {
-                    syncState[oId][uid] = {
-                        ...(syncState[oId][uid] ?? {}),
-                        avg_verify_at:       verifyAt,
-                        avg_verify_mismatch: mismatchSet.has(uid),
-                    };
-                }
-                await writeSyncState(courseId, syncState, apiClient);
-                logger.debug(`[MOAvgService] avg verify results persisted for ${verifyUserIds.length} student(s)`);
-            } catch (err) {
-                logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message);
-            }
+                    notifySaveStatus(avg_outcome_id);
+                },
+            })
+                .catch(err => logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message))
+                .finally(() => {
+                    pushedAverages.forEach(a => rowsAwaitingOutcome.delete(avgKey(a.userId)));
+                    notifySaveStatus(avg_outcome_id);
+                });
         }
 
         return result.errors.length === 0;
@@ -299,6 +267,112 @@ export async function updateAvgAssignmentForStudents({
         logger.error('[MOAvgService] Avg update failed (non-critical):', err.message);
         return false;
     }
+}
+
+/**
+ * Set one student's in-memory Canvas score for an outcome (e.g. the confirmed
+ * Current Score) so the row shows the new value without a refresh.
+ *
+ * @param {Object} cache - in-memory Mastery Outlook cache
+ * @param {string|number} outcomeId
+ * @param {string|number} userId
+ * @param {number|undefined} score
+ */
+function setInMemoryCanvasScore(cache, outcomeId, userId, score) {
+    if (score == null) return;
+    const od = cache?.students?.find(s => String(s.id) === String(userId))
+        ?.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
+    if (od) od.canvasScore = score;
+}
+
+/**
+ * Step 8 of the Current Score update: poll the shared course-wide rollups until
+ * Canvas shows the expected Current Score for each student, then record
+ * avg_verify_at / avg_verify_mismatch in sync_state so the status survives reload.
+ * Same poll timing as the override verify. Runs in the background after the push.
+ *
+ * @param {Object} opts
+ * @param {string|number} opts.courseId
+ * @param {Object}        opts.apiClient
+ * @param {string|number} opts.avgOutcomeId - Current Score outcome ID
+ * @param {Array<{userId: string|number, average: number}>} opts.averages - expected scores
+ * @param {Function}      [opts.onProgress] - (confirmedUserIds: string[]) => void, as students confirm
+ * @returns {Promise<string[]>} user IDs that still didn't match when polling stopped
+ */
+export async function verifyAvgScores({ courseId, apiClient, avgOutcomeId, averages, onProgress = null }) {
+    const verifyUserIds   = averages.map(a => String(a.userId));
+    const expectedByUser  = new Map(averages.map(a => [String(a.userId), a.average]));
+
+    let avgMismatches     = [...verifyUserIds];
+    let lastMismatchCount = Infinity;
+    let lastProgressAt    = Date.now();
+    let attempt           = 1;
+
+    while (true) {
+        logger.debug(`[MOAvgService] Step 8 avg verify poll ${attempt}`);
+        const { rollups: verifyRollups } = await fetchCourseRollupsForVerify(courseId, apiClient);
+
+        const actualAvg = new Map();
+        verifyRollups.forEach(rollup => {
+            const uid = String(rollup.links?.user);
+            if (!verifyUserIds.includes(uid)) return;
+            const score = rollup.scores?.find(
+                s => String(s.links?.outcome) === String(avgOutcomeId)
+            )?.score;
+            if (score !== undefined) actualAvg.set(uid, score);
+        });
+
+        const before = avgMismatches;
+        avgMismatches = verifyUserIds.filter(uid => {
+            const actual   = actualAvg.get(uid);
+            const expected = expectedByUser.get(uid);
+            return actual === undefined || Math.abs(actual - expected) >= 0.005;
+        });
+        const newlyConfirmed = before.filter(uid => !avgMismatches.includes(uid));
+        if (newlyConfirmed.length > 0) onProgress?.(newlyConfirmed);
+
+        if (avgMismatches.length === 0) {
+            logger.info(`[MOAvgService] Avg scores verified on poll ${attempt}`);
+            break;
+        }
+
+        if (avgMismatches.length < lastMismatchCount) {
+            lastMismatchCount = avgMismatches.length;
+            lastProgressAt    = Date.now();
+        } else if (Date.now() - lastProgressAt >= VERIFY_NO_PROGRESS_LIMIT_MS) {
+            logger.warn(
+                `[MOAvgService] ${avgMismatches.length} avg mismatch(es) — no progress for `
+                + `${VERIFY_NO_PROGRESS_LIMIT_MS / 1000}s, giving up. `
+                + 'There was an issue verifying all grades were updated. Try checking back in a few minutes — '
+                + 'if grades show as synced, run the Current Score (avg) update from the Learning Mastery Gradebook '
+                + 'to ensure averages are updated. If students still show as not synced after 15+ minutes, '
+                + 're-run the Mastery Outlook sync.'
+            );
+            break;
+        }
+
+        const delayMs = verifyPollDelayMs(attempt);
+        attempt++;
+        await new Promise(r => setTimeout(r, delayMs));
+    }
+
+    // Persist avg_verify_at / avg_verify_mismatch so status survives reload
+    const syncState = await readSyncState(courseId, apiClient);
+    const oId       = String(avgOutcomeId);
+    if (!syncState[oId]) syncState[oId] = {};
+    const mismatchSet = new Set(avgMismatches);
+    const verifyAt    = new Date().toISOString();
+    for (const uid of verifyUserIds) {
+        syncState[oId][uid] = {
+            ...(syncState[oId][uid] ?? {}),
+            avg_verify_at:       verifyAt,
+            avg_verify_mismatch: mismatchSet.has(uid),
+        };
+    }
+    await writeSyncState(courseId, syncState, apiClient);
+    logger.debug(`[MOAvgService] avg verify results persisted for ${verifyUserIds.length} student(s)`);
+
+    return avgMismatches;
 }
 
 /**

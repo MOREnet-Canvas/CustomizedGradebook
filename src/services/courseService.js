@@ -63,3 +63,23 @@ export async function enableCourseGradingScheme(courseId, apiClient) {
     }
 }
 
+/**
+ * Fetch the course name from the Canvas API
+ *
+ * Use this instead of scraping document.title — on pages like SpeedGrader the
+ * title is the student/assignment, not the course.
+ *
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<string|null>} Course name, or null if unavailable
+ */
+export async function fetchCourseName(courseId, apiClient) {
+    try {
+        const course = await apiClient.get(`/api/v1/courses/${courseId}`, {}, 'fetchCourseName');
+        return course?.name || null;
+    } catch (error) {
+        logger.warn(`[CourseService] Could not fetch course name for ${courseId}:`, error.message);
+        return null;
+    }
+}
+

@@ -23,70 +23,30 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { roundToHalf } from './powerLaw.js';
 import { mountOutcomeRow, isOutcomeInitialized } from './outcomeRow.js';
-import { scoresMatch } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, describeOverrideException } from './plOutlookSyncStatus.js';
 import { fetchOutcomeNames, fetchOutcomeRollups } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
-import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
+import {
+    isCurrentScoreOutcome, isSpecialOutcome, isRegularOutcome, orderOutcomesForPage
+} from './outcomeTypes.js';
 
-// ─── Outcome Type Helpers ────────────────────────────────────────────────────
+// Outcome type helpers live in outcomeTypes.js; re-exported for existing importers.
+export { isCurrentScoreOutcome, isRegularOutcome };
 
 /**
- * Check if an outcome title matches the configured Current Score outcome name.
+ * Compute class stats for the Current Score row from each student's Current
+ * Score as reported by Canvas — consistent with the other rows' Canvas averages.
  *
- * @param {string} title - Outcome title to test
- * @returns {boolean} true if the title equals `AVG_OUTCOME_NAME`
+ * @param {Object} cache
+ * @param {number} threshold
+ * @param {string|number} currentScoreOutcomeId
+ * @returns {Object} classStats
  */
-export function isCurrentScoreOutcome(title) {
-    return title === AVG_OUTCOME_NAME;
-}
-
-function isExcludedOutcome(title) {
-    return EXCLUDED_OUTCOME_KEYWORDS.some(kw => title.includes(kw));
-}
-
-function isSpecialOutcome(title) {
-    return isCurrentScoreOutcome(title) || isExcludedOutcome(title);
-}
-
-/**
- * Check whether an outcome is a regular (gradable) outcome.
- * Returns false for the Current Score outcome and any excluded-keyword outcomes.
- *
- * @param {{ title: string }} outcome - Outcome object with a title property
- * @returns {boolean} true if the outcome should be included in Power Law calculations
- */
-export function isRegularOutcome(outcome) {
-    return !isSpecialOutcome(outcome.title);
-}
-
-/**
- * Calculate a student's PL Avg from their regular outcome PL Predictions.
- * Used for Current Score outcome rendering.
- */
-function calculateStudentPLAvg(student, cache) {
-    const regularOutcomes = cache.outcomes.filter(o => isRegularOutcome(o));
-
-    const plPredictions = student.outcomes
-        .filter(so => {
-            const outcome = regularOutcomes.find(ro => String(ro.id) === String(so.outcomeId));
-            return outcome && so.plPrediction !== null;
-        })
-        .map(so => so.plPrediction);
-
-    if (plPredictions.length === 0) return null;
-
-    return plPredictions.reduce((sum, p) => sum + p, 0) / plPredictions.length;
-}
-
-/**
- * Compute class stats for Current Score outcome based on student PL Avgs
- * (the average of each student's regular outcome PL Predictions).
- */
-function computeCurrentScoreClassStats(cache, threshold) {
+export function computeCurrentScoreClassStats(cache, threshold, currentScoreOutcomeId) {
     const studentPLAvgs = cache.students
-        .map(student => calculateStudentPLAvg(student, cache))
-        .filter(v => v !== null);
+        .map(student => student.outcomes?.find(o => String(o.outcomeId) === String(currentScoreOutcomeId))?.canvasScore)
+        .filter(v => v !== null && v !== undefined);
 
     if (studentPLAvgs.length === 0) {
         return {
@@ -136,7 +96,7 @@ export function initOutcomeSyncContainer(containerEl) {
         <div id="od-col-headers" class="od-col-headers">
             <div class="od-col-header">#</div>
             <div class="od-col-header">Outcome</div>
-            <div class="od-col-header center">PL avg</div>
+            <div class="od-col-header center">Canvas avg</div>
             <div class="od-col-header center">Spread</div>
             <div class="od-col-header center">Below threshold</div>
             <div class="od-col-header center">Canvas sync</div>
@@ -158,13 +118,12 @@ function renderCourseSyncStrip(cache) {
     if (!stripEl) return;
 
     const syncState   = cache.sync_state ?? {};
+    const plConfig    = { pl_assignments: cache.pl_assignments ?? {}, sync_state: syncState };
     const regular     = (cache.outcomes || []).filter(o => isRegularOutcome(o));
     const initialized = regular.filter(o => isOutcomeInitialized(o, cache));
 
-    // Use the same scoresMatch-based logic as the per-outcome sync chip so
-    // these strip totals always agree with what each chip displays.
-    // (aggregateSyncStatus requires last_synced_score != null to classify
-    // a student as 'synced', which diverges from the chip's needsCount logic.)
+    // Student counts use the same rules as the per-outcome sync chip so the
+    // strip totals always agree with what each chip displays.
     const totals = { synced: 0, needsSync: 0, override: 0 };
     for (const o of initialized) {
         const oId = String(o.id);
@@ -174,37 +133,33 @@ function renderCourseSyncStrip(cache) {
             const od = student.outcomes?.find(s => String(s.outcomeId) === oId);
             if (!od) continue;
 
-            const syncEntry       = (syncState[oId] ?? {})[String(student.id)] ?? {};
-            const marzano         = od.plPrediction;
-            const canvas          = od.canvasScore;
+            const syncEntry = (syncState[oId] ?? {})[String(student.id)] ?? {};
+            const canvas    = od.canvasScore ?? null;
 
-            // Override priority (mirrors getSyncStatus order)
-            if (syncEntry.manual_override) { overrideCount++; continue; }
-            const lastSyncedScore = syncEntry.last_synced_score ?? null;
-            if (lastSyncedScore !== null && canvas !== null
-                && !scoresMatch(canvas, lastSyncedScore)) {
-                overrideCount++;
-                continue;
-            }
+            // Flags mirror the chip: manual / possible override count, a save that
+            // is still verifying does not.
+            const { status } = getSyncStatus(student.id, oId, od.plPrediction, canvas, plConfig);
+            if (status === 'manual_override' || status === 'possible_override') { overrideCount++; continue; }
 
-            // Skip NE students and those without a Canvas score
-            if (marzano === null || marzano === undefined) continue;
-            if (canvas  === null) continue;
-
-            activeCount++;
             const willPost      = syncEntry.will_post ?? null;
             const pendingNote   = syncEntry.will_post_note ?? null;
             const lastSubmitted = syncEntry.will_post_note_last_submitted ?? null;
             const noteIsPending = pendingNote !== null && pendingNote !== lastSubmitted;
 
-            if (!scoresMatch(willPost ?? roundToHalf(marzano), canvas) || noteIsPending) {
+            // Only teacher-set overrides are pushed — no override means not "needs".
+            // An override with nothing in Canvas yet still needs saving (matches the row).
+            if (willPost !== null && (canvas === null || !scoresMatch(willPost, canvas) || noteIsPending)) {
                 needsCount++;
+                continue;
             }
+
+            // Anyone else with a Canvas score is up to date (NE students included).
+            if (canvas !== null) activeCount++;
         }
 
         totals.needsSync += needsCount;
         totals.override  += overrideCount;
-        totals.synced    += (activeCount - needsCount);  // active students that match
+        totals.synced    += activeCount;
     }
 
     const setupX = initialized.length;
@@ -230,7 +185,7 @@ function renderCourseSyncStrip(cache) {
         </div>
         <div class="cs-progress">
             <span class="spinner"></span>
-            <span>Pushing scores to Canvas…</span>
+            <span>Publishing scores to Canvas…</span>
             <div class="ps-bar"><div class="ps-bar-fill"></div></div>
         </div>
     `;
@@ -305,7 +260,7 @@ function buildRefreshPrompt() {
     return `
         <div class="od-refresh-prompt">
             Outcome names loaded from Canvas. Hit
-            <strong>Refresh Data</strong> to calculate Power Law predictions,
+            <strong>Refresh Data</strong> to calculate Marzano Power Law scores,
             class distribution, and intervention flags.
         </div>`;
 }
@@ -330,7 +285,7 @@ function emptySpread() {
  *
  * @param {Object}   cache
  * @param {Object}   opts
- * @param {boolean}  opts.showOverrides   - Include manual_override + locked Will Post rows
+ * @param {boolean}  opts.showOverrides   - Include pending, saved, locked, and manual overrides (describeOverrideException)
  * @param {boolean}  opts.showIgnored     - Include ignored alignment rows
  * @returns {string} HTML string
  */
@@ -353,23 +308,22 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
             for (const [studentId, entry] of Object.entries(studentMap)) {
                 const student = studentById[studentId];
                 if (!student) continue;
-                if (!entry.manual_override && entry.will_post_lock !== 'locked') continue;
+                const ex = describeOverrideException(entry);
+                if (!ex) continue;
 
-                const od         = student.outcomes?.find(o => String(o.outcomeId) === outcomeId);
-                const typeParts  = [];
-                if (entry.manual_override)              typeParts.push('Override');
-                if (entry.will_post_lock === 'locked')  typeParts.push('Locked Override');
+                const od = student.outcomes?.find(o => String(o.outcomeId) === outcomeId);
 
                 rows.push({
                     outcomeName: outcome.title,
                     studentName: student.name || `Student ${studentId}`,
-                    type:        typeParts.join(' + '),
+                    type:        ex.types.join(' + '),
                     typeClass:   'override',
                     canvas:      od?.canvasScore != null ? od.canvasScore.toFixed(2) : '—',
                     marzano:     od?.plPrediction != null ? roundToHalf(od.plPrediction).toFixed(2) : 'NE',
-                    willPost:    entry.will_post != null ? entry.will_post.toFixed(2) : '—',
-                    note:        entry.will_post_note ?? '',
-                    date:        entry.override_at ?? entry.last_synced_at ?? '',
+                    recent:      od?.mostRecent != null ? Number(od.mostRecent).toFixed(2) : '—',
+                    willPost:    ex.score != null ? ex.score.toFixed(2) : '—',
+                    note:        ex.note,
+                    date:        ex.date ?? '',
                 });
             }
         }
@@ -388,6 +342,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
                 typeClass:   'ignored',
                 canvas:      '—',
                 marzano:     '—',
+                recent:      '—',
                 willPost:    '—',
                 note:        ia.reason ?? '',
                 date:        ia.ignored_at ?? '',
@@ -409,6 +364,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
             <td><span class="od-ex-pill ${pillClass}">${escapeHtml(r.type)}</span></td>
             <td class="od-center">${r.canvas}</td>
             <td class="od-center">${r.marzano}</td>
+            <td class="od-center">${r.recent}</td>
             <td class="od-center">${r.willPost}</td>
             <td><div class="od-note-clip">${escapeHtml(r.note)}</div></td>
             <td class="od-date od-nowrap">${dateDisp}</td>
@@ -422,6 +378,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
             <th>Type</th>
             <th class="od-center">Canvas</th>
             <th class="od-center">Marzano</th>
+            <th class="od-center">Most recent</th>
             <th class="od-center">Override</th>
             <th>Note</th>
             <th>Date</th>
@@ -476,36 +433,16 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
 
         const threshold = ctx.getThreshold();
 
-        // Sort outcomes: Current Score → Excluded → Regular
-        const currentScore = cache.outcomes.find(o => isCurrentScoreOutcome(o.title));
-        const excluded = cache.outcomes.filter(o => isExcludedOutcome(o.title) && !isCurrentScoreOutcome(o.title));
-        const regular  = cache.outcomes.filter(o => isRegularOutcome(o));
+        // Current Score → Excluded → Regular (teacher order)
+        const sortedOutcomes = orderOutcomesForPage(cache);
+        const hasRegular     = sortedOutcomes.some(o => !isSpecialOutcome(o.title));
 
-        if (!currentScore) {
+        if (!sortedOutcomes.some(o => isCurrentScoreOutcome(o.title))) {
             const noCurrentScore = document.createElement('div');
             noCurrentScore.className = 'od-no-current-score';
             noCurrentScore.textContent = 'No Current Score found';
             outcomesEl.appendChild(noCurrentScore);
         }
-
-        // Apply persisted custom regular-outcome order. Wiki page stores IDs as
-        // strings; outcome.id from cache is a number — coerce to string.
-        if (cache.meta.customOutcomeOrder && Array.isArray(cache.meta.customOutcomeOrder)) {
-            regular.sort((a, b) => {
-                const indexA = cache.meta.customOutcomeOrder.indexOf(String(a.id));
-                const indexB = cache.meta.customOutcomeOrder.indexOf(String(b.id));
-                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                if (indexA !== -1) return -1;
-                if (indexB !== -1) return 1;
-                return 0;
-            });
-        }
-
-        const sortedOutcomes = [
-            ...(currentScore ? [currentScore] : []),
-            ...excluded,
-            ...regular
-        ];
 
         let regularIndex = 0;
 
@@ -514,7 +451,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
             const displayNumber     = isSpecial ? '' : ++regularIndex;
             const isCurrentScoreRow = isCurrentScoreOutcome(outcome.title);
             const displayStats      = isCurrentScoreRow
-                ? computeCurrentScoreClassStats(cache, threshold)
+                ? computeCurrentScoreClassStats(cache, threshold, outcome.id)
                 : outcome.classStats;
 
             const controller = mountOutcomeRow({
@@ -546,7 +483,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
             // Divider between the last special outcome and the first regular one
             const isLastSpecial = isSpecial &&
                 (i === sortedOutcomes.length - 1 || !isSpecialOutcome(sortedOutcomes[i + 1].title));
-            if (isLastSpecial && regular.length > 0) {
+            if (isLastSpecial && hasRegular) {
                 const divider = document.createElement('div');
                 divider.className = 'od-outcome-divider';
                 outcomesEl.appendChild(divider);

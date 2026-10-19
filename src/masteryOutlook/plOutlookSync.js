@@ -24,6 +24,7 @@ import { PL_STATE_HANDLERS }                from './plOutlookStateHandlers.js';
 import { readMasteryOutlookCache, readPLAssignments, readSyncState } from './masteryOutlookCacheService.js';
 import { aggregateSyncStatus } from './plOutlookSyncStatus.js';
 import { logger } from '../utils/logger.js';
+import { runExclusive } from './masteryOutlookState.js';
 
 // ─── Run a full sync for one outcome ─────────────────────────────────────────
 
@@ -48,14 +49,21 @@ import { logger } from '../utils/logger.js';
  *                   whose in-memory plPrediction differs from the disk cache (e.g. after an
  *                   ignore/recompute without a cache write). handleCalculatingChanges uses these
  *                   values in preference to the stale disk value.
- * @returns {Promise<{ success: boolean, successCount: number, errors: Array, stateHistory: string[] }>}
+ * @param {Function|null} [opts.onPushed=null] - ({ successCount, errors, pushedUserIds }) => void.
+ *                   Called once scores are written to Canvas, before VERIFYING polls, so
+ *                   follow-up work (e.g. the Current Score update) doesn't depend on the
+ *                   teacher staying on the page through verification.
+ * @returns {Promise<{ success: boolean, successCount: number, errors: Array, error: string|null, warning: string|null, verifyMismatchIds: string[], stateHistory: string[] }>}
+ *   error: message of the handler error that moved the flow to ERROR (null on success)
+ *   warning: non-blocking setup warning, e.g. calculation method could not be confirmed
+ *   verifyMismatchIds: student IDs whose Canvas rollup didn't confirm the pushed score
  */
-export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null, canvasScoreOverrides = null, onStudentsResolved = null }) {
+export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, onProgress = null, targetUserIds = null, setupOnly = false, cachedPLEntry = null, plScoreOverrides = null, canvasScoreOverrides = null, onStudentsResolved = null, onPushed = null }) {
     logger.info(`[PLSync] Starting sync — course ${courseId}, outcome ${outcomeId} (${outcomeName})`);
 
     const sm = new PLOutlookStateMachine({
         courseId, outcomeId, outcomeName, apiClient, onProgress,
-        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides, canvasScoreOverrides, onStudentsResolved
+        targetUserIds, setupOnly, cachedPLEntry, plScoreOverrides, canvasScoreOverrides, onStudentsResolved, onPushed
     });
 
     // ── Run loop ──
@@ -104,6 +112,9 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
         success,
         successCount: ctx.successCount || 0,
         errors:       ctx.errors       || [],
+        error:        ctx.error?.message ?? null,
+        warning:      ctx.calcMethodWarning ?? null,
+        verifyMismatchIds: (ctx.verifyMismatches ?? []).map(m => String(m.userId)),
         stateHistory
     };
 }
@@ -126,6 +137,7 @@ export async function runPLSync({ courseId, outcomeId, outcomeName, apiClient, o
  *   total:            number,
  *   synced:           number,
  *   needsSync:        number,
+ *   verifying:        number,
  *   possibleOverride: number,
  *   manualOverride:   number,
  *   ne:               number,
@@ -171,26 +183,29 @@ export async function checkSyncNeeded({ courseId, outcomeId, apiClient }) {
  * @returns {Promise<Object[]>} Array of per-outcome results
  */
 export async function runPLSyncForAllOutcomes({ courseId, apiClient, onProgress = null, onOutcomeDone = null }) {
-    const cache = await readMasteryOutlookCache(courseId, apiClient);
-    if (!cache?.outcomes?.length) {
-        logger.warn('[PLSync] No outcomes in cache — run Refresh Data first');
-        return [];
-    }
+    // One queued job for the whole loop so it never overlaps a teacher's save.
+    return runExclusive(async () => {
+        const cache = await readMasteryOutlookCache(courseId, apiClient);
+        if (!cache?.outcomes?.length) {
+            logger.warn('[PLSync] No outcomes in cache — run Refresh Data first');
+            return [];
+        }
 
-    const results = [];
-    for (const outcome of cache.outcomes) {
-        const result = await runPLSync({
-            courseId,
-            outcomeId:    String(outcome.id),
-            outcomeName:  outcome.name || String(outcome.id),
-            apiClient,
-            onProgress
-        });
-        results.push({ outcomeId: String(outcome.id), outcomeName: outcome.name, ...result });
-        if (onOutcomeDone) onOutcomeDone(String(outcome.id), result);
-    }
+        const results = [];
+        for (const outcome of cache.outcomes) {
+            const result = await runPLSync({
+                courseId,
+                outcomeId:    String(outcome.id),
+                outcomeName:  outcome.name || String(outcome.id),
+                apiClient,
+                onProgress
+            });
+            results.push({ outcomeId: String(outcome.id), outcomeName: outcome.name, ...result });
+            if (onOutcomeDone) onOutcomeDone(String(outcome.id), result);
+        }
 
-    return results;
+        return results;
+    });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
