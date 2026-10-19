@@ -29,7 +29,7 @@ import { initTeacherStudentGradeCustomizer } from "./teacher/teacherStudentGrade
 import { compareDataSourceApproaches } from "./student/allGradesDataSourceTest.js";
 import { clearAllSnapshots, debugSnapshots, validateAllSnapshots, getCourseSnapshot, populateCourseSnapshot } from "./services/courseSnapshotService.js";
 import { getUserRoleGroup, getCourseId } from "./utils/canvas.js";
-import { isDashboardPage, isGradebookPage, isSpeedGraderPage, isTeacherViewingStudentGrades, isCourseSettingsPage } from "./utils/pageDetection.js";
+import { isDashboardPage, isGradebookPage, isLMGBPage, isSpeedGraderPage, isTeacherViewingStudentGrades, isCourseSettingsPage } from "./utils/pageDetection.js";
 import { CanvasApiClient } from "./utils/canvasApiClient.js";
 import { initAdminDashboard } from "./admin/adminDashboard.js";
 import { isAdminDashboardPage } from "./admin/pageDetection.js";
@@ -37,6 +37,8 @@ import { initMasteryDashboardCreation } from "./masteryDashboardCreation/mastery
 import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
 import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
 import { exposeCGDevTools } from "./masteryOutlook/cgDevTools.js";
+import { initLmgbMasteryColors } from "./gradebook/lmgbMasteryColors.js";
+import { ENABLE_LMGB_MASTERY_COLORS } from "./config.js";
 
 /**
  * Main initialization function
@@ -98,6 +100,15 @@ import { exposeCGDevTools } from "./masteryOutlook/cgDevTools.js";
     if (isGradebookPage()) {
         logger.debug('[Init] On gradebook page, initializing gradebook modules');
         injectButtons(); // Always run for all courses
+
+        // LMGB mastery colors (opt-in per district; same LMGB check as the button)
+        if (ENABLE_LMGB_MASTERY_COLORS && isLMGBPage()) {
+            try {
+                initLmgbMasteryColors();
+            } catch (err) {
+                logger.warn('[Init] Failed to initialize LMGB mastery colors:', err);
+            }
+        }
 
         // Async block for Refresh Mastery initialization (standards-based courses only)
         (async () => {
