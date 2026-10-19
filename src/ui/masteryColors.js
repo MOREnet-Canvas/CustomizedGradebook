@@ -89,3 +89,92 @@ export function scoreToneStyle(tone) {
     if (tone === 'ne') return 'background:var(--bg-secondary);color:var(--text-tertiary);';
     return `background:var(--s-${tone});color:var(--s-${tone}-ink);`;
 }
+
+/* ------------------------------------------------------------------
+   Opt-in palettes.
+   Not offered by Mastery Outlook / Mastery View. A district enables one
+   by naming its key in config (e.g. LMGB_MASTERY_SCHEME: 'sedaliaA').
+   Bands use { min, bg, fg, accent, label } — sorted high → low.
+   ------------------------------------------------------------------ */
+
+export const OPT_IN_MASTERY_PALETTES = {
+    sedaliaA: {
+        label: 'Sedalia Mastery Color Scheme A',
+        bands: [
+            { min: 4.0, bg: '#6A4AA5', fg: '#FFFFFF', accent: '#6A4AA5', label: 'Exemplary' },
+            { min: 3.5, bg: '#963C9F', fg: '#FFFFFF', accent: '#963C9F', label: 'Beyond Target' },
+            { min: 3.0, bg: '#009B14', fg: '#000000', accent: '#009B14', label: 'Target' },
+            { min: 2.5, bg: '#8A9B00', fg: '#000000', accent: '#8A9B00', label: 'Approaching Target' },
+            { min: 2.0, bg: '#485BB0', fg: '#FFFFFF', accent: '#485BB0', label: 'Developing' },
+            { min: 1.5, bg: '#1979AE', fg: '#FFFFFF', accent: '#1979AE', label: 'Beginning' },
+            { min: 1.0, bg: '#1199DA', fg: '#000000', accent: '#1199DA', label: 'Needs Partial Support' },
+            { min: 0.5, bg: '#DA7600', fg: '#000000', accent: '#DA7600', label: 'Needs Full Support' },
+            { min: 0.1, bg: '#EB5A83', fg: '#000000', accent: '#EB5A83', label: 'Insufficient Evidence' },
+            { min: 0.0, bg: '#F43F38', fg: '#000000', accent: '#F43F38', label: 'No Evidence' },
+        ],
+    },
+};
+
+/**
+ * Pick black or white text for a hex background using WCAG relative
+ * luminance (whichever gives the higher contrast ratio).
+ *
+ * @param {string} hex - '#RRGGBB'
+ * @returns {'#000000'|'#FFFFFF'}
+ */
+export function getReadableTextColor(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    if (!m) return '#000000';
+    const [r, g, b] = [0, 2, 4].map(i => {
+        const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return (1.05 / (lum + 0.05)) >= ((lum + 0.05) / 0.05) ? '#FFFFFF' : '#000000';
+}
+
+/**
+ * Resolve an opt-in palette by key.
+ *
+ * District palettes (`customPalettes`, from CG_CONFIG.CUSTOM_MASTERY_PALETTES)
+ * override built-ins with the same key. Bands are validated, sorted high → low,
+ * and missing `fg`/`accent` are filled in. Returns null for an unknown key or
+ * a palette with no valid bands.
+ *
+ * @param {string|null|undefined} key
+ * @param {Object<string, {label?:string, bands:Array}>} [customPalettes]
+ * @returns {{ key:string, label:string, bands:Array<{min:number,bg:string,fg:string,accent:string,label:string}> }|null}
+ */
+export function getOptInPalette(key, customPalettes = {}) {
+    if (!key) return null;
+    const source = (customPalettes && customPalettes[key]) || OPT_IN_MASTERY_PALETTES[key];
+    if (!source || !Array.isArray(source.bands)) return null;
+
+    const bands = source.bands
+        .filter(b => b && Number.isFinite(Number(b.min)) && typeof b.bg === 'string')
+        .map(b => ({
+            min: Number(b.min),
+            bg: b.bg,
+            fg: b.fg || getReadableTextColor(b.bg),
+            accent: b.accent || b.bg,
+            label: b.label || '',
+        }))
+        .sort((a, b) => b.min - a.min);
+
+    if (!bands.length) return null;
+    return { key, label: source.label || key, bands };
+}
+
+/**
+ * Index of the band a score falls into (first band whose `min` ≤ score).
+ * Scores below every band fall into the lowest band.
+ *
+ * @param {number} score
+ * @param {Array<{min:number}>} bands - sorted high → low
+ * @returns {number} band index, or -1 if score is not a finite number
+ */
+export function getBandIndex(score, bands) {
+    if (typeof score !== 'number' || !Number.isFinite(score) || !bands?.length) return -1;
+    const i = bands.findIndex(b => score >= b.min);
+    return i === -1 ? bands.length - 1 : i;
+}

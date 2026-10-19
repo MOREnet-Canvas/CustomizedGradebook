@@ -163,6 +163,14 @@ const defaultRatings = [
 ];
 export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_RATINGS ?? defaultRatings;
 
+// Learning Mastery Gradebook colors (opt-in per district)
+// LMGB_MASTERY_SCHEME: key of an opt-in palette in src/ui/masteryColors.js
+//   (e.g. 'sedaliaA') or of a palette supplied in CUSTOM_MASTERY_PALETTES.
+// CUSTOM_MASTERY_PALETTES: { <key>: { label, bands: [{ min, bg, fg?, label? }] } }
+export const ENABLE_LMGB_MASTERY_COLORS = window.CG_CONFIG?.ENABLE_LMGB_MASTERY_COLORS ?? false;
+export const LMGB_MASTERY_SCHEME = window.CG_CONFIG?.LMGB_MASTERY_SCHEME ?? null;
+export const CUSTOM_MASTERY_PALETTES = window.CG_CONFIG?.CUSTOM_MASTERY_PALETTES ?? {};
+
 // Outcome filtering
 const defaultExcludedKeywords = [];
 export const EXCLUDED_OUTCOME_KEYWORDS = window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS ?? defaultExcludedKeywords;
