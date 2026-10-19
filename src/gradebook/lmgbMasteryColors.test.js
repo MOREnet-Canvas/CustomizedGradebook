@@ -6,6 +6,8 @@ vi.mock('../utils/canvasApiClient.js', () => ({
     CanvasApiClient: class { get(...args) { return mockGet(...args); } },
 }));
 vi.mock('../utils/canvas.js', () => ({ getCourseId: () => '566' }));
+// Isolate from config.js module-load side effects; tests pass schemeKey explicitly
+vi.mock('../config.js', () => ({ LMGB_MASTERY_SCHEME: 'sedaliaA', CUSTOM_MASTERY_PALETTES: {} }));
 
 import {
     initLmgbMasteryColors,
