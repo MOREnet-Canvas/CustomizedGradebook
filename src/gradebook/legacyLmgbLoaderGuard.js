@@ -37,9 +37,10 @@
  * Only when ALL of these are true:
  *   - Section D has been removed from every theme loader that uses the CG
  *     loader (desktop Theme JS for each account / sub-account).
- *   - Those loaders set, in Section B `window.CG_MANAGED.config`:
- *       ENABLE_LMGB_MASTERY_COLORS: true,
- *       LMGB_MASTERY_SCHEME: "sedaliaA",
+ *   - The bundle version those loaders resolve includes this module. It is on
+ *     by default (ENABLE_LMGB_MASTERY_COLORS: true, LMGB_MASTERY_SCHEME:
+ *     'sedaliaA'), so no loader config is required — just confirm no loader
+ *     sets ENABLE_LMGB_MASTERY_COLORS: false.
  *   - On a live LMGB page the console no longer shows the "deferring" log and
  *     `document.querySelector('[data-schs-mastery-score]')` returns null.
  *
