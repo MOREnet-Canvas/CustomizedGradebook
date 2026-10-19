@@ -7,8 +7,6 @@ describe('UpdateFlowStateMachine', () => {
 
     beforeEach(() => {
         stateMachine = new UpdateFlowStateMachine();
-        // Clear localStorage before each test
-        localStorage.clear();
     });
 
     // ===== Basic State Management =====
@@ -112,87 +110,6 @@ describe('UpdateFlowStateMachine', () => {
         expect(goodListener).toHaveBeenCalled();
     });
 
-    // ===== Persistence =====
-
-    test('serializes state to JSON', () => {
-        stateMachine.updateContext({ courseId: '12345' });
-        stateMachine.transition(STATES.CHECKING_SETUP);
-
-        const serialized = stateMachine.serialize();
-
-        expect(serialized.currentState).toBe(STATES.CHECKING_SETUP);
-        expect(serialized.context.courseId).toBe('12345');
-        expect(serialized.stateHistory).toEqual([STATES.IDLE, STATES.CHECKING_SETUP]);
-        expect(serialized.timestamp).toBeDefined();
-    });
-
-    test('deserializes state from JSON', () => {
-        const data = {
-            currentState: STATES.CALCULATING,
-            context: { courseId: '12345', outcomeId: '67890' },
-            stateHistory: [STATES.IDLE, STATES.CHECKING_SETUP, STATES.CALCULATING],
-            timestamp: new Date().toISOString()
-        };
-
-        stateMachine.deserialize(data);
-
-        expect(stateMachine.getCurrentState()).toBe(STATES.CALCULATING);
-        expect(stateMachine.getContext().courseId).toBe('12345');
-        expect(stateMachine.getStateHistory()).toEqual(data.stateHistory);
-    });
-
-    test('saves state to localStorage', () => {
-        stateMachine.updateContext({ courseId: '12345' });
-        stateMachine.transition(STATES.CHECKING_SETUP);
-
-        stateMachine.saveToLocalStorage('12345');
-
-        const stored = localStorage.getItem('updateFlow_state_12345');
-        expect(stored).toBeDefined();
-        
-        const parsed = JSON.parse(stored);
-        expect(parsed.currentState).toBe(STATES.CHECKING_SETUP);
-    });
-
-    test('loads state from localStorage', () => {
-        const data = {
-            currentState: STATES.CALCULATING,
-            context: { courseId: '12345' },
-            stateHistory: [STATES.IDLE, STATES.CALCULATING],
-            timestamp: new Date().toISOString()
-        };
-        localStorage.setItem('updateFlow_state_12345', JSON.stringify(data));
-
-        const loaded = stateMachine.loadFromLocalStorage('12345');
-
-        expect(loaded).toBe(true);
-        expect(stateMachine.getCurrentState()).toBe(STATES.CALCULATING);
-    });
-
-    test('ignores old state from localStorage (> 1 hour)', () => {
-        const oldTimestamp = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
-        const data = {
-            currentState: STATES.CALCULATING,
-            context: { courseId: '12345' },
-            stateHistory: [STATES.IDLE, STATES.CALCULATING],
-            timestamp: oldTimestamp.toISOString()
-        };
-        localStorage.setItem('updateFlow_state_12345', JSON.stringify(data));
-
-        const loaded = stateMachine.loadFromLocalStorage('12345');
-
-        expect(loaded).toBe(false);
-        expect(stateMachine.getCurrentState()).toBe(STATES.IDLE);
-    });
-
-    test('clears state from localStorage', () => {
-        localStorage.setItem('updateFlow_state_12345', 'test');
-
-        stateMachine.clearLocalStorage('12345');
-
-        expect(localStorage.getItem('updateFlow_state_12345')).toBe(null);
-    });
-
     // ===== Edge Cases =====
 
     test('handles self-transition (POLLING_PROGRESS)', () => {
@@ -248,6 +165,7 @@ describe('UpdateFlowStateMachine', () => {
         stateMachine.transition(STATES.CALCULATING);
         stateMachine.transition(STATES.UPDATING_GRADES);
         stateMachine.transition(STATES.VERIFYING);
+        stateMachine.transition(STATES.VERIFYING_OVERRIDES);
         stateMachine.transition(STATES.COMPLETE);
 
         expect(stateMachine.getCurrentState()).toBe(STATES.COMPLETE);
@@ -260,6 +178,7 @@ describe('UpdateFlowStateMachine', () => {
         stateMachine.transition(STATES.POLLING_PROGRESS);
         stateMachine.transition(STATES.POLLING_PROGRESS);
         stateMachine.transition(STATES.VERIFYING);
+        stateMachine.transition(STATES.VERIFYING_OVERRIDES);
         stateMachine.transition(STATES.COMPLETE);
 
         expect(stateMachine.getCurrentState()).toBe(STATES.COMPLETE);

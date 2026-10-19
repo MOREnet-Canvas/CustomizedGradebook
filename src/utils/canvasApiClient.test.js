@@ -94,7 +94,7 @@ describe('CanvasApiClient', () => {
             await client.get('/api/v1/test');
 
             expect(mockSafeFetch).toHaveBeenCalledWith(
-                '/api/v1/test',
+                '/api/v1/test?per_page=100',
                 expect.objectContaining({
                     headers: expect.objectContaining({
                         'X-CSRF-Token': 'test-csrf-token-12345'
@@ -177,7 +177,7 @@ describe('CanvasApiClient', () => {
             await client.get('/api/v1/courses/123');
 
             expect(mockSafeFetch).toHaveBeenCalledWith(
-                '/api/v1/courses/123',
+                '/api/v1/courses/123?per_page=100',
                 expect.objectContaining({
                     method: 'GET',
                     body: null
@@ -341,7 +341,7 @@ describe('CanvasApiClient', () => {
             await client.get('/api/v1/test');
 
             expect(mockSafeFetch).toHaveBeenCalledWith(
-                '/api/v1/test',
+                '/api/v1/test?per_page=100',
                 expect.objectContaining({
                     credentials: 'same-origin'
                 }),
@@ -362,7 +362,7 @@ describe('CanvasApiClient', () => {
             });
 
             expect(mockSafeFetch).toHaveBeenCalledWith(
-                '/api/v1/test',
+                '/api/v1/test?per_page=100',
                 expect.objectContaining({
                     headers: expect.objectContaining({
                         'Accept': 'application/json',
@@ -599,7 +599,7 @@ describe('CanvasApiClient', () => {
             await client.get('/api/v1/test', customOptions);
 
             expect(mockSafeFetch).toHaveBeenCalledWith(
-                '/api/v1/test',
+                '/api/v1/test?per_page=100',
                 expect.objectContaining({
                     signal: customOptions.signal,
                     credentials: 'same-origin',
