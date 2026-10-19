@@ -180,7 +180,7 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
           </table>
         </div>
         <div class="os-table-hint">
-          Each chip is the student's Canvas score for an outcome in the average · Hover a chip for the outcome name · ⏳ = Canvas is updating
+          Current Score = the average of the student's outcome scores in Canvas · Each chip is one outcome (hover for its name) · ⏳ = Canvas is updating
         </div>`;
 }
 

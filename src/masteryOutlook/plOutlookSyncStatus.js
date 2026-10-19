@@ -35,8 +35,9 @@ export const VERIFYING_TIP = 'Saved to Canvas; waiting for Canvas to update the 
 
 /** Tooltip text for the "possible override" status (chip and row marker). */
 export const POSSIBLE_OVERRIDE_TIP =
-    'Canvas score no longer matches the score Mastery Outlook last saved — ' +
-    'it may have been changed directly in Canvas. Open the outcome to review.';
+    'Canvas score no longer matches the latest grade (last chip) or the Last Override — ' +
+    'it was changed outside Mastery Outlook (e.g. the Projected Score assignment was graded ' +
+    'directly in Canvas or by a script). Click Last Override, then Save, to restore it.';
 
 /**
  * Describe a sync_state entry as an override "exception" for the exceptions

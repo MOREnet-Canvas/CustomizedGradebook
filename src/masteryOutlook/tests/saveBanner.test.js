@@ -120,6 +120,21 @@ describe('save banner', () => {
         expect(b.text).toBe('✓ Canvas gradebook is up to date');
         expect(b.button).toBeNull();
     });
+
+    test('Canvas changed after a verified save (⚑) → not "up to date"; banner counts the flagged rows', () => {
+        const cache = makeCache();
+        cache.sync_state[OID] = { a: {
+            last_synced_score: 3,
+            last_synced_at:  new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+            last_verify_at:  new Date(Date.now() - 9 * 60 * 1000).toISOString(),
+        } };
+        const b = banner(cache);
+        expect(b.cls).toBe('warn');
+        expect(b.text).toBe('⚑ 1 score changed outside Mastery Outlook — hover ⚑ for details');
+        expect(b.text).not.toMatch(/up to date/);
+        expect(b.button).toBeNull();
+        expect(document.querySelector('tr[data-stu="a"] .os-sync-marker.override')).not.toBeNull();
+    });
 });
 
 describe('getOutcomeSaveSummary', () => {
@@ -128,7 +143,7 @@ describe('getOutcomeSaveSummary', () => {
         rowSavePhase.set(`${OID}_b`, 'queued');
 
         expect(getOutcomeSaveSummary({ id: OID }, makeCache())).toEqual({
-            saving: 1, verifying: 0, queued: 1, remaining: 1, remainingIds: ['c'],
+            saving: 1, verifying: 0, queued: 1, remaining: 1, remainingIds: ['c'], flagged: 0,
         });
     });
 });
