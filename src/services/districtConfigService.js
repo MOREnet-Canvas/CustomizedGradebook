@@ -301,13 +301,12 @@ export async function writeDistrictConfig(districtCourseId, apiClient, settings)
  */
 export async function readDistrictConfigFile(districtCourseId, apiClient) {
     try {
+        // Filters must be in the query string — get()'s 2nd arg is fetch options
         const searchResults = await apiClient.get(
-            `/api/v1/courses/${districtCourseId}/files`,
-            {
-                search_term: FILE_NAME,
-                content_types: ['application/json'],
-                per_page: 10
-            },
+            `/api/v1/courses/${districtCourseId}/files` +
+            `?search_term=${encodeURIComponent(FILE_NAME)}` +
+            `&content_types[]=application/json&per_page=100`,
+            {},
             'districtConfigService:searchFile'
         );
 

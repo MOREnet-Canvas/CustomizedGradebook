@@ -150,6 +150,20 @@ describe('districtConfigService', () => {
 
             expect(result).toBeNull();
         });
+
+        test('sends search filters in the query string, not as fetch options (#99)', async () => {
+            apiClient = makeApiClient({ get: vi.fn().mockResolvedValue([]) });
+
+            await readDistrictConfigFile('581', apiClient);
+
+            const [url, options] = apiClient.get.mock.calls[0];
+            expect(url).toContain('/api/v1/courses/581/files?');
+            expect(url).toContain('search_term=district_config.json');
+            expect(url).toContain('content_types[]=application/json');
+            expect(url).toContain('per_page=100');
+            expect(options).not.toHaveProperty('search_term');
+            expect(options).not.toHaveProperty('content_types');
+        });
     });
 
     describe('getEffectiveValue', () => {
