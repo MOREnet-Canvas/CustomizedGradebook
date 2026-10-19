@@ -23,7 +23,7 @@ import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
 import { roundToHalf } from './powerLaw.js';
 import { mountOutcomeRow, isOutcomeInitialized } from './outcomeRow.js';
-import { scoresMatch, getSyncStatus, describeOverrideException } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, latestAttemptScore, describeOverrideException } from './plOutlookSyncStatus.js';
 import { fetchOutcomeNames, fetchOutcomeRollups } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
@@ -138,7 +138,7 @@ function renderCourseSyncStrip(cache) {
 
             // Flags mirror the chip: manual / possible override count, a save that
             // is still verifying does not.
-            const { status } = getSyncStatus(student.id, oId, od.plPrediction, canvas, plConfig);
+            const { status } = getSyncStatus(student.id, oId, od.plPrediction, canvas, plConfig, undefined, latestAttemptScore(od));
             if (status === 'manual_override' || status === 'possible_override') { overrideCount++; continue; }
 
             const willPost      = syncEntry.will_post ?? null;

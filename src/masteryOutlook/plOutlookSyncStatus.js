@@ -98,6 +98,8 @@ function isVerifyPending(state, now) {
  *  3. manual_override — teacher has confirmed Canvas score should be kept
  *  3b. verifying — pushed recently, Canvas not yet showing it, no verify pass since
  *  4. possible_override — Canvas score changed AFTER the last PL push
+ *                          (not when Canvas matches the latest alignment — with
+ *                          Most Recent, a newer real grade replaces the override)
  *  5. needs_sync — teacher-set will_post differs from Canvas score (or never pushed)
  *  6. synced     — Canvas score matches last pushed PL prediction
  *
@@ -107,9 +109,10 @@ function isVerifyPending(state, now) {
  * @param {number|null}   canvasScore   - current Canvas rollup score (null = not set)
  * @param {Object}        plConfig      - { pl_assignments, sync_state } from cache
  * @param {number}        [now=Date.now()] - current time in epoch ms (injectable for tests)
+ * @param {number|null}   [latestScore=null] - score of the student's latest alignment (see latestAttemptScore)
  * @returns {{ status: string, label: string, cssClass: string, [extra]: * }}
  */
-export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, plConfig, now = Date.now()) {
+export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, plConfig, now = Date.now(), latestScore = null) {
     const oId = String(outcomeId);
     const sId = String(studentId);
 
@@ -156,9 +159,13 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
     }
 
     // 4. possible_override — Canvas changed AFTER the last PL push
-    //    (lastSyncedScore exists but canvasScore no longer matches it)
+    //    (lastSyncedScore exists but canvasScore no longer matches it).
+    //    Canvas matching the latest alignment is expected, not an outside change:
+    //    with Most Recent, a real grade given after the override replaces it.
+    const matchesLatest = latestScore !== null && latestScore !== undefined
+        && canvasScore !== null && scoresMatch(canvasScore, latestScore);
     if (lastSyncedScore !== null && canvasScore !== null
-        && !scoresMatch(canvasScore, lastSyncedScore)) {
+        && !scoresMatch(canvasScore, lastSyncedScore) && !matchesLatest) {
         return {
             status:          'possible_override',
             label:           '⚑ Override?',
@@ -193,6 +200,21 @@ export function getSyncStatus(studentId, outcomeId, plPrediction, canvasScore, p
 }
 
 /**
+ * Score of the student's latest alignment (the last Alignments chip) for one
+ * outcome. extractAttempts sorts attempts oldest → newest. Ignored alignments
+ * still count — Canvas still counts them.
+ *
+ * @param {Object} outcomeData - student.outcomes entry
+ * @returns {number|null}
+ */
+export function latestAttemptScore(outcomeData) {
+    const attempts = outcomeData?.attempts;
+    if (!Array.isArray(attempts) || attempts.length === 0) return null;
+    const score = attempts[attempts.length - 1]?.score;
+    return score === null || score === undefined || Number.isNaN(Number(score)) ? null : Number(score);
+}
+
+/**
  * Aggregate getSyncStatus across all students for one outcome.
  * Returns counts used by checkSyncNeeded and the sync-summary badge.
  *
@@ -215,7 +237,7 @@ export function aggregateSyncStatus(students, outcomeId, plConfig) {
         const { status } = getSyncStatus(
             student.id, outcomeId,
             outcomeData.plPrediction, outcomeData.canvasScore,
-            plConfig
+            plConfig, undefined, latestAttemptScore(outcomeData)
         );
 
         switch (status) {

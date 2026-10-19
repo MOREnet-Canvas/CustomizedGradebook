@@ -167,6 +167,18 @@ describe('getSyncStatus', () => {
             expect(result.status).toBe('possible_override');
         });
 
+        it('Canvas changed but matches the latest alignment (newer real grade) → not flagged', () => {
+            const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(4) });
+            const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW, 1.5);
+            expect(result.status).toBe('synced');
+        });
+
+        it('Canvas matches neither the last override nor the latest alignment → possible_override', () => {
+            const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(4) });
+            const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW, 0);
+            expect(result.status).toBe('possible_override');
+        });
+
         it('verify pass older than the push does not count as verified → verifying', () => {
             const config = configFor({ last_synced_at: minsAgo(5), last_verify_at: minsAgo(60) });
             const result = getSyncStatus('642', '599', 1.5, 1.5, config, NOW);

@@ -19,7 +19,7 @@
 
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
-import { scoresMatch, getSyncStatus, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, latestAttemptScore, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
@@ -125,7 +125,7 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     }
 
     const syncStatus = plConfig
-        ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig).status
+        ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig, undefined, latestAttemptScore(outcomeData)).status
         : null;
     // ⏳ while the background outcome check runs (saved on the assignment, Canvas
     // still recalculating the outcome score), or from saved data after a reload.
