@@ -30,7 +30,7 @@ import {
     isBandClassName,
     MASTERY_HIDDEN_ATTR,
 } from '../ui/masteryColorStyles.js';
-import { isLegacyLoaderLmgbActive } from './legacyLmgbLoaderGuard.js';
+import { isLegacyLoaderLmgbActive } from './legacyLmgbLoaderGuard.js'; // TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js
 
 const LOG = '[LMGB Colors]';
 
@@ -44,7 +44,7 @@ const SCORE_PATTERN = /^-?\d+(\.\d+)?$/;
 /** Max outcome IDs per distribution request (keeps the URL a sane length). */
 const DISTRIBUTION_BATCH_SIZE = 50;
 
-/** Re-check for the loader's Section D shortly after start (it may render after us). */
+/** TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js. Re-check for loader Section D shortly after start (it may mark the grid after us). */
 const LEGACY_RECHECK_MS = 1500;
 
 let state = null;
@@ -58,7 +58,7 @@ function createState(courseId, apiClient, palette, root) {
         root,
         observer: null,
         passScheduled: false,
-        legacyTimer: null,
+        legacyTimer: null, // TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js
         /** outcomeId → distribution */
         distributions: new Map(),
         /** outcomeIds that failed or returned nothing; not retried until reload */
@@ -117,7 +117,7 @@ export function initLmgbMasteryColors(options = {}) {
     window.addEventListener('scroll', state.onScrollOrResize, true);
     window.addEventListener('resize', state.onScrollOrResize);
     document.addEventListener('keydown', state.onKeydown);
-    state.legacyTimer = setTimeout(schedulePass, LEGACY_RECHECK_MS);
+    state.legacyTimer = setTimeout(schedulePass, LEGACY_RECHECK_MS); // TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js
 
     logger.info(`${LOG} Enabled (${palette.label})`);
     applyLmgbMasteryColors();
@@ -133,7 +133,7 @@ export function stopLmgbMasteryColors() {
     state = null;
 
     s.observer?.disconnect();
-    clearTimeout(s.legacyTimer);
+    clearTimeout(s.legacyTimer); // TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js
     window.removeEventListener('scroll', s.onScrollOrResize, true);
     window.removeEventListener('resize', s.onScrollOrResize);
     document.removeEventListener('keydown', s.onKeydown);
@@ -158,7 +158,7 @@ export function stopLmgbMasteryColors() {
 export function applyLmgbMasteryColors() {
     if (!state) return Promise.resolve();
 
-    // TEMPORARY — see legacyLmgbLoaderGuard.js
+    // TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js. Defer to the loader's Section D if it is running; remove this block with the guard.
     if (isLegacyLoaderLmgbActive()) {
         logger.info(`${LOG} Loader Section D detected — deferring to it`);
         stopLmgbMasteryColors();
