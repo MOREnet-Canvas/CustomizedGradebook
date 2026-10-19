@@ -54,7 +54,14 @@ export async function loadDistrictConfig(apiClient) {
 
         try {
             const fileData = await readDistrictConfigFile(districtCourseId, apiClient);
-            return fileData?.settings ?? {};
+            if (!fileData) {
+                // Course is configured, so a missing/unusable file means settings silently fall back
+                logger.warn(`[DistrictConfigService] No usable ${FILE_NAME} in course ${districtCourseId} — using defaults`);
+                return {};
+            }
+            const settings = fileData.settings ?? {};
+            logger.info(`[DistrictConfigService] Loaded district config from course ${districtCourseId}: ${Object.keys(settings).length} setting(s)`);
+            return settings;
         } catch (error) {
             logger.warn('[DistrictConfigService] Failed to load district config, using defaults', error);
             return {};

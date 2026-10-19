@@ -6,6 +6,7 @@ import {
     readDistrictConfigFile,
     _resetForTests
 } from './districtConfigService.js';
+import { logger } from '../utils/logger.js';
 
 vi.mock('../utils/logger.js', () => ({
     logger: {
@@ -61,6 +62,20 @@ describe('districtConfigService', () => {
             const result = await loadDistrictConfig(apiClient);
 
             expect(result).toEqual(settings);
+            expect(logger.info).toHaveBeenCalledWith(
+                expect.stringContaining('Loaded district config from course 581: 1 setting(s)')
+            );
+        });
+
+        test('warns when the configured course has no usable config file', async () => {
+            window.CG_DISTRICT_COURSE = '581';
+            apiClient = makeApiClient({ get: vi.fn().mockResolvedValue([]) });
+
+            await loadDistrictConfig(apiClient);
+
+            expect(logger.warn).toHaveBeenCalledWith(
+                expect.stringContaining('No usable district_config.json in course 581')
+            );
         });
 
         test('resolves to {} when the file cannot be found', async () => {
