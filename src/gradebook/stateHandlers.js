@@ -267,6 +267,48 @@ export async function handlePreloadSubmissions(stateMachine) {
 }
 
 /**
+ * Drop rollups for users who no longer have an active/invited StudentEnrollment.
+ * Outcome rollups can include inactive or concluded students (per the teacher's LMGB
+ * settings); grading or verifying them fails, so they must never reach `averages`.
+ * Falls back to the unfiltered rollups if enrollments can't be fetched.
+ *
+ * @param {Object} rollupData - Canvas outcome rollup data
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object>} Rollup data containing only currently enrolled students
+ */
+export async function filterRollupsToActiveStudents(rollupData, courseId, apiClient) {
+    const rollups = rollupData?.rollups ?? [];
+
+    let enrollmentMap;
+    try {
+        enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+    } catch (error) {
+        logger.warn('Failed to fetch enrollments; calculating without enrollment filter:', error);
+        return rollupData;
+    }
+
+    if (!enrollmentMap || enrollmentMap.size === 0) {
+        logger.warn('No active student enrollments found; calculating without enrollment filter');
+        return rollupData;
+    }
+
+    const active = [];
+    const excluded = [];
+    for (const rollup of rollups) {
+        const userId = String(rollup.links?.user);
+        if (enrollmentMap.has(userId)) active.push(rollup);
+        else excluded.push(userId);
+    }
+
+    if (excluded.length > 0) {
+        logger.debug(`Excluding ${excluded.length} non-active students from update:`, excluded);
+    }
+
+    return { ...rollupData, rollups: active };
+}
+
+/**
  * CALCULATING State Handler
  * Calculates student averages and determines next state
  */
@@ -279,7 +321,8 @@ export async function handleCalculating(stateMachine) {
         : 'Calculating student averages for grade overrides...';
     banner.setText(calculatingMessage);
 
-    const averages = await calculateStudentAverages(rollupData, outcomeId, courseId, apiClient);
+    const activeRollupData = await filterRollupsToActiveStudents(rollupData, courseId, apiClient);
+    const averages = await calculateStudentAverages(activeRollupData, outcomeId, courseId, apiClient);
     const numberOfUpdates = averages.length;
 
     stateMachine.updateContext({ averages, numberOfUpdates, startTime: new Date().toISOString() });
