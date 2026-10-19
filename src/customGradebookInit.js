@@ -100,8 +100,10 @@ import { ENABLE_LMGB_MASTERY_COLORS } from "./config.js";
         logger.debug('[Init] On gradebook page, initializing gradebook modules');
         injectButtons(); // Always run for all courses
 
-        // LMGB mastery colors (opt-in per district; same LMGB check as the button)
-        if (ENABLE_LMGB_MASTERY_COLORS && isLMGBPage()) {
+        // LMGB mastery colors (on by default; same LMGB check as the button)
+        if (!ENABLE_LMGB_MASTERY_COLORS) {
+            logger.debug('[Init] LMGB mastery colors disabled by config');
+        } else if (isLMGBPage()) {
             try {
                 initLmgbMasteryColors();
             } catch (err) {
