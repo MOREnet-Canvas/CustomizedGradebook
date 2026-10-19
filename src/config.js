@@ -163,12 +163,13 @@ const defaultRatings = [
 ];
 export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_RATINGS ?? defaultRatings;
 
-// Learning Mastery Gradebook colors (opt-in per district)
+// Learning Mastery Gradebook colors (on by default; a district can turn it off
+// with ENABLE_LMGB_MASTERY_COLORS: false or choose another scheme)
 // LMGB_MASTERY_SCHEME: key of an opt-in palette in src/ui/masteryColors.js
 //   (e.g. 'sedaliaA') or of a palette supplied in CUSTOM_MASTERY_PALETTES.
 // CUSTOM_MASTERY_PALETTES: { <key>: { label, bands: [{ min, bg, fg?, label? }] } }
-export const ENABLE_LMGB_MASTERY_COLORS = window.CG_CONFIG?.ENABLE_LMGB_MASTERY_COLORS ?? false;
-export const LMGB_MASTERY_SCHEME = window.CG_CONFIG?.LMGB_MASTERY_SCHEME ?? null;
+export const ENABLE_LMGB_MASTERY_COLORS = window.CG_CONFIG?.ENABLE_LMGB_MASTERY_COLORS ?? true;
+export const LMGB_MASTERY_SCHEME = window.CG_CONFIG?.LMGB_MASTERY_SCHEME ?? 'sedaliaA';
 export const CUSTOM_MASTERY_PALETTES = window.CG_CONFIG?.CUSTOM_MASTERY_PALETTES ?? {};
 
 // Outcome filtering
