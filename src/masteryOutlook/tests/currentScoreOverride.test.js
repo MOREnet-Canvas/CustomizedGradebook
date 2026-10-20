@@ -19,7 +19,6 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
 }));
 vi.mock('../../services/gradeCalculator.js', () => ({ calculateStudentAverages: vi.fn() }));
 vi.mock('../../services/graphqlGradingService.js', () => ({
-    submitRubricAssessment:      vi.fn(async () => ({})),
     submitRubricAssessmentBatch: vi.fn(async (students) => ({ successCount: students.length, errors: [] })),
 }));
 vi.mock('../../services/gradeOverride.js', () => ({
@@ -46,9 +45,10 @@ import {
 import {
     renderCurrentScoreTable, wireCurrentScoreTable, countLockedOverrides, overrideDrifted, buildCurrentScoreRows,
 } from '../currentScoreTable.js';
-import { submitRubricAssessment, submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
+import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
 import { calculateStudentAverages } from '../../services/gradeCalculator.js';
 import { writeSyncState } from '../masteryOutlookCacheService.js';
+import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
 import { rowsAwaitingOutcome, rowSavePhase } from '../masteryOutlookState.js';
 
 const CS = '603';
@@ -74,23 +74,35 @@ const apiClient = () => ({ put: vi.fn(async () => ({})) });
 beforeEach(() => { vi.clearAllMocks(); rowsAwaitingOutcome.clear(); rowSavePhase.clear(); });
 
 describe('setCurrentScoreOverride', () => {
-    test('one GraphQL call sets the Current Score assignment, course override and a dated comment', async () => {
+    test('goes through the shared grading path: rubric score, course override and dated comment', async () => {
         const cache = makeCache();
         const client = apiClient();
         await setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 3, note: ' Retest ', cache, apiClient: client });
 
-        expect(submitRubricAssessment).toHaveBeenCalledTimes(1);
-        const [args, passedClient] = submitRubricAssessment.mock.calls[0];
+        expect(submitRubricAssessmentBatch).toHaveBeenCalledTimes(1);
+        const [batch, passedClient] = submitRubricAssessmentBatch.mock.calls[0];
         expect(passedClient).toBe(client);
-        expect(args).toMatchObject({
-            submissionId: 'sub-1', rubricAssociationId: 'assoc', rubricCriterionId: 'crit',
-            points: 3, enrollmentId: 'enr-1', overrideScore: 75,
+        expect(batch).toHaveLength(1);
+        expect(batch[0]).toMatchObject({
+            userId: '1', submissionId: 'sub-1', rubricAssociationId: 'assoc', rubricCriterionId: 'crit',
+            points: 3, enrollmentId: 'enr-1', overrideScore: 75, overrideStatusId: null, customStatusId: null,
         });
-        expect(args.comment).toMatch(/^Current Score override: 3\.00 \(75%\) · [A-Z][a-z]{2} \d{1,2}, \d{4} · Note: Retest$/);
+        expect(batch[0].comment).toMatch(/^Current Score override: 3\.00 \(75%\) · [A-Z][a-z]{2} \d{1,2}, \d{4} · Note: Retest$/);
+        expect(refreshMasteryForAssignment).toHaveBeenCalledWith('566', 'avg-a');
+        expect(rowsAwaitingOutcome.has(`${CS}_1`)).toBe(true);           // ⏳ until Canvas confirms
+        expect(cache.students[0].outcomes[1].canvasScore).toBe(2);       // not faked before Canvas confirms
         expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 3, note: 'Retest', locked: false });
         expect(getCurrentScoreOverride(cache, CS, '1').at).toEqual(expect.any(String));
-        expect(cache.students[0].outcomes[1].canvasScore).toBe(3);
         expect(writeSyncState).toHaveBeenCalledWith('566', cache.sync_state, client);
+    });
+
+    test('Canvas rejects the write → throws and records nothing', async () => {
+        submitRubricAssessmentBatch.mockResolvedValueOnce({ successCount: 0, errors: [{ userId: '1', error: 'Rubric assessment errors' }] });
+        const cache = makeCache();
+        await expect(setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 3, cache, apiClient: apiClient() }))
+            .rejects.toThrow(/Rubric assessment errors/);
+        expect(getCurrentScoreOverride(cache, CS, '1')).toBeNull();
+        expect(writeSyncState).not.toHaveBeenCalled();
     });
 
     test('keeps an existing lock when the override is changed', async () => {
@@ -103,7 +115,7 @@ describe('setCurrentScoreOverride', () => {
     test('rejects scores outside 0–4 without calling Canvas', async () => {
         await expect(setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 5, cache: makeCache(), apiClient: apiClient() }))
             .rejects.toThrow(/0 to 4/);
-        expect(submitRubricAssessment).not.toHaveBeenCalled();
+        expect(submitRubricAssessmentBatch).not.toHaveBeenCalled();
     });
 
     test('missing Current Score setup → "run Refresh Data" and no Canvas call', async () => {
@@ -111,7 +123,7 @@ describe('setCurrentScoreOverride', () => {
         delete cache.avg_assignment;
         await expect(setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 3, cache, apiClient: apiClient() }))
             .rejects.toThrow(/Refresh Data/);
-        expect(submitRubricAssessment).not.toHaveBeenCalled();
+        expect(submitRubricAssessmentBatch).not.toHaveBeenCalled();
     });
 });
 
@@ -127,8 +139,9 @@ describe('clearCurrentScoreOverride / lock', () => {
         const [rollups, outcomeId] = calculateStudentAverages.mock.calls[0];
         expect(outcomeId).toBe(CS);
         expect(rollups.rollups.map(r => r.links.user)).toEqual(['2']);   // only this student
-        expect(submitRubricAssessment.mock.calls[0][0]).toMatchObject({ submissionId: 'sub-2', points: 3, overrideScore: 75 });
-        expect(submitRubricAssessment.mock.calls[0][0].comment).toMatch(/override removed .* back to 3\.00$/);
+        const [cleared] = submitRubricAssessmentBatch.mock.calls[0][0];
+        expect(cleared).toMatchObject({ userId: '2', submissionId: 'sub-2', rubricCriterionId: 'crit', points: 3, overrideScore: 75 });
+        expect(cleared.comment).toMatch(/override removed .* back to 3\.00$/);
         expect(getCurrentScoreOverride(cache, CS, '2')).toBeNull();
         expect(cache.sync_state[CS]['2']).toMatchObject({ cs_override_score: null, cs_override_lock: null, cs_override_at: null });
     });
@@ -142,7 +155,7 @@ describe('clearCurrentScoreOverride / lock', () => {
         expect(cache.sync_state[CS]['1'].cs_override_at).toBe('2026-10-01T00:00:00Z');   // override date unchanged
         expect(writeSyncState).toHaveBeenCalledTimes(1);
         expect(await setCurrentScoreOverrideLock({ courseId: '566', studentId: '2', locked: true, cache, apiClient: apiClient() })).toBe(false);
-        expect(submitRubricAssessment).not.toHaveBeenCalled();
+        expect(submitRubricAssessmentBatch).not.toHaveBeenCalled();
     });
 });
 

@@ -17,8 +17,8 @@
 
 import { logger } from '../utils/logger.js';
 import { calculateStudentAverages } from '../services/gradeCalculator.js';
-import { submitRubricAssessment, submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
-import { getAllEnrollmentIds, getEnrollmentIdForUser } from '../services/gradeOverride.js';
+import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
+import { getAllEnrollmentIds } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
 import { OVERRIDE_SCALE, AVG_OUTCOME_NAME, ENABLE_GRADE_OVERRIDE } from '../config.js';
 import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
@@ -82,8 +82,7 @@ export async function updateAvgAssignmentForStudents({
             return false;
         }
 
-        const { assignment_id, criterion_id, rubric_association_id,
-                submission_ids, avg_outcome_id } = avgSetup;
+        const { avg_outcome_id } = avgSetup;
 
         if (!avg_outcome_id) {
             logger.warn('[MOAvgService] avg_outcome_id missing — run Refresh Data to rebuild');
@@ -117,13 +116,8 @@ export async function updateAvgAssignmentForStudents({
             return true;
         }
 
-        // Step 4: Get enrollment IDs (memory-cached after first call)
-        const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
-
-        // Step 5: Build batch params — one GraphQL call per student whose avg changed.
-        // Always includes a comment; score + override included because avg changed.
-
-        // Build Marzano plPrediction lookup for the synced outcome — used in comment
+        // Step 4: Build one update per student whose avg changed — comment names the
+        // outcome just saved. Marzano plPrediction lookup for the synced outcome.
         const plScoreByUserId = new Map();
         (cache?.students ?? []).forEach(student => {
             const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcomeId));
@@ -132,26 +126,19 @@ export async function updateAvgAssignmentForStudents({
             }
         });
 
-        const students = [];
-        // Teacher course-grade overrides set from the Current Score table: locked ones
+        const updates = [];
+        // Teacher Current Score overrides set from the Current Score table: locked ones
         // are left alone; unlocked ones are replaced by the average and cleared below.
         const avgSync = (cache?.sync_state ?? {})[String(avg_outcome_id)] ?? {};
-        const unlockedOverrideIds = [];
+        const unlockedOverrideIds = new Set();
 
         for (const { userId, average } of averages) {
-            const submissionId = submission_ids?.[String(userId)];
-            if (!submissionId) {
-                logger.warn(`[MOAvgService] No submission ID for student ${userId} — skipping`);
-                continue;
-            }
-
             const csOverride = activeOverrideEntry(avgSync[String(userId)]);
             // Locked: the override sets both the Current Score assignment and the course
             // grade, so writing either would undo it — leave the student alone.
             if (csOverride?.cs_override_lock === 'locked') continue;
-            if (csOverride) unlockedOverrideIds.push(String(userId));
+            if (csOverride) unlockedOverrideIds.add(String(userId));
 
-            const enrollmentId = enrollmentMap.get(String(userId));
             const noteText     = notes[String(userId)];
             // Prefer the score actually pushed, then will_post (teacher override), then plPrediction
             const syncEntry  = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(userId)] ?? {};
@@ -163,41 +150,17 @@ export async function updateAvgAssignmentForStudents({
                 ? `${outcomeName} Score updated: ${plScoreStr}, Note: ${noteText.trim()} | ${AVG_OUTCOME_NAME} updated: ${avgStr}`
                 : `${outcomeName} Score updated: ${plScoreStr} | ${AVG_OUTCOME_NAME} updated: ${avgStr}`;
 
-            students.push({
-                submissionId,
-                rubricAssociationId: rubric_association_id,
-                rubricCriterionId:   criterion_id,
-                points:              average,
-                score:               average,
-                comment,
-                userId,
-                ...(enrollmentId ? {
-                    enrollmentId,
-                    overrideScore:    OVERRIDE_SCALE(average),
-                    overrideStatusId: null,
-                } : {}),
-                customStatusId: null,
-            });
+            updates.push({ userId, average, comment });
         }
 
-        if (!students.length) {
-            logger.info('[MOAvgService] Nothing to update (no submission IDs, or only students with locked overrides)');
+        if (!updates.length) {
+            logger.info('[MOAvgService] Nothing to update (only students with locked overrides)');
             return true;
         }
 
-        // Step 6: Submit via GraphQL batch
-        const result = await submitRubricAssessmentBatch(students, apiClient, {
-            concurrency:  3,
-            maxAttempts:  2,
-            retryDelayMs: 500,
-        });
+        // Steps 5–8: the shared Current Score grading path
+        const result = await pushCurrentScores({ courseId, cache, apiClient, updates });
 
-        logger.info(
-            `[MOAvgService] Batch complete: ${result.successCount}/${students.length} succeeded, `
-            + `${result.errors.length} error(s)`
-        );
-
-        // Step 7: Refresh mastery after successful updates
         if (result.successCount > 0) {
             // Mark notes as submitted in sync_state so the row clears to synced
             if (Object.keys(notes).length > 0) {
@@ -228,11 +191,9 @@ export async function updateAvgAssignmentForStudents({
                 }).catch(err => logger.warn('[MOAvgService] Note-only post failed:', err.message));
             }
 
-
             // Unlocked teacher overrides were just replaced by the average — clear them
-            const failedOverrideIds = new Set((result.errors ?? []).map(e => String(e.userId)));
-            for (const uid of unlockedOverrideIds) {
-                if (!failedOverrideIds.has(uid)) clearOverrideFields(avgSync[uid]);
+            for (const uid of result.pushedIds) {
+                if (unlockedOverrideIds.has(uid)) clearOverrideFields(avgSync[uid]);
             }
 
             // Persist last_submitted to disk so it survives page reload
@@ -241,40 +202,6 @@ export async function updateAvgAssignmentForStudents({
             } catch (err) {
                 logger.warn('[MOAvgService] Failed to persist note submitted state:', err.message);
             }
-
-            try {
-                await refreshMasteryForAssignment(courseId, assignment_id);
-                logger.info(`[MOAvgService] Mastery refreshed for avg assignment ${assignment_id}`);
-            } catch (err) {
-                logger.warn('[MOAvgService] Mastery refresh failed (non-critical):', err.message);
-            }
-
-            // Step 8: Verify avg scores were accepted by Canvas — in the background.
-            // Not awaited: the save queue only waits for the push above. Step 8 reads
-            // the shared rollups and records avg_verify_* via the merge-safe writer.
-            // Current Score rows show ⏳ until Canvas's Current Score outcome matches.
-            const failedIds = new Set((result.errors ?? []).map(e => String(e.userId)));
-            const pushedAverages = averages.filter(a => !failedIds.has(String(a.userId)));
-            const avgKey = uid => `${avg_outcome_id}_${uid}`;
-            const expectedAvg = new Map(pushedAverages.map(a => [String(a.userId), a.average]));
-            pushedAverages.forEach(a => rowsAwaitingOutcome.add(avgKey(a.userId)));
-            notifySaveStatus(avg_outcome_id);
-
-            verifyAvgScores({
-                courseId, apiClient, avgOutcomeId: avg_outcome_id, averages: pushedAverages,
-                onProgress: (confirmedIds) => {
-                    for (const uid of confirmedIds) {
-                        rowsAwaitingOutcome.delete(avgKey(uid));
-                        setInMemoryCanvasScore(cache, avg_outcome_id, uid, expectedAvg.get(String(uid)));
-                    }
-                    notifySaveStatus(avg_outcome_id);
-                },
-            })
-                .catch(err => logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message))
-                .finally(() => {
-                    pushedAverages.forEach(a => rowsAwaitingOutcome.delete(avgKey(a.userId)));
-                    notifySaveStatus(avg_outcome_id);
-                });
         }
 
         return result.errors.length === 0;
@@ -283,6 +210,115 @@ export async function updateAvgAssignmentForStudents({
         logger.error('[MOAvgService] Avg update failed (non-critical):', err.message);
         return false;
     }
+}
+
+/**
+ * Write Current Scores to Canvas — the one grading path for every Current Score
+ * change made from Mastery Outlook (outcome saves and teacher overrides).
+ *
+ * Per student, one GraphQL call scores the Current Score assignment's rubric
+ * criterion, sets the course grade override (when the student has an active
+ * enrollment) and posts the comment; failures are retried by the batch. Then
+ * mastery is refreshed on the assignment and the scores are verified in the
+ * background — rows show ⏳ until Canvas's Current Score outcome matches, and
+ * avg_verify_* is recorded in sync_state.
+ *
+ * Students without a Current Score submission are skipped (logged), not errors.
+ *
+ * @param {Object} opts
+ * @param {string|number} opts.courseId
+ * @param {Object} opts.cache     - in-memory Mastery Outlook cache; avg_assignment required
+ * @param {Object} opts.apiClient
+ * @param {Array<{ userId: string|number, average: number, comment: string }>} opts.updates
+ * @returns {Promise<{ successCount: number, errors: Array<{ userId: string, error: string }>, pushedIds: string[] }>}
+ */
+export async function pushCurrentScores({ courseId, cache, apiClient, updates }) {
+    const { assignment_id, criterion_id, rubric_association_id,
+            submission_ids, avg_outcome_id } = cache.avg_assignment;
+
+    // Step 5: Enrollment IDs (memory-cached after first call) and batch params
+    const enrollmentMap = await getAllEnrollmentIds(courseId, apiClient);
+    const students = [];
+    for (const { userId, average, comment } of updates) {
+        const submissionId = submission_ids?.[String(userId)];
+        if (!submissionId) {
+            logger.warn(`[MOAvgService] No submission ID for student ${userId} — skipping`);
+            continue;
+        }
+        const enrollmentId = enrollmentMap.get(String(userId));
+        students.push({
+            submissionId,
+            rubricAssociationId: rubric_association_id,
+            rubricCriterionId:   criterion_id,
+            points:              average,
+            score:               average,
+            comment,
+            userId,
+            ...(enrollmentId ? {
+                enrollmentId,
+                overrideScore:    OVERRIDE_SCALE(average),
+                overrideStatusId: null,
+            } : {}),
+            customStatusId: null,
+        });
+    }
+
+    if (!students.length) return { successCount: 0, errors: [], pushedIds: [] };
+
+    // Step 6: Submit via GraphQL batch
+    const result = await submitRubricAssessmentBatch(students, apiClient, {
+        concurrency:  3,
+        maxAttempts:  2,
+        retryDelayMs: 500,
+    });
+    const errors = result.errors ?? [];
+
+    logger.info(
+        `[MOAvgService] Batch complete: ${result.successCount}/${students.length} succeeded, `
+        + `${errors.length} error(s)`
+    );
+
+    const failedIds = new Set(errors.map(e => String(e.userId)));
+    const sentIds   = new Set(students.map(s => String(s.userId)));
+    const pushed    = updates.filter(u => sentIds.has(String(u.userId)) && !failedIds.has(String(u.userId)));
+
+    if (pushed.length > 0) {
+        // Step 7: Refresh mastery — Canvas mislabels points_possible = 0 assignments until it runs
+        try {
+            await refreshMasteryForAssignment(courseId, assignment_id);
+            logger.info(`[MOAvgService] Mastery refreshed for avg assignment ${assignment_id}`);
+        } catch (err) {
+            logger.warn('[MOAvgService] Mastery refresh failed (non-critical):', err.message);
+        }
+
+        // Step 8: Verify avg scores were accepted by Canvas — in the background.
+        // Not awaited: the save queue only waits for the push above. Step 8 reads
+        // the shared rollups and records avg_verify_* via the merge-safe writer.
+        // Current Score rows show ⏳ until Canvas's Current Score outcome matches.
+        const pushedAverages = pushed.map(u => ({ userId: u.userId, average: u.average }));
+        const avgKey = uid => `${avg_outcome_id}_${uid}`;
+        const expectedAvg = new Map(pushedAverages.map(a => [String(a.userId), a.average]));
+        pushedAverages.forEach(a => rowsAwaitingOutcome.add(avgKey(a.userId)));
+        notifySaveStatus(avg_outcome_id);
+
+        verifyAvgScores({
+            courseId, apiClient, avgOutcomeId: avg_outcome_id, averages: pushedAverages,
+            onProgress: (confirmedIds) => {
+                for (const uid of confirmedIds) {
+                    rowsAwaitingOutcome.delete(avgKey(uid));
+                    setInMemoryCanvasScore(cache, avg_outcome_id, uid, expectedAvg.get(String(uid)));
+                }
+                notifySaveStatus(avg_outcome_id);
+            },
+        })
+            .catch(err => logger.warn('[MOAvgService] Step 8 avg verify failed (non-critical):', err.message))
+            .finally(() => {
+                pushedAverages.forEach(a => rowsAwaitingOutcome.delete(avgKey(a.userId)));
+                notifySaveStatus(avg_outcome_id);
+            });
+    }
+
+    return { successCount: result.successCount, errors, pushedIds: pushed.map(u => String(u.userId)) };
 }
 
 // ─── Current Score (course grade) override ───────────────────────────────────
@@ -346,23 +382,16 @@ function formatOverrideDate(iso) {
 }
 
 /**
- * One GraphQL call: Current Score assignment rubric score, course grade override
- * (when enabled), and a comment — so nothing is half-written.
+ * Push one student's Current Score through the shared grading path
+ * (pushCurrentScores). Throws with Canvas's error when it isn't accepted.
  */
-async function writeCurrentScore({ courseId, studentId, setup, score, comment, apiClient }) {
-    const enrollmentId = ENABLE_GRADE_OVERRIDE ? await getEnrollmentIdForUser(courseId, studentId, apiClient) : null;
-    await submitRubricAssessment({
-        submissionId:        setup.submissionId,
-        rubricAssociationId: setup.rubricAssociationId,
-        rubricCriterionId:   setup.criterionId,
-        points:              score,
-        ...(enrollmentId ? { enrollmentId, overrideScore: OVERRIDE_SCALE(score), overrideStatusId: null } : {}),
-        customStatusId:      null,
-        comment,
-    }, apiClient);
-    // Canvas mislabels points_possible = 0 assignments until mastery is refreshed — background.
-    refreshMasteryForAssignment(courseId, setup.assignmentId)
-        .catch(err => logger.warn('[MOAvgService] Mastery refresh after override failed (non-critical):', err.message));
+async function pushOneCurrentScore({ courseId, studentId, score, comment, cache, apiClient }) {
+    const result = await pushCurrentScores({
+        courseId, cache, apiClient, updates: [{ userId: String(studentId), average: score, comment }],
+    });
+    if (!result.pushedIds.includes(String(studentId))) {
+        throw new Error(result.errors[0]?.error || 'Canvas did not accept the Current Score — try again');
+    }
 }
 
 /**
@@ -387,11 +416,12 @@ export function getCurrentScoreOverride(cache, avgOutcomeId, studentId) {
 }
 
 /**
- * Override a student's Current Score from the Current Score table. Sets the
- * Current Score assignment to the override (so the Current Score outcome and the
- * LMGB show it) and the course grade override (0–4 → OVERRIDE_SCALE percent, as
- * "Update Current Score" does), with the date and note as a comment, then records
- * it in sync_state. Keeps the current lock (new overrides start unlocked).
+ * Override a student's Current Score from the Current Score table. Goes through
+ * the same grading path as outcome saves (pushCurrentScores): scores the Current
+ * Score assignment's rubric with the override (so the Current Score outcome and
+ * the LMGB show it), sets the course grade override (0–4 → OVERRIDE_SCALE
+ * percent), comments the date and note, refreshes mastery and verifies. Then
+ * records it in sync_state. Keeps the current lock (new overrides start unlocked).
  *
  * @param {Object} opts
  * @param {string|number} opts.courseId
@@ -411,8 +441,8 @@ export async function setCurrentScoreOverride({ courseId, studentId, score, note
     const at = new Date().toISOString();
     const noteText = String(note ?? '').trim();
     const pct = ENABLE_GRADE_OVERRIDE ? ` (${OVERRIDE_SCALE(value)}%)` : '';
-    await writeCurrentScore({
-        courseId, studentId, setup, score: value, apiClient,
+    await pushOneCurrentScore({
+        courseId, studentId, score: value, cache, apiClient,
         comment: `${AVG_OUTCOME_NAME} override: ${value.toFixed(2)}${pct} · ${formatOverrideDate(at)}${noteText ? ` · Note: ${noteText}` : ''}`,
     });
 
@@ -424,7 +454,6 @@ export async function setCurrentScoreOverride({ courseId, studentId, score, note
     entry.cs_override_lock_at = entry.cs_override_lock_at ?? null;
     entry.cs_override_at      = at;
     entry.cs_override_by      = window.ENV?.current_user?.display_name ?? String(window.ENV?.current_user_id ?? '');
-    setInMemoryCanvasScore(cache, setup.avgOutcomeId, studentId, value);
     await writeSyncState(courseId, cache.sync_state, apiClient);
     logger.info(`[MOAvgService] Current Score override set for student ${studentId}: ${value}`);
     return entry;
@@ -450,11 +479,10 @@ export async function clearCurrentScoreOverride({ courseId, studentId, cache, ap
     const average = result?.average ?? null;
 
     if (average !== null) {
-        await writeCurrentScore({
-            courseId, studentId, setup, score: average, apiClient,
+        await pushOneCurrentScore({
+            courseId, studentId, score: average, cache, apiClient,
             comment: `${AVG_OUTCOME_NAME} override removed · ${formatOverrideDate()} · back to ${Number(average).toFixed(2)}`,
         });
-        setInMemoryCanvasScore(cache, setup.avgOutcomeId, studentId, average);
     }
 
     clearOverrideFields(avgSyncEntry(cache, setup.avgOutcomeId, studentId, true));
