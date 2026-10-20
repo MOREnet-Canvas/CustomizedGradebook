@@ -661,7 +661,11 @@ tr.os-needs-row td { background:#FFFDF7; }
 .cs-ov-input { width:3.5em; text-align:center; font-size:0.846em; font-family:inherit; padding:0.231em 0.385em; border-radius:0.615em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-primary); }
 .cs-ov-input.has-override { border-color:var(--amber-border); background:#FFF8EE; font-weight:600; }
 .cs-ov-input:focus { outline:2px solid var(--blue); outline-offset:1px; }
-.cs-ov-lock { background:none; border:1px solid transparent; border-radius:50%; width:1.6em; height:1.6em; padding:0; cursor:pointer; font-size:0.85em; line-height:1; }
+.cs-ov-lock { background:none; border:1px solid transparent; border-radius:50%; width:1.9em; height:1.9em; padding:0; cursor:pointer; font-size:1em; line-height:1; }
+.cs-ov-lock.saving, .cs-ov-lock.saving:hover { animation:cs-lock-spin 0.9s linear infinite; cursor:progress; opacity:.8; filter:none; border-color:transparent; background:none; }
+@keyframes cs-lock-spin { to { transform:rotate(360deg); } }
+@keyframes cs-lock-pulse { 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) { .cs-ov-lock.saving { animation:cs-lock-pulse 1.2s ease-in-out infinite; } }
 .cs-ov-lock.unlocked { filter:grayscale(1); opacity:.75; }
 .cs-ov-lock:hover { border-color:var(--amber-border); background:#FDF3E3; filter:none; opacity:1; }
 .cs-ov-lock:focus-visible { outline:2px solid var(--blue); outline-offset:1px; }

@@ -111,6 +111,21 @@ function warnBeforeUnload(e) {
     e.returnValue = '';
 }
 
+/**
+ * Show the browser's "Leave site?" prompt until `promise` settles (and the save
+ * queue is idle), so leaving mid-save can't silently drop it.
+ *
+ * @template T
+ * @param {Promise<T>} promise - e.g. a Current Score override or lock save
+ * @returns {Promise<T>} the same result
+ */
+export function warnUntilSettled(promise) {
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return promise.finally(() => {
+        if (!isSaveQueueBusy()) window.removeEventListener('beforeunload', warnBeforeUnload);
+    });
+}
+
 // ─── Debounced cache writer (optimistic UI + dedupe) ─────────────────────────
 
 /** Trailing-edge debounce window for cache writes. */

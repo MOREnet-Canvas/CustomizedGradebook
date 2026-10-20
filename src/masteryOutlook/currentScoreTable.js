@@ -34,7 +34,7 @@ const COLUMN_DRAG_TYPE = 'application/x-cg-outcome-column';
  * @returns {{ drafts: Object, saving: Set<string>, errors: Object, renamingId: string|null }}
  */
 export function createCurrentScoreViewState() {
-    return { drafts: {}, saving: new Set(), errors: {}, renamingId: null };
+    return { drafts: {}, saving: new Set(), locking: new Set(), errors: {}, renamingId: null };
 }
 
 /**
@@ -257,10 +257,11 @@ function renderOverrideCells(row, view) {
     const dirty  = isOverrideDirty(row, view);
     const sid    = escapeHtml(row.id);
 
+    const locking = view?.locking?.has(row.id);
     const lockHtml = row.override
-        ? `<button class="cs-ov-lock ${row.override.locked ? 'locked' : 'unlocked'}" data-action="cs-ov-lock" data-stu="${sid}"
-              aria-pressed="${row.override.locked}"
-              title="${row.override.locked
+        ? `<button class="cs-ov-lock ${row.override.locked ? 'locked' : 'unlocked'}${locking ? ' saving' : ''}" data-action="cs-ov-lock" data-stu="${sid}"
+              aria-pressed="${row.override.locked}"${locking ? ' disabled aria-busy="true"' : ''}
+              title="${locking ? 'Saving lock…' : row.override.locked
                   ? 'Locked — outcome saves keep this override. Click to unlock.'
                   : 'Unlocked — the next outcome save replaces this override with the Current Score. Click to lock.'}"
               aria-label="${row.override.locked ? 'Unlock override' : 'Lock override'}">${row.override.locked ? '🔒' : '🔓'}</button>`
@@ -544,7 +545,7 @@ export function wireCurrentScoreTable({
         if (action === 'cs-ov-lock') {
             e.stopPropagation();
             const row = rowById(el.dataset.stu);
-            if (row?.override) await onToggleLock?.(row.id, !row.override.locked);
+            if (row?.override && !view.locking?.has(row.id)) await onToggleLock?.(row.id, !row.override.locked);
             return;
         }
         if (action === 'os-refresh-outcome') {

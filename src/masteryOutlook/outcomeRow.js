@@ -23,7 +23,7 @@ import { getMasteryColor } from '../ui/masteryColors.js';
 import { roundToHalf } from './powerLaw.js';
 import { getSyncStatus, aggregateSyncStatus, scoresMatch, describeOverrideException, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import {
-    handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride,
+    handleSyncStudents, handleConfirmOverride, handleDismissOverride, handleRevertOverride, warnUntilSettled,
 } from './plOutlookActions.js';
 import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyncTable.js';
 import { runPLSync } from './plOutlookSync.js';
@@ -694,9 +694,9 @@ function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial, r
             renderTable();
             try {
                 // Same course-wide queue as outcome saves, so the two never interleave.
-                await runExclusive(() => score === null
+                await warnUntilSettled(runExclusive(() => score === null
                     ? clearCurrentScoreOverride({ courseId: ctx.courseId, studentId, cache, apiClient: ctx.apiClient })
-                    : setCurrentScoreOverride({ courseId: ctx.courseId, studentId, score, note, cache, apiClient: ctx.apiClient }));
+                    : setCurrentScoreOverride({ courseId: ctx.courseId, studentId, score, note, cache, apiClient: ctx.apiClient })));
                 delete view.drafts[studentId];
             } catch (err) {
                 logger.warn(`[MasteryOutlook] Current Score override failed for ${studentId}:`, err);
@@ -707,13 +707,19 @@ function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial, r
             }
         },
         onToggleLock: async (studentId, locked) => {
+            // Not optimistic: the padlock spins until the lock is saved, then flips.
+            view.locking.add(studentId);
+            delete view.errors[studentId];
+            renderTable();
             try {
-                await setCurrentScoreOverrideLock({ courseId: ctx.courseId, studentId, locked, cache, apiClient: ctx.apiClient });
+                await warnUntilSettled(setCurrentScoreOverrideLock({ courseId: ctx.courseId, studentId, locked, cache, apiClient: ctx.apiClient }));
             } catch (err) {
                 logger.warn(`[MasteryOutlook] Override lock failed for ${studentId}:`, err);
-                view.errors[studentId] = err.message || 'Could not change the lock';
+                view.errors[studentId] = "Couldn't save the lock — try again";
+            } finally {
+                view.locking.delete(studentId);
+                if (!torn) renderTable();
             }
-            if (!torn) renderTable();
         },
         onReorder: (order) => {
             cache.meta = cache.meta ?? {};

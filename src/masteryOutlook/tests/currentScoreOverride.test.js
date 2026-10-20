@@ -296,6 +296,26 @@ describe('Current Score table wiring', () => {
         teardown();
     });
 
+    test('while the lock saves, the padlock spins, keeps its old icon, and ignores clicks', async () => {
+        const cache = makeCache();
+        cache.sync_state = { [CS]: { '2': { cs_override_score: 3, cs_override_lock: 'unlocked' } } };
+        const { contentEl, state, handlers, teardown } = mountWired(cache);
+        state.csView.locking.add('2');
+        contentEl.innerHTML = renderCurrentScoreTable(cache.outcomes[1], cache, state.currentScoreSort, state.csView);
+
+        const lock = contentEl.querySelector('tr[data-stu="2"] [data-action="cs-ov-lock"]');
+        expect(lock.classList.contains('saving')).toBe(true);
+        expect(lock.disabled).toBe(true);
+        expect(lock.textContent).toBe('🔓');
+        expect(lock.title).toBe('Saving lock…');
+
+        lock.disabled = false;   // a click that slips through still does nothing
+        lock.click();
+        await Promise.resolve();
+        expect(handlers.onToggleLock).not.toHaveBeenCalled();
+        teardown();
+    });
+
     test('the padlock toggles the lock', async () => {
         const cache = makeCache();
         cache.sync_state = { [CS]: { '2': { cs_override_score: 3, cs_override_lock: 'unlocked' } } };
