@@ -39,6 +39,7 @@ import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
 import { exposeCGDevTools } from "./masteryOutlook/cgDevTools.js";
 import { loadDistrictConfig } from "./services/districtConfigService.js";
 import { initLmgbMasteryColors } from "./gradebook/lmgbMasteryColors.js";
+import { initLmgbOverrideLocks } from "./gradebook/lmgbOverrideLocks.js";
 import { ENABLE_LMGB_MASTERY_COLORS } from "./config.js";
 
 /**
@@ -125,6 +126,12 @@ import { ENABLE_LMGB_MASTERY_COLORS } from "./config.js";
             } catch (err) {
                 logger.warn('[Init] Failed to initialize LMGB mastery colors:', err);
             }
+        }
+
+        // LMGB 🔒 on Current Score cells with a locked Mastery Outlook override (read-only)
+        if (isLMGBPage()) {
+            initLmgbOverrideLocks()
+                .catch(err => logger.warn('[Init] Failed to initialize LMGB override locks:', err));
         }
 
         // Async block for Refresh Mastery initialization (standards-based courses only)
