@@ -18,9 +18,9 @@
 import { logger } from '../utils/logger.js';
 import { calculateStudentAverages } from '../services/gradeCalculator.js';
 import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.js';
-import { getAllEnrollmentIds } from '../services/gradeOverride.js';
+import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
-import { OVERRIDE_SCALE, AVG_OUTCOME_NAME } from '../config.js';
+import { OVERRIDE_SCALE, AVG_OUTCOME_NAME, ENABLE_GRADE_OVERRIDE } from '../config.js';
 import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
 import { fetchCourseRollupsForVerify, verifyPollDelayMs, VERIFY_NO_PROGRESS_LIMIT_MS } from './masteryOutlookDataService.js';
 import { rowsAwaitingOutcome, notifySaveStatus } from './masteryOutlookState.js';
@@ -133,6 +133,10 @@ export async function updateAvgAssignmentForStudents({
         });
 
         const students = [];
+        // Teacher course-grade overrides set from the Current Score table: locked ones
+        // are left alone; unlocked ones are replaced by the average and cleared below.
+        const avgSync = (cache?.sync_state ?? {})[String(avg_outcome_id)] ?? {};
+        const unlockedOverrideIds = [];
 
         for (const { userId, average } of averages) {
             const submissionId = submission_ids?.[String(userId)];
@@ -141,7 +145,16 @@ export async function updateAvgAssignmentForStudents({
                 continue;
             }
 
-            const enrollmentId = enrollmentMap.get(String(userId));
+            const csOverride     = activeOverrideEntry(avgSync[String(userId)]);
+            const overrideLocked = csOverride?.cs_override_lock === 'locked';
+            // A locked override always differs from the average, so calculateStudentAverages
+            // returns the student every time — skip unless the average itself changed.
+            if (overrideLocked && sameScore(currentScoreInCache(cache, avg_outcome_id, userId), average)) {
+                continue;
+            }
+            if (csOverride && !overrideLocked) unlockedOverrideIds.push(String(userId));
+
+            const enrollmentId = overrideLocked ? null : enrollmentMap.get(String(userId));
             const noteText     = notes[String(userId)];
             // Prefer the score actually pushed, then will_post (teacher override), then plPrediction
             const syncEntry  = ((cache?.sync_state ?? {})[String(outcomeId)] ?? {})[String(userId)] ?? {};
@@ -171,8 +184,8 @@ export async function updateAvgAssignmentForStudents({
         }
 
         if (!students.length) {
-            logger.warn('[MOAvgService] No students with submission IDs — skipping');
-            return false;
+            logger.info('[MOAvgService] Nothing to update (no submission IDs, or only locked overrides with an unchanged average)');
+            return true;
         }
 
         // Step 6: Submit via GraphQL batch
@@ -218,6 +231,12 @@ export async function updateAvgAssignmentForStudents({
                 }).catch(err => logger.warn('[MOAvgService] Note-only post failed:', err.message));
             }
 
+
+            // Unlocked teacher overrides were just replaced by the average — clear them
+            const failedOverrideIds = new Set((result.errors ?? []).map(e => String(e.userId)));
+            for (const uid of unlockedOverrideIds) {
+                if (!failedOverrideIds.has(uid)) clearOverrideFields(avgSync[uid]);
+            }
 
             // Persist last_submitted to disk so it survives page reload
             try {
@@ -267,6 +286,178 @@ export async function updateAvgAssignmentForStudents({
         logger.error('[MOAvgService] Avg update failed (non-critical):', err.message);
         return false;
     }
+}
+
+// ─── Current Score (course grade) override ───────────────────────────────────
+
+/**
+ * sync_state[avgOutcomeId][studentId] fields for a teacher's course-grade override
+ * set from the Current Score table. Cleared by setting them to null (a merge-safe
+ * reset — mergeCacheForWrite would resurrect deleted keys from disk).
+ */
+export const CS_OVERRIDE_FIELDS = Object.freeze([
+    'cs_override_score', 'cs_override_note', 'cs_override_lock', 'cs_override_at', 'cs_override_by',
+]);
+
+function activeOverrideEntry(entry) {
+    return entry && entry.cs_override_score !== null && entry.cs_override_score !== undefined ? entry : null;
+}
+
+function clearOverrideFields(entry) {
+    if (!entry) return;
+    for (const f of CS_OVERRIDE_FIELDS) entry[f] = null;
+}
+
+function sameScore(a, b) {
+    return a !== null && a !== undefined && b !== null && b !== undefined
+        && Math.abs(Number(a) - Number(b)) < 0.005;
+}
+
+function currentScoreInCache(cache, avgOutcomeId, userId) {
+    const v = cache?.students?.find(s => String(s.id) === String(userId))
+        ?.outcomes?.find(o => String(o.outcomeId) === String(avgOutcomeId))?.canvasScore;
+    return v === null || v === undefined || isNaN(v) ? null : Number(v);
+}
+
+function avgSyncEntry(cache, avgOutcomeId, studentId, create = false) {
+    const oId = String(avgOutcomeId);
+    const sId = String(studentId);
+    if (create) {
+        cache.sync_state = cache.sync_state ?? {};
+        cache.sync_state[oId] = cache.sync_state[oId] ?? {};
+        cache.sync_state[oId][sId] = cache.sync_state[oId][sId] ?? {};
+    }
+    return cache?.sync_state?.[oId]?.[sId] ?? null;
+}
+
+function requireAvgOutcomeId(cache) {
+    const id = cache?.avg_assignment?.avg_outcome_id;
+    if (!id) throw new Error('Current Score is not set up yet — run Refresh Data first');
+    return id;
+}
+
+/** Comment on the student's Current Score Assignment submission. Never throws. */
+async function postAvgAssignmentComment(courseId, cache, studentId, text, apiClient) {
+    const assignmentId = cache?.avg_assignment?.assignment_id;
+    if (!assignmentId) return false;
+    try {
+        await apiClient.put(
+            `/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`,
+            { comment: { text_comment: text } },
+            {},
+            'MOAvgService:currentScoreOverrideComment'
+        );
+        return true;
+    } catch (err) {
+        logger.warn(`[MOAvgService] Override comment not posted for student ${studentId}: ${err.message}`);
+        return false;
+    }
+}
+
+/**
+ * The teacher's Current Score override for one student, or null.
+ *
+ * @param {Object} cache
+ * @param {string|number} avgOutcomeId - Current Score outcome ID
+ * @param {string|number} studentId
+ * @returns {{ score: number, note: string, locked: boolean, at: string|null, by: string|null }|null}
+ */
+export function getCurrentScoreOverride(cache, avgOutcomeId, studentId) {
+    const entry = activeOverrideEntry(avgSyncEntry(cache, avgOutcomeId, studentId));
+    if (!entry) return null;
+    return {
+        score:  Number(entry.cs_override_score),
+        note:   entry.cs_override_note ?? '',
+        locked: entry.cs_override_lock === 'locked',
+        at:     entry.cs_override_at ?? null,
+        by:     entry.cs_override_by ?? null,
+    };
+}
+
+/**
+ * Set a student's course grade override from the Current Score table — the same
+ * course override "Update Current Score" writes (0–4 score → OVERRIDE_SCALE percent).
+ * Posts the note as a comment on the Current Score Assignment and records the
+ * override in sync_state. Keeps the current lock (new overrides start unlocked).
+ *
+ * @param {Object} opts
+ * @param {string|number} opts.courseId
+ * @param {string|number} opts.studentId
+ * @param {number} opts.score   - 0–4
+ * @param {string} [opts.note]
+ * @param {Object} opts.cache   - in-memory Mastery Outlook cache (mutated)
+ * @param {Object} opts.apiClient
+ * @returns {Promise<Object>} the updated sync_state entry
+ * @throws {Error} when overrides are disabled, Current Score isn't set up, or Canvas rejects it
+ */
+export async function setCurrentScoreOverride({ courseId, studentId, score, note = '', cache, apiClient }) {
+    if (!ENABLE_GRADE_OVERRIDE) throw new Error('Course grade overrides are turned off for this account');
+    const value = Number(score);
+    if (!Number.isFinite(value) || value < 0 || value > 4) throw new Error('Override must be a number from 0 to 4');
+    const avgOutcomeId = requireAvgOutcomeId(cache);
+
+    const enrollmentId = await getEnrollmentIdForUser(courseId, studentId, apiClient);
+    if (!enrollmentId) throw new Error('No active enrollment found for this student');
+
+    const percent = OVERRIDE_SCALE(value);
+    await setOverrideScoreGQL(enrollmentId, percent, apiClient);
+
+    const noteText = String(note ?? '').trim();
+    await postAvgAssignmentComment(courseId, cache, studentId,
+        `${AVG_OUTCOME_NAME} override: ${value.toFixed(2)} (${percent}%)${noteText ? ` · Note: ${noteText}` : ''}`,
+        apiClient);
+
+    const entry = avgSyncEntry(cache, avgOutcomeId, studentId, true);
+    entry.cs_override_score = value;
+    entry.cs_override_note  = noteText || null;
+    entry.cs_override_lock  = entry.cs_override_lock === 'locked' ? 'locked' : 'unlocked';
+    entry.cs_override_at    = new Date().toISOString();
+    entry.cs_override_by    = window.ENV?.current_user?.display_name ?? String(window.ENV?.current_user_id ?? '');
+    await writeSyncState(courseId, cache.sync_state, apiClient);
+    logger.info(`[MOAvgService] Current Score override set for student ${studentId}: ${value} (${percent}%)`);
+    return entry;
+}
+
+/**
+ * Remove a student's Current Score override: the course override goes back to the
+ * student's Current Score (the computed average Canvas shows) and the fields are cleared.
+ *
+ * @param {Object} opts - { courseId, studentId, cache, apiClient }
+ * @returns {Promise<void>}
+ */
+export async function clearCurrentScoreOverride({ courseId, studentId, cache, apiClient }) {
+    const avgOutcomeId = requireAvgOutcomeId(cache);
+    const current = currentScoreInCache(cache, avgOutcomeId, studentId);
+
+    if (ENABLE_GRADE_OVERRIDE && current !== null) {
+        const enrollmentId = await getEnrollmentIdForUser(courseId, studentId, apiClient);
+        if (enrollmentId) await setOverrideScoreGQL(enrollmentId, OVERRIDE_SCALE(current), apiClient);
+    }
+    await postAvgAssignmentComment(courseId, cache, studentId,
+        current !== null
+            ? `${AVG_OUTCOME_NAME} override removed — back to ${current.toFixed(2)}`
+            : `${AVG_OUTCOME_NAME} override removed`,
+        apiClient);
+
+    clearOverrideFields(avgSyncEntry(cache, avgOutcomeId, studentId, true));
+    await writeSyncState(courseId, cache.sync_state, apiClient);
+    logger.info(`[MOAvgService] Current Score override cleared for student ${studentId}`);
+}
+
+/**
+ * Lock or unlock a student's Current Score override. Locked overrides are not
+ * replaced when an outcome save recalculates the Current Score. No Canvas call.
+ *
+ * @param {Object} opts - { courseId, studentId, locked, cache, apiClient }
+ * @returns {Promise<boolean>} false when the student has no override
+ */
+export async function setCurrentScoreOverrideLock({ courseId, studentId, locked, cache, apiClient }) {
+    const avgOutcomeId = requireAvgOutcomeId(cache);
+    const entry = activeOverrideEntry(avgSyncEntry(cache, avgOutcomeId, studentId));
+    if (!entry) return false;
+    entry.cs_override_lock = locked ? 'locked' : 'unlocked';
+    await writeSyncState(courseId, cache.sync_state, apiClient);
+    return true;
 }
 
 /**

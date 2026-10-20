@@ -26,7 +26,8 @@ import { mountOutcomeRow, isOutcomeInitialized } from './outcomeRow.js';
 import { scoresMatch, getSyncStatus, latestAttemptScore, describeOverrideException } from './plOutlookSyncStatus.js';
 import { fetchOutcomeNames, fetchOutcomeRollups } from './masteryOutlookDataService.js';
 import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
-import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
+import { saveOutcomeLayout } from './outcomeLayoutService.js';
+import { notifyOutcomeLayout } from './masteryOutlookState.js';
 import {
     isCurrentScoreOutcome, isSpecialOutcome, isRegularOutcome, orderOutcomesForPage
 } from './outcomeTypes.js';
@@ -467,6 +468,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
                     if (JSON.stringify(newOrder) !== JSON.stringify(cache.meta.customOutcomeOrder)) {
                         cache.meta.customOutcomeOrder = newOrder;
                         saveCustomOutcomeOrder(newOrder);
+                        notifyOutcomeLayout();   // Current Score columns follow the new order
                         let newIndex = 0;
                         outcomesEl.querySelectorAll('[data-outcome-id]').forEach(el => {
                             newIndex++;
@@ -493,31 +495,8 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
         renderCourseSyncStrip(cache);
     }
 
-    async function saveCustomOutcomeOrder(orderArray) {
-        const courseId  = ctx.courseId;
-        const apiClient = ctx.apiClient;
-        try {
-            const pageUrl = await findMasteryDashboardPageUrl(courseId, apiClient);
-            if (!pageUrl) {
-                logger.warn('[MasteryOutlook] Cannot save outcome order — Mastery Dashboard page not found');
-                return;
-            }
-            const page = await getPage(courseId, pageUrl, apiClient);
-            if (page && page.body) {
-                let newBody = page.body;
-                const orderJson = JSON.stringify(orderArray);
-                // Canvas HTML-encodes the body on save (e.g. " → &quot;), so match both quote styles
-                if (newBody.includes('data-outcome-order=')) {
-                    newBody = newBody.replace(/data-outcome-order=(?:"[^"]*"|'[^']*')/, `data-outcome-order='${orderJson}'`);
-                } else {
-                    newBody = newBody.replace(/<div\s+id=["']mastery-dashboard-root["']/, `<div id="mastery-dashboard-root" data-outcome-order='${orderJson}'`);
-                }
-                await updatePage(courseId, pageUrl, { body: newBody }, apiClient);
-                logger.info('[MasteryOutlook] Saved custom outcome order to wiki page');
-            }
-        } catch (e) {
-            logger.warn('[MasteryOutlook] Failed to save custom outcome order', e);
-        }
+    function saveCustomOutcomeOrder(orderArray) {
+        return saveOutcomeLayout(ctx.courseId, ctx.apiClient, { order: orderArray });
     }
 
     function teardown() {

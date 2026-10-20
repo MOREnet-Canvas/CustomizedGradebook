@@ -29,8 +29,11 @@ import { renderOutcomeStudentTable, wireOutcomeStudentTable } from './studentSyn
 import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats, fetchCourseRollupsForVerify, clearCourseRollupReuse } from './masteryOutlookDataService.js';
-import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome } from './masteryOutlookState.js';
-import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT } from './currentScoreTable.js';
+import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome, subscribeOutcomeLayout, notifyOutcomeLayout } from './masteryOutlookState.js';
+import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT, createCurrentScoreViewState } from './currentScoreTable.js';
+import { setCurrentScoreOverride, clearCurrentScoreOverride, setCurrentScoreOverrideLock } from './masteryOutlookAvgService.js';
+import { saveOutcomeLayout } from './outcomeLayoutService.js';
+import { getOutcomeDisplayName } from './outcomeTypes.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -611,12 +614,12 @@ async function refreshAllCanvasScores(cache, ctx) {
 // ─── Detail panel (Current Score) ────────────────────────────────────────────
 
 /**
- * Current Score detail panel — no tabs, no overrides: a sortable table of each
- * student's averaged-outcome chips and Current Score (currentScoreTable.js).
- * Redraws on save activity for *any* outcome, since a save anywhere changes
- * a chip and the Current Score.
+ * Current Score detail panel — no tabs: a sortable table of each student's
+ * averaged-outcome scores (named, reorderable columns), Current Score, and a
+ * course-grade Override + Note (currentScoreTable.js). Redraws on save activity
+ * for *any* outcome, since a save anywhere changes a chip and the Current Score.
  */
-function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial }) {
+function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial, rerender }) {
     const panel = document.createElement('div');
     panel.className = 'od-detail-panel';
 
@@ -625,13 +628,37 @@ function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial })
     panel.appendChild(content);
 
     if (!state.currentScoreSort) state.currentScoreSort = { ...DEFAULT_CURRENT_SCORE_SORT };
+    if (!state.csView) state.csView = createCurrentScoreViewState();
+    const view = state.csView;
 
+    // Background redraws wait while the teacher is typing in the table, so the
+    // input keeps focus; they run when focus leaves.
+    let renderDeferred = false;
+    const isTyping = () => {
+        const a = document.activeElement;
+        return a && a.tagName === 'INPUT' && content.contains(a);
+    };
     const renderTable = () => {
-        content.innerHTML = renderCurrentScoreTable(outcome, cache, state.currentScoreSort);
+        renderDeferred = false;
+        content.innerHTML = renderCurrentScoreTable(outcome, cache, state.currentScoreSort, view);
         const syncCellEl = content.closest('.od-outcome-container')?.querySelector('.od-sync-cell');
         if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
     };
+    const renderWhenIdle = () => {
+        if (isTyping()) { renderDeferred = true; return; }
+        renderTable();
+    };
+    const onFocusOut = () => setTimeout(() => { if (renderDeferred && !isTyping()) renderTable(); }, 0);
+    content.addEventListener('focusout', onFocusOut);
     renderTable();
+
+    // Order / names changed (here or by the outcome-list drag-and-drop): save to
+    // the Mastery Dashboard page, then redraw the outcome list and this table.
+    const commitLayout = (layout) => {
+        saveOutcomeLayout(ctx.courseId, ctx.apiClient, layout);
+        if (rerender) rerender();
+        else { notifyOutcomeLayout(); renderTable(); }
+    };
 
     // Coalesce bursts of save-status changes into one redraw per frame.
     let pendingRender = null;
@@ -639,32 +666,82 @@ function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial })
         if (pendingRender != null) return;
         pendingRender = requestAnimationFrame(() => {
             pendingRender = null;
-            renderTable();
+            renderWhenIdle();
         });
     };
 
     let torn = false;
-    refreshAllCanvasScores(cache, ctx).then(() => { if (!torn) renderTable(); });
+    refreshAllCanvasScores(cache, ctx).then(() => { if (!torn) renderWhenIdle(); });
 
     const unwire = wireCurrentScoreTable({
         contentEl: content,
         state,
+        outcome,
+        cache,
         renderTable,
         onRefreshOutcome: async () => {
             clearCourseRollupReuse();
             await refreshAllCanvasScores(cache, ctx);
             renderTable();
         },
+        onSaveOverride: async (studentId, { score, note }) => {
+            view.saving.add(studentId);
+            delete view.errors[studentId];
+            renderTable();
+            try {
+                // Same course-wide queue as outcome saves, so the two never interleave.
+                await runExclusive(() => score === null
+                    ? clearCurrentScoreOverride({ courseId: ctx.courseId, studentId, cache, apiClient: ctx.apiClient })
+                    : setCurrentScoreOverride({ courseId: ctx.courseId, studentId, score, note, cache, apiClient: ctx.apiClient }));
+                delete view.drafts[studentId];
+            } catch (err) {
+                logger.warn(`[MasteryOutlook] Current Score override failed for ${studentId}:`, err);
+                view.errors[studentId] = err.message || 'Save failed';
+            } finally {
+                view.saving.delete(studentId);
+                if (!torn) renderTable();
+            }
+        },
+        onToggleLock: async (studentId, locked) => {
+            try {
+                await setCurrentScoreOverrideLock({ courseId: ctx.courseId, studentId, locked, cache, apiClient: ctx.apiClient });
+            } catch (err) {
+                logger.warn(`[MasteryOutlook] Override lock failed for ${studentId}:`, err);
+                view.errors[studentId] = err.message || 'Could not change the lock';
+            }
+            if (!torn) renderTable();
+        },
+        onReorder: (order) => {
+            cache.meta = cache.meta ?? {};
+            cache.meta.customOutcomeOrder = order;
+            commitLayout({ order });
+        },
+        onRename: (outcomeId, name) => {
+            const o = (cache.outcomes || []).find(x => String(x.id) === String(outcomeId));
+            const trimmed = String(name ?? '').trim();
+            const names = { ...(cache.meta?.customOutcomeNames ?? {}) };
+            const before = names[String(outcomeId)];
+            if (!trimmed || trimmed === o?.title) delete names[String(outcomeId)];
+            else names[String(outcomeId)] = trimmed;
+            if (names[String(outcomeId)] === before) return;
+            cache.meta = cache.meta ?? {};
+            cache.meta.customOutcomeNames = names;
+            commitLayout({ names });
+        },
     });
 
     const unsubscribe = subscribeSaveStatus(() => scheduleRender());
+    // The outcome-list drag-and-drop changed the order — redraw the columns.
+    const unsubscribeLayout = subscribeOutcomeLayout(() => scheduleRender());
 
     return {
         panel,
         detailTeardown: () => {
             torn = true;
             if (pendingRender != null) cancelAnimationFrame(pendingRender);
+            content.removeEventListener('focusout', onFocusOut);
             unsubscribe();
+            unsubscribeLayout();
             unwire();
         },
     };
@@ -1079,7 +1156,7 @@ export function mountOutcomeRow({
     row.innerHTML = `
         <div class="od-row-number row-num">${displayNumber}</div>
         <div>
-            <div class="row-title">${escapeHtml(outcome.title)}</div>
+            <div class="row-title"${getOutcomeDisplayName(outcome, cache) !== outcome.title ? ` title="${escapeHtml(outcome.title)}"` : ''}>${escapeHtml(getOutcomeDisplayName(outcome, cache))}</div>
         </div>
         ${rightSideHtml}
         ${initialized ? syncChipHtml : ''}

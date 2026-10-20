@@ -126,7 +126,6 @@ function snapshotCache(cache) {
     return JSON.stringify({
         sync_state:              cache.sync_state              ?? {},
         ignored_alignments:      cache.ignored_alignments      ?? [],
-        current_score_overrides: cache.current_score_overrides ?? {},
     });
 }
 
@@ -1006,77 +1005,5 @@ export function handleUnignoreAlignment({ outcomeId, studentId, alignmentId, cac
     logger.debug(`[PLActions] Alignment un-ignored (${cache.ignored_alignments.length} remaining)`);
 
     recomputeStudentProjection(cache, outcomeId, studentId);
-    onRerender?.();
-}
-
-// ─── Current Score overrides (spec Sections 5F and 5G) ───────────────────────
-
-/**
- * Override the Current Score for one student.
- *
- * Writes to cache.current_score_overrides[studentId].
- * On next Update Current Score run, students with an active override are
- * skipped — Canvas keeps the manually set score.
- *
- * TODO: Push override score to Canvas via the Current Score assignment rubric.
- *       Post comment to Current Score assignment if reason is provided.
- *
- * @param {Object}  opts
- * @param {string}  opts.courseId
- * @param {string}  opts.studentId
- * @param {number}  opts.overrideScore  - Numeric score to set
- * @param {string}  [opts.reason]       - Teacher-provided reason
- * @param {Object}  opts.apiClient
- * @param {Function} opts.onRerender
- */
-export async function handleOverrideCurrentScore({ courseId, studentId, overrideScore, reason = null, apiClient, onRerender }) {
-    logger.info(`[PLActions] Override Current Score: student ${studentId}, score ${overrideScore}`);
-
-    const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
-    rawCache.current_score_overrides = rawCache.current_score_overrides ?? {};
-
-    rawCache.current_score_overrides[String(studentId)] = {
-        score:          overrideScore,
-        reason:         reason || null,
-        override_by:    String(window.ENV?.current_user_id ?? 'unknown'),
-        override_at:    new Date().toISOString(),
-        comment_posted: false,
-    };
-
-    await writeMasteryOutlookCache(courseId, apiClient, rawCache);
-    logger.debug(`[PLActions] current_score_overrides written for student ${studentId}`);
-
-    // TODO: Push overrideScore to Canvas Current Score assignment rubric
-    // TODO: Post comment to Current Score assignment if reason is provided
-
-    onRerender?.();
-}
-
-/**
- * Clear the Current Score override for one student, reverting to the
- * Power Law average.
- *
- * Removes cache.current_score_overrides[studentId].
- *
- * TODO: Push recalculated Current Score to Canvas avg_assignment.
- *
- * @param {Object}  opts
- * @param {string}  opts.courseId
- * @param {string}  opts.studentId
- * @param {Object}  opts.apiClient
- * @param {Function} opts.onRerender
- */
-export async function handleClearCurrentScoreOverride({ courseId, studentId, apiClient, onRerender }) {
-    logger.info(`[PLActions] Clear Current Score override: student ${studentId}`);
-
-    const rawCache = await readMasteryOutlookCache(courseId, apiClient) ?? {};
-    rawCache.current_score_overrides = rawCache.current_score_overrides ?? {};
-    delete rawCache.current_score_overrides[String(studentId)];
-
-    await writeMasteryOutlookCache(courseId, apiClient, rawCache);
-    logger.debug(`[PLActions] current_score_overrides cleared for student ${studentId}`);
-
-    // TODO: Push recalculated (non-overridden) Current Score to Canvas
-
     onRerender?.();
 }

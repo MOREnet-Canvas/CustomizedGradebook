@@ -1,10 +1,16 @@
 // src/masteryOutlook/currentScoreTable.js
 /**
- * Current Score detail table — read-only.
+ * Current Score detail table.
  *
- * One row per student: a chip per averaged outcome (the student's Canvas score,
- * in page order) and the Current Score Canvas reports. No overrides — the
- * Current Score is computed from the other outcomes, never set directly here.
+ * One row per student: a column per averaged outcome (the student's Canvas
+ * score, in the teacher's outcome order), the Current Score Canvas reports, and
+ * a course-grade Override + Note.
+ *
+ * - Outcome column headers show the teacher's display names (✎ to rename) and
+ *   can be dragged to reorder — the same order as the outcome-list drag-and-drop.
+ * - Override sets the course grade override (0–4, same as "Update Current Score").
+ *   🔓 unlocked (default): the next outcome save recalculates the Current Score and
+ *   replaces it. 🔒 locked: outcome saves leave it alone.
  *
  * ⏳ marks a chip while that outcome's save for the student is queued / running
  * or Canvas hasn't recalculated it yet, and marks the Current Score while any of
@@ -13,11 +19,23 @@
 
 import { escapeHtml } from '../utils/html.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
-import { getAveragedOutcomes } from './outcomeTypes.js';
+import { ENABLE_GRADE_OVERRIDE } from '../config.js';
+import { getAveragedOutcomes, getOutcomeDisplayName } from './outcomeTypes.js';
 import { rowSavePhase, rowsAwaitingOutcome } from './masteryOutlookState.js';
 
 /** Default sort: student name, A→Z. */
 export const DEFAULT_CURRENT_SCORE_SORT = Object.freeze({ key: 'name', dir: 'asc' });
+
+/** dataTransfer type for dragging an outcome column header. */
+const COLUMN_DRAG_TYPE = 'application/x-cg-outcome-column';
+
+/**
+ * Fresh per-panel view state for the editable parts of the table.
+ * @returns {{ drafts: Object, saving: Set<string>, errors: Object, renamingId: string|null }}
+ */
+export function createCurrentScoreViewState() {
+    return { drafts: {}, saving: new Set(), errors: {}, renamingId: null };
+}
 
 /**
  * True while a row ("outcomeId_studentId") has a save queued / running or is
@@ -43,12 +61,25 @@ function canvasScoreOf(student, outcomeId) {
 }
 
 /**
+ * The teacher's course-grade override for a student (sync_state on the Current
+ * Score outcome), or null.
+ * @returns {{ score: number, note: string, locked: boolean }|null}
+ */
+function overrideOf(cache, outcomeId, studentId) {
+    const entry = cache.sync_state?.[String(outcomeId)]?.[String(studentId)];
+    const score = entry?.cs_override_score;
+    if (score === null || score === undefined || isNaN(score)) return null;
+    return { score: Number(score), note: entry.cs_override_note ?? '', locked: entry.cs_override_lock === 'locked' };
+}
+
+/**
  * Build the Current Score table rows.
  *
  * @param {Object} outcome - the Current Score outcome
  * @param {Object} cache
  * @returns {{ outcomes: Object[], rows: Array<{ id: string, name: string, sortableName: string,
  *            current: number|null, currentPending: boolean,
+ *            override: { score: number, note: string, locked: boolean }|null,
  *            chips: Array<{ outcomeId: string, title: string, score: number|null, pending: boolean }> }> }}
  */
 export function buildCurrentScoreRows(outcome, cache) {
@@ -57,7 +88,7 @@ export function buildCurrentScoreRows(outcome, cache) {
         const sid = String(student.id);
         const chips = outcomes.map(o => ({
             outcomeId: String(o.id),
-            title:     o.title || String(o.id),
+            title:     getOutcomeDisplayName(o, cache),
             score:     canvasScoreOf(student, o.id),
             pending:   isScorePending(o.id, sid),
         }));
@@ -67,6 +98,7 @@ export function buildCurrentScoreRows(outcome, cache) {
             sortableName:   student.sortableName || student.name || sid,
             current:        canvasScoreOf(student, outcome.id),
             currentPending: chips.some(c => c.pending) || rowsAwaitingOutcome.has(`${outcome.id}_${sid}`),
+            override:       overrideOf(cache, outcome.id, sid),
             chips,
         };
     });
@@ -101,6 +133,44 @@ export function sortCurrentScoreRows(rows, sortState = DEFAULT_CURRENT_SCORE_SOR
     });
 }
 
+/**
+ * Parse an Override box value. '' → null (no override / remove it).
+ * @param {string} text
+ * @returns {{ value: number|null, error: string|null }}
+ */
+export function parseOverrideInput(text) {
+    const t = String(text ?? '').trim();
+    if (t === '') return { value: null, error: null };
+    const n = Number(t);
+    if (!Number.isFinite(n) || n < 0 || n > 4) return { value: null, error: 'Enter a score from 0 to 4' };
+    return { value: n, error: null };
+}
+
+/** Override / note text currently shown for a row (draft if the teacher is editing). */
+function draftFor(row, view) {
+    const d = view?.drafts?.[row.id];
+    return {
+        score: d?.score ?? (row.override ? String(row.override.score) : ''),
+        note:  d?.note  ?? (row.override?.note ?? ''),
+    };
+}
+
+/**
+ * True when the row's Override / Note differ from what's saved.
+ * @param {Object} row  - from buildCurrentScoreRows
+ * @param {Object} view - from createCurrentScoreViewState
+ * @returns {boolean}
+ */
+export function isOverrideDirty(row, view) {
+    const draft = draftFor(row, view);
+    const { value, error } = parseOverrideInput(draft.score);
+    if (error) return true;   // let Save run so it can show the error
+    const savedScore = row.override?.score ?? null;
+    const scoreChanged = value === null ? savedScore !== null : (savedScore === null || Math.abs(value - savedScore) > 1e-9);
+    const noteChanged = draft.note.trim() !== (row.override?.note ?? '').trim();
+    return scoreChanged || (noteChanged && (value !== null || savedScore !== null));
+}
+
 function renderChip(chip) {
     const hasScore = chip.score !== null;
     const style = scoreToneStyle(hasScore ? scoreTone(chip.score) : 'ne');
@@ -114,15 +184,80 @@ function renderChip(chip) {
         style="${style}">${text}</span><span class="cs-pending${chip.pending ? '' : ' hidden'}"${chip.pending ? '' : ' aria-hidden="true"'}>⏳</span></span>`;
 }
 
+function renderColumnHeader(o, cache, view) {
+    const oid  = escapeHtml(String(o.id));
+    const name = getOutcomeDisplayName(o, cache);
+    if (view?.renamingId === String(o.id)) {
+        return `<th class="c cs-col-head renaming" data-col-oid="${oid}">
+              <input class="cs-col-rename-input" data-action="cs-rename-input" data-oid="${oid}"
+                  value="${escapeHtml(name)}" aria-label="Name for ${escapeHtml(o.title || name)}"
+                  placeholder="${escapeHtml(o.title || '')}">
+            </th>`;
+    }
+    const tip = name !== o.title
+        ? `${name} (${o.title}) — drag to reorder`
+        : `${name} — drag to reorder`;
+    return `<th class="c cs-col-head" draggable="true" data-col-oid="${oid}" title="${escapeHtml(tip)}">
+          <span class="cs-col-name">${escapeHtml(name)}</span><button class="cs-col-rename" data-action="cs-rename"
+              data-oid="${oid}" title="Rename" aria-label="Rename ${escapeHtml(name)}">✎</button>
+        </th>`;
+}
+
+function renderOverrideCells(row, view) {
+    const draft  = draftFor(row, view);
+    const saving = view?.saving?.has(row.id);
+    const error  = view?.errors?.[row.id];
+    const dirty  = isOverrideDirty(row, view);
+    const sid    = escapeHtml(row.id);
+
+    const lockHtml = row.override
+        ? `<button class="cs-ov-lock ${row.override.locked ? 'locked' : 'unlocked'}" data-action="cs-ov-lock" data-stu="${sid}"
+              aria-pressed="${row.override.locked}"
+              title="${row.override.locked
+                  ? 'Locked — outcome saves keep this override. Click to unlock.'
+                  : 'Unlocked — the next outcome save replaces this override with the Current Score. Click to lock.'}"
+              aria-label="${row.override.locked ? 'Unlock override' : 'Lock override'}">${row.override.locked ? '🔒' : '🔓'}</button>`
+        : '';
+
+    const removing = parseOverrideInput(draft.score).value === null && row.override;
+    const saveHtml = saving
+        ? `<span class="os-posting"><span class="spinner"></span> Saving…</span>`
+        : `<button class="os-save-row-btn ${dirty ? 'needs' : 'synced'}" data-action="cs-ov-save" data-stu="${sid}"
+              ${dirty ? '' : 'disabled'}
+              title="${removing ? 'Remove the override' : dirty ? 'Save override to Canvas' : 'No changes'}">
+             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
+               ${dirty ? '<polyline points="2,7 6,3 10,7"/><line x1="6" y1="3" x2="6" y2="11"/>' : '<polyline points="2.5,6.5 5,9 9.5,3.5"/>'}
+             </svg>
+           </button>`;
+
+    return `
+      <td class="c cs-ov-cell">
+        <span class="cs-ov-wrap">
+          <input class="cs-ov-input${row.override ? ' has-override' : ''}" type="text" inputmode="decimal"
+              data-action="cs-ov-score" data-stu="${sid}" value="${escapeHtml(draft.score)}"
+              placeholder="—" aria-label="Course grade override for ${escapeHtml(row.name)} (0–4)">${lockHtml}
+        </span>
+      </td>
+      <td class="os-td-comment">
+        <input class="os-comment-input cs-ov-note" type="text" data-action="cs-ov-note" data-stu="${sid}"
+            value="${escapeHtml(draft.note)}" placeholder="Note…" aria-label="Override note for ${escapeHtml(row.name)}">
+      </td>
+      <td class="c">${saveHtml}${error ? `<div class="cs-ov-error" role="alert">${escapeHtml(error)}</div>` : ''}</td>`;
+}
+
 /**
  * Render the Current Score table (toolbar + table).
  *
  * @param {Object} outcome - the Current Score outcome
  * @param {Object} cache
  * @param {{ key: string, dir: 'asc'|'desc' }} [sortState]
+ * @param {Object} [view] - from createCurrentScoreViewState (drafts, saving, errors, renamingId)
+ * @param {{ overrideEnabled?: boolean }} [options]
  * @returns {string} HTML
  */
-export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURRENT_SCORE_SORT) {
+export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURRENT_SCORE_SORT,
+                                        view = createCurrentScoreViewState(),
+                                        { overrideEnabled = ENABLE_GRADE_OVERRIDE } = {}) {
     const { outcomes, rows } = buildCurrentScoreRows(outcome, cache);
     const sorted = sortCurrentScoreRows(rows, sortState);
     const dir = sortState?.dir === 'desc' ? 'desc' : 'asc';
@@ -133,7 +268,7 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
     const options = [
         option('name', 'Student name'),
         option('current', 'Current Score'),
-        ...outcomes.map(o => option(String(o.id), o.title || String(o.id))),
+        ...outcomes.map(o => option(String(o.id), getOutcomeDisplayName(o, cache))),
     ].join('');
 
     const toolbar = `
@@ -159,50 +294,157 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
         return `
             <tr data-stu="${escapeHtml(r.id)}">
               <td><span class="os-stu-name">${escapeHtml(r.name)}</span></td>
-              <td class="cs-chips">${r.chips.map(renderChip).join(' ')}</td>
+              ${r.chips.map(c => `<td class="c cs-chip-cell">${renderChip(c)}</td>`).join('')}
               <td class="c cs-current">
                 <span class="os-pill" style="${currentStyle}"
                     ${r.currentPending ? 'title="Waiting for Canvas to update the Current Score"' : ''}>${hasCurrent ? r.current.toFixed(2) : '—'}</span>${r.currentPending ? '<span class="cs-pending"> ⏳</span>' : ''}
               </td>
+              ${overrideEnabled ? renderOverrideCells(r, view) : ''}
             </tr>`;
     }).join('');
 
+    const hint = overrideEnabled
+        ? `Current Score = the average of the student's outcome scores in Canvas · ⏳ = Canvas is updating ·
+           Override sets the course grade (0–4) · 🔓 the next outcome save replaces it · 🔒 keeps it ·
+           Drag outcome names to reorder · ✎ to rename`
+        : `Current Score = the average of the student's outcome scores in Canvas · ⏳ = Canvas is updating ·
+           Drag outcome names to reorder · ✎ to rename · Course grade overrides are turned off for this account`;
+
     return `
         ${toolbar}
-        <div class="os-block">
+        <div class="os-block cs-table-wrap">
           <table>
             <thead><tr>
               <th style="width:1%;min-width:130px;white-space:nowrap;">Student</th>
-              <th>Outcomes</th>
+              ${outcomes.map(o => renderColumnHeader(o, cache, view)).join('')}
               <th class="c">Canvas</th>
+              ${overrideEnabled ? '<th class="c">Override</th><th>Note</th><th class="c">Save</th>' : ''}
             </tr></thead>
             <tbody>${body}</tbody>
           </table>
         </div>
-        <div class="os-table-hint">
-          Current Score = the average of the student's outcome scores in Canvas · Each chip is one outcome (hover for its name) · ⏳ = Canvas is updating
-        </div>`;
+        <div class="os-table-hint">${hint}</div>`;
 }
 
 /**
- * Wire the Current Score table's sort controls and refresh button. Listeners are
- * delegated on contentEl, so they survive renderTable() replacing its HTML.
+ * Move `draggedId` before/after `targetId` in `order`.
+ * @param {string[]} order
+ * @param {string} draggedId
+ * @param {string} targetId
+ * @param {boolean} after
+ * @returns {string[]}
+ */
+export function moveOutcomeInOrder(order, draggedId, targetId, after) {
+    const ids = order.map(String).filter(id => id !== String(draggedId));
+    const at  = ids.indexOf(String(targetId));
+    if (at === -1) return order.map(String);
+    ids.splice(after ? at + 1 : at, 0, String(draggedId));
+    return ids;
+}
+
+/**
+ * Wire the Current Score table. Listeners are delegated on contentEl, so they
+ * survive renderTable() replacing its HTML.
  *
  * @param {Object}   opts
  * @param {HTMLElement} opts.contentEl
- * @param {Object}   opts.state            - holds currentScoreSort
+ * @param {Object}   opts.state            - holds currentScoreSort and csView
+ * @param {Object}   opts.outcome          - the Current Score outcome
+ * @param {Object}   opts.cache
  * @param {Function} opts.renderTable
  * @param {Function} [opts.onRefreshOutcome] - re-pull Canvas scores
+ * @param {Function} [opts.onSaveOverride]   - (studentId, { score: number|null, note }) => Promise
+ * @param {Function} [opts.onToggleLock]     - (studentId, locked: boolean) => Promise
+ * @param {Function} [opts.onReorder]        - (newOrder: string[]) => void
+ * @param {Function} [opts.onRename]         - (outcomeId, name) => void
  * @returns {Function} teardown
  */
-export function wireCurrentScoreTable({ contentEl, state, renderTable, onRefreshOutcome }) {
+export function wireCurrentScoreTable({
+    contentEl, state, outcome, cache, renderTable, onRefreshOutcome,
+    onSaveOverride, onToggleLock, onReorder, onRename,
+}) {
     if (!state.currentScoreSort) state.currentScoreSort = { ...DEFAULT_CURRENT_SCORE_SORT };
+    if (!state.csView) state.csView = createCurrentScoreViewState();
+    const view = state.csView;
+
+    const rowById = (sid) => buildCurrentScoreRows(outcome, cache).rows.find(r => r.id === String(sid));
+
+    const saveRow = async (sid) => {
+        const row = rowById(sid);
+        if (!row || view.saving.has(row.id)) return;
+        const draft = draftFor(row, view);
+        const { value, error } = parseOverrideInput(draft.score);
+        if (error) { view.errors[row.id] = error; renderTable(); return; }
+        if (value === null && draft.note.trim() && !row.override) {
+            view.errors[row.id] = 'Enter an override score first';
+            renderTable();
+            return;
+        }
+        if (!isOverrideDirty(row, view)) return;
+        await onSaveOverride?.(row.id, { score: value, note: draft.note.trim() });
+    };
+
+    // Keep the row's Save button in step with typing without re-rendering (keeps focus).
+    const refreshSaveButton = (sid) => {
+        const row = rowById(sid);
+        const btn = contentEl.querySelector(`[data-action="cs-ov-save"][data-stu="${String(sid).replace(/["\\]/g, '\\$&')}"]`);
+        if (!row || !btn) return;
+        const dirty = isOverrideDirty(row, view);
+        btn.disabled = !dirty;
+        btn.classList.toggle('needs', dirty);
+        btn.classList.toggle('synced', !dirty);
+    };
+
+    let renameCommitted = false;
+    const commitRename = (input) => {
+        if (renameCommitted) return;
+        renameCommitted = true;
+        const oid = input.dataset.oid;
+        view.renamingId = null;
+        onRename?.(oid, input.value);
+        renderTable();
+    };
+    const cancelRename = () => {
+        renameCommitted = true;
+        view.renamingId = null;
+        renderTable();
+    };
 
     const onChange = (e) => {
         const el = e.target.closest?.('[data-action="cs-sort-key"]');
         if (!el) return;
         state.currentScoreSort = { ...state.currentScoreSort, key: el.value };
         renderTable();
+    };
+
+    const onInput = (e) => {
+        const el = e.target;
+        const action = el?.dataset?.action;
+        if (action !== 'cs-ov-score' && action !== 'cs-ov-note') return;
+        const sid = el.dataset.stu;
+        const row = rowById(sid);
+        if (!row) return;
+        view.drafts[sid] = { ...draftFor(row, view), [action === 'cs-ov-score' ? 'score' : 'note']: el.value };
+        delete view.errors[sid];
+        refreshSaveButton(sid);
+    };
+
+    const onKeydown = (e) => {
+        const el = e.target;
+        const action = el?.dataset?.action;
+        if (action === 'cs-rename-input') {
+            if (e.key === 'Enter')  { e.preventDefault(); commitRename(el); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+            return;
+        }
+        if ((action === 'cs-ov-score' || action === 'cs-ov-note') && e.key === 'Enter') {
+            e.preventDefault();
+            saveRow(el.dataset.stu);
+        }
+    };
+
+    const onFocusOut = (e) => {
+        if (e.target?.dataset?.action === 'cs-rename-input') commitRename(e.target);
     };
 
     const onClick = async (e) => {
@@ -214,6 +456,27 @@ export function wireCurrentScoreTable({ contentEl, state, renderTable, onRefresh
             const dir = state.currentScoreSort.dir === 'desc' ? 'asc' : 'desc';
             state.currentScoreSort = { ...state.currentScoreSort, dir };
             renderTable();
+            return;
+        }
+        if (action === 'cs-rename') {
+            e.stopPropagation();
+            view.renamingId = el.dataset.oid;
+            renameCommitted = false;
+            renderTable();
+            const input = contentEl.querySelector('[data-action="cs-rename-input"]');
+            input?.focus();
+            input?.select();
+            return;
+        }
+        if (action === 'cs-ov-save') {
+            e.stopPropagation();
+            await saveRow(el.dataset.stu);
+            return;
+        }
+        if (action === 'cs-ov-lock') {
+            e.stopPropagation();
+            const row = rowById(el.dataset.stu);
+            if (row?.override) await onToggleLock?.(row.id, !row.override.locked);
             return;
         }
         if (action === 'os-refresh-outcome') {
@@ -230,10 +493,58 @@ export function wireCurrentScoreTable({ contentEl, state, renderTable, onRefresh
         }
     };
 
-    contentEl.addEventListener('change', onChange);
-    contentEl.addEventListener('click', onClick);
-    return () => {
-        contentEl.removeEventListener('change', onChange);
-        contentEl.removeEventListener('click', onClick);
+    // ── Column drag-and-drop (same saved order as the outcome list) ──────────
+    let draggedId = null;
+    const headOf = (e) => e.target.closest?.('th[data-col-oid]');
+    const clearMarks = () => contentEl.querySelectorAll('th.cs-drop-before, th.cs-drop-after')
+        .forEach(th => th.classList.remove('cs-drop-before', 'cs-drop-after'));
+    const dropAfter = (th, e) => {
+        const r = th.getBoundingClientRect();
+        return e.clientX > r.left + r.width / 2;
     };
+
+    const onDragStart = (e) => {
+        const th = headOf(e);
+        if (!th || th.classList.contains('renaming')) return;
+        e.stopPropagation();
+        draggedId = th.dataset.colOid;
+        // Custom type only — the outcome list's drop handler reads text/plain.
+        e.dataTransfer?.setData(COLUMN_DRAG_TYPE, draggedId);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        th.classList.add('cs-dragging');
+    };
+    const onDragOver = (e) => {
+        const th = headOf(e);
+        if (!th || draggedId === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        clearMarks();
+        if (th.dataset.colOid !== draggedId) th.classList.add(dropAfter(th, e) ? 'cs-drop-after' : 'cs-drop-before');
+    };
+    const onDrop = (e) => {
+        const th = headOf(e);
+        if (!th || draggedId === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const targetId = th.dataset.colOid;
+        const after = dropAfter(th, e);
+        clearMarks();
+        if (targetId === draggedId) return;
+        const current = getAveragedOutcomes(cache).map(o => String(o.id));
+        const next = moveOutcomeInOrder(current, draggedId, targetId, after);
+        if (JSON.stringify(next) !== JSON.stringify(current)) onReorder?.(next);
+    };
+    const onDragEnd = () => {
+        draggedId = null;
+        clearMarks();
+        contentEl.querySelectorAll('th.cs-dragging').forEach(th => th.classList.remove('cs-dragging'));
+    };
+
+    const listeners = [
+        ['change', onChange], ['input', onInput], ['keydown', onKeydown], ['focusout', onFocusOut],
+        ['click', onClick], ['dragstart', onDragStart], ['dragover', onDragOver],
+        ['drop', onDrop], ['dragend', onDragEnd], ['dragleave', clearMarks],
+    ];
+    listeners.forEach(([type, fn]) => contentEl.addEventListener(type, fn));
+    return () => listeners.forEach(([type, fn]) => contentEl.removeEventListener(type, fn));
 }
