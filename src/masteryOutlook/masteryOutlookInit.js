@@ -207,8 +207,9 @@ export async function runFullRefresh(courseId, apiClient, onProgress = () => {})
     let knownPlAssignmentIds = new Set();
     try {
         const allAssignments = await apiClient.getAllPages(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: PL_ASSIGNMENT_SUFFIX, per_page: 50 },
+            // Filters go in the URL — getAllPages' second argument is fetch options
+            `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(PL_ASSIGNMENT_SUFFIX)}&per_page=50`,
+            {},
             'runFullRefresh:searchPLAssignments'
         );
         allAssignments

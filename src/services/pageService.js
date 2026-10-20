@@ -108,8 +108,9 @@ export async function findMasteryDashboardPageUrl(courseId, apiClient) {
         // for backward compatibility with existing deployments.
         for (const searchTerm of ['Mastery View', 'Mastery Dashboard']) {
             const pages = await apiClient.get(
-                `/api/v1/courses/${courseId}/pages`,
-                { search_term: searchTerm, per_page: 10 },
+                // Filters go in the URL — get's second argument is fetch options
+                `/api/v1/courses/${courseId}/pages?search_term=${encodeURIComponent(searchTerm)}&per_page=10`,
+                {},
                 'findMasteryDashboardPageUrl'
             );
 

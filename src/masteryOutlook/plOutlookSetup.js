@@ -45,8 +45,9 @@ export async function findExistingPLAssignment(courseId, outcomeName, apiClient)
     const expectedName = `${outcomeName} — ${PL_ASSIGNMENT_SUFFIX}`;
     try {
         const results = await apiClient.getAllPages(
-            `/api/v1/courses/${courseId}/assignments`,
-            { search_term: PL_ASSIGNMENT_SUFFIX, per_page: 50 },
+            // Filters go in the URL — getAllPages' second argument is fetch options
+            `/api/v1/courses/${courseId}/assignments?search_term=${encodeURIComponent(PL_ASSIGNMENT_SUFFIX)}&per_page=50`,
+            {},
             'PLSync:searchAssignments'
         );
         return results.find(a => a.name === expectedName) ?? null;
