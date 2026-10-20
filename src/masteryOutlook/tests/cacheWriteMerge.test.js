@@ -7,7 +7,7 @@ vi.mock('../../utils/logger.js', () => ({
     logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }));
 
-import { mergeCacheForWrite, normalizeCacheMetadata, SCHEMA_VERSION } from '../masteryOutlookCacheService.js';
+import { mergeCacheForWrite, normalizeCacheMetadata, SCHEMA_VERSION, lockedCurrentScoreStudentsFrom } from '../masteryOutlookCacheService.js';
 
 const disk = {
     metadata: { schemaVersion: '1.0', computedAt: '2026-09-25T15:00:00Z', studentCount: 5, outcomeCount: 6 },
@@ -108,5 +108,27 @@ describe('normalizeCacheMetadata', () => {
         expect(normalizeCacheMetadata({ meta: { computedAt: 'old' }, metadata: { computedAt: 'new' } }))
             .toEqual({ computedAt: 'new' });
         expect(normalizeCacheMetadata(null)).toEqual({});
+    });
+});
+
+describe('lockedCurrentScoreStudentsFrom', () => {
+    test('returns only locked, non-cleared Current Score overrides', () => {
+        const cache = {
+            avg_assignment: { avg_outcome_id: 603 },
+            sync_state: { '603': {
+                '1': { cs_override_score: 3, cs_override_lock: 'locked', cs_override_note: 'IEP', cs_override_at: '2026-10-20T15:00:00Z' },
+                '2': { cs_override_score: 2, cs_override_lock: 'unlocked' },
+                '3': { cs_override_score: null, cs_override_lock: null },
+                '4': { avg_verify_at: '2026-10-20T15:00:00Z' },
+            } },
+        };
+        const locked = lockedCurrentScoreStudentsFrom(cache);
+        expect([...locked.keys()]).toEqual(['1']);
+        expect(locked.get('1')).toEqual({ score: 3, note: 'IEP', at: '2026-10-20T15:00:00Z' });
+    });
+
+    test('no cache or no Current Score setup → empty', () => {
+        expect(lockedCurrentScoreStudentsFrom(null).size).toBe(0);
+        expect(lockedCurrentScoreStudentsFrom({ sync_state: {} }).size).toBe(0);
     });
 });

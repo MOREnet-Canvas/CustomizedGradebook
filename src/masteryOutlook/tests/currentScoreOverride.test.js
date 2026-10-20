@@ -19,16 +19,17 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
 }));
 vi.mock('../../services/gradeCalculator.js', () => ({ calculateStudentAverages: vi.fn() }));
 vi.mock('../../services/graphqlGradingService.js', () => ({
+    submitRubricAssessment:      vi.fn(async () => ({})),
     submitRubricAssessmentBatch: vi.fn(async (students) => ({ successCount: students.length, errors: [] })),
 }));
 vi.mock('../../services/gradeOverride.js', () => ({
     getAllEnrollmentIds:    vi.fn(async () => new Map([['1', 'enr-1'], ['2', 'enr-2']])),
     getEnrollmentIdForUser: vi.fn(async (courseId, userId) => `enr-${userId}`),
-    setOverrideScoreGQL:    vi.fn(async (enrollmentId, score) => score),
 }));
 vi.mock('../../services/masteryRefreshService.js', () => ({ refreshMasteryForAssignment: vi.fn(async () => {}) }));
 vi.mock('../masteryOutlookDataService.js', async (importOriginal) => ({
     ...(await importOriginal()),
+    clearCourseRollupReuse:      vi.fn(),
     fetchCourseRollupsForVerify: vi.fn(async () => ({
         rollups: [
             { links: { user: '1' }, scores: [{ score: 2, links: { outcome: '599' } }, { score: 2, links: { outcome: '603' } }] },
@@ -42,11 +43,13 @@ import {
     setCurrentScoreOverride, clearCurrentScoreOverride, setCurrentScoreOverrideLock,
     getCurrentScoreOverride, updateAvgAssignmentForStudents,
 } from '../masteryOutlookAvgService.js';
-import { renderCurrentScoreTable, wireCurrentScoreTable } from '../currentScoreTable.js';
-import { setOverrideScoreGQL } from '../../services/gradeOverride.js';
-import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
+import {
+    renderCurrentScoreTable, wireCurrentScoreTable, countLockedOverrides, overrideDrifted, buildCurrentScoreRows,
+} from '../currentScoreTable.js';
+import { submitRubricAssessment, submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
 import { calculateStudentAverages } from '../../services/gradeCalculator.js';
 import { writeSyncState } from '../masteryOutlookCacheService.js';
+import { rowsAwaitingOutcome, rowSavePhase } from '../masteryOutlookState.js';
 
 const CS = '603';
 
@@ -68,56 +71,78 @@ function makeCache() {
 
 const apiClient = () => ({ put: vi.fn(async () => ({})) });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); rowsAwaitingOutcome.clear(); rowSavePhase.clear(); });
 
 describe('setCurrentScoreOverride', () => {
-    test('sets the course override (0–4 → percent), comments the note, and records it unlocked', async () => {
+    test('one GraphQL call sets the Current Score assignment, course override and a dated comment', async () => {
         const cache = makeCache();
         const client = apiClient();
         await setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 3, note: ' Retest ', cache, apiClient: client });
 
-        expect(setOverrideScoreGQL).toHaveBeenCalledWith('enr-1', 75, client);
-        expect(client.put).toHaveBeenCalledWith(
-            '/api/v1/courses/566/assignments/avg-a/submissions/1',
-            { comment: { text_comment: 'Current Score override: 3.00 (75%) · Note: Retest' } },
-            {}, expect.any(String));
+        expect(submitRubricAssessment).toHaveBeenCalledTimes(1);
+        const [args, passedClient] = submitRubricAssessment.mock.calls[0];
+        expect(passedClient).toBe(client);
+        expect(args).toMatchObject({
+            submissionId: 'sub-1', rubricAssociationId: 'assoc', rubricCriterionId: 'crit',
+            points: 3, enrollmentId: 'enr-1', overrideScore: 75,
+        });
+        expect(args.comment).toMatch(/^Current Score override: 3\.00 \(75%\) · [A-Z][a-z]{2} \d{1,2}, \d{4} · Note: Retest$/);
         expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 3, note: 'Retest', locked: false });
+        expect(getCurrentScoreOverride(cache, CS, '1').at).toEqual(expect.any(String));
+        expect(cache.students[0].outcomes[1].canvasScore).toBe(3);
         expect(writeSyncState).toHaveBeenCalledWith('566', cache.sync_state, client);
     });
 
     test('keeps an existing lock when the override is changed', async () => {
         const cache = makeCache();
-        cache.sync_state = { [CS]: { '1': { cs_override_score: 3, cs_override_lock: 'locked' } } };
+        cache.sync_state = { [CS]: { '1': { cs_override_score: 3, cs_override_lock: 'locked', cs_override_lock_at: '2026-10-01T00:00:00Z' } } };
         await setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 2.5, cache, apiClient: apiClient() });
-        expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 2.5, locked: true });
+        expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 2.5, locked: true, lockAt: '2026-10-01T00:00:00Z' });
     });
 
     test('rejects scores outside 0–4 without calling Canvas', async () => {
         await expect(setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 5, cache: makeCache(), apiClient: apiClient() }))
             .rejects.toThrow(/0 to 4/);
-        expect(setOverrideScoreGQL).not.toHaveBeenCalled();
+        expect(submitRubricAssessment).not.toHaveBeenCalled();
+    });
+
+    test('missing Current Score setup → "run Refresh Data" and no Canvas call', async () => {
+        const cache = makeCache();
+        delete cache.avg_assignment;
+        await expect(setCurrentScoreOverride({ courseId: '566', studentId: '1', score: 3, cache, apiClient: apiClient() }))
+            .rejects.toThrow(/Refresh Data/);
+        expect(submitRubricAssessment).not.toHaveBeenCalled();
     });
 });
 
 describe('clearCurrentScoreOverride / lock', () => {
-    test('clearing puts the course override back to the Current Score and nulls the fields', async () => {
+    test('clearing recomputes the real average, writes it back, and nulls the fields', async () => {
         const cache = makeCache();
         cache.sync_state = { [CS]: { '2': { cs_override_score: 1, cs_override_note: 'x', cs_override_lock: 'locked' } } };
+        calculateStudentAverages.mockResolvedValue([{ userId: '2', average: 3 }]);
         const client = apiClient();
-        await clearCurrentScoreOverride({ courseId: '566', studentId: '2', cache, apiClient: client });
-        expect(setOverrideScoreGQL).toHaveBeenCalledWith('enr-2', 75, client);   // Current Score 3 → 75%
+
+        expect(await clearCurrentScoreOverride({ courseId: '566', studentId: '2', cache, apiClient: client })).toBe(3);
+
+        const [rollups, outcomeId] = calculateStudentAverages.mock.calls[0];
+        expect(outcomeId).toBe(CS);
+        expect(rollups.rollups.map(r => r.links.user)).toEqual(['2']);   // only this student
+        expect(submitRubricAssessment.mock.calls[0][0]).toMatchObject({ submissionId: 'sub-2', points: 3, overrideScore: 75 });
+        expect(submitRubricAssessment.mock.calls[0][0].comment).toMatch(/override removed .* back to 3\.00$/);
         expect(getCurrentScoreOverride(cache, CS, '2')).toBeNull();
-        expect(cache.sync_state[CS]['2']).toMatchObject({ cs_override_score: null, cs_override_lock: null });
+        expect(cache.sync_state[CS]['2']).toMatchObject({ cs_override_score: null, cs_override_lock: null, cs_override_at: null });
     });
 
-    test('the padlock persists the lock; no override → nothing to lock', async () => {
+    test('the padlock persists the lock with a date; no override → nothing to lock', async () => {
         const cache = makeCache();
-        cache.sync_state = { [CS]: { '1': { cs_override_score: 3, cs_override_lock: 'unlocked' } } };
+        cache.sync_state = { [CS]: { '1': { cs_override_score: 3, cs_override_lock: 'unlocked', cs_override_at: '2026-10-01T00:00:00Z' } } };
         expect(await setCurrentScoreOverrideLock({ courseId: '566', studentId: '1', locked: true, cache, apiClient: apiClient() })).toBe(true);
         expect(cache.sync_state[CS]['1'].cs_override_lock).toBe('locked');
+        expect(cache.sync_state[CS]['1'].cs_override_lock_at).toEqual(expect.any(String));
+        expect(cache.sync_state[CS]['1'].cs_override_at).toBe('2026-10-01T00:00:00Z');   // override date unchanged
         expect(writeSyncState).toHaveBeenCalledTimes(1);
         expect(await setCurrentScoreOverrideLock({ courseId: '566', studentId: '2', locked: true, cache, apiClient: apiClient() })).toBe(false);
-        expect(setOverrideScoreGQL).not.toHaveBeenCalled();
+        expect(submitRubricAssessment).not.toHaveBeenCalled();
     });
 });
 
@@ -137,24 +162,75 @@ describe('outcome saves and the Current Score override', () => {
         expect(getCurrentScoreOverride(cache, CS, '1')).toBeNull();
     });
 
-    test('locked: the average changed → rubric updates but the course override is left alone', async () => {
+    test('locked: the student is skipped entirely, even when the average changed', async () => {
         const cache = makeCache();
         cache.sync_state = { [CS]: { '1': { cs_override_score: 4, cs_override_lock: 'locked' } } };
-        calculateStudentAverages.mockResolvedValue([{ userId: '1', average: 2.5 }]);   // Current Score was 2
-        await save(cache);
-        expect(sent()[0]).toMatchObject({ userId: '1', points: 2.5 });
-        expect(sent()[0]).not.toHaveProperty('overrideScore');
-        expect(sent()[0]).not.toHaveProperty('enrollmentId');
+        calculateStudentAverages.mockResolvedValue([{ userId: '1', average: 2.5 }]);
+        expect(await save(cache)).toBe(true);
+        expect(sent().find(s => String(s.userId) === '1')).toBeUndefined();
         expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 4, locked: true });
     });
 
-    test('locked with an unchanged average → the student is skipped entirely', async () => {
+    test('locked students are skipped while others in the same save still update', async () => {
         const cache = makeCache();
         cache.sync_state = { [CS]: { '1': { cs_override_score: 4, cs_override_lock: 'locked' } } };
-        calculateStudentAverages.mockResolvedValue([{ userId: '1', average: 2 }]);    // same as Current Score
-        expect(await save(cache)).toBe(true);
-        expect(submitRubricAssessmentBatch).not.toHaveBeenCalled();
-        expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 4, locked: true });
+        calculateStudentAverages.mockResolvedValue([{ userId: '1', average: 2.5 }, { userId: '2', average: 3.5 }]);
+        await save(cache, ['1', '2']);
+        expect(sent().map(s => String(s.userId))).toEqual(['2']);
+    });
+});
+
+describe('Current Score table: lock and date markers', () => {
+    const outcome = { id: 603, title: 'Current Score' };
+    const lockedCache = () => {
+        const cache = makeCache();
+        cache.sync_state = { [CS]: {
+            '1': { cs_override_score: 3, cs_override_lock: 'locked', cs_override_at: '2026-10-01T15:00:00Z', cs_override_by: 'Ms. T' },
+            '2': { cs_override_score: 2, cs_override_lock: 'unlocked', cs_override_at: '2026-10-02T15:00:00Z' },
+        } };
+        return cache;
+    };
+    const mount = (cache) => {
+        const el = document.createElement('div');
+        el.innerHTML = renderCurrentScoreTable(outcome, cache, undefined, undefined, { overrideEnabled: true });
+        return el;
+    };
+
+    test('counts locked overrides', () => {
+        expect(countLockedOverrides(lockedCache(), CS)).toBe(1);
+        expect(countLockedOverrides(makeCache(), CS)).toBe(0);
+    });
+
+    test('lock banner and amber row only for locked students', () => {
+        const el = mount(lockedCache());
+        expect(el.querySelector('.cs-lock-banner').textContent).toMatch(/1\s*student has a locked/);
+        expect(el.querySelector('tr[data-stu="1"]').classList.contains('cs-row-locked')).toBe(true);
+        expect(el.querySelector('tr[data-stu="2"]').classList.contains('cs-row-locked')).toBe(false);
+        expect(mount(makeCache()).querySelector('.cs-lock-banner')).toBeNull();
+    });
+
+    test('override date shows under the box with who set it in the tooltip', () => {
+        const date = mount(lockedCache()).querySelector('tr[data-stu="1"] .cs-ov-date');
+        expect(date.textContent).toBe('Oct 1');
+        expect(date.title).toMatch(/^Set Oct 1, 2026.* by Ms\. T$/);
+    });
+
+    test('the note cell carries the full note as a tooltip', () => {
+        const cache = lockedCache();
+        cache.sync_state[CS]['1'].cs_override_note = 'A long explanation of the override';
+        const note = mount(cache).querySelector('tr[data-stu="1"] .cs-ov-note');
+        expect(note.title).toBe('A long explanation of the override');
+    });
+
+    test('⚑ when Canvas differs from the saved override (after the grace period)', () => {
+        const cache = lockedCache();               // student 1: override 3, Canvas 2
+        const el = mount(cache);
+        expect(el.querySelector('tr[data-stu="1"] .os-sync-marker.override')).not.toBeNull();
+        const { rows } = buildCurrentScoreRows(outcome, cache);
+        const row1 = rows.find(r => r.id === '1');
+        expect(overrideDrifted(row1, Date.parse('2026-10-01T15:05:00Z'))).toBe(false);   // within 10 min
+        expect(overrideDrifted({ ...row1, current: 3 })).toBe(false);
+        expect(overrideDrifted({ ...row1, currentPending: true })).toBe(false);
     });
 });
 

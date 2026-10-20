@@ -30,7 +30,7 @@ import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats, fetchCourseRollupsForVerify, clearCourseRollupReuse } from './masteryOutlookDataService.js';
 import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome, subscribeOutcomeLayout, notifyOutcomeLayout } from './masteryOutlookState.js';
-import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT, createCurrentScoreViewState } from './currentScoreTable.js';
+import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT, createCurrentScoreViewState, countLockedOverrides } from './currentScoreTable.js';
 import { setCurrentScoreOverride, clearCurrentScoreOverride, setCurrentScoreOverrideLock } from './masteryOutlookAvgService.js';
 import { saveOutcomeLayout } from './outcomeLayoutService.js';
 import { getOutcomeDisplayName } from './outcomeTypes.js';
@@ -165,9 +165,13 @@ export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         const n = counts.possibleOverride + counts.manualOverride;
         return `<span class="od-sync-chip override" title="${POSSIBLE_OVERRIDE_TIP}">⚑ ${n}</span>`;
     }
-    // Special outcomes (Current Score, excluded) are not managed by overrides.
+    // Special outcomes (Current Score, excluded) are not managed by outcome overrides;
+    // the Current Score shows how many of its own overrides are locked.
     if (isSpecial) {
-        return `<span class="od-sync-chip none">—</span>`;
+        const locked = countLockedOverrides(cache, outcome.id);
+        return locked > 0
+            ? `<span class="od-sync-chip locked" title="${locked} locked Current Score override${locked === 1 ? '' : 's'} — outcome saves and Update Current Score leave ${locked === 1 ? 'it' : 'them'} alone">🔒 ${locked}</span>`
+            : `<span class="od-sync-chip none">—</span>`;
     }
     // Only teacher-set overrides are ever pushed, so a set-up outcome with no
     // pending override, verification, or flag is up to date — even when every

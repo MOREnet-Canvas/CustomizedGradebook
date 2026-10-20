@@ -60,16 +60,63 @@ function canvasScoreOf(student, outcomeId) {
     return (v === null || v === undefined || isNaN(v)) ? null : Number(v);
 }
 
+/** A just-saved override can differ from Canvas until Canvas recalculates. */
+const DRIFT_GRACE_MS = 10 * 60 * 1000;
+
 /**
- * The teacher's course-grade override for a student (sync_state on the Current
+ * The teacher's Current Score override for a student (sync_state on the Current
  * Score outcome), or null.
- * @returns {{ score: number, note: string, locked: boolean }|null}
+ * @returns {{ score: number, note: string, locked: boolean, at: string|null, by: string|null, lockAt: string|null }|null}
  */
 function overrideOf(cache, outcomeId, studentId) {
-    const entry = cache.sync_state?.[String(outcomeId)]?.[String(studentId)];
+    const entry = cache?.sync_state?.[String(outcomeId)]?.[String(studentId)];
     const score = entry?.cs_override_score;
     if (score === null || score === undefined || isNaN(score)) return null;
-    return { score: Number(score), note: entry.cs_override_note ?? '', locked: entry.cs_override_lock === 'locked' };
+    return {
+        score:  Number(score),
+        note:   entry.cs_override_note ?? '',
+        locked: entry.cs_override_lock === 'locked',
+        at:     entry.cs_override_at ?? null,
+        by:     entry.cs_override_by ?? null,
+        lockAt: entry.cs_override_lock_at ?? null,
+    };
+}
+
+/**
+ * Number of students with a locked Current Score override.
+ * @param {Object} cache
+ * @param {string|number} outcomeId - the Current Score outcome
+ * @returns {number}
+ */
+export function countLockedOverrides(cache, outcomeId) {
+    const entries = cache?.sync_state?.[String(outcomeId)] ?? {};
+    return Object.keys(entries).filter(sid => overrideOf(cache, outcomeId, sid)?.locked).length;
+}
+
+/**
+ * True when Canvas's Current Score no longer matches the saved override — it was
+ * changed outside Mastery Outlook (e.g. in SpeedGrader or the Gradebook).
+ * @param {Object} row - from buildCurrentScoreRows
+ * @param {number} [now]
+ * @returns {boolean}
+ */
+export function overrideDrifted(row, now = Date.now()) {
+    if (!row.override || row.current === null || row.currentPending) return false;
+    const at = row.override.at ? Date.parse(row.override.at) : NaN;
+    if (!Number.isNaN(at) && now - at < DRIFT_GRACE_MS) return false;
+    return Math.abs(row.current - row.override.score) > 0.005;
+}
+
+function formatShortDate(iso) {
+    const d = iso ? new Date(iso) : null;
+    return d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+}
+
+function formatLongDate(iso) {
+    const d = iso ? new Date(iso) : null;
+    return d && !isNaN(d.getTime())
+        ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : '';
 }
 
 /**
@@ -219,6 +266,15 @@ function renderOverrideCells(row, view) {
               aria-label="${row.override.locked ? 'Unlock override' : 'Lock override'}">${row.override.locked ? '🔒' : '🔓'}</button>`
         : '';
 
+    const ov = row.override;
+    const dateTip = ov?.at
+        ? [`Set ${formatLongDate(ov.at)}${ov.by ? ` by ${ov.by}` : ''}`,
+           ov.locked && ov.lockAt ? `Locked ${formatLongDate(ov.lockAt)}` : ''].filter(Boolean).join(' · ')
+        : '';
+    const dateHtml = ov?.at
+        ? `<span class="cs-ov-date" title="${escapeHtml(dateTip)}">${escapeHtml(formatShortDate(ov.at))}</span>`
+        : '';
+
     const removing = parseOverrideInput(draft.score).value === null && row.override;
     const saveHtml = saving
         ? `<span class="os-posting"><span class="spinner"></span> Saving…</span>`
@@ -235,12 +291,13 @@ function renderOverrideCells(row, view) {
         <span class="cs-ov-wrap">
           <input class="cs-ov-input${row.override ? ' has-override' : ''}" type="text" inputmode="decimal"
               data-action="cs-ov-score" data-stu="${sid}" value="${escapeHtml(draft.score)}"
-              placeholder="—" aria-label="Course grade override for ${escapeHtml(row.name)} (0–4)">${lockHtml}
-        </span>
+              placeholder="—" aria-label="Current Score override for ${escapeHtml(row.name)} (0–4)">${lockHtml}
+        </span>${dateHtml}
       </td>
-      <td class="os-td-comment">
+      <td class="c cs-note-cell">
         <input class="os-comment-input cs-ov-note" type="text" data-action="cs-ov-note" data-stu="${sid}"
-            value="${escapeHtml(draft.note)}" placeholder="Note…" aria-label="Override note for ${escapeHtml(row.name)}">
+            value="${escapeHtml(draft.note)}" placeholder="Note…" title="${escapeHtml(draft.note)}"
+            aria-label="Override note for ${escapeHtml(row.name)}">
       </td>
       <td class="c">${saveHtml}${error ? `<div class="cs-ov-error" role="alert">${escapeHtml(error)}</div>` : ''}</td>`;
 }
@@ -291,13 +348,16 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
     const body = sorted.map(r => {
         const hasCurrent = r.current !== null;
         const currentStyle = scoreToneStyle(hasCurrent ? scoreTone(r.current) : 'ne');
+        const drift = overrideEnabled && overrideDrifted(r)
+            ? `<span class="os-sync-marker override" title="Canvas shows ${r.current.toFixed(2)}, but the override is ${r.override.score.toFixed(2)} — it was changed outside Mastery Outlook. Save the override again to restore it.">⚑</span>`
+            : '';
         return `
-            <tr data-stu="${escapeHtml(r.id)}">
+            <tr data-stu="${escapeHtml(r.id)}"${overrideEnabled && r.override?.locked ? ' class="cs-row-locked"' : ''}>
               <td><span class="os-stu-name">${escapeHtml(r.name)}</span></td>
               ${r.chips.map(c => `<td class="c cs-chip-cell">${renderChip(c)}</td>`).join('')}
               <td class="c cs-current">
                 <span class="os-pill" style="${currentStyle}"
-                    ${r.currentPending ? 'title="Waiting for Canvas to update the Current Score"' : ''}>${hasCurrent ? r.current.toFixed(2) : '—'}</span>${r.currentPending ? '<span class="cs-pending"> ⏳</span>' : ''}
+                    ${r.currentPending ? 'title="Waiting for Canvas to update the Current Score"' : ''}>${hasCurrent ? r.current.toFixed(2) : '—'}</span>${r.currentPending ? '<span class="cs-pending"> ⏳</span>' : ''}${drift}
               </td>
               ${overrideEnabled ? renderOverrideCells(r, view) : ''}
             </tr>`;
@@ -305,20 +365,28 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
 
     const hint = overrideEnabled
         ? `Current Score = the average of the student's outcome scores in Canvas · ⏳ = Canvas is updating ·
-           Override sets the course grade (0–4) · 🔓 the next outcome save replaces it · 🔒 keeps it ·
+           Override sets the Current Score and course grade (0–4) · 🔓 the next outcome save replaces it · 🔒 keeps it ·
            Drag outcome names to reorder · ✎ to rename`
         : `Current Score = the average of the student's outcome scores in Canvas · ⏳ = Canvas is updating ·
            Drag outcome names to reorder · ✎ to rename · Course grade overrides are turned off for this account`;
 
+    const lockedCount = overrideEnabled ? rows.filter(r => r.override?.locked).length : 0;
+    const lockBanner = lockedCount > 0
+        ? `<div class="os-status-banner warn cs-lock-banner">
+             <div class="os-status-banner-left">🔒 <b>${lockedCount}</b> student${lockedCount === 1 ? ' has a locked Current Score override' : 's have locked Current Score overrides'} — outcome saves and Update Current Score won't change ${lockedCount === 1 ? 'it' : 'them'}.</div>
+           </div>`
+        : '';
+
     return `
         ${toolbar}
+        ${lockBanner}
         <div class="os-block cs-table-wrap">
           <table>
             <thead><tr>
               <th style="width:1%;min-width:130px;white-space:nowrap;">Student</th>
               ${outcomes.map(o => renderColumnHeader(o, cache, view)).join('')}
               <th class="c">Canvas</th>
-              ${overrideEnabled ? '<th class="c">Override</th><th>Note</th><th class="c">Save</th>' : ''}
+              ${overrideEnabled ? '<th class="c">Override</th><th class="c">Note</th><th class="c">Save</th>' : ''}
             </tr></thead>
             <tbody>${body}</tbody>
           </table>

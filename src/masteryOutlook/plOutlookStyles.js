@@ -665,7 +665,13 @@ tr.os-needs-row td { background:#FFFDF7; }
 .cs-ov-lock.unlocked { filter:grayscale(1); opacity:.75; }
 .cs-ov-lock:hover { border-color:var(--amber-border); background:#FDF3E3; filter:none; opacity:1; }
 .cs-ov-lock:focus-visible { outline:2px solid var(--blue); outline-offset:1px; }
-.cs-ov-note { min-width:8em; }
+.cs-note-cell { width:1%; }
+.cs-ov-note { width:9em; min-width:0; text-overflow:ellipsis; }
+.cs-ov-cell .cs-ov-date { display:block; font-size:0.692em; color:var(--text-tertiary); line-height:1.2; margin-top:0.154em; cursor:help; }
+tr.cs-row-locked > td { background:#FFF8EE; }
+tr.cs-row-locked > td:first-child { box-shadow:inset 3px 0 0 var(--amber-border); }
+.cs-lock-banner { margin-top:-0.231em; }
+.od-sync-chip.locked { background:var(--amber-bg); color:var(--amber); border:0.5px solid var(--amber-border); }
 .cs-ov-error { font-size:0.769em; color:#B42318; margin-top:0.154em; white-space:normal; max-width:10em; }
 
 /* Per-outcome refresh button (#54 manual rollup re-pull) */

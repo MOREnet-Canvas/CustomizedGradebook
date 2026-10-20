@@ -40,6 +40,7 @@ import { getAllEnrollmentIds, getEnrollmentIdForUser, setOverrideScoreGQL } from
 import { enableCourseGradingScheme } from "../services/courseService.js";
 import { refreshMasteryForAssignment } from "../services/masteryRefreshService.js";
 import { clearAllSnapshots } from "../services/courseSnapshotService.js";
+import { getLockedCurrentScoreStudents } from "../masteryOutlook/masteryOutlookCacheService.js";
 
 /**
  * CHECKING_SETUP State Handler
@@ -298,6 +299,30 @@ export async function filterRollupsToActiveStudents(rollupData, courseId, apiCli
 }
 
 /**
+ * Drop students whose Current Score override is locked in Mastery Outlook. If the
+ * Mastery Outlook cache can't be read, nothing is dropped and lockCheckFailed is set
+ * so the completion message can warn — grading itself is never blocked.
+ *
+ * @param {Array<{userId: string|number, average: number}>} averages
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<{ averages: Array, lockedSkipped: number, lockCheckFailed: boolean }>}
+ */
+export async function removeLockedStudents(averages, courseId, apiClient) {
+    let locked;
+    try {
+        locked = await getLockedCurrentScoreStudents(courseId, apiClient);
+    } catch (err) {
+        logger.warn('[UpdateGrades] Could not check Mastery Outlook override locks:', err);
+        return { averages, lockedSkipped: 0, lockCheckFailed: true };
+    }
+    const kept = averages.filter(a => !locked.has(String(a.userId)));
+    const lockedSkipped = averages.length - kept.length;
+    if (lockedSkipped > 0) logger.info(`[UpdateGrades] Skipping ${lockedSkipped} student(s) with a locked Current Score override`);
+    return { averages: kept, lockedSkipped, lockCheckFailed: false };
+}
+
+/**
  * CALCULATING State Handler
  * Calculates student averages and determines next state
  */
@@ -311,10 +336,14 @@ export async function handleCalculating(stateMachine) {
     banner.setText(calculatingMessage);
 
     const activeRollupData = await filterRollupsToActiveStudents(rollupData, courseId, apiClient);
-    const averages = await calculateStudentAverages(activeRollupData, outcomeId, courseId, apiClient);
-    const numberOfUpdates = averages.length;
+    const allAverages = await calculateStudentAverages(activeRollupData, outcomeId, courseId, apiClient);
 
-    stateMachine.updateContext({ averages, numberOfUpdates, startTime: new Date().toISOString() });
+    // Leave students with a locked Current Score override (set in Mastery Outlook) alone.
+    const { averages, lockedSkipped, lockCheckFailed } = await removeLockedStudents(allAverages, courseId, apiClient);
+    const numberOfUpdates = averages.length;
+    if (lockedSkipped > 0) banner.setText(`${calculatingMessage} 🔒 Skipping ${lockedSkipped} locked override${lockedSkipped === 1 ? '' : 's'}.`);
+
+    stateMachine.updateContext({ averages, numberOfUpdates, lockedSkipped, lockCheckFailed, startTime: new Date().toISOString() });
 
     if (numberOfUpdates === 0) {
         stateMachine.updateContext({ zeroUpdates: true });
@@ -561,7 +590,11 @@ export async function handleVerifyingOverrides(stateMachine) {
  * Shows success message and cleans up
  */
 export async function handleComplete(stateMachine) {
-    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled, overrideMismatchCount, enforceCourseOverride } = stateMachine.getContext();
+    const { numberOfUpdates, banner, courseId, zeroUpdates, overridesNotEnabled, overrideMismatchCount, enforceCourseOverride,
+            lockedSkipped = 0, lockCheckFailed = false } = stateMachine.getContext();
+    const lockNote = lockedSkipped > 0
+        ? ` 🔒 ${lockedSkipped} student${lockedSkipped === 1 ? '' : 's'} with a locked Current Score override ${lockedSkipped === 1 ? 'was' : 'were'} skipped.`
+        : lockCheckFailed ? ' ⚠️ Couldn\'t check Mastery Outlook override locks.' : '';
 
     const elapsedTime = getElapsedTimeSinceStart(stateMachine);
     stopElapsedTimer(banner);
@@ -575,8 +608,8 @@ export async function handleComplete(stateMachine) {
 
     // Handle zero updates case (no changes needed)
     if (zeroUpdates || numberOfUpdates === 0) {
-        banner.setText(`No changes to ${updateTarget} found.`);
-        alert(`No changes to ${updateTarget} have been found. No updates performed.`);
+        banner.setText(`No changes to ${updateTarget} found.${lockNote}`);
+        alert(`No changes to ${updateTarget} have been found. No updates performed.${lockNote ? `\n\n${lockNote.trim()}` : ''}`);
 
         // Remove banner after a short delay
         setTimeout(() => {
@@ -593,6 +626,7 @@ export async function handleComplete(stateMachine) {
     if (overrideMismatchCount && overrideMismatchCount > 0) {
         bannerText += ` ⚠️ ${overrideMismatchCount} override verification mismatches`;
     }
+    bannerText += lockNote;
 
     banner.setText(bannerText);
 
@@ -612,6 +646,8 @@ export async function handleComplete(stateMachine) {
     if (overrideMismatchCount && overrideMismatchCount > 0) {
         completionMessage += `\n\n⚠️ Update complete but ${overrideMismatchCount} students may not have correct override grades. Please try running again.`;
     }
+
+    if (lockNote) completionMessage += `\n\n${lockNote.trim()}`;
 
     alert(completionMessage);
 
