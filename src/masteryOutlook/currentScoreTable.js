@@ -272,9 +272,10 @@ function renderOverrideCells(row, view) {
         ? [`Set ${formatLongDate(ov.at)}${ov.by ? ` by ${ov.by}` : ''}`,
            ov.locked && ov.lockAt ? `Locked ${formatLongDate(ov.lockAt)}` : ''].filter(Boolean).join(' · ')
         : '';
+    // Fixed-width slots (empty without an override) keep every row's input aligned.
     const dateHtml = ov?.at
         ? `<span class="cs-ov-date" title="${escapeHtml(dateTip)}">${escapeHtml(formatShortDate(ov.at))}</span>`
-        : '';
+        : '<span class="cs-ov-date"></span>';
 
     const removing = parseOverrideInput(draft.score).value === null && row.override;
     const saveHtml = saving
@@ -292,8 +293,8 @@ function renderOverrideCells(row, view) {
         <span class="cs-ov-wrap">
           <input class="cs-ov-input${row.override ? ' has-override' : ''}" type="text" inputmode="decimal"
               data-action="cs-ov-score" data-stu="${sid}" value="${escapeHtml(draft.score)}"
-              placeholder="—" aria-label="Current Score override for ${escapeHtml(row.name)} (0–4)">${lockHtml}
-        </span>${dateHtml}
+              placeholder="—" aria-label="Current Score override for ${escapeHtml(row.name)} (0–4)"><span class="cs-ov-lock-slot">${lockHtml}</span>${dateHtml}
+        </span>
       </td>
       <td class="c cs-note-cell">
         <input class="os-comment-input cs-ov-note" type="text" data-action="cs-ov-note" data-stu="${sid}"

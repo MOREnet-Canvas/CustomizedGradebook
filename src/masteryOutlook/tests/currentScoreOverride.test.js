@@ -230,6 +230,13 @@ describe('Current Score table: lock and date markers', () => {
         const date = mount(lockedCache()).querySelector('tr[data-stu="1"] .cs-ov-date');
         expect(date.textContent).toBe('Oct 1');
         expect(date.title).toMatch(/^Set Oct 1, 2026.* by Ms\. T$/);
+        expect(date.closest('.cs-ov-wrap')).not.toBeNull();   // inline after the padlock
+    });
+
+    test('rows without an override keep empty padlock/date slots so inputs line up', () => {
+        const wrap = mount(makeCache()).querySelector('tr[data-stu="1"] .cs-ov-wrap');
+        expect(wrap.querySelector('.cs-ov-lock-slot').textContent).toBe('');
+        expect(wrap.querySelector('.cs-ov-date').textContent).toBe('');
     });
 
     test('the note cell carries the full note as a tooltip', () => {

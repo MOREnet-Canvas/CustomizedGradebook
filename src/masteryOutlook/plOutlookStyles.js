@@ -657,7 +657,8 @@ tr.os-needs-row td { background:#FFFDF7; }
 .cs-col-head.cs-drop-before { box-shadow:inset 2px 0 0 #0374B5; }
 .cs-col-head.cs-drop-after  { box-shadow:inset -2px 0 0 #0374B5; }
 .cs-col-rename-input { width:8em; font-size:1em; font-family:inherit; padding:0.154em 0.385em; border:1px solid var(--blue); border-radius:0.308em; }
-.cs-ov-wrap { display:inline-flex; align-items:center; gap:0.231em; }
+.cs-ov-wrap { display:inline-flex; align-items:center; gap:0.231em; white-space:nowrap; }
+.cs-ov-lock-slot { display:inline-flex; width:1.9em; justify-content:center; }
 .cs-ov-input { width:3.5em; text-align:center; font-size:0.846em; font-family:inherit; padding:0.231em 0.385em; border-radius:0.615em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-primary); }
 .cs-ov-input.has-override { border-color:var(--amber-border); background:#FFF8EE; font-weight:600; }
 .cs-ov-input:focus { outline:2px solid var(--blue); outline-offset:1px; }
@@ -671,7 +672,7 @@ tr.os-needs-row td { background:#FFFDF7; }
 .cs-ov-lock:focus-visible { outline:2px solid var(--blue); outline-offset:1px; }
 .cs-note-cell { width:1%; }
 .cs-ov-note { width:9em; min-width:0; text-overflow:ellipsis; }
-.cs-ov-cell .cs-ov-date { display:block; font-size:0.692em; color:var(--text-tertiary); line-height:1.2; margin-top:0.154em; cursor:help; }
+.cs-ov-cell .cs-ov-date { display:inline-block; min-width:3.4em; text-align:left; font-size:0.769em; color:var(--text-tertiary); cursor:help; }
 tr.cs-row-locked > td { background:#FFF8EE; }
 tr.cs-row-locked > td:first-child { box-shadow:inset 3px 0 0 var(--amber-border); }
 .cs-lock-banner { margin-top:-0.231em; }
