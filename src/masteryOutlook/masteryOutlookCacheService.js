@@ -462,6 +462,52 @@ export function lockedCurrentScoreStudentsFrom(cache) {
     return locked;
 }
 
+const lockSnapshotKey = (courseId) => `cg_lmgb_locks_${courseId}`;
+
+/**
+ * Remember this course's locked Current Score overrides in localStorage so the
+ * LMGB can show its 🔒 markers before the cache file finishes downloading.
+ * Clears the entry when nothing is locked. Storage errors are ignored.
+ *
+ * @param {string|number} courseId
+ * @param {Object|null} cache - Mastery Outlook cache (avg_assignment + sync_state)
+ */
+export function saveLmgbLockSnapshot(courseId, cache) {
+    try {
+        const avgOutcomeId = cache?.avg_assignment?.avg_outcome_id;
+        const locks = lockedCurrentScoreStudentsFrom(cache);
+        if (!avgOutcomeId || locks.size === 0) {
+            localStorage.removeItem(lockSnapshotKey(courseId));
+            return;
+        }
+        localStorage.setItem(lockSnapshotKey(courseId), JSON.stringify({
+            avgOutcomeId: String(avgOutcomeId),
+            locks:        [...locks],
+            savedAt:      new Date().toISOString(),
+        }));
+    } catch (err) {
+        logger.debug('[masteryOutlookCacheService] Could not save LMGB lock snapshot:', err?.message);
+    }
+}
+
+/**
+ * Last-known locked Current Score overrides for a course (see saveLmgbLockSnapshot).
+ *
+ * @param {string|number} courseId
+ * @returns {{ avgOutcomeId: string, locks: Map<string, { score: number, note: string, at: string|null }> }|null}
+ */
+export function loadLmgbLockSnapshot(courseId) {
+    try {
+        const raw = localStorage.getItem(lockSnapshotKey(courseId));
+        if (!raw) return null;
+        const { avgOutcomeId, locks } = JSON.parse(raw);
+        if (!avgOutcomeId || !Array.isArray(locks)) return null;
+        return { avgOutcomeId: String(avgOutcomeId), locks: new Map(locks) };
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Export schema version for external validation
  */

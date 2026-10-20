@@ -30,6 +30,7 @@ import {
     isBandClassName,
     MASTERY_HIDDEN_ATTR,
 } from '../ui/masteryColorStyles.js';
+import { LMGB_LOCK_ATTR } from './lmgbOverrideLocks.js';
 import { isLegacyLoaderLmgbActive } from './legacyLmgbLoaderGuard.js'; // TEMPORARY — legacy loader guard, see legacyLmgbLoaderGuard.js
 
 const LOG = '[LMGB Colors]';
@@ -204,7 +205,7 @@ function applyScoreColors() {
 
     root.querySelectorAll(SCORE_CELL_SELECTOR).forEach(cell => {
         const el = cell.querySelector('span span') || cell.querySelector('span') || cell;
-        const text = cell.textContent.trim();
+        const text = scoreTextOf(cell);
         const score = SCORE_PATTERN.test(text) ? Number(text) : NaN;
         const bandClass = getMasteryBandClass(score, schemeKey, bands);
 
@@ -222,6 +223,13 @@ function applyScoreColors() {
         const band = bands[getBandIndex(score, bands)];
         el.title = band.label ? `${band.label} (${score})` : String(score);
     });
+}
+
+/** The cell's score text, ignoring the 🔒 that lmgbOverrideLocks puts after the number. */
+function scoreTextOf(cell) {
+    const lock = cell.querySelector(`[${LMGB_LOCK_ATTR}]`);
+    const text = cell.textContent;
+    return (lock ? text.replace(lock.textContent, '') : text).trim();
 }
 
 function clearScoreElement(el) {

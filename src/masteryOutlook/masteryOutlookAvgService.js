@@ -21,7 +21,7 @@ import { submitRubricAssessmentBatch } from '../services/graphqlGradingService.j
 import { getAllEnrollmentIds } from '../services/gradeOverride.js';
 import { refreshMasteryForAssignment } from '../services/masteryRefreshService.js';
 import { OVERRIDE_SCALE, AVG_OUTCOME_NAME, ENABLE_GRADE_OVERRIDE } from '../config.js';
-import { writeMasteryOutlookCache, readSyncState, writeSyncState } from './masteryOutlookCacheService.js';
+import { writeMasteryOutlookCache, readSyncState, writeSyncState, saveLmgbLockSnapshot } from './masteryOutlookCacheService.js';
 import { fetchCourseRollupsForVerify, clearCourseRollupReuse, verifyPollDelayMs, VERIFY_NO_PROGRESS_LIMIT_MS } from './masteryOutlookDataService.js';
 import { rowsAwaitingOutcome, notifySaveStatus } from './masteryOutlookState.js';
 
@@ -455,6 +455,7 @@ export async function setCurrentScoreOverride({ courseId, studentId, score, note
     entry.cs_override_at      = at;
     entry.cs_override_by      = window.ENV?.current_user?.display_name ?? String(window.ENV?.current_user_id ?? '');
     await writeSyncState(courseId, cache.sync_state, apiClient);
+    saveLmgbLockSnapshot(courseId, cache);   // LMGB 🔒 shows instantly in this browser
     logger.info(`[MOAvgService] Current Score override set for student ${studentId}: ${value}`);
     return entry;
 }
@@ -487,6 +488,7 @@ export async function clearCurrentScoreOverride({ courseId, studentId, cache, ap
 
     clearOverrideFields(avgSyncEntry(cache, setup.avgOutcomeId, studentId, true));
     await writeSyncState(courseId, cache.sync_state, apiClient);
+    saveLmgbLockSnapshot(courseId, cache);   // LMGB 🔒 shows instantly in this browser
     logger.info(`[MOAvgService] Current Score override cleared for student ${studentId} (average ${average ?? 'unchanged'})`);
     return average;
 }
@@ -506,6 +508,7 @@ export async function setCurrentScoreOverrideLock({ courseId, studentId, locked,
     entry.cs_override_lock    = locked ? 'locked' : 'unlocked';
     entry.cs_override_lock_at = new Date().toISOString();
     await writeSyncState(courseId, cache.sync_state, apiClient);
+    saveLmgbLockSnapshot(courseId, cache);   // LMGB 🔒 shows instantly in this browser
     return true;
 }
 

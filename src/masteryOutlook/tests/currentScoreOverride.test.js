@@ -16,6 +16,7 @@ vi.mock('../masteryOutlookCacheService.js', () => ({
     readMasteryOutlookCache:  vi.fn(async () => null),
     writeMasteryOutlookCache: vi.fn(async () => {}),
     readPLAssignments:        vi.fn(async () => ({})),
+    saveLmgbLockSnapshot:     vi.fn(),
 }));
 vi.mock('../../services/gradeCalculator.js', () => ({ calculateStudentAverages: vi.fn() }));
 vi.mock('../../services/graphqlGradingService.js', () => ({
@@ -47,7 +48,7 @@ import {
 } from '../currentScoreTable.js';
 import { submitRubricAssessmentBatch } from '../../services/graphqlGradingService.js';
 import { calculateStudentAverages } from '../../services/gradeCalculator.js';
-import { writeSyncState } from '../masteryOutlookCacheService.js';
+import { writeSyncState, saveLmgbLockSnapshot } from '../masteryOutlookCacheService.js';
 import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
 import { rowsAwaitingOutcome, rowSavePhase } from '../masteryOutlookState.js';
 
@@ -94,6 +95,7 @@ describe('setCurrentScoreOverride', () => {
         expect(getCurrentScoreOverride(cache, CS, '1')).toMatchObject({ score: 3, note: 'Retest', locked: false });
         expect(getCurrentScoreOverride(cache, CS, '1').at).toEqual(expect.any(String));
         expect(writeSyncState).toHaveBeenCalledWith('566', cache.sync_state, client);
+        expect(saveLmgbLockSnapshot).toHaveBeenCalledWith('566', cache);
     });
 
     test('Canvas rejects the write → throws and records nothing', async () => {
@@ -144,6 +146,7 @@ describe('clearCurrentScoreOverride / lock', () => {
         expect(cleared.comment).toMatch(/override removed .* back to 3\.00$/);
         expect(getCurrentScoreOverride(cache, CS, '2')).toBeNull();
         expect(cache.sync_state[CS]['2']).toMatchObject({ cs_override_score: null, cs_override_lock: null, cs_override_at: null });
+        expect(saveLmgbLockSnapshot).toHaveBeenCalledWith('566', cache);
     });
 
     test('the padlock persists the lock with a date; no override → nothing to lock', async () => {
@@ -154,6 +157,7 @@ describe('clearCurrentScoreOverride / lock', () => {
         expect(cache.sync_state[CS]['1'].cs_override_lock_at).toEqual(expect.any(String));
         expect(cache.sync_state[CS]['1'].cs_override_at).toBe('2026-10-01T00:00:00Z');   // override date unchanged
         expect(writeSyncState).toHaveBeenCalledTimes(1);
+        expect(saveLmgbLockSnapshot).toHaveBeenCalledWith('566', cache);
         expect(await setCurrentScoreOverrideLock({ courseId: '566', studentId: '2', locked: true, cache, apiClient: apiClient() })).toBe(false);
         expect(submitRubricAssessmentBatch).not.toHaveBeenCalled();
     });

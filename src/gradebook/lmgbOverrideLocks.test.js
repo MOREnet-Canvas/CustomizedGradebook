@@ -13,12 +13,15 @@ vi.mock('../masteryOutlook/masteryOutlookCacheService.js', async (importOriginal
 import {
     initLmgbOverrideLocks, stopLmgbOverrideLocks, applyLmgbOverrideLocks, lockTooltip,
 } from './lmgbOverrideLocks.js';
+import { saveLmgbLockSnapshot, loadLmgbLockSnapshot } from '../masteryOutlook/masteryOutlookCacheService.js';
 
 const CS = '603';
 
+// Canvas's LMGB cell: score-cell-content > span(flex) > span(pill) > span(flex row) > span(text)
 function cell(userId, outcomeId, score) {
     return `<td data-col-key="outcome-${outcomeId}"><div data-testid="student-outcome-score-${userId}-${outcomeId}">`
-        + `<div data-testid="score-cell-content"><span><span>${score}</span></span></div></div></td>`;
+        + `<div data-testid="score-cell-content"><span><span class="pill"><span class="row"><span class="txt">${score}</span></span></span></span></div>`
+        + `</div></td>`;
 }
 
 function mountGrid() {
@@ -33,9 +36,21 @@ const badge = (userId, outcomeId) =>
 
 const locks = () => new Map([['642', { score: 3, note: 'IEP', at: '2026-10-20T15:00:00Z' }]]);
 
+const lockedCache = (lock = 'locked') => ({
+    avg_assignment: { avg_outcome_id: 603 },
+    sync_state: { [CS]: { '642': { cs_override_score: 3, cs_override_lock: lock } } },
+});
+
+function deferred() {
+    let resolve;
+    const promise = new Promise(r => { resolve = r; });
+    return { promise, resolve };
+}
+
 describe('lmgbOverrideLocks', () => {
     beforeEach(() => {
         mountGrid();
+        localStorage.clear();
         mockReadCache.mockReset();
     });
     afterEach(() => stopLmgbOverrideLocks());
@@ -47,16 +62,19 @@ describe('lmgbOverrideLocks', () => {
         expect(badge('643', CS)).toBeNull();
     });
 
-    it('keeps the badge out of the score text the mastery colors read', () => {
+    it('puts the 🔒 right after the number inside the pill', () => {
         applyLmgbOverrideLocks(locks(), CS);
-        const scoreText = document.querySelector(`[data-testid="student-outcome-score-642-${CS}"] [data-testid="score-cell-content"]`).textContent;
-        expect(scoreText.trim()).toBe('3');
+        const b = badge('642', CS);
+        expect(b.previousElementSibling.className).toBe('txt');
+        expect(b.parentElement.className).toBe('row');
     });
 
-    it('is idempotent', () => {
+    it('is idempotent and removes badges that are no longer locked', () => {
         applyLmgbOverrideLocks(locks(), CS);
         expect(applyLmgbOverrideLocks(locks(), CS)).toBe(0);
         expect(document.querySelectorAll('[data-cg-lmgb-lock]')).toHaveLength(1);
+        applyLmgbOverrideLocks(new Map(), CS);
+        expect(document.querySelectorAll('[data-cg-lmgb-lock]')).toHaveLength(0);
     });
 
     it('tooltip shows the score, date and note', () => {
@@ -64,13 +82,25 @@ describe('lmgbOverrideLocks', () => {
             .toBe('Current Score override locked in Mastery Outlook · 3.00 · set Oct 20 · Note: IEP');
     });
 
-    it('init reads the cache, marks the grid, and re-marks re-rendered cells; stop removes badges', async () => {
-        mockReadCache.mockResolvedValue({
-            avg_assignment: { avg_outcome_id: 603 },
-            sync_state: { [CS]: { '642': { cs_override_score: 3, cs_override_lock: 'locked' } } },
-        });
+    it('shows the localStorage snapshot before the cache file arrives', async () => {
+        saveLmgbLockSnapshot('566', lockedCache());
+        const read = deferred();
+        mockReadCache.mockReturnValue(read.promise);
+
+        const running = initLmgbOverrideLocks();
+        expect(badge('642', CS)).not.toBeNull();          // before the cache resolves
+
+        read.resolve(lockedCache('unlocked'));            // unlocked since the snapshot
+        expect(await running).toBe(false);
+        expect(badge('642', CS)).toBeNull();
+        expect(loadLmgbLockSnapshot('566')).toBeNull();
+    });
+
+    it('init reads the cache, saves the snapshot, re-marks re-rendered cells; stop removes badges', async () => {
+        mockReadCache.mockResolvedValue(lockedCache());
         expect(await initLmgbOverrideLocks()).toBe(true);
         expect(badge('642', CS)).not.toBeNull();
+        expect([...loadLmgbLockSnapshot('566').locks.keys()]).toEqual(['642']);
 
         // Canvas re-renders the row
         document.querySelector('tr').innerHTML = cell('642', CS, 3);
@@ -81,13 +111,15 @@ describe('lmgbOverrideLocks', () => {
         expect(document.querySelectorAll('[data-cg-lmgb-lock]')).toHaveLength(0);
     });
 
-    it('init does nothing when nothing is locked or there is no cache', async () => {
-        mockReadCache.mockResolvedValue({
-            avg_assignment: { avg_outcome_id: 603 },
-            sync_state: { [CS]: { '642': { cs_override_score: 3, cs_override_lock: 'unlocked' } } },
-        });
-        expect(await initLmgbOverrideLocks()).toBe(false);
+    it('a failed cache read keeps the snapshot markers', async () => {
+        saveLmgbLockSnapshot('566', lockedCache());
         mockReadCache.mockResolvedValue(null);
+        expect(await initLmgbOverrideLocks()).toBe(true);
+        expect(badge('642', CS)).not.toBeNull();
+    });
+
+    it('init does nothing when nothing is locked', async () => {
+        mockReadCache.mockResolvedValue(lockedCache('unlocked'));
         expect(await initLmgbOverrideLocks()).toBe(false);
         expect(document.querySelectorAll('[data-cg-lmgb-lock]')).toHaveLength(0);
     });
