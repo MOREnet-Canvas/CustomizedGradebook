@@ -29,6 +29,10 @@ import { getRollup, getOutcomeObjectByName } from '../services/outcomeService.js
 import { getAssignmentObjectFromOutcomeObj } from '../services/assignmentService.js';
 import { getRubricForAssignment } from '../services/rubricService.js';
 import { fetchAllSubmissions, fetchRubricAssociationId } from '../services/submissionService.js';
+import { waitForElement } from '../utils/observerHelpers.js';
+
+const ROOT_CONTAINER_ID = 'teacher-mastery-dashboard-root';
+const ROOT_CONTAINER_TIMEOUT_MS = 15000;
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERMISSIONS
@@ -62,13 +66,21 @@ function canAccessMasteryOutlook() {
 /**
  * Initialize Teacher Mastery OUTLOOK VIEW
  *
- * Finds the root container, sets up refresh handler, and renders the dashboard.
+ * Waits for the root container, sets up refresh handler, and renders the dashboard.
  * Uses MasteryOutlookView.js for UI rendering.
+ *
+ * The bundle can run before Canvas renders the wiki page body, so the container
+ * may not exist yet — wait for it instead of checking once.
  */
-function initMasteryOutlookView() {
-    const containerEl = document.getElementById('teacher-mastery-dashboard-root');
-
-    if (!containerEl) {
+export async function initMasteryOutlookView() {
+    let containerEl;
+    try {
+        containerEl = await waitForElement(`#${ROOT_CONTAINER_ID}`, {
+            timeout: ROOT_CONTAINER_TIMEOUT_MS,
+            target: document.body ?? document.documentElement,
+            name: 'MasteryOutlookInit',
+        });
+    } catch {
         logger.warn('[MasteryOutlookInit] Root container not found');
         return;
     }
@@ -342,11 +354,10 @@ export function initMasteryOutlook() {
     if (isMasteryOutlookPage()) {
         logger.info('[MasteryOutlookInit] On Mastery Outlook page, initializing view...');
 
-        try {
-            initMasteryOutlookView();
-        } catch (error) {
+        // Not awaited — the sidebar link below shouldn't wait for the page body.
+        initMasteryOutlookView().catch(error => {
             logger.error('[MasteryOutlookInit] Error initializing OUTLOOK VIEW', error);
-        }
+        });
     }
 
     // Route 3: Any course page - check if page exists and inject sidebar link
