@@ -1163,10 +1163,13 @@ export function mountOutcomeRow({
 
     const syncChipHtml = `<div class="od-sync-cell">${buildSyncChip(outcome, cache, { isSpecial })}</div>`;
 
+    // The Current Score row is labeled "Course Overview"; the Canvas outcome keeps its name.
+    const rowTitle = isCurrentScoreRow ? 'Course Overview' : getOutcomeDisplayName(outcome, cache);
+
     row.innerHTML = `
         <div class="od-row-number row-num">${displayNumber}</div>
         <div>
-            <div class="row-title"${getOutcomeDisplayName(outcome, cache) !== outcome.title ? ` title="${escapeHtml(outcome.title)}"` : ''}>${escapeHtml(getOutcomeDisplayName(outcome, cache))}</div>
+            <div class="row-title"${rowTitle !== outcome.title ? ` title="${escapeHtml(outcome.title)}"` : ''}>${escapeHtml(rowTitle)}</div>
         </div>
         ${rightSideHtml}
         ${initialized ? syncChipHtml : ''}

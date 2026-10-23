@@ -148,7 +148,7 @@ describe('renderCurrentScoreTable', () => {
         cache.sync_state = { [CS]: { '2': { cs_override_score: 3, cs_override_note: 'Retest', cs_override_lock: 'locked' } } };
         document.body.innerHTML = renderCurrentScoreTable(outcome, cache, undefined, undefined, { overrideEnabled: true });
         const heads = [...document.querySelectorAll('th')].map(th => th.textContent.trim()).slice(-4);
-        expect(heads).toEqual(['Canvas', 'Override', 'Note', 'Save']);
+        expect(heads).toEqual(['Current Score', 'Override', 'Note', 'Save']);
         const row2 = rowOf(document.body, '2');
         expect(row2.querySelector('[data-action="cs-ov-score"]').value).toBe('3');
         expect(row2.querySelector('[data-action="cs-ov-note"]').value).toBe('Retest');
@@ -379,6 +379,14 @@ describe('mounted detail panel', () => {
         teardown();
     });
 
+    test('Current Score row is labeled "Course Overview" with the Canvas title on hover', () => {
+        const { rootEl, teardown } = mount(CS, true);
+        const title = rootEl.querySelector('.row-title');
+        expect(title.textContent).toBe('Course Overview');
+        expect(title.getAttribute('title')).toBe('Current Score');
+        teardown();
+    });
+
     test('sort controls re-render the table', () => {
         const { rootEl, teardown, state } = mount(CS, true);
         const select = rootEl.querySelector('[data-action="cs-sort-key"]');
@@ -437,7 +445,7 @@ describe('outcome list', () => {
 
         const children   = [...outcomesEl.children];
         const containers = children.filter(el => el.classList.contains('od-outcome-container'));
-        const titles     = ['Current Score', 'Homework Completion', 'Outcome 2 — Writing', 'Outcome 1 — Reading closely'];
+        const titles     = ['Course Overview', 'Homework Completion', 'Outcome 2 — Writing', 'Outcome 1 — Reading closely'];
         expect(containers).toHaveLength(4);
         containers.forEach((el, i) => expect(el.textContent).toContain(titles[i]));
         // Divider sits between the last special row (Homework) and the first regular row

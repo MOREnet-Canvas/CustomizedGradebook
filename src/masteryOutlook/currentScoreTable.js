@@ -387,7 +387,7 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
             <thead><tr>
               <th style="width:1%;min-width:130px;white-space:nowrap;">Student</th>
               ${outcomes.map(o => renderColumnHeader(o, cache, view)).join('')}
-              <th class="c">Canvas</th>
+              <th class="c">Current Score</th>
               ${overrideEnabled ? '<th class="c">Override</th><th class="c">Note</th><th class="c">Save</th>' : ''}
             </tr></thead>
             <tbody>${body}</tbody>
