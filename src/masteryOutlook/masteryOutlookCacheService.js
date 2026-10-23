@@ -360,6 +360,80 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
 }
 
 /**
+ * Find the cache file's Canvas file object (not its contents).
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object|null>} Canvas file object, or null when there is none
+ */
+export async function findMasteryOutlookCacheFile(courseId, apiClient) {
+    // Filters go in the query string — get()'s 2nd argument is fetch options (same fix as #99).
+    const searchResults = await apiClient.get(
+        `/api/v1/courses/${courseId}/files` +
+        `?search_term=${encodeURIComponent(FILE_NAME)}` +
+        `&content_types[]=application/json&per_page=100`,
+        {},
+        'readMasteryOutlookCache:searchFile'
+    );
+    return (searchResults || []).find(f =>
+        f.display_name === FILE_NAME &&
+        f.folder_id &&
+        f['content-type'] === 'application/json'
+    ) ?? null;
+}
+
+/**
+ * Find the cache folders without creating them.
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<{ parent: Object|null, subfolder: Object|null }>} Canvas folder objects
+ */
+export async function findMasteryOutlookFolders(courseId, apiClient) {
+    const folders = await apiClient.getAllPages(
+        `/api/v1/courses/${courseId}/folders?per_page=100`,
+        {},
+        'findMasteryOutlookFolders'
+    );
+    const parent = folders.find(f => f.name === PARENT_FOLDER_NAME && !f.deleted) ?? null;
+    const subfolder = parent
+        ? folders.find(f => f.name === FOLDER_NAME && f.parent_folder_id === parent.id && !f.deleted) ?? null
+        : null;
+    return { parent, subfolder };
+}
+
+/**
+ * Delete the cache file.
+ *
+ * @param {string|number} courseId
+ * @param {string|number} fileId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} The deleted file object
+ */
+export async function deleteMasteryOutlookCacheFile(courseId, fileId, apiClient) {
+    const deleted = await apiClient.delete(`/api/v1/files/${fileId}`, {}, 'deleteMasteryOutlookCacheFile');
+    invalidateFolderCache(courseId);
+    logger.info(`[masteryOutlookCacheService] Cache file ${fileId} deleted`);
+    return deleted;
+}
+
+/**
+ * Delete a cache folder. Never forced: Canvas refuses when the folder still has
+ * files or subfolders (e.g. district_config/ under the shared parent folder).
+ *
+ * @param {string|number} courseId
+ * @param {string|number} folderId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} The deleted folder object
+ */
+export async function deleteMasteryOutlookFolder(courseId, folderId, apiClient) {
+    const deleted = await apiClient.delete(`/api/v1/folders/${folderId}`, {}, 'deleteMasteryOutlookFolder');
+    invalidateFolderCache(courseId);
+    logger.info(`[masteryOutlookCacheService] Folder ${folderId} deleted`);
+    return deleted;
+}
+
+/**
  * Read the cache file. Like readMasteryOutlookCache, but network / download
  * errors throw instead of looking like "no cache" — for callers that must tell
  * the two apart. Missing file or schema mismatch → null.
@@ -371,22 +445,8 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
 async function readCacheFile(courseId, apiClient) {
     logger.info('[masteryOutlookCacheService] Reading cache from Canvas Files...');
 
-    // Step 1: Search for the cache file. Filters go in the query string —
-    // get()'s 2nd argument is fetch options (same fix as #99).
-    const searchResults = await apiClient.get(
-        `/api/v1/courses/${courseId}/files` +
-        `?search_term=${encodeURIComponent(FILE_NAME)}` +
-        `&content_types[]=application/json&per_page=100`,
-        {},
-        'readMasteryOutlookCache:searchFile'
-    );
-
-    // Find exact match in mastery_outlook_cache folder
-    const cacheFile = searchResults.find(f =>
-        f.display_name === FILE_NAME &&
-        f.folder_id &&
-        f['content-type'] === 'application/json'
-    );
+    // Step 1: Find the cache file
+    const cacheFile = await findMasteryOutlookCacheFile(courseId, apiClient);
 
     if (!cacheFile) {
         logger.info('[masteryOutlookCacheService] No cache file found');
@@ -505,6 +565,20 @@ export function loadLmgbLockSnapshot(courseId) {
         return { avgOutcomeId: String(avgOutcomeId), locks: new Map(locks) };
     } catch {
         return null;
+    }
+}
+
+/**
+ * Forget the last-known locks for a course (e.g. after a course reset deletes
+ * the cache — the LMGB would otherwise keep showing the old 🔒 markers).
+ *
+ * @param {string|number} courseId
+ */
+export function clearLmgbLockSnapshot(courseId) {
+    try {
+        localStorage.removeItem(lockSnapshotKey(courseId));
+    } catch {
+        // storage unavailable — nothing to clear
     }
 }
 

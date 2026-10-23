@@ -101,3 +101,22 @@ export async function createRubric(courseId, assignmentId, outcomeId, apiClient)
     logger.debug("Rubric created and linked to outcome:", rubric);
     return rubric.id;
 }
+
+/**
+ * Delete a course rubric. Delete the assignment that uses it first — this only
+ * removes the rubric itself from the course.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {string|number} rubricId - Rubric ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object>} The deleted rubric object
+ */
+export async function deleteRubric(courseId, rubricId, apiClient) {
+    const deleted = await apiClient.delete(
+        `/api/v1/courses/${courseId}/rubrics/${rubricId}`,
+        {},
+        'deleteRubric'
+    );
+    logger.info(`Rubric ${rubricId} deleted`);
+    return deleted;
+}

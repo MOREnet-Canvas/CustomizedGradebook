@@ -21,9 +21,10 @@ import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 // ═══════════════════════════════════════════════════════════════════════
 
 const INJECTION_MARKER = 'cg-mastery-outlook-creator';
-const OUTLOOK_PAGE_TITLE = 'Mastery Outlook';
-const OUTLOOK_PAGE_URL = 'mastery-outlook';
-const OUTLOOK_PAGE_BODY = '<div id="teacher-mastery-dashboard-root"></div>';
+export const OUTLOOK_PAGE_TITLE = 'Mastery Outlook';
+export const OUTLOOK_PAGE_URL = 'mastery-outlook';
+export const OUTLOOK_ROOT_ID = 'teacher-mastery-dashboard-root';
+const OUTLOOK_PAGE_BODY = `<div id="${OUTLOOK_ROOT_ID}"></div>`;
 
 // ═══════════════════════════════════════════════════════════════════════
 // CREATE Mastery Outlook PAGE

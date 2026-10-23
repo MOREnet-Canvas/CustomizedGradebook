@@ -15,7 +15,7 @@
 import { logger } from '../utils/logger.js';
 import { getUserRoleGroup, getCourseId } from '../utils/canvas.js';
 import { isMasteryOutlookPage } from '../utils/pageDetection.js';
-import { injectMasteryOutlookButton } from './masteryOutlookCreation.js';
+import { injectMasteryOutlookButton, OUTLOOK_ROOT_ID } from './masteryOutlookCreation.js';
 import { renderMasteryOutlook } from './masteryOutlookView.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { fetchAllOutcomeData, computeOutcomeStats, applyPossibleManualOverrides, reapplyIgnoredAlignments, applyCanvasClassStats } from './masteryOutlookDataService.js';
@@ -31,7 +31,6 @@ import { getRubricForAssignment } from '../services/rubricService.js';
 import { fetchAllSubmissions, fetchRubricAssociationId } from '../services/submissionService.js';
 import { waitForElement } from '../utils/observerHelpers.js';
 
-const ROOT_CONTAINER_ID = 'teacher-mastery-dashboard-root';
 const ROOT_CONTAINER_TIMEOUT_MS = 15000;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -75,7 +74,7 @@ function canAccessMasteryOutlook() {
 export async function initMasteryOutlookView() {
     let containerEl;
     try {
-        containerEl = await waitForElement(`#${ROOT_CONTAINER_ID}`, {
+        containerEl = await waitForElement(`#${OUTLOOK_ROOT_ID}`, {
             timeout: ROOT_CONTAINER_TIMEOUT_MS,
             target: document.body ?? document.documentElement,
             name: 'MasteryOutlookInit',

@@ -8,7 +8,10 @@ vi.mock('../../utils/canvas.js', () => ({
     getCourseId: () => '566',
 }));
 vi.mock('../../utils/pageDetection.js', () => ({ isMasteryOutlookPage: () => true }));
-vi.mock('../masteryOutlookCreation.js', () => ({ injectMasteryOutlookButton: vi.fn() }));
+vi.mock('../masteryOutlookCreation.js', () => ({
+    injectMasteryOutlookButton: vi.fn(),
+    OUTLOOK_ROOT_ID: 'teacher-mastery-dashboard-root',
+}));
 vi.mock('../sidebarLinkInjection.js', () => ({ checkAndInjectMasteryOutlookLink: vi.fn() }));
 vi.mock('../../utils/canvasApiClient.js', () => ({ CanvasApiClient: class {} }));
 

@@ -67,6 +67,23 @@ export async function updatePage(courseId, pageUrl, pageData, apiClient) {
 }
 
 /**
+ * Delete a wiki page by URL slug.
+ * @param {string} courseId - Course ID
+ * @param {string} pageUrl - Page URL slug
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object>} The deleted page object
+ */
+export async function deletePage(courseId, pageUrl, apiClient) {
+    const deleted = await apiClient.delete(
+        `/api/v1/courses/${courseId}/pages/${pageUrl}`,
+        {},
+        'deletePage'
+    );
+    logger.info(`Page ${pageUrl} deleted`);
+    return deleted;
+}
+
+/**
  * Get a specific wiki page by URL slug
  * @param {string} courseId - Course ID
  * @param {string} pageUrl - Page URL slug
