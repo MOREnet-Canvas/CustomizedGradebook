@@ -20,8 +20,20 @@
  *   - If a rollups response was already read unpatched and its ratings lack
  *     colors, the page reloads once (guarded) — the bundle is cached by then.
  *
- * Remove once Instructure fixes the LMGB (ratings without color should still
- * show their score).
+ * ─── TEMPORARY — Canvas LMGB workaround, see #107 ─────────────────────────
+ * REMOVE WHEN CANVAS FIXES THE LMGB (ratings without a color must still show
+ * their score). To check: open a 9-level course's LMGB with
+ * ENABLE_LMGB_RATING_COLOR_FIX: false (or the bundle blocked) — real scores
+ * instead of all 0s means Canvas fixed it. Then remove:
+ *   1. this file and lmgbRatingColorPatch.test.js
+ *   2. src/config.js — ENABLE_LMGB_RATING_COLOR_FIX and its comment
+ *   3. src/customGradebookInit.js — the installLmgbRatingColorPatch import,
+ *      ENABLE_LMGB_RATING_COLOR_FIX in the config import, and the install
+ *      block at the top of init()
+ *   4. documents/TODOs/TODO-remove-lmgb-rating-color-workaround.md
+ * Search "TEMPORARY — Canvas LMGB workaround" to find every piece. Nothing
+ * else depends on it; the cg_lmgb_color_reload:* sessionStorage keys expire
+ * with the browser session.
  */
 
 import { logger } from '../utils/logger.js';
