@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
 import { getCourseId, getUserRoleGroup } from '../utils/canvas.js';
 import { isCoursePage } from '../utils/pageDetection.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { findMasteryOutlookPage, MASTERY_OUTLOOK_PAGE_URL } from '../services/pageService.js';
+import { findMasteryOutlookPage, hasMasteryOutlookRoot, MASTERY_OUTLOOK_PAGE_URL } from '../services/pageService.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -124,7 +124,11 @@ export async function checkAndInjectMasteryOutlookLink() {
         // Find the page by title — its slug may be numbered after a reset
         const page = await findMasteryOutlookPage(courseId, apiClient);
 
-        if (page) {
+        if (page && !hasMasteryOutlookRoot(page)) {
+            // e.g. a blank page saved from Canvas's "create it below" editor —
+            // a link would open a page that loads nothing. Create repairs it.
+            logger.info(`[SidebarLink] ${page.url} has no Mastery Outlook container — no link (run Create Mastery Outlook in Settings to repair)`);
+        } else if (page) {
             logger.debug('[SidebarLink] Mastery Outlook page exists, injecting link');
             injectMasteryOutlookLink(courseId, page.url);
         } else {

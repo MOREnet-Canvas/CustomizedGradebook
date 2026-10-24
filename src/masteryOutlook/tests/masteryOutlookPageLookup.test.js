@@ -15,10 +15,12 @@ vi.mock('../../utils/pageDetection.js', async (importOriginal) => ({
     isCoursePage: () => true,
 }));
 
-const pages = vi.hoisted(() => ({ list: [] }));
+const pages = vi.hoisted(() => ({ list: [], puts: [], posts: [] }));
 vi.mock('../../utils/canvasApiClient.js', () => ({
     CanvasApiClient: class {
         async getAllPages(url) { return url.includes('/pages?search_term=') ? pages.list : []; }
+        async put(url, data) { pages.puts.push({ url, data }); return {}; }
+        async post(url, data) { pages.posts.push({ url, data }); return { url: 'mastery-outlook-8' }; }
     },
 }));
 
@@ -32,10 +34,13 @@ const p = (url, body = ROOT, extra = {}) => ({ url, title: 'Mastery Outlook', bo
 beforeEach(() => {
     document.body.innerHTML = '<ul id="section-tabs"><li class="section"><a>Home</a></li></ul>';
     pages.list = [];
+    pages.puts = [];
+    pages.posts = [];
+    vi.restoreAllMocks();
 });
 
 describe('findMasteryOutlookPages', () => {
-    test('page with the Mastery Outlook root first, then newest; ignores other titles and deleted pages', async () => {
+    test('newest first; ignores other titles and deleted pages', async () => {
         pages.list = [
             p('mastery-outlook-4', '', { created_at: '2026-10-24T01:28:05Z' }),
             p('mastery-outlook-3', ROOT, { created_at: '2026-10-24T01:27:38Z' }),
@@ -45,7 +50,7 @@ describe('findMasteryOutlookPages', () => {
             { url: 'other', title: 'Mastery Outlook', body: ROOT },
         ];
         const found = await findMasteryOutlookPages('566', new CanvasApiClient());
-        expect(found.map(x => x.url)).toEqual(['mastery-outlook-5', 'mastery-outlook-3', 'mastery-outlook-4']);
+        expect(found.map(x => x.url)).toEqual(['mastery-outlook-5', 'mastery-outlook-4', 'mastery-outlook-3']);
         expect((await findMasteryOutlookPage('566', new CanvasApiClient())).url).toBe('mastery-outlook-5');
     });
 
@@ -70,15 +75,62 @@ describe('sidebar link', () => {
     });
 });
 
-describe('Create Mastery Outlook', () => {
-    test('a numbered page already exists → no duplicate, link to that page', async () => {
+describe('sidebar link for a broken page', () => {
+    test('newest page has no Mastery Outlook container → no link', async () => {
+        pages.list = [p('mastery-outlook-7', '', { created_at: '2026-10-24T01:32:08Z' })];
+        await checkAndInjectMasteryOutlookLink();
+        await new Promise(r => setTimeout(r, 400));
+        expect(document.getElementById('cg-mastery-outlook-nav-link')).toBeNull();
+    });
+});
+
+describe('Create Mastery Outlook checks before creating', () => {
+    async function runCreate() {
         const { createMasteryOutlook } = await import('../masteryOutlookCreation.js');
-        pages.list = [p('mastery-outlook-5')];
         const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
         await createMasteryOutlook(document.createElement('button'));
-        expect(alertSpy.mock.calls[0][0]).toMatch(/already exists/);
+        return alertSpy.mock.calls[0]?.[0] ?? '';
+    }
+    const linkHref = async () => {
         await vi.waitFor(() => expect(document.querySelector('#cg-mastery-outlook-nav-link a')).not.toBeNull());
-        expect(document.querySelector('#cg-mastery-outlook-nav-link a').getAttribute('href'))
-            .toBe('/courses/566/pages/mastery-outlook-5');
+        return document.querySelector('#cg-mastery-outlook-nav-link a').getAttribute('href');
+    };
+
+    test('empty existing page → repaired (container prepended, content kept), no new page', async () => {
+        pages.list = [p('mastery-outlook-7', '<p>notes</p>')];
+        expect(await runCreate()).toMatch(/repaired/);
+        expect(pages.posts).toHaveLength(0);
+        expect(pages.puts).toHaveLength(1);
+        expect(pages.puts[0].url).toBe('/api/v1/courses/566/pages/mastery-outlook-7');
+        expect(pages.puts[0].data.wiki_page.body).toBe(ROOT + '<p>notes</p>');
+        expect(await linkHref()).toBe('/courses/566/pages/mastery-outlook-7');
+    });
+
+    test('working page → no write, "ready"', async () => {
+        pages.list = [p('mastery-outlook-5')];
+        expect(await runCreate()).toMatch(/ready/);
+        expect(pages.puts).toHaveLength(0);
+        expect(pages.posts).toHaveLength(0);
+        expect(await linkHref()).toBe('/courses/566/pages/mastery-outlook-5');
+    });
+
+    test('no page → created; Canvas picks the slug', async () => {
+        expect(await runCreate()).toMatch(/created/);
+        expect(pages.posts).toHaveLength(1);
+        expect(pages.posts[0].data.wiki_page.url).toBeUndefined();
+        expect(pages.posts[0].data.wiki_page.body).toBe(ROOT);
+        expect(await linkHref()).toBe('/courses/566/pages/mastery-outlook-8');
+    });
+});
+
+describe('isMasteryOutlookPage', () => {
+    test('page view only', async () => {
+        const { isMasteryOutlookPage } = await vi.importActual('../../utils/pageDetection.js');
+        expect(isMasteryOutlookPage('/courses/566/pages/mastery-outlook')).toBe(true);
+        expect(isMasteryOutlookPage('/courses/566/pages/mastery-outlook-7')).toBe(true);
+        expect(isMasteryOutlookPage('/courses/566/pages/mastery-outlook-7/')).toBe(true);
+        expect(isMasteryOutlookPage('/courses/566/pages/mastery-outlook-7/edit')).toBe(false);
+        expect(isMasteryOutlookPage('/courses/566/pages/mastery-outlook-7/revisions')).toBe(false);
+        expect(isMasteryOutlookPage('/courses/566/pages/mastery-outlook-notes')).toBe(false);
     });
 });

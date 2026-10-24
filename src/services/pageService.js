@@ -125,8 +125,8 @@ export const MASTERY_OUTLOOK_ROOT_ID = 'teacher-mastery-dashboard-root';
  *
  * @param {string|number} courseId
  * @param {CanvasApiClient} apiClient
- * @returns {Promise<Object[]>} Page objects (with body). Pages containing the
- *   Mastery Outlook root element first, then newest first.
+ * @returns {Promise<Object[]>} Page objects (with body), newest first. The
+ *   newest one is "the" Mastery Outlook page.
  */
 export async function findMasteryOutlookPages(courseId, apiClient) {
     const pages = await apiClient.getAllPages(
@@ -135,17 +135,24 @@ export async function findMasteryOutlookPages(courseId, apiClient) {
         {},
         'findMasteryOutlookPages'
     );
-    const hasRoot = p => String(p.body ?? '').includes(MASTERY_OUTLOOK_ROOT_ID);
     return (pages ?? [])
         .filter(p => p.title === MASTERY_OUTLOOK_PAGE_TITLE
             && p.workflow_state !== 'deleted'
             && String(p.url ?? '').startsWith(MASTERY_OUTLOOK_PAGE_URL))
-        .sort((a, b) => (hasRoot(b) - hasRoot(a))
-            || String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+        .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
 }
 
 /**
- * The course's Mastery Outlook page (see findMasteryOutlookPages), or null.
+ * @param {Object|null} page - wiki page object (with body)
+ * @returns {boolean} true when the page contains the element Mastery Outlook renders into
+ */
+export function hasMasteryOutlookRoot(page) {
+    return String(page?.body ?? '').includes(MASTERY_OUTLOOK_ROOT_ID);
+}
+
+/**
+ * The course's Mastery Outlook page — the most recent non-deleted page titled
+ * "Mastery Outlook" (see findMasteryOutlookPages) — or null.
  *
  * @param {string|number} courseId
  * @param {CanvasApiClient} apiClient
