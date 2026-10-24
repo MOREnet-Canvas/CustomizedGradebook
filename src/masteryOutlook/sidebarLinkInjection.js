@@ -10,14 +10,13 @@ import { logger } from '../utils/logger.js';
 import { getCourseId, getUserRoleGroup } from '../utils/canvas.js';
 import { isCoursePage } from '../utils/pageDetection.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getPage } from '../services/pageService.js';
+import { findMasteryOutlookPage, MASTERY_OUTLOOK_PAGE_URL } from '../services/pageService.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
 
 const LINK_ID = 'cg-mastery-outlook-nav-link';
-const OUTLOOK_PAGE_URL = 'mastery-outlook';
 const LINK_TEXT = 'Mastery Outlook';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -30,8 +29,10 @@ const LINK_TEXT = 'Mastery Outlook';
  * Called immediately after page creation, or on page load if page exists.
  *
  * @param {string} courseId - Canvas course ID
+ * @param {string} [pageUrl] - the page's actual slug (Canvas may number it, e.g.
+ *   mastery-outlook-3); defaults to mastery-outlook
  */
-export function injectMasteryOutlookLink(courseId) {
+export function injectMasteryOutlookLink(courseId, pageUrl = MASTERY_OUTLOOK_PAGE_URL) {
     if (!courseId) {
         logger.warn('[SidebarLink] No course ID provided, cannot inject link');
         return;
@@ -55,7 +56,7 @@ export function injectMasteryOutlookLink(courseId) {
 
         // Create <a> element
         const a = document.createElement('a');
-        a.href = `/courses/${courseId}/pages/${OUTLOOK_PAGE_URL}`;
+        a.href = `/courses/${courseId}/pages/${pageUrl}`;
         a.className = 'mastery-outlook';
         a.tabIndex = 0;
         a.textContent = LINK_TEXT;
@@ -120,12 +121,12 @@ export async function checkAndInjectMasteryOutlookLink() {
     const apiClient = new CanvasApiClient();
 
     try {
-        // Check if Mastery Outlook page exists
-        const page = await getPage(courseId, OUTLOOK_PAGE_URL, apiClient);
+        // Find the page by title — its slug may be numbered after a reset
+        const page = await findMasteryOutlookPage(courseId, apiClient);
 
         if (page) {
             logger.debug('[SidebarLink] Mastery Outlook page exists, injecting link');
-            injectMasteryOutlookLink(courseId);
+            injectMasteryOutlookLink(courseId, page.url);
         } else {
             logger.debug('[SidebarLink] Mastery Outlook page does not exist, no link injected');
         }

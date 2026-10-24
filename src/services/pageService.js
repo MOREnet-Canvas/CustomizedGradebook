@@ -111,6 +111,51 @@ export async function getPage(courseId, pageUrl, apiClient) {
     }
 }
 
+/** Mastery Outlook page identity (shared by creation, sidebar link, init, reset). */
+export const MASTERY_OUTLOOK_PAGE_TITLE = 'Mastery Outlook';
+/** Preferred slug. Canvas may number it (mastery-outlook-2, …) when the slug is taken or was deleted. */
+export const MASTERY_OUTLOOK_PAGE_URL = 'mastery-outlook';
+/** The element Mastery Outlook renders into; its presence marks our page. */
+export const MASTERY_OUTLOOK_ROOT_ID = 'teacher-mastery-dashboard-root';
+
+/**
+ * Find every Mastery Outlook page in a course, by title — not by slug, because
+ * Canvas keeps a deleted page's slug reserved and numbers the next one
+ * (mastery-outlook-3, …).
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object[]>} Page objects (with body). Pages containing the
+ *   Mastery Outlook root element first, then newest first.
+ */
+export async function findMasteryOutlookPages(courseId, apiClient) {
+    const pages = await apiClient.getAllPages(
+        // Filters go in the URL — getAllPages' second argument is fetch options
+        `/api/v1/courses/${courseId}/pages?search_term=${encodeURIComponent(MASTERY_OUTLOOK_PAGE_TITLE)}&include[]=body&per_page=50`,
+        {},
+        'findMasteryOutlookPages'
+    );
+    const hasRoot = p => String(p.body ?? '').includes(MASTERY_OUTLOOK_ROOT_ID);
+    return (pages ?? [])
+        .filter(p => p.title === MASTERY_OUTLOOK_PAGE_TITLE
+            && p.workflow_state !== 'deleted'
+            && String(p.url ?? '').startsWith(MASTERY_OUTLOOK_PAGE_URL))
+        .sort((a, b) => (hasRoot(b) - hasRoot(a))
+            || String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+}
+
+/**
+ * The course's Mastery Outlook page (see findMasteryOutlookPages), or null.
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object|null>}
+ */
+export async function findMasteryOutlookPage(courseId, apiClient) {
+    const pages = await findMasteryOutlookPages(courseId, apiClient);
+    return pages[0] ?? null;
+}
+
 /**
  * Find the actual URL of the Mastery Dashboard page by searching by title
  * Handles auto-numbered URLs (mastery-dashboard-2, mastery-dashboard-3, etc.)

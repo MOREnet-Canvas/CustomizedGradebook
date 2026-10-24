@@ -12,7 +12,10 @@ import { logger } from '../utils/logger.js';
 import { makeButton } from '../ui/buttons.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { createPage, getPage } from '../services/pageService.js';
+import {
+    createPage, findMasteryOutlookPage,
+    MASTERY_OUTLOOK_PAGE_TITLE, MASTERY_OUTLOOK_PAGE_URL, MASTERY_OUTLOOK_ROOT_ID,
+} from '../services/pageService.js';
 import { isCourseSettingsPage, waitForSettingsSidebar } from '../utils/pageDetection.js';
 import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 
@@ -21,9 +24,9 @@ import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 // ═══════════════════════════════════════════════════════════════════════
 
 const INJECTION_MARKER = 'cg-mastery-outlook-creator';
-export const OUTLOOK_PAGE_TITLE = 'Mastery Outlook';
-export const OUTLOOK_PAGE_URL = 'mastery-outlook';
-export const OUTLOOK_ROOT_ID = 'teacher-mastery-dashboard-root';
+export const OUTLOOK_PAGE_TITLE = MASTERY_OUTLOOK_PAGE_TITLE;
+export const OUTLOOK_PAGE_URL = MASTERY_OUTLOOK_PAGE_URL;
+export const OUTLOOK_ROOT_ID = MASTERY_OUTLOOK_ROOT_ID;
 const OUTLOOK_PAGE_BODY = `<div id="${OUTLOOK_ROOT_ID}"></div>`;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -54,7 +57,8 @@ export async function createMasteryOutlook(button) {
         logger.info('[MasteryOutlook] Creating Mastery Outlook page');
 
         // Check if page already exists
-        const existingPage = await getPage(courseId, OUTLOOK_PAGE_URL, apiClient);
+        // Found by title — the slug may be numbered (mastery-outlook-3) after a reset
+        const existingPage = await findMasteryOutlookPage(courseId, apiClient);
 
         if (existingPage) {
             logger.info('[MasteryOutlook] Page already exists');
@@ -64,7 +68,7 @@ export async function createMasteryOutlook(button) {
             alert(`Mastery Outlook page already exists!\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}`);
 
             // Inject sidebar link (in case it was removed or page loaded without it)
-            injectMasteryOutlookLink(courseId);
+            injectMasteryOutlookLink(courseId, existingPage.url);
 
             // Reset button after 3 seconds
             setTimeout(() => {
@@ -76,10 +80,10 @@ export async function createMasteryOutlook(button) {
             return;
         }
 
-        // Create Mastery Outlook page (UNPUBLISHED)
+        // Create Mastery Outlook page (UNPUBLISHED). Canvas picks the slug from the
+        // title (mastery-outlook, or mastery-outlook-N if that slug is reserved).
         const createdPage = await createPage(courseId, {
             title: OUTLOOK_PAGE_TITLE,
-            url: OUTLOOK_PAGE_URL,
             body: OUTLOOK_PAGE_BODY,
             published: false  // UNPUBLISHED - only teachers can access
         }, apiClient);
@@ -87,7 +91,7 @@ export async function createMasteryOutlook(button) {
         logger.info(`[MasteryOutlook] Page created at: ${createdPage.url}`);
 
         // Inject sidebar link immediately
-        injectMasteryOutlookLink(courseId);
+        injectMasteryOutlookLink(courseId, createdPage.url);
         logger.info('[MasteryOutlook] Sidebar link injection triggered');
 
         // Success!

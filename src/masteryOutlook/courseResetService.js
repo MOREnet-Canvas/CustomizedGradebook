@@ -26,7 +26,7 @@ import { logger } from '../utils/logger.js';
 import { AVG_ASSIGNMENT_NAME, PL_ASSIGNMENT_SUFFIX, PL_RUBRIC_SUFFIX } from '../config.js';
 import { deleteAssignment } from '../services/assignmentService.js';
 import { deleteRubric } from '../services/rubricService.js';
-import { getPage, deletePage } from '../services/pageService.js';
+import { findMasteryOutlookPages, deletePage, MASTERY_OUTLOOK_ROOT_ID as OUTLOOK_ROOT_ID } from '../services/pageService.js';
 import {
     readMasteryOutlookCache,
     findMasteryOutlookCacheFile,
@@ -37,7 +37,6 @@ import {
     clearLmgbLockSnapshot,
 } from './masteryOutlookCacheService.js';
 import { isCurrentScoreOutcome } from './outcomeTypes.js';
-import { OUTLOOK_PAGE_TITLE, OUTLOOK_PAGE_URL, OUTLOOK_ROOT_ID } from './masteryOutlookCreation.js';
 import { removeMasteryOutlookLink } from './sidebarLinkInjection.js';
 
 const LOG = '[CourseReset]';
@@ -143,14 +142,14 @@ export async function buildResetPlan(courseId, apiClient) {
         });
     }
 
-    // ── Mastery Outlook page ──
-    const page = await getPage(courseId, OUTLOOK_PAGE_URL, apiClient);
-    if (page && page.title === OUTLOOK_PAGE_TITLE) {
+    // ── Mastery Outlook page(s) — by title; a reset/recreate can leave numbered
+    //    copies (mastery-outlook-3, -4, …) ──
+    for (const page of await findMasteryOutlookPages(courseId, apiClient)) {
         const verified = String(page.body ?? '').includes(OUTLOOK_ROOT_ID);
         items.push({
             type: RESET_ITEM_TYPES.PAGE,
-            id: page.url ?? OUTLOOK_PAGE_URL,
-            name: `Page: ${page.title}`,
+            id: page.url,
+            name: `Page: ${page.title} (${page.url})`,
             verified,
             note: verified ? null : 'Page content was changed after setup',
         });

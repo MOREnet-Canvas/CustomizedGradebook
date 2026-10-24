@@ -40,12 +40,14 @@ const assignment = (id, name, rubric) => ({
 });
 
 /** Fake CanvasApiClient routed by URL. `fail` = set of URL substrings whose DELETE throws. */
-function makeApi({ assignments, page, outcomes, folderContents = {}, fail = new Set() } = {}) {
+function makeApi({ assignments, page, pages, outcomes, folderContents = {}, fail = new Set() } = {}) {
+    const pageList = pages ?? (page ? [page] : []);
     const deletes = [];
     return {
         deletes,
         getAllPages: vi.fn(async (url) => {
             if (url.includes('/assignments?search_term=')) return assignments;
+            if (url.includes('/pages?search_term=')) return pageList;
             if (url.includes('/submissions')) {
                 return url.includes('/3617/')
                     ? [{ user_id: 643, score: 2.5, grade: '2.5', submission_comments: [{ comment: 'PL', author_name: 'T' }] },
@@ -135,6 +137,17 @@ describe('buildResetPlan', () => {
             [RESET_ITEM_TYPES.SUBFOLDER, true],
             [RESET_ITEM_TYPES.PARENT, true],
         ]);
+    });
+
+    test('lists every Mastery Outlook page (numbered copies); an empty copy is unverified', async () => {
+        setupDisk();
+        const plan = await buildResetPlan(COURSE, makeApi({ assignments: [], outcomes: [], pages: [
+            { url: 'mastery-outlook-4', title: 'Mastery Outlook', body: '', created_at: '2026-10-24T01:28:05Z' },
+            { url: 'mastery-outlook-5', title: 'Mastery Outlook', body: page.body, created_at: '2026-10-24T01:28:25Z' },
+            { url: 'mastery-outlook-notes', title: 'Mastery Outlook notes', body: page.body },
+        ] }));
+        const pages = plan.items.filter(i => i.type === RESET_ITEM_TYPES.PAGE);
+        expect(pages.map(p => [p.id, p.verified])).toEqual([['mastery-outlook-5', true], ['mastery-outlook-4', false]]);
     });
 
     test('a page whose content was replaced is unverified', async () => {
