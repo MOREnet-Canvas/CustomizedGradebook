@@ -8,11 +8,17 @@
  * numbers" — LearningOutcome#meets_color_criteria), so outcomes on a 7+ rating
  * scale (e.g. Sedalia's 9 ratings) show 0 for every student.
  *
- * This wraps the page's XHR and fetch for `/api/v1/courses/:id/outcome_rollups`
- * responses and adds a color to each `linked.outcomes[].ratings[]` entry that
- * has none. Scores and every other field are left as they are; nothing is
- * written to Canvas. Colors come from the configured mastery palette, so Canvas's
- * own pills match the LMGB mastery colors.
+ * This adds a color to each `linked.outcomes[].ratings[]` entry that has none in
+ * `/api/v1/courses/:id/outcome_rollups` responses. Scores and every other field
+ * are left as they are; nothing is written to Canvas. Colors come from the
+ * configured mastery palette, so Canvas's own pills match the LMGB mastery colors.
+ *
+ * Timing: the loaders insert this bundle as an async script, so Canvas may
+ * request rollups before it runs. Two safeguards:
+ *   - XHR is patched on the prototype (by responseURL), so a request Canvas
+ *     started before install but reads after it is still fixed.
+ *   - If a rollups response was already read unpatched and its ratings lack
+ *     colors, the page reloads once (guarded) — the bundle is cached by then.
  *
  * Remove once Instructure fixes the LMGB (ratings without color should still
  * show their score).
@@ -27,8 +33,13 @@ const ROLLUPS_URL = /\/api\/v1\/courses\/\d+\/outcome_rollups(?:[?#]|$)/;
 const JSON_PREFIX = 'while(1);';
 /** Used when no mastery palette is configured. Canvas colors are hex without '#'. */
 export const FALLBACK_RATING_COLOR = '6B7780';
+/** Wait this long after install before deciding a response was missed. */
+export const MISSED_CHECK_DELAY_MS = 1500;
+/** No second recovery reload of the same page within this window. */
+export const RELOAD_GUARD_MS = 60000;
+const RELOAD_KEY_PREFIX = 'cg_lmgb_color_reload:';
 
-let installed = false;
+let state = null;
 
 /**
  * @param {string} url
@@ -58,10 +69,22 @@ export function addMissingRatingColors(json, bands) {
     return { json, changed };
 }
 
+/**
+ * @param {Object} json - outcome_rollups response
+ * @returns {boolean} true when some rating has no color (Canvas would show 0s)
+ */
+export function hasUncoloredRatings(json) {
+    return (json?.linked?.outcomes ?? []).some(o => (o?.ratings ?? []).some(r => r && !r.color));
+}
+
 function colorForPoints(points, bands) {
     if (!bands?.length || !Number.isFinite(points)) return FALLBACK_RATING_COLOR;
     const band = bands[getBandIndex(points, bands)];
     return String(band?.bg ?? FALLBACK_RATING_COLOR).replace(/^#/, '');
+}
+
+function parseJson(text) {
+    return JSON.parse(text.startsWith(JSON_PREFIX) ? text.slice(JSON_PREFIX.length) : text);
 }
 
 /**
@@ -74,75 +97,103 @@ function colorForPoints(points, bands) {
  */
 export function patchRollupsText(text, bands) {
     if (typeof text !== 'string' || !text) return text;
-    const prefixed = text.startsWith(JSON_PREFIX);
     try {
-        const json = JSON.parse(prefixed ? text.slice(JSON_PREFIX.length) : text);
+        const json = parseJson(text);
         const { changed } = addMissingRatingColors(json, bands);
         if (!changed) return text;
         logger.debug(`${LOG} Added ${changed} rating color(s)`);
-        return (prefixed ? JSON_PREFIX : '') + JSON.stringify(json);
+        return (text.startsWith(JSON_PREFIX) ? JSON_PREFIX : '') + JSON.stringify(json);
     } catch {
         return text;
     }
 }
 
 /**
- * Install the XHR + fetch wrappers. Call on the LMGB page as early as possible
- * (before Canvas requests rollups). Safe to call more than once.
+ * Install the XHR + fetch patches and schedule the missed-response check. Call
+ * on the LMGB page as early as possible. Safe to call more than once.
  *
  * @param {Object} [options]
  * @param {string} [options.schemeKey] - palette key (default LMGB_MASTERY_SCHEME)
+ * @param {Function} [options.reload] - page reload (default location.reload)
  * @returns {boolean} true if installed by this call
  */
 export function installLmgbRatingColorPatch(options = {}) {
-    if (installed) return false;
-    installed = true;
+    if (state) return false;
 
     const palette = getOptInPalette(options.schemeKey ?? LMGB_MASTERY_SCHEME, CUSTOM_MASTERY_PALETTES);
-    const bands = palette?.bands ?? null;
+    state = {
+        bands: palette?.bands ?? null,
+        installedAt: performance.now(),
+        servedUrls: new Set(),
+        restore: [],
+        originalFetch: window.fetch,
+        checkTimer: null,
+    };
 
-    patchXhr(bands);
-    patchFetch(bands);
+    patchXhr();
+    patchFetch();
+    state.checkTimer = setTimeout(
+        () => recoverMissedRollups({ reload: options.reload }).catch(() => {}),
+        MISSED_CHECK_DELAY_MS
+    );
+
     logger.info(`${LOG} Installed (${palette ? palette.label : 'neutral color'})`);
     return true;
 }
 
-function patchXhr(bands) {
-    const proto = window.XMLHttpRequest?.prototype;
-    if (!proto) return;
-    const textDesc = Object.getOwnPropertyDescriptor(proto, 'responseText');
-    const respDesc = Object.getOwnPropertyDescriptor(proto, 'response');
-    const originalOpen = proto.open;
+// ════════════════════════════════════════════════════════════════════
+// XHR — patched on the prototype so in-flight requests are covered too
+// ════════════════════════════════════════════════════════════════════
 
-    proto.open = function (method, url, ...rest) {
-        if (isRollupsUrl(url) && textDesc?.get) {
-            let cached = null;
-            const patched = () => {
-                if (this.readyState !== 4) return textDesc.get.call(this);
-                if (cached === null) cached = patchRollupsText(textDesc.get.call(this), bands);
-                return cached;
-            };
-            Object.defineProperty(this, 'responseText', { configurable: true, get: patched });
-            if (respDesc?.get) {
-                Object.defineProperty(this, 'response', {
-                    configurable: true,
-                    get: () => {
-                        const type = this.responseType;
-                        if (type === '' || type === 'text') return patched();
-                        if (type === 'json' && this.readyState === 4) {
-                            try { return JSON.parse(patched().replace(JSON_PREFIX, '')); } catch { /* fall through */ }
-                        }
-                        return respDesc.get.call(this);
-                    },
-                });
-            }
-        }
-        return originalOpen.call(this, method, url, ...rest);
+function patchXhr() {
+    const proto = window.XMLHttpRequest?.prototype;
+    const textDesc = proto && Object.getOwnPropertyDescriptor(proto, 'responseText');
+    const respDesc = proto && Object.getOwnPropertyDescriptor(proto, 'response');
+    if (!textDesc?.get) return;
+
+    const cache = new WeakMap();   // xhr → { raw, out }
+    const isDoneRollups = xhr => xhr.readyState === 4 && isRollupsUrl(xhr.responseURL);
+    const patchedText = (xhr) => {
+        const raw = textDesc.get.call(xhr);
+        if (!isDoneRollups(xhr)) return raw;
+        state?.servedUrls.add(xhr.responseURL);
+        const hit = cache.get(xhr);
+        if (hit && hit.raw === raw) return hit.out;
+        const out = patchRollupsText(raw, state?.bands ?? null);
+        cache.set(xhr, { raw, out });
+        return out;
     };
+
+    Object.defineProperty(proto, 'responseText', {
+        configurable: true, enumerable: textDesc.enumerable,
+        get() { return patchedText(this); },
+    });
+    state.restore.push(() => Object.defineProperty(proto, 'responseText', textDesc));
+
+    if (respDesc?.get) {
+        Object.defineProperty(proto, 'response', {
+            configurable: true, enumerable: respDesc.enumerable,
+            get() {
+                const type = this.responseType;
+                if (type === '' || type === 'text') return patchedText(this);
+                const value = respDesc.get.call(this);
+                if (type === 'json' && value && isDoneRollups(this)) {
+                    state?.servedUrls.add(this.responseURL);
+                    addMissingRatingColors(value, state?.bands ?? null);
+                }
+                return value;
+            },
+        });
+        state.restore.push(() => Object.defineProperty(proto, 'response', respDesc));
+    }
 }
 
-function patchFetch(bands) {
-    const originalFetch = window.fetch;
+// ════════════════════════════════════════════════════════════════════
+// fetch
+// ════════════════════════════════════════════════════════════════════
+
+function patchFetch() {
+    const originalFetch = state.originalFetch;
     if (typeof originalFetch !== 'function') return;
 
     window.fetch = async function (input, init) {
@@ -150,8 +201,9 @@ function patchFetch(bands) {
         const url = typeof input === 'string' ? input : input?.url;
         if (!res.ok || !isRollupsUrl(url)) return res;
         try {
+            state?.servedUrls.add(res.url || url);
             const text = await res.clone().text();
-            const patched = patchRollupsText(text, bands);
+            const patched = patchRollupsText(text, state?.bands ?? null);
             if (patched === text) return res;
             return new Response(patched, { status: res.status, statusText: res.statusText, headers: res.headers });
         } catch (err) {
@@ -159,9 +211,63 @@ function patchFetch(bands) {
             return res;
         }
     };
+    state.restore.push(() => { window.fetch = originalFetch; });
 }
 
-/** Test helper: allow a fresh install. */
+// ════════════════════════════════════════════════════════════════════
+// Missed-response recovery
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * If Canvas read a rollups response before the patch was installed (never
+ * served by the patch) and that response has uncolored ratings, reload the page
+ * once. Exported for tests.
+ *
+ * @param {Object} [opts]
+ * @param {Function} [opts.reload] - default location.reload
+ * @param {Storage} [opts.storage] - default sessionStorage
+ * @returns {Promise<boolean>} true if a reload was triggered
+ */
+export async function recoverMissedRollups({ reload, storage } = {}) {
+    if (!state) return false;
+    const doReload = reload ?? (() => window.location.reload());
+    const store = storage ?? window.sessionStorage;
+
+    const missed = performance.getEntriesByType('resource')
+        .filter(e => isRollupsUrl(e.name) && e.responseEnd > 0 && e.responseEnd <= state.installedAt)
+        .filter(e => !state.servedUrls.has(e.name));
+    if (!missed.length) return false;
+
+    let needsFix = false;
+    try {
+        const res = await state.originalFetch.call(window, missed[0].name, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+        });
+        needsFix = res.ok && hasUncoloredRatings(parseJson(await res.text()));
+    } catch (err) {
+        logger.debug(`${LOG} Could not re-check rollups:`, err?.message);
+        return false;
+    }
+    if (!needsFix) return false;
+
+    const key = RELOAD_KEY_PREFIX + window.location.pathname + window.location.search;
+    const last = Number(store?.getItem(key) ?? 0);
+    if (last && Date.now() - last < RELOAD_GUARD_MS) {
+        logger.warn(`${LOG} Scores loaded before the fix and a reload already ran — refresh if the LMGB shows 0s`);
+        return false;
+    }
+
+    logger.info(`${LOG} Scores loaded before the fix — reloading once`);
+    try { store?.setItem(key, String(Date.now())); } catch { /* storage full/blocked */ }
+    doReload();
+    return true;
+}
+
+/** Test helper: undo the patches and allow a fresh install. */
 export function _resetLmgbRatingColorPatchForTests() {
-    installed = false;
+    if (!state) return;
+    clearTimeout(state.checkTimer);
+    state.restore.reverse().forEach(fn => fn());
+    state = null;
 }
