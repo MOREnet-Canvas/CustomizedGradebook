@@ -26,12 +26,13 @@ describe('search filters are sent in the URL', () => {
 
     test('findMasteryDashboardPageUrl searches pages by title', async () => {
         const apiClient = {
-            get: vi.fn(async () => [{ title: 'Mastery View', url: 'mastery-dashboard', workflow_state: 'active' }]),
+            getAllPages: vi.fn(async () => [{ title: 'Mastery View', url: 'mastery-dashboard', workflow_state: 'active' }]),
         };
         expect(await findMasteryDashboardPageUrl('566', apiClient)).toBe('mastery-dashboard');
 
-        const [url, options] = apiClient.get.mock.calls[0];
-        expect(url).toBe('/api/v1/courses/566/pages?search_term=Mastery%20View&per_page=10');
+        const [url, options] = apiClient.getAllPages.mock.calls[0];
+        expect(url).toBe('/api/v1/courses/566/pages?search_term=Mastery%20View&include[]=body&per_page=50');
         expect(options).toEqual({});
+        expect(apiClient.getAllPages.mock.calls[1][0]).toContain('search_term=Mastery%20Dashboard');
     });
 });
