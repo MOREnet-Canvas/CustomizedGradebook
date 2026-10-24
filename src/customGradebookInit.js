@@ -37,7 +37,7 @@ import { initMasteryDashboardCreation } from "./masteryDashboardCreation/mastery
 import { initMasteryDashboardViewer } from "./masteryDashboard/masteryDashboardInit.js";
 import { initMasteryOutlook } from "./masteryOutlook/masteryOutlookInit.js";
 import { initLmgbMasteryColors } from "./gradebook/lmgbMasteryColors.js";
-import { installLmgbRatingColorPatch } from "./gradebook/lmgbRatingColorPatch.js";
+import { installLmgbRatingColorPatch } from "./gradebook/lmgbRatingColorPatch.js"; // TEMPORARY — Canvas LMGB workaround, see #107
 import { ENABLE_LMGB_MASTERY_COLORS, ENABLE_LMGB_RATING_COLOR_FIX } from "./config.js";
 
 /**
@@ -53,6 +53,7 @@ import { ENABLE_LMGB_MASTERY_COLORS, ENABLE_LMGB_RATING_COLOR_FIX } from "./conf
     if (ENV_PROD) {logger.info("Running in PROD mode");}
     logger.info(`Build environment: ${ENV_NAME}`);
 
+    // TEMPORARY — Canvas LMGB workaround, see #107 (removal steps in src/gradebook/lmgbRatingColorPatch.js)
     // LMGB: add colors to rating scales Canvas leaves uncolored (7+ ratings), or
     // the new LMGB shows 0 for every score. First thing on the page, so it's in
     // place before Canvas requests rollups.
