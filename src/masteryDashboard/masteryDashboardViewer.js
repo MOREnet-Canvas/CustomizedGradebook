@@ -20,6 +20,7 @@ import { renderTeacherMasteryView } from './teacherMasteryView.js';
 import { renderObserverMasteryView } from './observerMasteryView.js';
 import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
 import { getMasteryColor } from '../ui/masteryColors.js';
+import { resolveOutcomeName } from '../masteryOutlook/outcomeTypes.js';
 import { injectStyles } from '../ui/styles.js';
 import { MASTERY_DASHBOARD_CSS } from './masteryDashboardStyles.js';
 
@@ -427,6 +428,16 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         }
     }
 
+    // Teacher-chosen outcome names (set in Mastery Outlook)
+    let customOutcomeNames = {};
+    if (rootEl && rootEl.dataset.outcomeNames) {
+        try {
+            customOutcomeNames = JSON.parse(rootEl.dataset.outcomeNames) || {};
+        } catch (e) {
+            debugLog('Failed to parse custom outcome names: ' + e.message);
+        }
+    }
+
     // Sort outcomes: AVG_OUTCOME first, then custom order (if available), then fallback to original logic
     const sortedScores = [...rollupScores].sort((a, b) => {
         const outcomeA = outcomeMap[a.links.outcome];
@@ -582,8 +593,9 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         const masteryColor = masteryBand.accent;        // border + bullet (decorative)
         const masteryFontColor = masteryBand.fgOnSurface; // readable text on white
 
-        // Use display_name if present, fall back to title
-        const outcomeName = outcome.display_name || outcome.title;
+        // Teacher's custom name, then Canvas display_name, then title
+        const outcomeName = resolveOutcomeName(
+            { id: oid, title: outcome.display_name || outcome.title }, customOutcomeNames);
 
         // AVG_OUTCOME is shown in the header stat box — skip it here
         if (outcome.title === AVG_OUTCOME_NAME) continue;

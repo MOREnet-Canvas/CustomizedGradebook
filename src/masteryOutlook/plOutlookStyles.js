@@ -647,6 +647,38 @@ tr.os-needs-row td { background:#FFFDF7; }
 .cs-chip-wrap .os-pill { cursor:default; }
 .cs-chip-wrap .cs-pending { width:1.2em; font-size:0.85em; text-align:center; }
 .cs-chip-wrap .cs-pending.hidden { visibility:hidden; }
+.cs-table-wrap { overflow-x:auto; }
+.cs-chip-cell .cs-chip-wrap { margin:0; }
+.os-block thead th.cs-col-head { cursor:grab; text-transform:none; letter-spacing:0; width:7.5em; min-width:7.5em; max-width:9em; white-space:normal; line-height:1.25; position:relative; padding-left:1em; padding-right:1em; }
+.cs-col-head .cs-col-name { display:inline; }
+/* Out of the text flow so it never changes how a name wraps or its line spacing */
+.cs-col-rename { position:absolute; top:0.2em; right:0.2em; background:none; border:none; padding:0; line-height:1; cursor:pointer; color:var(--text-tertiary); font-size:0.95em; opacity:0; transition:opacity .12s; }
+.cs-col-head:hover .cs-col-rename, .cs-col-rename:focus-visible { opacity:1; }
+.cs-col-head.cs-dragging { opacity:.45; }
+.cs-col-head.cs-drop-before { box-shadow:inset 2px 0 0 #0374B5; }
+.cs-col-head.cs-drop-after  { box-shadow:inset -2px 0 0 #0374B5; }
+.cs-col-rename-input { width:8em; font-size:1em; font-family:inherit; padding:0.154em 0.385em; border:1px solid var(--blue); border-radius:0.308em; }
+.cs-ov-wrap { display:inline-flex; align-items:center; gap:0.231em; white-space:nowrap; vertical-align:middle; }
+.cs-ov-lock-slot { display:inline-flex; width:1.9em; justify-content:center; }
+.cs-ov-input { width:3.5em; text-align:center; font-size:0.846em; font-family:inherit; padding:0.231em 0.385em; border-radius:0.615em; border:0.5px solid var(--border-secondary); background:var(--bg-surface); color:var(--text-primary); }
+.cs-ov-input.has-override { border-color:var(--amber-border); background:#FFF8EE; font-weight:600; }
+.cs-ov-input:focus { outline:2px solid var(--blue); outline-offset:1px; }
+.cs-ov-lock { background:none; border:1px solid transparent; border-radius:50%; width:1.9em; height:1.9em; padding:0; cursor:pointer; font-size:1em; line-height:1; }
+.cs-ov-lock.saving, .cs-ov-lock.saving:hover { animation:cs-lock-spin 0.9s linear infinite; cursor:progress; opacity:.8; filter:none; border-color:transparent; background:none; }
+@keyframes cs-lock-spin { to { transform:rotate(360deg); } }
+@keyframes cs-lock-pulse { 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) { .cs-ov-lock.saving { animation:cs-lock-pulse 1.2s ease-in-out infinite; } }
+.cs-ov-lock.unlocked { filter:grayscale(1); opacity:.75; }
+.cs-ov-lock:hover { border-color:var(--amber-border); background:#FDF3E3; filter:none; opacity:1; }
+.cs-ov-lock:focus-visible { outline:2px solid var(--blue); outline-offset:1px; }
+.cs-note-cell { width:1%; }
+.cs-ov-note { width:9em; min-width:0; text-overflow:ellipsis; vertical-align:middle; }
+.cs-ov-cell .cs-ov-date { display:inline-block; min-width:3.4em; text-align:left; font-size:0.769em; color:var(--text-tertiary); cursor:help; }
+tr.cs-row-locked > td { background:#FFF8EE; }
+tr.cs-row-locked > td:first-child { box-shadow:inset 3px 0 0 var(--amber-border); }
+.cs-lock-banner { margin-top:-0.231em; }
+.od-sync-chip.locked { background:var(--amber-bg); color:var(--amber); border:0.5px solid var(--amber-border); }
+.cs-ov-error { font-size:0.769em; color:#B42318; margin-top:0.154em; white-space:normal; max-width:10em; }
 
 /* Per-outcome refresh button (#54 manual rollup re-pull) */
 .os-refresh-outcome-btn { background:none; border:none; color:inherit; cursor:pointer; font-size:1.077em; line-height:1; padding:0 0.2em; opacity:0.65; transition:opacity 0.15s; }

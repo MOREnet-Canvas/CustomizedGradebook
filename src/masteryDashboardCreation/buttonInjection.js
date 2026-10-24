@@ -11,15 +11,21 @@ import { logger } from '../utils/logger.js';
 import { makeButton } from '../ui/buttons.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { getFrontPage, createPage, updatePage, setCourseDefaultViewToWiki, getPage } from '../services/pageService.js';
+import {
+    getFrontPage, createPage, updatePage, deletePage, setCourseDefaultViewToWiki,
+    findMasteryViewPage, findMasteryViewPages, hasMasteryViewRoot,
+    MASTERY_VIEW_PAGE_URL, MASTERY_VIEW_ROOT_ID,
+} from '../services/pageService.js';
 import { handleError } from '../utils/errorHandler.js';
 import { waitForSettingsSidebar } from '../utils/pageDetection.js';
 import { brandButtonPrimaryBg, brandButtonPrimaryText } from '../ui/brandColors.js';
 
 const INJECTION_MARKER = 'cg-mastery-dashboard-creator';
 const MASTERY_PAGE_TITLE = 'Mastery View';
-const MASTERY_PAGE_URL = 'mastery-dashboard';
-const MASTERY_PAGE_BODY = '<div id="mastery-dashboard-root"></div>';
+export const MASTERY_PAGE_URL = MASTERY_VIEW_PAGE_URL;
+const MASTERY_PAGE_BODY = `<div id="${MASTERY_VIEW_ROOT_ID}"></div>`;
+/** The front-page button block this module writes. */
+const MASTERY_BUTTON_PATTERN = /<div[^>]*data-cg-mastery-button="true"[^>]*>[\s\S]*?<\/div>/;
 
 /**
  * Create mastery dashboard button HTML for front page
@@ -44,143 +50,132 @@ function createMasteryButtonHtml(baseUrl, courseId, pageUrl) {
 }
 
 /**
- * Create or update mastery dashboard and front page button
+ * Make sure a Mastery View page contains the element the viewer renders into.
+ * A page saved from Canvas's "page does not exist, create it below" editor is
+ * titled right but empty. Prepends the element, keeping existing content; does
+ * nothing when it's already there.
+ *
+ * @param {string|number} courseId
+ * @param {Object} page - wiki page object (with body)
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<{ repaired: boolean }>}
+ */
+export async function ensureMasteryViewRoot(courseId, page, apiClient) {
+    if (hasMasteryViewRoot(page)) return { repaired: false };
+    await updatePage(courseId, page.url, { body: MASTERY_PAGE_BODY + String(page.body ?? '') }, apiClient);
+    logger.info(`[MasteryDashboard] Repaired page ${page.url} (added the Mastery View container)`);
+    return { repaired: true };
+}
+
+/**
+ * Make sure the course front page has the "View Mastery View" button pointing
+ * at `pageUrl` (adds it, or replaces an old one), creating a "Home" front page
+ * when the course has none, and show the front page as the course home.
+ *
+ * @param {string|number} courseId
+ * @param {string} pageUrl - the Mastery View page's actual slug
+ * @param {CanvasApiClient} apiClient
+ * @param {string} [baseUrl=window.location.origin]
+ */
+export async function ensureMasteryViewFrontPageButton(courseId, pageUrl, apiClient, baseUrl = window.location.origin) {
+    const masteryButtonHtml = createMasteryButtonHtml(baseUrl, courseId, pageUrl);
+    const frontPage = await getFrontPage(courseId, apiClient);
+
+    if (frontPage) {
+        const currentBody = frontPage.body || '';
+        const newBody = currentBody.includes('data-cg-mastery-button="true"')
+            ? currentBody.replace(MASTERY_BUTTON_PATTERN, masteryButtonHtml)
+            : masteryButtonHtml + '\n' + currentBody;
+        if (newBody !== currentBody || !frontPage.published) {
+            await updatePage(courseId, frontPage.url, { body: newBody, published: true }, apiClient);
+            logger.info(`[MasteryDashboard] Front page button points to ${pageUrl}`);
+        }
+    } else {
+        await createPage(courseId, {
+            title: 'Home',
+            body: masteryButtonHtml,
+            published: true,
+            front_page: true
+        }, apiClient);
+        logger.info('[MasteryDashboard] New front page created with button');
+    }
+
+    await setCourseDefaultViewToWiki(courseId, apiClient);
+}
+
+/**
+ * Create Mastery View — or repair the existing one.
+ *
+ * Checks first: if a Mastery View page exists (the most recent one), it is
+ * repaired when needed and the front page button is pointed at it — never
+ * duplicated. Otherwise creates the page and the button.
+ *
  * @param {HTMLButtonElement} button - Button element to update state
  */
-async function createMasteryDashboard(button) {
+export async function createMasteryDashboard(button) {
     const courseId = getCourseId();
     if (!courseId) {
         alert('Could not determine course ID');
         return;
     }
 
-    const baseUrl = window.location.origin;
     const apiClient = new CanvasApiClient();
 
     try {
-        // Disable button during operation
         button.disabled = true;
         button.textContent = 'Creating...';
         logger.info('[MasteryDashboard] Starting creation process');
 
-        // Step 1: Check if mastery dashboard page already exists
-        logger.debug('[MasteryDashboard] Checking if mastery dashboard page exists');
-        const existingPage = await getPage(courseId, MASTERY_PAGE_URL, apiClient);
+        // Found by title — the slug may be numbered (mastery-dashboard-3) after a delete.
+        // LEGACY — "Mastery Dashboard" title, see #108 (also matches the old title; guarded in pageService)
+        const existingPage = await findMasteryViewPage(courseId, apiClient);
+        let pageUrl;
+        let message;
 
         if (existingPage) {
-            // Page exists - alert user to delete manually
-            logger.info('[MasteryDashboard] Mastery dashboard page already exists');
-            alert(
-                `⚠️ ${MASTERY_PAGE_TITLE} page already exists!\n\n` +
-                `Please delete the existing "${MASTERY_PAGE_TITLE}" page first, then try again.\n\n` +
-                'To delete:\n' +
-                '1. Go to Pages\n' +
-                `2. Find "${MASTERY_PAGE_TITLE}"\n` +
-                '3. Click the three dots menu\n' +
-                '4. Select "Delete"\n\n' +
-                `Or use the "Delete ${MASTERY_PAGE_TITLE} Setup" link below.`
-            );
-
-            // Reset button
-            button.disabled = false;
-            button.textContent = `🎯 Create ${MASTERY_PAGE_TITLE} Button`;
-            return;
-        }
-
-        // Create mastery dashboard page
-        logger.debug('[MasteryDashboard] Creating mastery dashboard page');
-        const createdPage = await createPage(courseId, {
-            title: MASTERY_PAGE_TITLE,
-            url: MASTERY_PAGE_URL,
-            body: MASTERY_PAGE_BODY,
-            published: true
-        }, apiClient);
-
-        // Use the actual URL Canvas assigned (might be auto-numbered if conflict)
-        const actualPageUrl = createdPage.url;
-        logger.info(`[MasteryDashboard] Mastery dashboard page created at: ${actualPageUrl}`);
-
-        // Step 2: Get or create front page
-        logger.debug('[MasteryDashboard] Checking front page');
-        let frontPage = await getFrontPage(courseId, apiClient);
-
-        const masteryButtonHtml = createMasteryButtonHtml(baseUrl, courseId, actualPageUrl);
-
-        if (frontPage) {
-            // Update existing front page
-            logger.debug('[MasteryDashboard] Updating existing front page');
-            const currentBody = frontPage.body || '';
-
-            // Check if button already exists (using data attribute instead of HTML comments)
-            const buttonExists = currentBody.includes('data-cg-mastery-button="true"');
-            let newBody;
-
-            if (buttonExists) {
-                logger.debug('[MasteryDashboard] Button already exists, replacing with updated version');
-
-                // Replace existing button HTML with new version
-                // Pattern matches: <div data-cg-mastery-button="true" ... > ... </div>
-                const buttonPattern = /<div[^>]*data-cg-mastery-button="true"[^>]*>[\s\S]*?<\/div>/;
-                newBody = currentBody.replace(buttonPattern, masteryButtonHtml);
-            } else {
-                logger.debug('[MasteryDashboard] Button does not exist, prepending to front page');
-                // Prepend button to existing content
-                newBody = masteryButtonHtml + '\n' + currentBody;
-            }
-
-            await updatePage(courseId, frontPage.url, {
-                body: newBody,
+            const { repaired } = await ensureMasteryViewRoot(courseId, existingPage, apiClient);
+            pageUrl = existingPage.url;
+            message = repaired
+                ? `✅ ${MASTERY_PAGE_TITLE} was repaired.\n\n• The page was fixed so it loads again\n• Front page button points to it\n\nRefresh the course home page to see it.`
+                : `✅ ${MASTERY_PAGE_TITLE} is ready.\n\n• The page already exists\n• Front page button points to it\n\nRefresh the course home page to see it.`;
+            logger.info(`[MasteryDashboard] Page exists at ${pageUrl}${repaired ? ' — repaired' : ''}`);
+        } else {
+            // Canvas picks the slug from the title (mastery-dashboard, or -N if reserved)
+            const createdPage = await createPage(courseId, {
+                title: MASTERY_PAGE_TITLE,
+                body: MASTERY_PAGE_BODY,
                 published: true
             }, apiClient);
-
-            logger.info('[MasteryDashboard] Front page updated with button');
-        } else {
-            // Create new front page with button
-            logger.debug('[MasteryDashboard] Creating new front page');
-            await createPage(courseId, {
-                title: 'Home',
-                body: masteryButtonHtml,
-                published: true,
-                front_page: true
-            }, apiClient);
-
-            logger.info('[MasteryDashboard] New front page created with button');
+            pageUrl = createdPage.url;
+            message = `✅ ${MASTERY_PAGE_TITLE} setup complete!\n\n• ${MASTERY_PAGE_TITLE} page created\n• Front page updated with button\n• Course home page set to display front page\n\nRefresh the course home page to see it.`;
+            logger.info(`[MasteryDashboard] Mastery dashboard page created at: ${pageUrl}`);
         }
 
-        // Step 3: Set course default view to wiki (front page)
-        logger.debug('[MasteryDashboard] Setting course default view to wiki');
-        await setCourseDefaultViewToWiki(courseId, apiClient);
-        logger.info('[MasteryDashboard] Course default view set to wiki (front page)');
-
-        // Show success message
-        alert(`✅ ${MASTERY_PAGE_TITLE} setup complete!\n\n• ${MASTERY_PAGE_TITLE} page created\n• Front page updated with button\n• Course home page set to display front page\n\nRefresh the course home page to see it.`);
-
-        // Reset button
-        button.disabled = false;
-        button.textContent = `🎯 Create ${MASTERY_PAGE_TITLE} Button`;
+        await ensureMasteryViewFrontPageButton(courseId, pageUrl, apiClient);
+        alert(message);
 
     } catch (error) {
         logger.error('[MasteryDashboard] Error creating mastery dashboard:', error);
         handleError(error, 'createMasteryDashboard', { showAlert: true });
-
-        // Reset button
+    } finally {
         button.disabled = false;
         button.textContent = `🎯 Create ${MASTERY_PAGE_TITLE} Button`;
     }
 }
 
 /**
- * Delete mastery dashboard setup (page and front page button)
+ * Delete Mastery View setup: every Mastery View page (numbered copies too)
+ * and the front page button.
+ *
  * @param {HTMLAnchorElement} linkElement - Delete link element to update state
  */
-async function deleteMasteryDashboard(linkElement) {
+export async function deleteMasteryDashboard(linkElement) {
     const courseId = getCourseId();
     if (!courseId) {
         alert('Could not determine course ID');
         return;
     }
 
-    // Confirm deletion
     const confirmed = confirm(
         `⚠️ Delete ${MASTERY_PAGE_TITLE} Setup?\n\n` +
         'This will:\n' +
@@ -188,97 +183,58 @@ async function deleteMasteryDashboard(linkElement) {
         '• Remove the button from the front page\n\n' +
         'Are you sure you want to continue?'
     );
-
-    if (!confirmed) {
-        return;
-    }
+    if (!confirmed) return;
 
     const apiClient = new CanvasApiClient();
     const originalText = linkElement.textContent;
 
     try {
-        // Update link during operation
         linkElement.style.pointerEvents = 'none';
         linkElement.style.opacity = '0.5';
         linkElement.textContent = 'Deleting...';
         logger.info('[MasteryDashboard] Starting deletion process');
 
-        // Step 1: Get the actual page URL from the front page button
-        logger.debug('[MasteryDashboard] Extracting page URL from front page button');
+        // Every Mastery View page, plus whatever the front page button points at.
+        // LEGACY — "Mastery Dashboard" title, see #108 (old-title pages are deleted too,
+        // but only ones containing #mastery-dashboard-root — guarded in pageService)
         const frontPage = await getFrontPage(courseId, apiClient);
-        let pageUrlToDelete = MASTERY_PAGE_URL;  // Default fallback
+        const urls = new Set((await findMasteryViewPages(courseId, apiClient)).map(p => p.url));
+        const buttonUrl = frontPage?.body?.match(/data-page-url="([^"]+)"/)?.[1];
+        if (buttonUrl) urls.add(buttonUrl);
 
-        if (frontPage && frontPage.body) {
-            // Extract the actual page URL from the button's data-page-url attribute
-            const match = frontPage.body.match(/data-page-url="([^"]+)"/);
-            if (match) {
-                pageUrlToDelete = match[1];
-                logger.debug(`[MasteryDashboard] Found page URL in button: ${pageUrlToDelete}`);
-            } else {
-                logger.warn('[MasteryDashboard] Could not find data-page-url in button, using default');
+        for (const pageUrl of urls) {
+            try {
+                await deletePage(courseId, pageUrl, apiClient);
+                logger.info(`[MasteryDashboard] Mastery dashboard page deleted: ${pageUrl}`);
+            } catch (error) {
+                // Page might not exist (404 error)
+                if (error.message?.includes('404')) {
+                    logger.info(`[MasteryDashboard] Page ${pageUrl} does not exist`);
+                } else {
+                    throw error;
+                }
             }
         }
 
-        // Step 2: Delete mastery dashboard page using extracted URL
-        logger.debug(`[MasteryDashboard] Deleting mastery dashboard page: ${pageUrlToDelete}`);
-        try {
-            await apiClient.delete(
-                `/api/v1/courses/${courseId}/pages/${pageUrlToDelete}`,
-                {},
-                'deleteMasteryPage'
-            );
-            logger.info(`[MasteryDashboard] Mastery dashboard page deleted: ${pageUrlToDelete}`);
-        } catch (error) {
-            // Page might not exist (404 error)
-            if (error.message?.includes('404')) {
-                logger.info('[MasteryDashboard] Mastery dashboard page does not exist');
-            } else {
-                throw error;
-            }
-        }
-
-        // Step 3: Remove button from front page
-        logger.debug('[MasteryDashboard] Removing button from front page');
-
-        if (frontPage) {
-            const currentBody = frontPage.body || '';
-
-            // Check if button exists (using data attribute)
-            const buttonExists = currentBody.includes('data-cg-mastery-button="true"');
-
-            if (buttonExists) {
-                logger.debug('[MasteryDashboard] Removing button from front page');
-
-                // Remove button HTML using regex
-                const buttonPattern = /<div[^>]*data-cg-mastery-button="true"[^>]*>[\s\S]*?<\/div>\n?/;
-                const newBody = currentBody.replace(buttonPattern, '');
-
-                await updatePage(courseId, frontPage.url, {
-                    body: newBody,
-                    published: true
-                }, apiClient);
-
-                logger.info('[MasteryDashboard] Button removed from front page');
-            } else {
-                logger.info('[MasteryDashboard] Button not found on front page');
-            }
+        // Remove button from front page
+        const currentBody = frontPage?.body || '';
+        if (frontPage && currentBody.includes('data-cg-mastery-button="true"')) {
+            const buttonPattern = /<div[^>]*data-cg-mastery-button="true"[^>]*>[\s\S]*?<\/div>\n?/;
+            await updatePage(courseId, frontPage.url, {
+                body: currentBody.replace(buttonPattern, ''),
+                published: true
+            }, apiClient);
+            logger.info('[MasteryDashboard] Button removed from front page');
         } else {
-            logger.info('[MasteryDashboard] No front page found');
+            logger.info('[MasteryDashboard] Button not found on front page');
         }
 
-        // Show success message
         alert(`✅ ${MASTERY_PAGE_TITLE} setup deleted!\n\n• ${MASTERY_PAGE_TITLE} page removed\n• Button removed from front page\n\nRefresh the page to see changes.`);
-
-        // Reset link
-        linkElement.style.pointerEvents = 'auto';
-        linkElement.style.opacity = '1';
-        linkElement.textContent = originalText;
 
     } catch (error) {
         logger.error('[MasteryDashboard] Error deleting mastery dashboard:', error);
         handleError(error, 'deleteMasteryDashboard', { showAlert: true });
-
-        // Reset link
+    } finally {
         linkElement.style.pointerEvents = 'auto';
         linkElement.style.opacity = '1';
         linkElement.textContent = originalText;

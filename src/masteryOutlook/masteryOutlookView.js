@@ -20,7 +20,9 @@ import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { findMasteryDashboardPageUrl, getPage } from '../services/pageService.js';
+import { parseOutcomeLayout } from './outcomeLayoutService.js';
 import { VIEWS, getView } from './viewRegistry.js';
+import { mountCourseResetCard } from './courseResetView.js';
 import {
     isRegularOutcome,
     renderOutcomeSyncDefault,
@@ -197,6 +199,7 @@ async function renderDefaultState(shell, courseId, apiClient, onRefresh) {
 
     renderMetricCards(shell.metricsEl, null);
     renderDefaultSidebar(shell.sidebarEl);
+    mountCourseResetCard(shell.sidebarEl, courseId, apiClient);
 
     // Outcome-row default state lives with the outcomes view module so it
     // owns its own markup + empty/refresh prompts.
@@ -254,6 +257,7 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
     // 4c + 4f — banner, polling, auto-refresh toggle (Tweaks panel)
     wirePollingAndBanner(shell, cache, courseId, apiClient, onRefresh);
     wireTweaksPanel(shell.sidebarEl, courseId);
+    mountCourseResetCard(shell.sidebarEl, courseId, apiClient);
 }
 
 // ─── Polling + Refresh banner (4a–4c) ────────────────────────────────────────
@@ -714,16 +718,11 @@ async function enrichCache(cache, courseId, apiClient) {
             }
         });
 
-        // Map custom outcome order
+        // Teacher outcome order + custom outcome names (stored on the dashboard page)
         if (dashboardPage && dashboardPage.body) {
-            const match = dashboardPage.body.match(/data-outcome-order=(['"])(.*?)\1/);
-            if (match && match[2]) {
-                try {
-                    cache.meta.customOutcomeOrder = JSON.parse(match[2].replace(/&quot;/g, '"'));
-                } catch (e) {
-                    logger.warn('[MasteryOutlook] Failed to parse custom outcome order', e);
-                }
-            }
+            const { order, names } = parseOutcomeLayout(dashboardPage.body);
+            if (order) cache.meta.customOutcomeOrder = order;
+            cache.meta.customOutcomeNames = names;
         }
     } catch (e) {
         logger.warn('[MasteryOutlook] Failed to enrich cache', e);

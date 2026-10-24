@@ -348,62 +348,7 @@ export async function writeMasteryOutlookCache(courseId, apiClient, cacheData) {
  */
 export async function readMasteryOutlookCache(courseId, apiClient) {
     try {
-        logger.info('[masteryOutlookCacheService] Reading cache from Canvas Files...');
-
-        // Step 1: Search for the cache file
-        const searchResults = await apiClient.get(
-            `/api/v1/courses/${courseId}/files`,
-            {
-                search_term: FILE_NAME,
-                content_types: ['application/json'],
-                per_page: 10
-            },
-            'readMasteryOutlookCache:searchFile'
-        );
-
-        // Find exact match in mastery_outlook_cache folder
-        const cacheFile = searchResults.find(f =>
-            f.display_name === FILE_NAME &&
-            f.folder_id &&
-            f['content-type'] === 'application/json'
-        );
-
-        if (!cacheFile) {
-            logger.info('[masteryOutlookCacheService] No cache file found');
-            return null;
-        }
-
-        logger.debug(`[masteryOutlookCacheService] Cache file found (id: ${cacheFile.id})`);
-
-        // Step 2: Download file content (no-store: a stale browser copy would make
-        // read-modify-write callers drop recent changes)
-        const fileResponse = await fetch(cacheFile.url, {
-            credentials: 'include',
-            cache: 'no-store'
-        });
-
-        if (!fileResponse.ok) {
-            throw new Error(`Failed to download cache: ${fileResponse.status} ${fileResponse.statusText}`);
-        }
-
-        const jsonText = await fileResponse.text();
-        const cacheData = JSON.parse(jsonText);
-
-        // Step 3: Validate schema version
-        const cacheVersion = cacheData.metadata?.schemaVersion;
-
-        if (cacheVersion !== SCHEMA_VERSION) {
-            logger.warn(
-                `[masteryOutlookCacheService] Schema version mismatch. ` +
-                `Expected: ${SCHEMA_VERSION}, Found: ${cacheVersion || 'none'}. ` +
-                `Discarding cache.`
-            );
-            return null;
-        }
-
-        logger.info('[masteryOutlookCacheService] Cache loaded successfully');
-        return cacheData;
-
+        return await readCacheFile(courseId, apiClient);
     } catch (error) {
         if (error.message.includes('JSON')) {
             logger.error('[masteryOutlookCacheService] Cache file is corrupted (invalid JSON)', error);
@@ -411,6 +356,229 @@ export async function readMasteryOutlookCache(courseId, apiClient) {
             logger.error('[masteryOutlookCacheService] Failed to read cache', error);
         }
         return null;  // Treat all read errors as "no cache"
+    }
+}
+
+/**
+ * Find the cache file's Canvas file object (not its contents).
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object|null>} Canvas file object, or null when there is none
+ */
+export async function findMasteryOutlookCacheFile(courseId, apiClient) {
+    // Filters go in the query string — get()'s 2nd argument is fetch options (same fix as #99).
+    const searchResults = await apiClient.get(
+        `/api/v1/courses/${courseId}/files` +
+        `?search_term=${encodeURIComponent(FILE_NAME)}` +
+        `&content_types[]=application/json&per_page=100`,
+        {},
+        'readMasteryOutlookCache:searchFile'
+    );
+    return (searchResults || []).find(f =>
+        f.display_name === FILE_NAME &&
+        f.folder_id &&
+        f['content-type'] === 'application/json'
+    ) ?? null;
+}
+
+/**
+ * Find the cache folders without creating them.
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<{ parent: Object|null, subfolder: Object|null }>} Canvas folder objects
+ */
+export async function findMasteryOutlookFolders(courseId, apiClient) {
+    const folders = await apiClient.getAllPages(
+        `/api/v1/courses/${courseId}/folders?per_page=100`,
+        {},
+        'findMasteryOutlookFolders'
+    );
+    const parent = folders.find(f => f.name === PARENT_FOLDER_NAME && !f.deleted) ?? null;
+    const subfolder = parent
+        ? folders.find(f => f.name === FOLDER_NAME && f.parent_folder_id === parent.id && !f.deleted) ?? null
+        : null;
+    return { parent, subfolder };
+}
+
+/**
+ * Delete the cache file.
+ *
+ * @param {string|number} courseId
+ * @param {string|number} fileId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} The deleted file object
+ */
+export async function deleteMasteryOutlookCacheFile(courseId, fileId, apiClient) {
+    const deleted = await apiClient.delete(`/api/v1/files/${fileId}`, {}, 'deleteMasteryOutlookCacheFile');
+    invalidateFolderCache(courseId);
+    logger.info(`[masteryOutlookCacheService] Cache file ${fileId} deleted`);
+    return deleted;
+}
+
+/**
+ * Delete a cache folder. Never forced: Canvas refuses when the folder still has
+ * files or subfolders (e.g. district_config/ under the shared parent folder).
+ *
+ * @param {string|number} courseId
+ * @param {string|number} folderId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object>} The deleted folder object
+ */
+export async function deleteMasteryOutlookFolder(courseId, folderId, apiClient) {
+    const deleted = await apiClient.delete(`/api/v1/folders/${folderId}`, {}, 'deleteMasteryOutlookFolder');
+    invalidateFolderCache(courseId);
+    logger.info(`[masteryOutlookCacheService] Folder ${folderId} deleted`);
+    return deleted;
+}
+
+/**
+ * Read the cache file. Like readMasteryOutlookCache, but network / download
+ * errors throw instead of looking like "no cache" — for callers that must tell
+ * the two apart. Missing file or schema mismatch → null.
+ *
+ * @param {string} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Object|null>}
+ */
+async function readCacheFile(courseId, apiClient) {
+    logger.info('[masteryOutlookCacheService] Reading cache from Canvas Files...');
+
+    // Step 1: Find the cache file
+    const cacheFile = await findMasteryOutlookCacheFile(courseId, apiClient);
+
+    if (!cacheFile) {
+        logger.info('[masteryOutlookCacheService] No cache file found');
+        return null;
+    }
+
+    logger.debug(`[masteryOutlookCacheService] Cache file found (id: ${cacheFile.id})`);
+
+    // Step 2: Download file content (no-store: a stale browser copy would make
+    // read-modify-write callers drop recent changes)
+    const fileResponse = await fetch(cacheFile.url, {
+        credentials: 'include',
+        cache: 'no-store'
+    });
+
+    if (!fileResponse.ok) {
+        throw new Error(`Failed to download cache: ${fileResponse.status} ${fileResponse.statusText}`);
+    }
+
+    const jsonText = await fileResponse.text();
+    const cacheData = JSON.parse(jsonText);
+
+    // Step 3: Validate schema version
+    const cacheVersion = cacheData.metadata?.schemaVersion;
+
+    if (cacheVersion !== SCHEMA_VERSION) {
+        logger.warn(
+            `[masteryOutlookCacheService] Schema version mismatch. ` +
+            `Expected: ${SCHEMA_VERSION}, Found: ${cacheVersion || 'none'}. ` +
+            `Discarding cache.`
+        );
+        return null;
+    }
+
+    logger.info('[masteryOutlookCacheService] Cache loaded successfully');
+    return cacheData;
+}
+
+/**
+ * Students whose Current Score override is locked in Mastery Outlook — outcome
+ * saves and the gradebook's Update Current Score must leave them alone.
+ *
+ * @param {string|number} courseId
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<Map<string, { score: number, note: string, at: string|null }>>}
+ *   empty when there's no cache or nothing is locked
+ * @throws {Error} when the cache file can't be read (network / download failure)
+ */
+export async function getLockedCurrentScoreStudents(courseId, apiClient) {
+    const cache = await readCacheFile(courseId, apiClient);
+    return lockedCurrentScoreStudentsFrom(cache);
+}
+
+/**
+ * Locked Current Score overrides in a cache object (see getLockedCurrentScoreStudents).
+ *
+ * @param {Object|null} cache
+ * @returns {Map<string, { score: number, note: string, at: string|null }>}
+ */
+export function lockedCurrentScoreStudentsFrom(cache) {
+    const locked = new Map();
+    const avgOutcomeId = cache?.avg_assignment?.avg_outcome_id;
+    const entries = avgOutcomeId ? (cache.sync_state?.[String(avgOutcomeId)] ?? {}) : {};
+    for (const [sid, entry] of Object.entries(entries)) {
+        const score = entry?.cs_override_score;
+        if (score === null || score === undefined || entry.cs_override_lock !== 'locked') continue;
+        locked.set(String(sid), {
+            score: Number(score),
+            note:  entry.cs_override_note ?? '',
+            at:    entry.cs_override_at ?? null,
+        });
+    }
+    return locked;
+}
+
+const lockSnapshotKey = (courseId) => `cg_lmgb_locks_${courseId}`;
+
+/**
+ * Remember this course's locked Current Score overrides in localStorage so the
+ * LMGB can show its 🔒 markers before the cache file finishes downloading.
+ * Clears the entry when nothing is locked. Storage errors are ignored.
+ *
+ * @param {string|number} courseId
+ * @param {Object|null} cache - Mastery Outlook cache (avg_assignment + sync_state)
+ */
+export function saveLmgbLockSnapshot(courseId, cache) {
+    try {
+        const avgOutcomeId = cache?.avg_assignment?.avg_outcome_id;
+        const locks = lockedCurrentScoreStudentsFrom(cache);
+        if (!avgOutcomeId || locks.size === 0) {
+            localStorage.removeItem(lockSnapshotKey(courseId));
+            return;
+        }
+        localStorage.setItem(lockSnapshotKey(courseId), JSON.stringify({
+            avgOutcomeId: String(avgOutcomeId),
+            locks:        [...locks],
+            savedAt:      new Date().toISOString(),
+        }));
+    } catch (err) {
+        logger.debug('[masteryOutlookCacheService] Could not save LMGB lock snapshot:', err?.message);
+    }
+}
+
+/**
+ * Last-known locked Current Score overrides for a course (see saveLmgbLockSnapshot).
+ *
+ * @param {string|number} courseId
+ * @returns {{ avgOutcomeId: string, locks: Map<string, { score: number, note: string, at: string|null }> }|null}
+ */
+export function loadLmgbLockSnapshot(courseId) {
+    try {
+        const raw = localStorage.getItem(lockSnapshotKey(courseId));
+        if (!raw) return null;
+        const { avgOutcomeId, locks } = JSON.parse(raw);
+        if (!avgOutcomeId || !Array.isArray(locks)) return null;
+        return { avgOutcomeId: String(avgOutcomeId), locks: new Map(locks) };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Forget the last-known locks for a course (e.g. after a course reset deletes
+ * the cache — the LMGB would otherwise keep showing the old 🔒 markers).
+ *
+ * @param {string|number} courseId
+ */
+export function clearLmgbLockSnapshot(courseId) {
+    try {
+        localStorage.removeItem(lockSnapshotKey(courseId));
+    } catch {
+        // storage unavailable — nothing to clear
     }
 }
 

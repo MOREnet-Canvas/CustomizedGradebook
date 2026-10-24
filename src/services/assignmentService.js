@@ -93,3 +93,22 @@ export async function createAssignment(courseId, apiClient) {
     logger.info("Assignment created:", assignment.name);
     return assignment.id;
 }
+
+/**
+ * Delete an assignment. Canvas also removes its submissions, grades, comments,
+ * rubric association, and the outcome results the rubric produced.
+ *
+ * @param {string|number} courseId - Canvas course ID
+ * @param {string|number} assignmentId - Assignment ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<Object>} The deleted assignment object
+ */
+export async function deleteAssignment(courseId, assignmentId, apiClient) {
+    const deleted = await apiClient.delete(
+        `/api/v1/courses/${courseId}/assignments/${assignmentId}`,
+        {},
+        'deleteAssignment'
+    );
+    logger.info(`Assignment ${assignmentId} deleted`);
+    return deleted;
+}

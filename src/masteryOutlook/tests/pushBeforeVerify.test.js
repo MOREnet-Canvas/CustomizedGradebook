@@ -24,7 +24,7 @@ vi.mock('../masteryOutlookAvgService.js', async (importOriginal) => ({
     postNoteToAvgAssignment:        vi.fn(async () => true),
 }));
 
-import { handleSyncStudents, refreshProjectedScoreLabels } from '../plOutlookActions.js';
+import { handleSyncStudents, refreshProjectedScoreLabels, warnUntilSettled } from '../plOutlookActions.js';
 import { refreshMasteryForAssignment } from '../../services/masteryRefreshService.js';
 import { PL_GRADING_TYPE, PL_GRADING_SCHEME_ID } from '../../config.js';
 import { runPLSync } from '../plOutlookSync.js';
@@ -333,5 +333,30 @@ describe('Projected Score mastery labels', () => {
     test('a failed refresh is logged, not thrown', async () => {
         refreshMasteryForAssignment.mockRejectedValueOnce(new Error('403'));
         await expect(refreshProjectedScoreLabels('566', 'c1')).resolves.toBeUndefined();
+    });
+});
+
+describe('warnUntilSettled', () => {
+    test('warns before leaving until the save settles', async () => {
+        const addSpy = vi.spyOn(window, 'addEventListener');
+        const removeSpy = vi.spyOn(window, 'removeEventListener');
+        let finish;
+        const saving = warnUntilSettled(new Promise(r => { finish = r; }));
+
+        expect(addSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+        expect(removeSpy).not.toHaveBeenCalledWith('beforeunload', expect.any(Function));
+
+        finish('done');
+        expect(await saving).toBe('done');
+        expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+        addSpy.mockRestore();
+        removeSpy.mockRestore();
+    });
+
+    test('a failed save still removes the warning and rethrows', async () => {
+        const removeSpy = vi.spyOn(window, 'removeEventListener');
+        await expect(warnUntilSettled(Promise.reject(new Error('nope')))).rejects.toThrow('nope');
+        expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+        removeSpy.mockRestore();
     });
 });

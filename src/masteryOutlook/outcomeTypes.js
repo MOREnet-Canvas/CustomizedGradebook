@@ -48,6 +48,33 @@ export function isRegularOutcome(outcome) {
 }
 
 /**
+ * Display name for an outcome from a { outcomeId: name } map of teacher-chosen
+ * names, falling back to the Canvas title.
+ *
+ * @param {{ id: string|number, title?: string }} outcome
+ * @param {Object<string,string>} [names]
+ * @returns {string}
+ */
+export function resolveOutcomeName(outcome, names) {
+    const custom = names?.[String(outcome?.id)];
+    return (typeof custom === 'string' && custom.trim())
+        ? custom.trim()
+        : (outcome?.title || String(outcome?.id ?? ''));
+}
+
+/**
+ * Display name for an outcome in Mastery Outlook (`cache.meta.customOutcomeNames`,
+ * loaded from the Mastery Dashboard page), falling back to the Canvas title.
+ *
+ * @param {{ id: string|number, title?: string }} outcome
+ * @param {Object} cache
+ * @returns {string}
+ */
+export function getOutcomeDisplayName(outcome, cache) {
+    return resolveOutcomeName(outcome, cache?.meta?.customOutcomeNames);
+}
+
+/**
  * Regular outcomes sorted by the teacher's saved order (`cache.meta.customOutcomeOrder`).
  * Outcomes missing from the saved order keep their cache order after the ordered ones.
  *

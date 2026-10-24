@@ -19,7 +19,7 @@
 
 import { logger } from '../utils/logger.js';
 import { escapeHtml } from '../utils/html.js';
-import { scoresMatch, getSyncStatus, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
+import { scoresMatch, getSyncStatus, latestAttemptScore, VERIFYING_TIP, POSSIBLE_OVERRIDE_TIP } from './plOutlookSyncStatus.js';
 import { roundToHalf } from './powerLaw.js';
 import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import {
@@ -125,7 +125,7 @@ function buildOutcomeStudentRow(student, outcomeData, syncEntry, ignoredAlignmen
     }
 
     const syncStatus = plConfig
-        ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig).status
+        ? getSyncStatus(student.id, outcomeId, marzano, canvas, plConfig, undefined, latestAttemptScore(outcomeData)).status
         : null;
     // ⏳ while the background outcome check runs (saved on the assignment, Canvas
     // still recalculating the outcome score), or from saved data after a reload.
@@ -392,10 +392,11 @@ function buildOutcomeStudentStates(outcome, cache) {
 /**
  * Summarize row save state for the outcome banner and "Save grades to Canvas".
  * `remaining` rows need saving and are not already queued or in flight — the
- * only rows the banner button sends.
+ * only rows the banner button sends. `flagged` counts rows whose Canvas score
+ * was changed outside Mastery Outlook (⚑).
  *
  * @param {Object[]} studentStates - rows from buildOutcomeStudentRow
- * @returns {{ saving: number, verifying: number, queued: number, remaining: number, remainingIds: string[] }}
+ * @returns {{ saving: number, verifying: number, queued: number, remaining: number, remainingIds: string[], flagged: number }}
  */
 function summarizeSaveStates(studentStates) {
     const remainingRows = studentStates.filter(s =>
@@ -407,6 +408,7 @@ function summarizeSaveStates(studentStates) {
         queued:       studentStates.filter(s => s.syncPhase === 'queued').length,
         remaining:    remainingRows.length,
         remainingIds: remainingRows.map(s => s.id),
+        flagged:      studentStates.filter(s => s.marker === 'possible_override').length,
     };
 }
 
@@ -431,12 +433,23 @@ export function getOutcomeSaveSummary(outcome, cache) {
  * @returns {string} HTML
  */
 function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
-    const { saving, verifying, queued, remaining } = summary;
+    const { saving, verifying, queued, remaining, flagged = 0 } = summary;
     const awaitingNote = awaitingOutcome > 0
         ? ` <span class="os-status-banner-note" title="Saved to Canvas; waiting for Canvas to update the outcome score. This clears on its own.">· ⏳ ${awaitingOutcome} outcome score${awaitingOutcome !== 1 ? 's' : ''} updating</span>`
         : '';
     const inProgress = saving > 0 || verifying > 0 || queued > 0;
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+    // Nothing to save, but Canvas no longer matches what was saved (⚑ rows) —
+    // don't claim "up to date".
+    if (!inProgress && remaining === 0 && flagged > 0) {
+        return `<div class="os-status-banner warn">
+             <div class="os-status-banner-left" title="${POSSIBLE_OVERRIDE_TIP}">
+               ⚑ <b>${flagged}</b> score${flagged !== 1 ? 's' : ''} changed outside Mastery Outlook — hover ⚑ for details${awaitingNote}
+             </div>
+             ${refreshBtn}
+           </div>`;
+    }
 
     if (!inProgress && remaining === 0) {
         return `<div class="os-status-banner ok">

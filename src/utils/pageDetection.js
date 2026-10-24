@@ -296,15 +296,16 @@ export async function resolveTargetStudentId(courseId = null, apiClient = null) 
 /**
  * Check if current page is the Mastery Outlook page
  *
- * Matches:
+ * Matches the page view only:
  * - /courses/123/pages/mastery-outlook
- * - /courses/123/pages/mastery-outlook-* (auto-numbered variants)
+ * - /courses/123/pages/mastery-outlook-7 (auto-numbered variants)
+ * Not /edit or /revisions, and not other pages like mastery-outlook-notes.
  *
+ * @param {string} [path=window.location.pathname]
  * @returns {boolean} True if on mastery outlook page
  */
-export function isMasteryOutlookPage() {
-    const path = window.location.pathname;
-    return path.includes('/pages/mastery-outlook');
+export function isMasteryOutlookPage(path = window.location.pathname) {
+    return /\/courses\/\d+\/pages\/mastery-outlook(?:-\d+)?\/?$/.test(path);
 }
 
 /**

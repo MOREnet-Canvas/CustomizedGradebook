@@ -67,6 +67,12 @@ describe('lmgbMasteryColors', () => {
         expect(pill(1).dataset.cgLmgbScore).toBeUndefined();
     });
 
+    it('ignores the override 🔒 badge when reading the score', () => {
+        mountGrid(scoreCell(1, '2<span data-cg-lmgb-lock>🔒</span>'));
+        initLmgbMasteryColors({ schemeKey: 'sedaliaA' });
+        expect(pill(1).classList).toContain(getBandClassName('sedaliaA', 4));
+    });
+
     it('fetches all visible outcome distributions in one request and renders bars', async () => {
         mountGrid(chartCell(11) + chartCell(12));
         mockGet.mockResolvedValue({ outcome_distributions: { 11: distribution(), 12: distribution() } });

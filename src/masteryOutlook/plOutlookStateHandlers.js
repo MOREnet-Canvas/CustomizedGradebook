@@ -160,9 +160,9 @@ export async function handleCreatingAssignment(sm) {
         // Fetch full assignment detail for rubric info
         const asgDetail         = await apiClient.get(`/api/v1/courses/${courseId}/assignments/${existing.id}`, {}, 'PLSync:fetchExistingAssignment');
         const rubricCriterionId = asgDetail.rubric?.[0]?.id ?? null;
-        const rubricId          = asgDetail.rubric_settings?.id
-                               ?? asgDetail.rubric?.[0]?.learning_outcome_id
-                               ?? null;
+        // Only rubric_settings.id is a rubric ID — the criterion's learning_outcome_id
+        // is an outcome ID and must never be stored as rubric_id.
+        const rubricId          = asgDetail.rubric_settings?.id ?? null;
 
         // rubric_association_id is not present on the Canvas assignment object —
         // fetch it via the rubrics API using the rubricId we already have.

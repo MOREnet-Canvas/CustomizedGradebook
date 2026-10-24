@@ -560,6 +560,25 @@ await deletePage(courseId, pageUrl, apiClient);
 const page = await getPage(courseId, pageUrl, apiClient);
 ```
 
+**Mastery Outlook / Mastery View pages: find them by title, never by slug.** Canvas numbers the slug after a delete (`mastery-outlook-7`, `mastery-dashboard-3`). "The" page is the newest non-deleted one with the title.
+
+```javascript
+import {
+    findMasteryOutlookPage, findMasteryOutlookPages, hasMasteryOutlookRoot,
+    findMasteryViewPage, findMasteryViewPages, hasMasteryViewRoot,
+    findMasteryDashboardPageUrl,   // = findMasteryViewPage()?.url
+} from '../services/pageService.js';
+
+const outlook = await findMasteryOutlookPage(courseId, apiClient);   // page object (with body) or null
+if (outlook && !hasMasteryOutlookRoot(outlook)) { /* blank page — Create Mastery Outlook repairs it */ }
+
+const view = await findMasteryViewPage(courseId, apiClient);
+```
+
+> ⚠️ **LEGACY — "Mastery Dashboard" title (#108):** `findMasteryViewPage(s)` also matches the old title "Mastery Dashboard", but only when the page contains `#mastery-dashboard-root`. A teacher's own page with that title shares the slug and must never be treated as Mastery View. See `documents/TODOs/TODO-remove-legacy-mastery-dashboard-title.md`.
+
+Repair helpers (used by the Create buttons): `ensureMasteryOutlookRoot()` in `src/masteryOutlook/masteryOutlookCreation.js`, and `ensureMasteryViewRoot()` / `ensureMasteryViewFrontPageButton()` in `src/masteryDashboardCreation/buttonInjection.js`.
+
 ---
 
 ### `outcomeService.js` - Outcomes API

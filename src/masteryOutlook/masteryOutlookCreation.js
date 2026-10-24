@@ -12,7 +12,10 @@ import { logger } from '../utils/logger.js';
 import { makeButton } from '../ui/buttons.js';
 import { getCourseId } from '../utils/canvas.js';
 import { CanvasApiClient } from '../utils/canvasApiClient.js';
-import { createPage, getPage } from '../services/pageService.js';
+import {
+    createPage, updatePage, findMasteryOutlookPage, hasMasteryOutlookRoot,
+    MASTERY_OUTLOOK_PAGE_TITLE, MASTERY_OUTLOOK_PAGE_URL, MASTERY_OUTLOOK_ROOT_ID,
+} from '../services/pageService.js';
 import { isCourseSettingsPage, waitForSettingsSidebar } from '../utils/pageDetection.js';
 import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 
@@ -21,18 +24,43 @@ import { injectMasteryOutlookLink } from './sidebarLinkInjection.js';
 // ═══════════════════════════════════════════════════════════════════════
 
 const INJECTION_MARKER = 'cg-mastery-outlook-creator';
-const OUTLOOK_PAGE_TITLE = 'Mastery Outlook';
-const OUTLOOK_PAGE_URL = 'mastery-outlook';
-const OUTLOOK_PAGE_BODY = '<div id="teacher-mastery-dashboard-root"></div>';
+export const OUTLOOK_PAGE_TITLE = MASTERY_OUTLOOK_PAGE_TITLE;
+export const OUTLOOK_PAGE_URL = MASTERY_OUTLOOK_PAGE_URL;
+export const OUTLOOK_ROOT_ID = MASTERY_OUTLOOK_ROOT_ID;
+const OUTLOOK_PAGE_BODY = `<div id="${OUTLOOK_ROOT_ID}"></div>`;
+
+// ═══════════════════════════════════════════════════════════════════════
+// REPAIR
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Make sure a Mastery Outlook page contains the element Mastery Outlook renders
+ * into. A page saved from Canvas's "page does not exist, create it below"
+ * editor is titled right but empty. Prepends the element, keeping any existing
+ * content; does nothing when it's already there.
+ *
+ * @param {string|number} courseId
+ * @param {Object} page - wiki page object (with body)
+ * @param {CanvasApiClient} apiClient
+ * @returns {Promise<{ repaired: boolean }>}
+ */
+export async function ensureMasteryOutlookRoot(courseId, page, apiClient) {
+    if (hasMasteryOutlookRoot(page)) return { repaired: false };
+    await updatePage(courseId, page.url, { body: OUTLOOK_PAGE_BODY + String(page.body ?? '') }, apiClient);
+    logger.info(`[MasteryOutlook] Repaired page ${page.url} (added the Mastery Outlook container)`);
+    return { repaired: true };
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // CREATE Mastery Outlook PAGE
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Create Mastery Outlook page
+ * Create Mastery Outlook page — or repair the existing one.
  *
- * Creates a single unpublished page that teachers navigate to manually.
+ * Checks first: if a Mastery Outlook page exists (the most recent one titled
+ * "Mastery Outlook"), it is repaired when needed and linked, never duplicated.
+ * Otherwise creates a single unpublished page that teachers navigate to manually.
  * No front page button, no course settings changes.
  *
  * @param {HTMLButtonElement} button - Button element to update state
@@ -53,17 +81,22 @@ export async function createMasteryOutlook(button) {
         logger.info('[MasteryOutlook] Creating Mastery Outlook page');
 
         // Check if page already exists
-        const existingPage = await getPage(courseId, OUTLOOK_PAGE_URL, apiClient);
+        // Found by title — the slug may be numbered (mastery-outlook-3) after a reset
+        const existingPage = await findMasteryOutlookPage(courseId, apiClient);
 
         if (existingPage) {
-            logger.info('[MasteryOutlook] Page already exists');
-            button.textContent = '✅ Already Exists';
+            // Fix it instead of creating a duplicate
+            const { repaired } = await ensureMasteryOutlookRoot(courseId, existingPage, apiClient);
+            logger.info(`[MasteryOutlook] Page exists at ${existingPage.url}${repaired ? ' — repaired' : ''}`);
+            button.textContent = repaired ? '✅ Repaired' : '✅ Ready';
             button.style.backgroundColor = '#28a745';
 
-            alert(`Mastery Outlook page already exists!\n\nNavigate to: Pages → ${OUTLOOK_PAGE_TITLE}`);
+            alert(repaired
+                ? `Mastery Outlook was repaired.\n\nOpen it from the course navigation sidebar (or Pages → ${OUTLOOK_PAGE_TITLE}).`
+                : `Mastery Outlook is ready.\n\nOpen it from the course navigation sidebar (or Pages → ${OUTLOOK_PAGE_TITLE}).`);
 
             // Inject sidebar link (in case it was removed or page loaded without it)
-            injectMasteryOutlookLink(courseId);
+            injectMasteryOutlookLink(courseId, existingPage.url);
 
             // Reset button after 3 seconds
             setTimeout(() => {
@@ -75,10 +108,10 @@ export async function createMasteryOutlook(button) {
             return;
         }
 
-        // Create Mastery Outlook page (UNPUBLISHED)
+        // Create Mastery Outlook page (UNPUBLISHED). Canvas picks the slug from the
+        // title (mastery-outlook, or mastery-outlook-N if that slug is reserved).
         const createdPage = await createPage(courseId, {
             title: OUTLOOK_PAGE_TITLE,
-            url: OUTLOOK_PAGE_URL,
             body: OUTLOOK_PAGE_BODY,
             published: false  // UNPUBLISHED - only teachers can access
         }, apiClient);
@@ -86,7 +119,7 @@ export async function createMasteryOutlook(button) {
         logger.info(`[MasteryOutlook] Page created at: ${createdPage.url}`);
 
         // Inject sidebar link immediately
-        injectMasteryOutlookLink(courseId);
+        injectMasteryOutlookLink(courseId, createdPage.url);
         logger.info('[MasteryOutlook] Sidebar link injection triggered');
 
         // Success!

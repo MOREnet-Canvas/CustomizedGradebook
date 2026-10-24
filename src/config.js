@@ -172,6 +172,13 @@ export const ENABLE_LMGB_MASTERY_COLORS = window.CG_CONFIG?.ENABLE_LMGB_MASTERY_
 export const LMGB_MASTERY_SCHEME = window.CG_CONFIG?.LMGB_MASTERY_SCHEME ?? 'sedaliaA';
 export const CUSTOM_MASTERY_PALETTES = window.CG_CONFIG?.CUSTOM_MASTERY_PALETTES ?? {};
 
+// TEMPORARY — Canvas LMGB workaround, see #107 (removal steps in src/gradebook/lmgbRatingColorPatch.js)
+// Canvas's new LMGB drops every score whose rating has no color, and Canvas never
+// colors scales with 7+ ratings — so those outcomes show 0. This fills in the
+// missing colors in the LMGB's rollup response (read-only; see
+// src/gradebook/lmgbRatingColorPatch.js). Turn off once Instructure fixes it.
+export const ENABLE_LMGB_RATING_COLOR_FIX = window.CG_CONFIG?.ENABLE_LMGB_RATING_COLOR_FIX ?? true;
+
 // Outcome filtering
 const defaultExcludedKeywords = [];
 export const EXCLUDED_OUTCOME_KEYWORDS = window.CG_CONFIG?.EXCLUDED_OUTCOME_KEYWORDS ?? defaultExcludedKeywords;

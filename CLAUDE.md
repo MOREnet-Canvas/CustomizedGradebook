@@ -170,6 +170,10 @@ Design decisions worth knowing before changing anything:
 - **Explicit state machines** for both PL sync and gradebook Refresh Mastery, so multi-step async flows (push → verify → complete) stay auditable.
 - **CSRF** — `CanvasApiClient` reads the `_csrf_token` cookie once at construction and injects it as both the `X-CSRF-Token` header and an `authenticity_token` body field on mutating requests.
 - **Canvas outcome scores come only from rubric criterion ratings.** Assignment grades, points possible, and grading schemes do not affect them. Changing `points_possible` may refresh the mastery *display* without changing any outcome data.
+- **Mastery Outlook / Mastery View pages are found by title, not slug.** Canvas keeps a deleted page's slug reserved and numbers the next one (`mastery-outlook-7`, `mastery-dashboard-3`). "The" page is the newest non-deleted one with the title: `findMasteryOutlookPage()` / `findMasteryViewPage()` in `src/services/pageService.js`. Never hard-code the slug. The Create buttons repair a page missing its root element instead of duplicating it.
+- **Temporary / legacy code — check before touching page lookup or the LMGB.** Search the marker to find every piece; each has a removal checklist.
+    - `TEMPORARY — Canvas LMGB workaround` (#107): `src/gradebook/lmgbRatingColorPatch.js` adds colors to 7+ level rating scales so Canvas's new LMGB doesn't show 0 for every score. Remove when Instructure fixes the LMGB. Checklist: `documents/TODOs/TODO-remove-lmgb-rating-color-workaround.md`.
+    - `LEGACY — "Mastery Dashboard" title` (#108): Mastery View lookup also matches the old page title "Mastery Dashboard". A teacher's own page with that title shares the slug, so a legacy-titled page only counts if it contains `#mastery-dashboard-root`. Keep that guard while the legacy title is matched. Checklist: `documents/TODOs/TODO-remove-legacy-mastery-dashboard-title.md`.
 
 ## Where to Look — Read Before Changing
 

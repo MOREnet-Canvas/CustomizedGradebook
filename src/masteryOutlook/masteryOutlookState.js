@@ -125,6 +125,28 @@ export function notifySaveStatus(outcomeId) {
     }
 }
 
+/** Listeners for outcome order / name changes — see subscribeOutcomeLayout(). */
+const _layoutListeners = new Set();
+
+/**
+ * Listen for changes to the teacher's outcome order or custom outcome names
+ * (outcome-list drag-and-drop, Current Score column headers).
+ *
+ * @param {() => void} listener
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeOutcomeLayout(listener) {
+    _layoutListeners.add(listener);
+    return () => _layoutListeners.delete(listener);
+}
+
+/** Tell listeners the outcome order or names changed. */
+export function notifyOutcomeLayout() {
+    for (const listener of [..._layoutListeners]) {
+        try { listener(); } catch { /* keep notifying the rest */ }
+    }
+}
+
 /**
  * Set of in-flight sync keys for entire outcomes in format "outcomeId".
  * Used to show an outcome-level "Checking..." indicator before specific

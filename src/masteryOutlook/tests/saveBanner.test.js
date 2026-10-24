@@ -120,6 +120,39 @@ describe('save banner', () => {
         expect(b.text).toBe('✓ Canvas gradebook is up to date');
         expect(b.button).toBeNull();
     });
+
+    test('Canvas changed after a verified save (⚑) → not "up to date"; banner counts the flagged rows', () => {
+        const cache = makeCache();
+        cache.sync_state[OID] = { a: {
+            last_synced_score: 3,
+            last_synced_at:  new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+            last_verify_at:  new Date(Date.now() - 9 * 60 * 1000).toISOString(),
+        } };
+        const b = banner(cache);
+        expect(b.cls).toBe('warn');
+        expect(b.text).toBe('⚑ 1 score changed outside Mastery Outlook — hover ⚑ for details');
+        expect(b.text).not.toMatch(/up to date/);
+        expect(b.button).toBeNull();
+        expect(document.querySelector('tr[data-stu="a"] .os-sync-marker.override')).not.toBeNull();
+    });
+
+    test('Canvas matches the latest alignment (graded after the override) → no ⚑, up to date', () => {
+        const cache = makeCache();
+        cache.students[0].outcomes[0].attempts = [
+            { score: 3, timestamp: '2026-09-01T00:00:00Z' },
+            { score: 2, timestamp: '2026-10-01T00:00:00Z' },   // latest = Canvas score 2
+        ];
+        cache.sync_state[OID] = { a: {
+            last_synced_score: 3,
+            last_synced_at:  new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+            last_verify_at:  new Date(Date.now() - 9 * 60 * 1000).toISOString(),
+        } };
+        const b = banner(cache);
+        expect(b.cls).toBe('ok');
+        expect(b.text).toBe('✓ Canvas gradebook is up to date');
+        expect(document.querySelector('tr[data-stu="a"] .os-sync-marker.override')).toBeNull();
+        expect(buildSyncChip({ id: OID }, cache)).not.toContain('⚑');
+    });
 });
 
 describe('getOutcomeSaveSummary', () => {
@@ -128,7 +161,7 @@ describe('getOutcomeSaveSummary', () => {
         rowSavePhase.set(`${OID}_b`, 'queued');
 
         expect(getOutcomeSaveSummary({ id: OID }, makeCache())).toEqual({
-            saving: 1, verifying: 0, queued: 1, remaining: 1, remainingIds: ['c'],
+            saving: 1, verifying: 0, queued: 1, remaining: 1, remainingIds: ['c'], flagged: 0,
         });
     });
 });

@@ -80,7 +80,7 @@ describe('Override does not default to Marzano', () => {
         const row = rowFor(renderOutcomeStudentTable({ id: '101' }, cache));
         const marker = row.querySelector('.os-sync-marker');
         expect(marker.classList.contains('override')).toBe(true);
-        expect(marker.getAttribute('title')).toMatch(/changed directly in Canvas/);
+        expect(marker.getAttribute('title')).toMatch(/changed outside Mastery Outlook/);
     });
 
     test('Last Override shows the last pushed score, date, and note tooltip', () => {
