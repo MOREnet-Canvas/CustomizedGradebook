@@ -1,13 +1,14 @@
 // src/gradebook/lmgbOverrideLocks.test.js
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const { mockReadCache } = vi.hoisted(() => ({ mockReadCache: vi.fn() }));
+const { mockReadCache, mockFindFile } = vi.hoisted(() => ({ mockReadCache: vi.fn(), mockFindFile: vi.fn() }));
 
 vi.mock('../utils/canvasApiClient.js', () => ({ CanvasApiClient: class {} }));
 vi.mock('../utils/canvas.js', () => ({ getCourseId: () => '566' }));
 vi.mock('../masteryOutlook/masteryOutlookCacheService.js', async (importOriginal) => ({
     ...(await importOriginal()),
     readMasteryOutlookCache: mockReadCache,
+    findMasteryOutlookCacheFile: mockFindFile,
 }));
 
 import {
@@ -52,6 +53,8 @@ describe('lmgbOverrideLocks', () => {
         mountGrid();
         localStorage.clear();
         mockReadCache.mockReset();
+        mockFindFile.mockReset();
+        mockFindFile.mockResolvedValue({ id: 77, display_name: 'mastery_outlook_cache.json' });
     });
     afterEach(() => stopLmgbOverrideLocks());
 
@@ -116,6 +119,23 @@ describe('lmgbOverrideLocks', () => {
         mockReadCache.mockResolvedValue(null);
         expect(await initLmgbOverrideLocks()).toBe(true);
         expect(badge('642', CS)).not.toBeNull();
+    });
+
+    it('no data file (Mastery Outlook reset) → clears the snapshot and the markers', async () => {
+        saveLmgbLockSnapshot('566', lockedCache());
+        mockFindFile.mockResolvedValue(null);
+        expect(await initLmgbOverrideLocks()).toBe(false);
+        expect(badge('642', CS)).toBeNull();
+        expect(loadLmgbLockSnapshot('566')).toBeNull();
+        expect(mockReadCache).not.toHaveBeenCalled();
+    });
+
+    it('a failed data-file lookup keeps the snapshot markers', async () => {
+        saveLmgbLockSnapshot('566', lockedCache());
+        mockFindFile.mockRejectedValue(new Error('HTTP 500'));
+        expect(await initLmgbOverrideLocks()).toBe(true);
+        expect(badge('642', CS)).not.toBeNull();
+        expect(loadLmgbLockSnapshot('566')).not.toBeNull();
     });
 
     it('init does nothing when nothing is locked', async () => {

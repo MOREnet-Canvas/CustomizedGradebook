@@ -19,6 +19,7 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { createPersistentObserver } from '../utils/observerHelpers.js';
 import {
     readMasteryOutlookCache, lockedCurrentScoreStudentsFrom, loadLmgbLockSnapshot, saveLmgbLockSnapshot,
+    findMasteryOutlookCacheFile, clearLmgbLockSnapshot,
 } from '../masteryOutlook/masteryOutlookCacheService.js';
 
 const LOG = '[LMGB Locks]';
@@ -46,9 +47,27 @@ export async function initLmgbOverrideLocks() {
     const snapshot = loadLmgbLockSnapshot(courseId);
     if (snapshot?.locks.size) start(snapshot.locks, snapshot.avgOutcomeId);
 
+    const apiClient = new CanvasApiClient();
+
+    // No cache file (e.g. Mastery Outlook was reset) → nothing is locked; forget
+    // the snapshot. A failed lookup is not "no file" — keep what's shown.
+    let cacheFile;
+    try {
+        cacheFile = await findMasteryOutlookCacheFile(courseId, apiClient);
+    } catch (err) {
+        logger.warn(`${LOG} Could not look up Mastery Outlook data:`, err);
+        return Boolean(state);
+    }
+    if (!cacheFile) {
+        logger.debug(`${LOG} No Mastery Outlook data file — clearing locks`);
+        clearLmgbLockSnapshot(courseId);
+        stopLmgbOverrideLocks();
+        return false;
+    }
+
     let cache;
     try {
-        cache = await readMasteryOutlookCache(courseId, new CanvasApiClient());
+        cache = await readMasteryOutlookCache(courseId, apiClient);
     } catch (err) {
         logger.warn(`${LOG} Could not read Mastery Outlook locks:`, err);
         return Boolean(state);
