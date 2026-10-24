@@ -186,8 +186,24 @@ export async function findMasteryDashboardPageUrl(courseId, apiClient) {
     }
 }
 
-/** Mastery View page identity. "Mastery Dashboard" is the legacy title. */
+/**
+ * Mastery View page identity. "Mastery Dashboard" is the legacy title.
+ *
+ * ─── LEGACY — "Mastery Dashboard" title, see #108 ──────────────────────────
+ * Older courses' Mastery View pages are titled "Mastery Dashboard", so it is
+ * still matched. RISK: a teacher's own page titled "Mastery Dashboard" gets the
+ * same slug (mastery-dashboard) and would be treated as Mastery View — Create
+ * would "repair"/re-link it, Delete Mastery View Setup would delete it, and
+ * Mastery Outlook could write outcome order/names onto it.
+ * GUARD: a legacy-titled page only counts when it contains #mastery-dashboard-root
+ * (see findMasteryViewPages).
+ * REMOVE when no course still has a legacy-titled Mastery View page: drop
+ * 'Mastery Dashboard' here, the guard in findMasteryViewPages, and its tests.
+ * Checklist: documents/TODOs/TODO-remove-legacy-mastery-dashboard-title.md
+ */
 export const MASTERY_VIEW_PAGE_TITLES = Object.freeze(['Mastery View', 'Mastery Dashboard']);
+/** Title currently written by Create Mastery View. */
+export const MASTERY_VIEW_PAGE_TITLE = 'Mastery View';
 /** Preferred slug. Canvas may number it (mastery-dashboard-2, …) when the slug is taken or was deleted. */
 export const MASTERY_VIEW_PAGE_URL = 'mastery-dashboard';
 /** The element the Mastery View viewer renders into. */
@@ -214,7 +230,10 @@ export async function findMasteryViewPages(courseId, apiClient) {
         for (const p of pages ?? []) {
             if (MASTERY_VIEW_PAGE_TITLES.includes(p.title)
                 && p.workflow_state !== 'deleted'
-                && String(p.url ?? '').startsWith(MASTERY_VIEW_PAGE_URL)) {
+                && String(p.url ?? '').startsWith(MASTERY_VIEW_PAGE_URL)
+                // LEGACY — "Mastery Dashboard" title, see #108: only a legacy page that
+                // really is Mastery View (has the root) counts, never a teacher's own page.
+                && (p.title === MASTERY_VIEW_PAGE_TITLE || hasMasteryViewRoot(p))) {
                 byUrl.set(p.url, p);
             }
         }

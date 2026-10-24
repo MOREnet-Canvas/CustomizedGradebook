@@ -126,7 +126,8 @@ export async function createMasteryDashboard(button) {
         button.textContent = 'Creating...';
         logger.info('[MasteryDashboard] Starting creation process');
 
-        // Found by title — the slug may be numbered (mastery-dashboard-3) after a delete
+        // Found by title — the slug may be numbered (mastery-dashboard-3) after a delete.
+        // LEGACY — "Mastery Dashboard" title, see #108 (also matches the old title; guarded in pageService)
         const existingPage = await findMasteryViewPage(courseId, apiClient);
         let pageUrl;
         let message;
@@ -193,7 +194,9 @@ export async function deleteMasteryDashboard(linkElement) {
         linkElement.textContent = 'Deleting...';
         logger.info('[MasteryDashboard] Starting deletion process');
 
-        // Every Mastery View page, plus whatever the front page button points at
+        // Every Mastery View page, plus whatever the front page button points at.
+        // LEGACY — "Mastery Dashboard" title, see #108 (old-title pages are deleted too,
+        // but only ones containing #mastery-dashboard-root — guarded in pageService)
         const frontPage = await getFrontPage(courseId, apiClient);
         const urls = new Set((await findMasteryViewPages(courseId, apiClient)).map(p => p.url));
         const buttonUrl = frontPage?.body?.match(/data-page-url="([^"]+)"/)?.[1];

@@ -67,6 +67,34 @@ describe('findMasteryViewPages', () => {
     });
 });
 
+// LEGACY — "Mastery Dashboard" title, see #108. Remove with the legacy match.
+describe('legacy "Mastery Dashboard" title guard', () => {
+    const teacherPage = { url: 'mastery-dashboard', title: 'Mastery Dashboard', body: '<p>My own notes</p>', created_at: '2026-10-22T00:00:00Z' };
+
+    test('a teacher\'s own "Mastery Dashboard" page is not Mastery View', async () => {
+        canvas.pages = [teacherPage];
+        expect(await findMasteryViewPages('566', new CanvasApiClient())).toEqual([]);
+    });
+
+    test('a legacy Mastery View page (has the root) is still found', async () => {
+        canvas.pages = [{ ...teacherPage, body: ROOT }];
+        expect((await findMasteryViewPages('566', new CanvasApiClient())).map(p => p.url)).toEqual(['mastery-dashboard']);
+    });
+
+    test('Create leaves the teacher\'s page alone and makes a new Mastery View page', async () => {
+        canvas.pages = [teacherPage];
+        await createMasteryDashboard(document.createElement('button'));
+        expect(canvas.puts.some(p => p.url.endsWith('/pages/mastery-dashboard'))).toBe(false);
+        expect(canvas.posts.find(p => p.url === '/api/v1/courses/566/pages').data.wiki_page.title).toBe('Mastery View');
+    });
+
+    test('Delete leaves the teacher\'s page alone', async () => {
+        canvas.pages = [teacherPage, page('mastery-dashboard-2')];
+        await deleteMasteryDashboard(document.createElement('a'));
+        expect(canvas.deletes).toEqual(['/api/v1/courses/566/pages/mastery-dashboard-2']);
+    });
+});
+
 describe('Create Mastery View checks before creating', () => {
     test('empty existing page → repaired (container prepended, content kept), button points to it, no new page', async () => {
         canvas.pages = [page('mastery-dashboard-3', '<p>hello</p>')];
