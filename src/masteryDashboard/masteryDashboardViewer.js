@@ -568,7 +568,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             `;
         }).join('');
         bannerEl.innerHTML = `
-            <div class="pm-banner-title">⚠ Missing Assignments</div>
+            <div class="pm-banner-title">⚠ Opportunities for evidence</div>
             ${bannerRows}
         `;
         bannerEl.style.display = 'block';
