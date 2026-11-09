@@ -560,7 +560,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
             `;
         }).join('');
         bannerEl.innerHTML = `
-            <div style="${HFONT} font-size:0.75rem; font-weight:600; color:#795500; margin-bottom:6px; -webkit-font-smoothing:antialiased;">⚠ Missing Assignments</div>
+            <div style="${HFONT} font-size:0.75rem; font-weight:600; color:#795500; margin-bottom:6px; -webkit-font-smoothing:antialiased;">⚠ Opportunities for evidence</div>
             ${bannerRows}
         `;
         bannerEl.style.display = 'block';
