@@ -23,7 +23,7 @@ import { getMasteryColor } from '../ui/masteryColors.js';
 import { resolveOutcomeName } from '../masteryOutlook/outcomeTypes.js';
 import { injectStyles } from '../ui/styles.js';
 import { MASTERY_DASHBOARD_CSS } from './masteryDashboardStyles.js';
-import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml, buildOutcomeProgressBarHtml } from './pacingPanel.js';
+import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml, buildOutcomeProgressBarHtml, paceBarColor } from './pacingPanel.js';
 import { parsePacing, todayInTimeZone } from '../services/pacingService.js';
 
 /** Course IANA time zone (from the course API), used for pacing target dates. */
@@ -663,6 +663,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // Pacing line for required outcomes ("Target Sep 1, 2026 · Behind pace")
         const paceItem = paceByOutcome.get(oid);
         const paceLineHtml = paceItem ? buildOutcomePaceLineHtml(paceItem) : '';
+        // Score bar: pace color for required outcomes (see PACE_COLORS), else score color
+        const barColor = paceBarColor(paceItem) ?? masteryColor;
 
         // AVG_OUTCOME is shown in the header stat box — skip it here
         if (outcome.title === AVG_OUTCOME_NAME) continue;
@@ -688,7 +690,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                     <span class="pm-expand-arrow">▶</span>
                     <div class="pm-outcome-main">
                         <div class="pm-outcome-name">${escapeHtml(outcomeName)}</div>
-                        ${buildOutcomeProgressBarHtml(rollupScore.score, masteryColor)}
+                        ${buildOutcomeProgressBarHtml(rollupScore.score, barColor)}
                         ${paceLineHtml}
                     </div>
                     <div class="pm-outcome-right">

@@ -21,6 +21,7 @@
 import { DEFAULT_MASTERY_THRESHOLD, DEFAULT_MAX_POINTS } from '../config.js';
 import { injectStyles } from '../ui/styles.js';
 import {
+    DUE_SOON_DAYS,
     computePacingSummary,
     formatTargetDate,
     percentOf,
@@ -28,6 +29,35 @@ import {
 } from '../services/pacingService.js';
 
 export const PACING_STYLE_ID = 'pm-pace-styles';
+
+/**
+ * Pace colors — single source for the Pace stat bar and the per-outcome score bars.
+ *
+ * KEEP THIS RATIONALE when consolidating CSS/colors (see documents/TODOs/Mastery_colors.md):
+ *
+ * - These encode PACE (where a student is relative to the teacher's target dates),
+ *   not a rating level. Rating-level colors stay score-based (card border, LMGB).
+ * - ontrack (#3B6EA5, muted blue) = required outcome not mastered yet but more than
+ *   DUE_SOON_DAYS before its target ("in progress, nothing wrong"). Chosen because:
+ *     · gray already means "no score yet" / disabled (empty bar, `none`)
+ *     · purple means Exemplary / Beyond Target in Sedalia's scale (reads as "excellent")
+ *     · teal blurs with green ("nearly" vs "mastered")
+ *     · a second amber/yellow reads as a warning
+ *     · blue stays distinct from red/amber/green under red-green color blindness
+ *     · the muted shade avoids Sedalia's own rating blues (Developing #485BB0,
+ *       Beginning #1979AE, Needs Partial Support #1199DA) so it isn't read as a rating
+ * - Contrast (WCAG 1.4.11, non-text ≥ 3:1) against the light track (#e8ebee / #dfe4e8):
+ *   blue ≈ 4.8, red ≈ 5, amber ≈ 4.2, green ≈ 4.3.
+ * - Color is never the only signal: the line under each bar states the status in words
+ *   ("Target Dec 4, 2026 · in 17 days"), and the Pace box has a text detail line.
+ */
+export const PACE_COLORS = Object.freeze({
+    mastered: '#03893D', // mastered / on pace
+    behind: '#c5221f',   // past target date, not mastered
+    soon: '#b45f06',     // not mastered, due within DUE_SOON_DAYS (today included)
+    ontrack: '#3B6EA5',  // not mastered, target more than DUE_SOON_DAYS away
+    none: '#6b7780'      // no target dates set (Pace box only)
+});
 
 const FONT = "LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif";
 
@@ -39,11 +69,11 @@ export const PACING_CSS = `
 .pm-pace-pill--today { background:#fff0d5; color:#7a4a00; }
 .pm-pace-pill--behind { background:#fce5e5; color:#a22b2b; }
 .pm-pace-bar { position:relative; height:10px; background:#dfe4e8; border-radius:999px; margin:14px 0 8px; }
-.pm-pace-fill { height:100%; background:#03893D; border-radius:999px; }
-.pm-pace-fill--onpace { background:#03893D; }
-.pm-pace-fill--soon { background:#b45f06; }
-.pm-pace-fill--behind { background:#c5221f; }
-.pm-pace-fill--none { background:#6b7780; }
+.pm-pace-fill { height:100%; background:${PACE_COLORS.mastered}; border-radius:999px; }
+.pm-pace-fill--onpace { background:${PACE_COLORS.mastered}; }
+.pm-pace-fill--soon { background:${PACE_COLORS.soon}; }
+.pm-pace-fill--behind { background:${PACE_COLORS.behind}; }
+.pm-pace-fill--none { background:${PACE_COLORS.none}; }
 .pm-pace-tick { position:absolute; top:-4px; width:2px; height:18px; background:#273540; border-radius:1px; transform:translateX(-1px); }
 .pm-pace-detail { font-family:${FONT}; font-size:0.78rem; color:#555; line-height:1.4; -webkit-font-smoothing:antialiased; }
 .pm-pace-line { font-family:${FONT}; font-size:0.8rem; color:#555; margin-top:2px; line-height:1.4; -webkit-font-smoothing:antialiased; }
@@ -185,8 +215,25 @@ export function buildOutcomePaceLineHtml(item) {
 }
 
 /**
- * Score bar for an outcome card: fill = score / max points in the card's mastery
- * color, with a tick at the mastery threshold. Inline-styled (works without the
+ * Score-bar color for a required outcome in a pacing course (see PACE_COLORS).
+ * Returns null when the caller should keep the card's score-based mastery color
+ * (outcome has no target date).
+ * @param {{pacing: string, days: number|null}} item - summary item
+ * @returns {string|null}
+ */
+export function paceBarColor(item) {
+    if (!item) return null;
+    if (item.pacing === PACING_STATUS.MASTERED) return PACE_COLORS.mastered;
+    if (item.pacing === PACING_STATUS.NO_TARGET_DATE || item.days == null) return null;
+    if (item.days < 0) return PACE_COLORS.behind;
+    if (item.days <= DUE_SOON_DAYS) return PACE_COLORS.soon;
+    return PACE_COLORS.ontrack;
+}
+
+/**
+ * Score bar for an outcome card: fill = score / max points, with a tick at the
+ * mastery threshold. Color: paceBarColor() for required outcomes in a pacing course,
+ * otherwise the card's score-based mastery color. Inline-styled (works without the
  * pacing stylesheet), so it can render on every course.
  *
  * @param {number|null} score - rollup score (null = no evidence yet)
