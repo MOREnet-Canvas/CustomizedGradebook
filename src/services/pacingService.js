@@ -26,18 +26,18 @@ export const PACING_FORMAT_VERSION = 1;
 /** Per-outcome evidence labels */
 export const EVIDENCE_STATUS = Object.freeze({
     NO_EVIDENCE: 'No Evidence',
-    BELOW_TARGET: 'Below Target',
+    NOT_YET_MASTERED: 'Not yet mastered',
     MASTERED: 'Mastered'
 });
 
 /** Per-outcome and overall pacing labels */
 export const PACING_STATUS = Object.freeze({
     MASTERED: 'Mastered',
-    NO_TARGET_DATE: 'No Target Date',
-    BEHIND: 'Behind Pace',
-    TARGET_TODAY: 'Target Today',
+    NO_TARGET_DATE: 'No target date',
+    BEHIND: 'Behind pace',
+    TARGET_TODAY: 'Due today',
     UPCOMING: 'Upcoming',
-    ON_PACE: 'On Pace'
+    ON_PACE: 'On pace'
 });
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -176,7 +176,7 @@ export function evidenceStatus(score, threshold = DEFAULT_MASTERY_THRESHOLD) {
     if (score == null || !Number.isFinite(Number(score)) || Number(score) === 0) {
         return EVIDENCE_STATUS.NO_EVIDENCE;
     }
-    return isMastered(score, threshold) ? EVIDENCE_STATUS.MASTERED : EVIDENCE_STATUS.BELOW_TARGET;
+    return isMastered(score, threshold) ? EVIDENCE_STATUS.MASTERED : EVIDENCE_STATUS.NOT_YET_MASTERED;
 }
 
 /**

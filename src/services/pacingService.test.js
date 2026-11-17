@@ -89,7 +89,7 @@ describe('classification', () => {
     test('evidenceStatus', () => {
         expect(evidenceStatus(null, 3)).toBe(EVIDENCE_STATUS.NO_EVIDENCE);
         expect(evidenceStatus(0, 3)).toBe(EVIDENCE_STATUS.NO_EVIDENCE);
-        expect(evidenceStatus(2.5, 3)).toBe(EVIDENCE_STATUS.BELOW_TARGET);
+        expect(evidenceStatus(2.5, 3)).toBe(EVIDENCE_STATUS.NOT_YET_MASTERED);
         expect(evidenceStatus(3, 3)).toBe(EVIDENCE_STATUS.MASTERED);
     });
 

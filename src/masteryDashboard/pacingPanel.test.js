@@ -1,70 +1,108 @@
 // src/masteryDashboard/pacingPanel.test.js
-// DOM render tests for the student/observer pacing panel on Mastery View.
+// Student/observer pacing on Mastery View: the Pace stat box and per-outcome lines.
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { renderPacingPanel, clearPacingPanel, PACING_PANEL_STYLE_ID } from './pacingPanel.js';
+import {
+    buildPacingModel,
+    renderPaceStat,
+    clearPaceStat,
+    buildOutcomePaceLineHtml,
+    PACING_STYLE_ID
+} from './pacingPanel.js';
 
 const today = '2026-11-17';
-const outcomeNames = new Map([['1', 'Alpha <b>'], ['2', 'Beta']]);
-const scoresByOutcomeId = new Map([['1', 3.5], ['2', 1]]);
+const outcomeNames = new Map([['1', 'Alpha'], ['2', 'Beta'], ['3', 'Gamma']]);
+const scoresByOutcomeId = new Map([['1', 3.5], ['2', 1], ['3', null]]);
 
-let slot;
-beforeEach(() => {
-    document.head.innerHTML = '';
-    document.body.innerHTML = '<div id="pm-pacing" style="display:none;"></div>';
-    slot = document.getElementById('pm-pacing');
+const model = scales => buildPacingModel({
+    pacing: { enabled: true, scales },
+    scoresByOutcomeId, outcomeNames, today
 });
 
-describe('renderPacingPanel', () => {
-    test('stays hidden without a config', () => {
-        expect(renderPacingPanel(slot, { pacing: null, scoresByOutcomeId, outcomeNames, today })).toBe(false);
-        expect(slot.style.display).toBe('none');
-        expect(slot.innerHTML).toBe('');
-    });
+let box;
+beforeEach(() => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '<div id="pm-stat-pace" style="display:none;"></div>';
+    box = document.getElementById('pm-stat-pace');
+});
 
-    test('stays hidden when disabled or nothing included', () => {
-        const scales = [{ id: '1', date: '', included: true }];
-        expect(renderPacingPanel(slot, { pacing: { enabled: false, scales }, scoresByOutcomeId, outcomeNames, today })).toBe(false);
-        expect(renderPacingPanel(slot, {
-            pacing: { enabled: true, scales: [{ id: '1', date: '', included: false }] },
+describe('buildPacingModel', () => {
+    test('null without a config, when disabled, or with nothing required', () => {
+        expect(buildPacingModel({ pacing: null, scoresByOutcomeId, outcomeNames, today })).toBeNull();
+        expect(buildPacingModel({
+            pacing: { enabled: false, scales: [{ id: '1', date: '', included: true }] },
             scoresByOutcomeId, outcomeNames, today
-        })).toBe(false);
-        expect(slot.style.display).toBe('none');
+        })).toBeNull();
+        expect(model([{ id: '1', date: '', included: false }])).toBeNull();
+        expect(model([{ id: '999', date: '', included: true }])).toBeNull();
+    });
+});
+
+describe('Pace stat box', () => {
+    test('stays hidden for a null model', () => {
+        expect(renderPaceStat(box, null)).toBe(false);
+        expect(box.style.display).toBe('none');
+        expect(box.innerHTML).toBe('');
     });
 
-    test('renders bars, status, tiles and escaped outcome names', () => {
-        const pacing = {
-            enabled: true,
-            scales: [
-                { id: '1', date: '2026-11-01', included: true },
-                { id: '2', date: '2026-11-10', included: true }
-            ]
-        };
-        expect(renderPacingPanel(slot, { pacing, scoresByOutcomeId, outcomeNames, today })).toBe(true);
-        expect(slot.style.display).toBe('block');
-        expect(document.getElementById(PACING_PANEL_STYLE_ID)).not.toBeNull();
+    test('shows pill, bar with expected tick, and detail line', () => {
+        const summary = model([
+            { id: '1', date: '2026-11-01', included: true },
+            { id: '2', date: '2026-11-10', included: true },
+            { id: '3', date: '2026-12-01', included: true }
+        ]);
+        expect(renderPaceStat(box, summary)).toBe(true);
+        expect(box.style.display).toBe('');
+        expect(document.getElementById(PACING_STYLE_ID)).not.toBeNull();
 
-        const text = slot.textContent;
-        expect(text).toContain('Learning Progress');
-        expect(text).toContain('1 of 2 outcomes mastered');
-        expect(text).toContain('Expected Progress by Today');
-        expect(slot.querySelector('.pm-pacing-status--behind').textContent).toBe('Behind Pace');
-        expect(slot.querySelectorAll('.pm-pacing-item')).toHaveLength(2);
-        expect(slot.innerHTML).toContain('Alpha &lt;b&gt;');
-        expect(slot.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('50');
+        expect(box.querySelector('.pm-pace-pill--behind').textContent).toBe('Behind pace');
+        expect(box.querySelector('.pm-pace-fill').style.width).toBe('33%');
+        expect(box.querySelector('.pm-pace-tick').style.left).toBe('67%');
+        expect(box.querySelector('.pm-pace-detail').textContent).toBe('2 of 3 expected by today · 1 past target date');
+        expect(box.querySelector('[role="img"]').getAttribute('aria-label'))
+            .toBe('1 of 3 required outcomes mastered; 2 expected by today');
     });
 
-    test('notes missing dates and omits the overall status', () => {
-        const pacing = { enabled: true, scales: [{ id: '1', date: '', included: true }, { id: '2', date: '2026-12-01', included: true }] };
-        renderPacingPanel(slot, { pacing, scoresByOutcomeId, outcomeNames, today });
-        expect(slot.querySelector('.pm-pacing-status')).toBeNull();
-        expect(slot.textContent).toContain('1 target date has not been set');
+    test('on pace, and missing dates → no pill, "Some target dates not set"', () => {
+        renderPaceStat(box, model([{ id: '1', date: '2026-11-01', included: true }]));
+        expect(box.querySelector('.pm-pace-pill--onpace').textContent).toBe('On pace');
+
+        renderPaceStat(box, model([{ id: '1', date: '', included: true }, { id: '2', date: '2026-12-01', included: true }]));
+        expect(box.querySelector('.pm-pace-pill')).toBeNull();
+        expect(box.querySelector('.pm-pace-detail').textContent).toBe('Some target dates not set');
     });
 
-    test('clearPacingPanel hides a rendered panel', () => {
-        renderPacingPanel(slot, { pacing: { enabled: true, scales: [{ id: '1', date: '', included: true }] }, scoresByOutcomeId, outcomeNames, today });
-        clearPacingPanel(slot);
-        expect(slot.innerHTML).toBe('');
-        expect(slot.style.display).toBe('none');
+    test('no dates at all → no tick', () => {
+        renderPaceStat(box, model([{ id: '1', date: '', included: true }]));
+        expect(box.querySelector('.pm-pace-tick')).toBeNull();
+    });
+
+    test('clearPaceStat hides it again', () => {
+        renderPaceStat(box, model([{ id: '1', date: '', included: true }]));
+        clearPaceStat(box);
+        expect(box.innerHTML).toBe('');
+        expect(box.style.display).toBe('none');
+    });
+});
+
+describe('outcome card pace line', () => {
+    const line = item => {
+        const el = document.createElement('div');
+        el.innerHTML = buildOutcomePaceLineHtml(item);
+        return el.firstElementChild;
+    };
+
+    test('behind, mastered, due today carry a status and class', () => {
+        const behind = line({ date: '2026-09-01', pacing: 'Behind pace' });
+        expect(behind.textContent).toBe('Target Sep 1, 2026 · Behind pace');
+        expect(behind.classList.contains('pm-pace-line--behind')).toBe(true);
+
+        expect(line({ date: '2026-10-01', pacing: 'Mastered' }).classList.contains('pm-pace-line--mastered')).toBe(true);
+        expect(line({ date: today, pacing: 'Due today' }).textContent).toBe('Target Nov 17, 2026 · Due today');
+    });
+
+    test('upcoming shows only the date; undated says so', () => {
+        expect(line({ date: '2026-12-04', pacing: 'Upcoming' }).textContent).toBe('Target Dec 4, 2026');
+        expect(line({ date: '', pacing: 'No target date' }).textContent).toBe('No target date');
     });
 });
