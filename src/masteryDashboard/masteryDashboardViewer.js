@@ -694,8 +694,6 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                     <span class="expand-arrow" style="font-size:0.8rem; transition:transform 0.2s; margin-top:2px;">▶</span>
                     <div style="flex:1;">
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcomeName)}</div>
-                        ${buildOutcomeProgressBarHtml(rollupScore.score, barColor)}
-                        ${paceLineHtml}
                     </div>
                     <div style="text-align:right;">
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:1.5rem; font-weight:700; color:${masteryFontColor}; line-height:1.5; -webkit-font-smoothing:antialiased;">
@@ -704,6 +702,11 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                         ${letterGrade ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.9rem; font-weight:600; color:#333; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;"><span style="color:${masteryColor}; font-size:1.4em; line-height:1;">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
                         ${latestDate ? `<div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:0.875rem; color:#555; margin-top:4px; line-height:1.5; -webkit-font-smoothing:antialiased;">${latestDate}</div>` : ""}
                     </div>
+                </div>
+                <!-- Full-width row so every card's bar (and mastery tick) is the same length -->
+                <div style="margin-left:20px;">
+                    ${buildOutcomeProgressBarHtml(rollupScore.score, barColor)}
+                    ${paceLineHtml}
                 </div>
                 <div class="assignment-details" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #c8c8c8; margin-left:20px;">
                     <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:0.9rem; margin-bottom:8px; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">Loading assignments...</div>

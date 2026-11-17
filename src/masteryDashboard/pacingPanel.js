@@ -37,7 +37,7 @@ export const PACING_STYLE_ID = 'pm-pace-styles';
  *
  * - These encode PACE (where a student is relative to the teacher's target dates),
  *   not a rating level. Rating-level colors stay score-based (card border, LMGB).
- * - ontrack (#3B6EA5, muted blue) = required outcome not mastered yet but more than
+ * - ontrack (#4A7FB8, light muted blue) = required outcome not mastered yet but more than
  *   DUE_SOON_DAYS before its target ("in progress, nothing wrong"). Chosen because:
  *     · gray already means "no score yet" / disabled (empty bar, `none`)
  *     · purple means Exemplary / Beyond Target in Sedalia's scale (reads as "excellent")
@@ -46,8 +46,11 @@ export const PACING_STYLE_ID = 'pm-pace-styles';
  *     · blue stays distinct from red/amber/green under red-green color blindness
  *     · the muted shade avoids Sedalia's own rating blues (Developing #485BB0,
  *       Beginning #1979AE, Needs Partial Support #1199DA) so it isn't read as a rating
- * - Contrast (WCAG 1.4.11, non-text ≥ 3:1) against the light track (#e8ebee / #dfe4e8):
- *   blue ≈ 4.8, red ≈ 5, amber ≈ 4.2, green ≈ 4.3.
+ *     · lighter than red/amber on purpose: "in 14 days" must look calmer than "16 days past".
+ *       #3B6EA5 was tried first and looked as heavy as red. Do not go lighter than
+ *       #4B84C0 (3.27:1); #4F8AC9 is 3.02:1 and #5B93CF fails 3:1.
+ * - Contrast (WCAG 1.4.11, non-text ≥ 3:1), measured against the #e8ebee track:
+ *   blue #4A7FB8 3.50, green 3.77, amber 3.83, red 4.84.
  * - Color is never the only signal: the line under each bar states the status in words
  *   ("Target Dec 4, 2026 · in 17 days"), and the Pace box has a text detail line.
  */
@@ -55,7 +58,7 @@ export const PACE_COLORS = Object.freeze({
     mastered: '#03893D', // mastered / on pace
     behind: '#c5221f',   // past target date, not mastered
     soon: '#b45f06',     // not mastered, due within DUE_SOON_DAYS (today included)
-    ontrack: '#3B6EA5',  // not mastered, target more than DUE_SOON_DAYS away
+    ontrack: '#4A7FB8',  // not mastered, target more than DUE_SOON_DAYS away
     none: '#6b7780'      // no target dates set (Pace box only)
 });
 
@@ -249,7 +252,7 @@ export function buildOutcomeProgressBarHtml(score, color, { maxPoints = DEFAULT_
     const label = value == null
         ? `No score yet. Mastery is ${threshold} out of ${max}.`
         : `Score ${value} out of ${max}. Mastery is ${threshold}.`;
-    return `<div class="pm-outcome-progress" role="img" aria-label="${escapeHtml(label)}" style="position:relative; height:8px; background:#e8ebee; border-radius:999px; margin:6px 0 2px; max-width:420px;">` +
+    return `<div class="pm-outcome-progress" role="img" aria-label="${escapeHtml(label)}" style="position:relative; height:8px; background:#e8ebee; border-radius:999px; margin:8px 0 2px;">` +
         `<div style="width:${fillPct}%; height:100%; background:${escapeHtml(color)}; border-radius:999px;"></div>` +
         `<div style="position:absolute; top:-3px; bottom:-3px; left:${tickPct}%; width:2px; background:#2d3b45; transform:translateX(-1px);"></div>` +
         `</div>`;

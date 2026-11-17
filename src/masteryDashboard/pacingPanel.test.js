@@ -123,7 +123,7 @@ describe('outcome score bar pace color', () => {
         expect(paceBarColor({ pacing: 'Due today', days: 0 })).toBe(PACE_COLORS.soon);
         expect(paceBarColor({ pacing: 'Upcoming', days: 7 })).toBe(PACE_COLORS.soon);
         expect(paceBarColor({ pacing: 'Upcoming', days: 8 })).toBe(PACE_COLORS.ontrack);
-        expect(PACE_COLORS.ontrack).toBe('#3B6EA5');
+        expect(PACE_COLORS.ontrack).toBe('#4A7FB8');
     });
 
     test('no target date or not required → null (keep the score color)', () => {
