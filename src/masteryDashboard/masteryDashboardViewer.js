@@ -19,7 +19,7 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { renderTeacherMasteryView } from './teacherMasteryView.js';
 import { renderObserverMasteryView } from './observerMasteryView.js';
 import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
-import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml } from './pacingPanel.js';
+import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml, buildOutcomeProgressBarHtml } from './pacingPanel.js';
 import { parsePacing, todayInTimeZone } from '../services/pacingService.js';
 
 /** Course IANA time zone (from the course API), used for pacing target dates. */
@@ -692,6 +692,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                     <span class="expand-arrow" style="font-size:0.8rem; transition:transform 0.2s; margin-top:2px;">▶</span>
                     <div style="flex:1;">
                         <div style="font-family:LatoWeb,'Lato Extended',Lato,'Helvetica Neue',Helvetica,Arial,sans-serif; font-weight:600; font-size:1rem; color:#333; line-height:1.5; -webkit-font-smoothing:antialiased;">${escapeHtml(outcomeName)}</div>
+                        ${buildOutcomeProgressBarHtml(rollupScore.score, masteryColor)}
                         ${paceLineHtml}
                     </div>
                     <div style="text-align:right;">

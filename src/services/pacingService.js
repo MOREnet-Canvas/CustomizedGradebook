@@ -214,7 +214,7 @@ export function pacingStatus(scale, score, today, threshold = DEFAULT_MASTERY_TH
  *   total: number, mastered: number, dated: number, dueByToday: number,
  *   behind: number, dueToday: number, noEvidence: number, datesComplete: boolean,
  *   overall: string|null,
- *   items: Array<{id: string, name: string, score: number|null, date: string, evidence: string, pacing: string}>
+ *   items: Array<{id: string, name: string, score: number|null, date: string, days: number|null, evidence: string, pacing: string}>
  * }}
  */
 export function computePacingSummary({ scales, scoresByOutcomeId, outcomeNames, today, threshold = DEFAULT_MASTERY_THRESHOLD }) {
@@ -229,6 +229,7 @@ export function computePacingSummary({ scales, scoresByOutcomeId, outcomeNames, 
             name: outcomeNames.get(id),
             score,
             date: isValidDate(s.date) ? s.date : '',
+            days: daysUntil(s.date, today),
             evidence: evidenceStatus(score, threshold),
             pacing: pacingStatus(s, score, today, threshold)
         };

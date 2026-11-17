@@ -7,6 +7,7 @@ import {
     renderPaceStat,
     clearPaceStat,
     buildOutcomePaceLineHtml,
+    buildOutcomeProgressBarHtml,
     PACING_STYLE_ID
 } from './pacingPanel.js';
 
@@ -92,17 +93,50 @@ describe('outcome card pace line', () => {
         return el.firstElementChild;
     };
 
-    test('behind, mastered, due today carry a status and class', () => {
-        const behind = line({ date: '2026-09-01', pacing: 'Behind pace' });
-        expect(behind.textContent).toBe('Target Sep 1, 2026 · Behind pace');
+    test('behind shows days past in red; due today; upcoming shows days left', () => {
+        const behind = line({ date: '2026-09-01', days: -77, pacing: 'Behind pace' });
+        expect(behind.textContent).toBe('Target Sep 1, 2026 · 77 days past');
         expect(behind.classList.contains('pm-pace-line--behind')).toBe(true);
+        expect(line({ date: '2026-11-16', days: -1, pacing: 'Behind pace' }).textContent).toBe('Target Nov 16, 2026 · 1 day past');
 
-        expect(line({ date: '2026-10-01', pacing: 'Mastered' }).classList.contains('pm-pace-line--mastered')).toBe(true);
-        expect(line({ date: today, pacing: 'Due today' }).textContent).toBe('Target Nov 17, 2026 · Due today');
+        const today = line({ date: '2026-11-17', days: 0, pacing: 'Due today' });
+        expect(today.textContent).toBe('Target Nov 17, 2026 · Due today');
+        expect(today.classList.contains('pm-pace-line--today')).toBe(true);
+
+        expect(line({ date: '2026-12-04', days: 17, pacing: 'Upcoming' }).textContent).toBe('Target Dec 4, 2026 · in 17 days');
     });
 
-    test('upcoming shows only the date; undated says so', () => {
-        expect(line({ date: '2026-12-04', pacing: 'Upcoming' }).textContent).toBe('Target Dec 4, 2026');
-        expect(line({ date: '', pacing: 'No target date' }).textContent).toBe('No target date');
+    test('mastered shows only the expected date — no days, no "early"', () => {
+        const past = line({ date: '2026-10-01', days: -47, pacing: 'Mastered' });
+        expect(past.textContent).toBe('Expected by Oct 1, 2026 · Mastered');
+        expect(past.classList.contains('pm-pace-line--mastered')).toBe(true);
+        expect(line({ date: '2026-12-01', days: 14, pacing: 'Mastered' }).textContent).toBe('Expected by Dec 1, 2026 · Mastered');
+    });
+
+    test('undated outcomes say so', () => {
+        expect(line({ date: '', days: null, pacing: 'No target date' }).textContent).toBe('No target date');
+        expect(line({ date: '', days: null, pacing: 'Mastered' }).textContent).toBe('No target date · Mastered');
+    });
+});
+
+describe('outcome card progress bar', () => {
+    const bar = (score, color = '#03893D') => {
+        const el = document.createElement('div');
+        el.innerHTML = buildOutcomeProgressBarHtml(score, color, { maxPoints: 4, threshold: 3 });
+        return el.firstElementChild;
+    };
+
+    test('fill is score / max, tick at the mastery threshold', () => {
+        const b = bar(2);
+        const [fill, tick] = b.children;
+        expect(fill.style.width).toBe('50%');
+        expect(tick.style.left).toBe('75%');
+        expect(b.getAttribute('aria-label')).toBe('Score 2 out of 4. Mastery is 3.');
+    });
+
+    test('no score → empty fill, clamped above max', () => {
+        expect(bar(null).children[0].style.width).toBe('0%');
+        expect(bar(null).getAttribute('aria-label')).toBe('No score yet. Mastery is 3 out of 4.');
+        expect(bar(5).children[0].style.width).toBe('100%');
     });
 });
