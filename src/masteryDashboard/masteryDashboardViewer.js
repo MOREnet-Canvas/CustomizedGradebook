@@ -19,6 +19,11 @@ import { CanvasApiClient } from '../utils/canvasApiClient.js';
 import { renderTeacherMasteryView } from './teacherMasteryView.js';
 import { renderObserverMasteryView } from './observerMasteryView.js';
 import { buildAvgCommentToggleHtml, buildAvgCommentPanelHtml, initAvgCommentPanel } from './avgCommentPanel.js';
+import { renderPacingPanel, clearPacingPanel } from './pacingPanel.js';
+import { parsePacing, todayInTimeZone } from '../services/pacingService.js';
+
+/** Course IANA time zone (from the course API), used for pacing target dates. */
+let courseTimeZone = null;
 
 /**
  * Rating scale for calculating letter grades
@@ -107,6 +112,7 @@ function ensureHost(courseName = "Mastery Dashboard") {
         </div>
         <div id="pm-comment-panel-container"></div>
         <div id="pm-missing-banner" style="display:none; background:#FFF8E1; border:1px solid #FAB901; border-left:4px solid #FAB901; border-radius:6px; padding:10px 14px; margin-bottom:12px;"></div>
+        <div id="pm-pacing" style="display:none;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -123,6 +129,8 @@ function ensureHost(courseName = "Mastery Dashboard") {
 async function fetchCourseName(courseId, apiClient) {
     try {
         const course = await apiClient.get(`/api/v1/courses/${courseId}`, {}, 'fetchCourseName');
+        // Capture the course time zone for pacing target dates (null → browser zone)
+        courseTimeZone = course.time_zone || null;
         return course.name || "Mastery Dashboard";
     } catch (error) {
         debugLog(`Error fetching course name: ${error.message}`);
@@ -300,6 +308,48 @@ export async function renderMasteryDashboard() {
 }
 
 /**
+ * Render the course pacing panel from rollup data already fetched.
+ * No-op (slot stays hidden) when the root has no enabled data-outcome-pacing.
+ * Failures are logged and never block the rest of the dashboard.
+ *
+ * @param {HTMLElement|null} rootEl - #mastery-dashboard-root
+ * @param {Array} rollupScores - rollups[0].scores
+ * @param {Object} outcomeMap - outcome ID → linked outcome
+ */
+function renderStudentPacing(rootEl, rollupScores, outcomeMap) {
+    const slotEl = document.getElementById('pm-pacing');
+    try {
+        const pacing = parsePacing(rootEl);
+        if (!pacing) {
+            clearPacingPanel(slotEl);
+            return;
+        }
+
+        const scoresByOutcomeId = new Map(
+            rollupScores.map(s => [String(s.links.outcome), s.score ?? null])
+        );
+        const outcomeNames = new Map();
+        for (const outcome of Object.values(outcomeMap)) {
+            const title = outcome.title || '';
+            if (title === AVG_OUTCOME_NAME) continue;
+            if (EXCLUDED_OUTCOME_KEYWORDS.some(kw => title.includes(kw))) continue;
+            outcomeNames.set(String(outcome.id), outcome.display_name || title || `Outcome ${outcome.id}`);
+        }
+
+        const rendered = renderPacingPanel(slotEl, {
+            pacing,
+            scoresByOutcomeId,
+            outcomeNames,
+            today: todayInTimeZone(courseTimeZone)
+        });
+        debugLog(`Pacing panel ${rendered ? 'rendered' : 'skipped'} (tz: ${courseTimeZone || 'browser'})`);
+    } catch (error) {
+        console.warn('[MasteryDashboard] Pacing panel failed:', error);
+        clearPacingPanel(slotEl);
+    }
+}
+
+/**
  * Render mastery data for a specific student.
  * Called directly for students/observers, and by teacherMasteryView after student selection.
  *
@@ -310,6 +360,9 @@ export async function renderMasteryDashboard() {
  * @param {HTMLElement} cardsEl - Cards container element (#pm-cards)
  */
 export async function renderStudentData(studentId, courseId, apiClient, statusEl, cardsEl) {
+    // Clear any pacing panel from a previously selected student
+    clearPacingPanel(document.getElementById('pm-pacing'));
+
     // Fetch outcome rollups and submissions in parallel for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
@@ -565,6 +618,9 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         `;
         bannerEl.style.display = 'block';
     }
+
+    // Course pacing panel — only when the teacher saved an enabled configuration
+    renderStudentPacing(rootEl, rollupScores, outcomeMap);
 
     // Hide loading status now that header is populated
     statusEl.style.display = 'none';
