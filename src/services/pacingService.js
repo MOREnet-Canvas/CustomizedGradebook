@@ -23,6 +23,9 @@ import { DEFAULT_MASTERY_THRESHOLD } from '../config.js';
 export const PACING_ATTRIBUTE = 'data-outcome-pacing';
 export const PACING_FORMAT_VERSION = 1;
 
+/** A not-yet-mastered required outcome due within this many days counts as "due soon". */
+export const DUE_SOON_DAYS = 7;
+
 /** Per-outcome evidence labels */
 export const EVIDENCE_STATUS = Object.freeze({
     NO_EVIDENCE: 'No Evidence',
@@ -212,7 +215,7 @@ export function pacingStatus(scale, score, today, threshold = DEFAULT_MASTERY_TH
  * @param {number} [params.threshold]
  * @returns {{
  *   total: number, mastered: number, dated: number, dueByToday: number,
- *   behind: number, dueToday: number, noEvidence: number, datesComplete: boolean,
+ *   behind: number, dueToday: number, dueSoon: number, noEvidence: number, datesComplete: boolean,
  *   overall: string|null,
  *   items: Array<{id: string, name: string, score: number|null, date: string, days: number|null, evidence: string, pacing: string}>
  * }}
@@ -248,6 +251,9 @@ export function computePacingSummary({ scales, scoresByOutcomeId, outcomeNames, 
     const dueByToday = dated.filter(i => daysUntil(i.date, today) <= 0).length;
     const behind = items.filter(i => i.pacing === PACING_STATUS.BEHIND).length;
     const dueToday = items.filter(i => i.pacing === PACING_STATUS.TARGET_TODAY).length;
+    const dueSoon = items.filter(i =>
+        i.pacing !== PACING_STATUS.MASTERED && i.days != null && i.days >= 0 && i.days <= DUE_SOON_DAYS
+    ).length;
     const noEvidence = items.filter(i => i.evidence === EVIDENCE_STATUS.NO_EVIDENCE).length;
     const datesComplete = total > 0 && dated.length === total;
 
@@ -258,7 +264,7 @@ export function computePacingSummary({ scales, scoresByOutcomeId, outcomeNames, 
             : PACING_STATUS.ON_PACE;
     }
 
-    return { total, mastered, dated: dated.length, dueByToday, behind, dueToday, noEvidence, datesComplete, overall, items };
+    return { total, mastered, dated: dated.length, dueByToday, behind, dueToday, dueSoon, noEvidence, datesComplete, overall, items };
 }
 
 /**
