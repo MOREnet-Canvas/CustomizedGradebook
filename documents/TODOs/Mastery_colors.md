@@ -237,3 +237,30 @@ Mastery Dashboard will:
 - Require **no hardcoded color logic**
 
 ---
+# Note — Pace colors are NOT rating colors (keep when consolidating)
+
+Course pacing (#110) colors the Mastery View **Pace** box and the per-outcome score bars of
+*required* outcomes by **pace**, not by rating level. Source of truth: `PACE_COLORS` in
+`src/masteryDashboard/pacingPanel.js` (rationale in its JSDoc). Do not replace these with the
+account proficiency scale. The card's left border stays rating-based, and so does the score
+bar for outcomes that aren't required.
+
+| Pace state | Color |
+|---|---|
+| Mastered | `#03893D` |
+| Past target, not mastered | `#c5221f` |
+| Due within 7 days (`DUE_SOON_DAYS`), not mastered | `#b45f06` |
+| More than 7 days out, not mastered ("on track") | `#4A7FB8` |
+| No target dates set (Pace box only) | `#6b7780` |
+
+Why light muted blue `#4A7FB8` for "on track":
+- Gray already means "no score yet" or disabled.
+- Purple means Exemplary / Beyond Target in Sedalia's scale.
+- Teal blurs with green.
+- A second amber reads as a warning.
+- Blue stays distinct from red, amber, and green under red-green color blindness.
+- The muted shade avoids Sedalia's own rating blues (`#485BB0`, `#1979AE`, `#1199DA`).
+- It's lighter than red and amber on purpose: "in 14 days" should look calmer than "past". `#3B6EA5` was tried first and looked as heavy as red. Don't go lighter than `#4B84C0` (3.27:1). `#4F8AC9` is 3.02:1, and `#5B93CF` fails.
+
+All fills are ≥ 3:1 against the `#e8ebee` track (WCAG 1.4.11), measured: blue 3.50, green 3.77, amber 3.83, red 4.84. Color is never the only signal:
+each bar has a text line with the status.

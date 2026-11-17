@@ -23,6 +23,11 @@ import { getMasteryColor } from '../ui/masteryColors.js';
 import { resolveOutcomeName } from '../masteryOutlook/outcomeTypes.js';
 import { injectStyles } from '../ui/styles.js';
 import { MASTERY_DASHBOARD_CSS } from './masteryDashboardStyles.js';
+import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml, buildOutcomeProgressBarHtml, paceBarColor } from './pacingPanel.js';
+import { parsePacing, todayInTimeZone } from '../services/pacingService.js';
+
+/** Course IANA time zone (from the course API), used for pacing target dates. */
+let courseTimeZone = null;
 
 /**
  * Rating scale for calculating letter grades
@@ -109,6 +114,7 @@ function ensureHost(courseName = "Mastery View") {
             <div id="pm-stat-mastered">—</div>
             <div id="pm-stat-mastered-label"></div>
           </div>
+          <div id="pm-stat-pace" class="pm-stat-box" style="display:none;"></div>
         </div>
         <div id="pm-comment-panel-container"></div>
         <div id="pm-missing-banner"></div>
@@ -128,6 +134,8 @@ function ensureHost(courseName = "Mastery View") {
 async function fetchCourseName(courseId, apiClient) {
     try {
         const course = await apiClient.get(`/api/v1/courses/${courseId}`, {}, 'fetchCourseName');
+        // Capture the course time zone for pacing target dates (null → browser zone)
+        courseTimeZone = course.time_zone || null;
         return course.name || "Mastery View";
     } catch (error) {
         debugLog(`Error fetching course name: ${error.message}`);
@@ -305,6 +313,55 @@ export async function renderMasteryDashboard() {
 }
 
 /**
+ * Render course pacing from rollup data already fetched: the Pace stat box,
+ * plus a per-outcome lookup the card loop uses for its "Target … · …" line.
+ * Hidden (empty map) when the root has no enabled data-outcome-pacing.
+ * Failures are logged and never block the rest of the dashboard.
+ *
+ * @param {HTMLElement|null} rootEl - #mastery-dashboard-root
+ * @param {Array} rollupScores - rollups[0].scores
+ * @param {Object} outcomeMap - outcome ID → linked outcome
+ * @param {Object} [customNames] - teacher display names (data-outcome-names)
+ * @returns {Map<string, Object>} outcome ID → pacing summary item (required outcomes only)
+ */
+function renderStudentPacing(rootEl, rollupScores, outcomeMap, customNames = {}) {
+    const boxEl = document.getElementById('pm-stat-pace');
+    try {
+        const pacing = parsePacing(rootEl);
+        if (!pacing) {
+            clearPaceStat(boxEl);
+            return new Map();
+        }
+
+        const scoresByOutcomeId = new Map(
+            rollupScores.map(s => [String(s.links.outcome), s.score ?? null])
+        );
+        const outcomeNames = new Map();
+        for (const outcome of Object.values(outcomeMap)) {
+            const title = outcome.title || '';
+            if (title === AVG_OUTCOME_NAME) continue;
+            if (EXCLUDED_OUTCOME_KEYWORDS.some(kw => title.includes(kw))) continue;
+            outcomeNames.set(String(outcome.id), resolveOutcomeName(
+                { id: outcome.id, title: outcome.display_name || title || `Outcome ${outcome.id}` }, customNames));
+        }
+
+        const summary = buildPacingModel({
+            pacing,
+            scoresByOutcomeId,
+            outcomeNames,
+            today: todayInTimeZone(courseTimeZone)
+        });
+        renderPaceStat(boxEl, summary);
+        debugLog(`Pacing ${summary ? 'rendered' : 'skipped'} (tz: ${courseTimeZone || 'browser'})`);
+        return new Map((summary?.items ?? []).map(item => [item.id, item]));
+    } catch (error) {
+        console.warn('[MasteryDashboard] Pacing failed:', error);
+        clearPaceStat(boxEl);
+        return new Map();
+    }
+}
+
+/**
  * Render mastery data for a specific student.
  * Called directly for students/observers, and by teacherMasteryView after student selection.
  *
@@ -315,6 +372,9 @@ export async function renderMasteryDashboard() {
  * @param {HTMLElement} cardsEl - Cards container element (#pm-cards)
  */
 export async function renderStudentData(studentId, courseId, apiClient, statusEl, cardsEl) {
+    // Clear any pacing panel from a previously selected student
+    clearPaceStat(document.getElementById('pm-stat-pace'));
+
     // Fetch outcome rollups and submissions in parallel for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
 
@@ -574,6 +634,9 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         bannerEl.style.display = 'block';
     }
 
+    // Course pacing — only when the teacher saved an enabled configuration
+    const paceByOutcome = renderStudentPacing(rootEl, rollupScores, outcomeMap, customOutcomeNames);
+
     // Hide loading status now that header is populated
     statusEl.style.display = 'none';
     statusEl.textContent = '';
@@ -596,6 +659,12 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // Teacher's custom name, then Canvas display_name, then title
         const outcomeName = resolveOutcomeName(
             { id: oid, title: outcome.display_name || outcome.title }, customOutcomeNames);
+
+        // Pacing line for required outcomes ("Target Sep 1, 2026 · Behind pace")
+        const paceItem = paceByOutcome.get(oid);
+        const paceLineHtml = paceItem ? buildOutcomePaceLineHtml(paceItem) : '';
+        // Score bar: pace color for required outcomes (see PACE_COLORS), else score color
+        const barColor = paceBarColor(paceItem) ?? masteryColor;
 
         // AVG_OUTCOME is shown in the header stat box — skip it here
         if (outcome.title === AVG_OUTCOME_NAME) continue;
@@ -629,6 +698,11 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                         ${letterGrade ? `<div class="pm-outcome-grade"><span class="pm-outcome-grade-bullet" style="color:${masteryColor};">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
                         ${latestDate ? `<div class="pm-outcome-date">${latestDate}</div>` : ""}
                     </div>
+                </div>
+                <!-- Full-width row so every card's bar (and mastery tick) is the same length -->
+                <div class="pm-outcome-progress-row">
+                    ${buildOutcomeProgressBarHtml(rollupScore.score, barColor)}
+                    ${paceLineHtml}
                 </div>
                 <div class="pm-assignment-details" style="display:none;">
                     <div class="pm-details-title">Loading assignments...</div>

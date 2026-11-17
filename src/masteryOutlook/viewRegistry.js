@@ -17,6 +17,8 @@
 
 import { mountHeatmapView } from './heatmapView.js';
 import { mountOutcomeSyncView, initOutcomeSyncContainer } from './outcomeSyncView.js';
+import { mountPacingSettingsView } from './pacingSettingsView.js';
+import { ENABLE_COURSE_PACING } from '../config.js';
 
 /**
  * @typedef {Object} ViewContext
@@ -59,6 +61,13 @@ export const VIEWS = [
         hasSidebar: false,
         mount: mountHeatmapView,
     },
+    // Course pacing editor — dev + pilot builds by default (ENABLE_COURSE_PACING)
+    ...(ENABLE_COURSE_PACING ? [{
+        id: 'pacing',
+        label: '📅 Pacing',
+        hasSidebar: false,
+        mount: mountPacingSettingsView,
+    }] : []),
 ];
 
 /**

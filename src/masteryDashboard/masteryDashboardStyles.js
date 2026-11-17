@@ -73,6 +73,7 @@ export const MASTERY_DASHBOARD_CSS = `
 
 /* Assignment details (lazy-loaded; initial display:none stays inline so the
    toggle's 'details.style.display === none' check keeps working) */
+.pm-outcome-progress-row { margin-left: 20px; } /* aligns with the outcome name (arrow + gap) */
 .pm-assignment-details { margin-top: 12px; padding-top: 12px; border-top: 1px solid #c8c8c8; margin-left: 20px; }
 .pm-details-title   { font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; color: #333; line-height: 1.5; }
 .pm-assign-row      { padding: 8px 0; border-bottom: 1px solid #c8c8c8; }
