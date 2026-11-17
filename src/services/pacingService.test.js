@@ -127,6 +127,7 @@ describe('computePacingSummary', () => {
         expect(s.datesComplete).toBe(true);
         expect(s.overall).toBe(PACING_STATUS.BEHIND);
         expect(s.items.map(i => i.id)).toEqual(['1', '2', '3']);
+        expect(s.items.map(i => i.days)).toEqual([-16, -7, 14]);
     });
 
     test('target today and on pace', () => {

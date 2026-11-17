@@ -5,7 +5,10 @@
  * Pacing folds into the existing dashboard instead of adding a separate card:
  *   - a "Pace" stat box next to Score and Mastered (status pill, one bar where
  *     the fill is mastered % and a tick marks expected-by-today %, one detail line)
- *   - one line on each required outcome card: "Target Sep 1 · Behind pace"
+ *   - one line on each required outcome card: "Target Sep 1, 2026 · 77 days past"
+ *
+ * Also exports buildOutcomeProgressBarHtml(), the score bar shown on every outcome
+ * card (all courses, pacing or not). It uses inline styles so it needs no stylesheet.
  *
  * Shared by the desktop bundle and the mobile bundle (via masteryDashboardViewer.js),
  * so it must not touch the Canvas `ENV` global.
@@ -15,7 +18,7 @@
  * outcome still present in the course.
  */
 
-import { DEFAULT_MASTERY_THRESHOLD } from '../config.js';
+import { DEFAULT_MASTERY_THRESHOLD, DEFAULT_MAX_POINTS } from '../config.js';
 import { injectStyles } from '../ui/styles.js';
 import {
     computePacingSummary,
@@ -40,7 +43,7 @@ export const PACING_CSS = `
 .pm-pace-tick { position:absolute; top:-4px; width:2px; height:18px; background:#273540; border-radius:1px; transform:translateX(-1px); }
 .pm-pace-detail { font-family:${FONT}; font-size:0.78rem; color:#555; line-height:1.4; -webkit-font-smoothing:antialiased; }
 .pm-pace-line { font-family:${FONT}; font-size:0.8rem; color:#555; margin-top:2px; line-height:1.4; -webkit-font-smoothing:antialiased; }
-.pm-pace-line--mastered .pm-pace-status { color:#03893D; font-weight:600; }
+.pm-pace-line--mastered .pm-pace-status { color:#03793a; font-weight:600; }
 .pm-pace-line--behind .pm-pace-status { color:#a22b2b; font-weight:700; }
 .pm-pace-line--today .pm-pace-status { color:#7a4a00; font-weight:700; }
 `;
@@ -126,17 +129,65 @@ export function buildPaceStatHtml(summary) {
 }
 
 /**
- * One-line pacing note for an outcome card, e.g. "Target Sep 1, 2026 · Behind pace".
- * @param {{date: string, pacing: string}} item - summary item
+ * Relative due text for a not-yet-mastered outcome: "77 days past", "Due today", "in 12 days".
+ * @param {number} days - daysUntil(target, today)
+ * @returns {string}
+ */
+function relativeDueText(days) {
+    if (days === 0) return 'Due today';
+    if (days < 0) return `${-days} day${days === -1 ? '' : 's'} past`;
+    return `in ${days} day${days === 1 ? '' : 's'}`;
+}
+
+/**
+ * One-line pacing note for a required outcome card.
+ *   mastered:      "Expected by Oct 1, 2026 · Mastered"
+ *   behind:        "Target Sep 1, 2026 · 77 days past"   (red)
+ *   due today:     "Target Nov 17, 2026 · Due today"     (amber)
+ *   upcoming:      "Target Dec 4, 2026 · in 17 days"
+ *   no date:       "No target date"
+ * @param {{date: string, days: number|null, pacing: string}} item - summary item
  * @returns {string} HTML
  */
 export function buildOutcomePaceLineHtml(item) {
-    const target = item.date ? `Target ${formatTargetDate(item.date)}` : 'No target date';
-    const status = item.pacing === PACING_STATUS.UPCOMING || item.pacing === PACING_STATUS.NO_TARGET_DATE
-        ? ''
-        : ` · <span class="pm-pace-status">${escapeHtml(item.pacing)}</span>`;
+    if (!item.date) {
+        const status = item.pacing === PACING_STATUS.MASTERED ? ' · <span class="pm-pace-status">Mastered</span>' : '';
+        const mod = item.pacing === PACING_STATUS.MASTERED ? ' pm-pace-line--mastered' : '';
+        return `<div class="pm-pace-line${mod}">No target date${status}</div>`;
+    }
+
+    const date = escapeHtml(formatTargetDate(item.date));
+    if (item.pacing === PACING_STATUS.MASTERED) {
+        return `<div class="pm-pace-line pm-pace-line--mastered">Expected by ${date} · <span class="pm-pace-status">Mastered</span></div>`;
+    }
+
     const mod = LINE_CLASS[item.pacing] ? ` pm-pace-line--${LINE_CLASS[item.pacing]}` : '';
-    return `<div class="pm-pace-line${mod}">${escapeHtml(target)}${status}</div>`;
+    const due = item.days == null ? '' : ` · <span class="pm-pace-status">${relativeDueText(item.days)}</span>`;
+    return `<div class="pm-pace-line${mod}">Target ${date}${due}</div>`;
+}
+
+/**
+ * Score bar for an outcome card: fill = score / max points in the card's mastery
+ * color, with a tick at the mastery threshold. Inline-styled (works without the
+ * pacing stylesheet), so it can render on every course.
+ *
+ * @param {number|null} score - rollup score (null = no evidence yet)
+ * @param {string} color - fill color (the card's mastery color)
+ * @param {{maxPoints?: number, threshold?: number}} [opts]
+ * @returns {string} HTML
+ */
+export function buildOutcomeProgressBarHtml(score, color, { maxPoints = DEFAULT_MAX_POINTS, threshold = DEFAULT_MASTERY_THRESHOLD } = {}) {
+    const max = maxPoints > 0 ? maxPoints : 4;
+    const value = score == null || !Number.isFinite(Number(score)) ? null : Number(score);
+    const fillPct = value == null ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
+    const tickPct = Math.max(0, Math.min(100, (threshold / max) * 100));
+    const label = value == null
+        ? `No score yet. Mastery is ${threshold} out of ${max}.`
+        : `Score ${value} out of ${max}. Mastery is ${threshold}.`;
+    return `<div class="pm-outcome-progress" role="img" aria-label="${escapeHtml(label)}" style="position:relative; height:8px; background:#e8ebee; border-radius:999px; margin:6px 0 2px; max-width:420px;">` +
+        `<div style="width:${fillPct}%; height:100%; background:${escapeHtml(color)}; border-radius:999px;"></div>` +
+        `<div style="position:absolute; top:-3px; bottom:-3px; left:${tickPct}%; width:2px; background:#2d3b45; transform:translateX(-1px);"></div>` +
+        `</div>`;
 }
 
 /**

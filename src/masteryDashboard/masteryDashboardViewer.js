@@ -23,7 +23,7 @@ import { getMasteryColor } from '../ui/masteryColors.js';
 import { resolveOutcomeName } from '../masteryOutlook/outcomeTypes.js';
 import { injectStyles } from '../ui/styles.js';
 import { MASTERY_DASHBOARD_CSS } from './masteryDashboardStyles.js';
-import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml } from './pacingPanel.js';
+import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml, buildOutcomeProgressBarHtml } from './pacingPanel.js';
 import { parsePacing, todayInTimeZone } from '../services/pacingService.js';
 
 /** Course IANA time zone (from the course API), used for pacing target dates. */
@@ -688,6 +688,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                     <span class="pm-expand-arrow">▶</span>
                     <div class="pm-outcome-main">
                         <div class="pm-outcome-name">${escapeHtml(outcomeName)}</div>
+                        ${buildOutcomeProgressBarHtml(rollupScore.score, masteryColor)}
                         ${paceLineHtml}
                     </div>
                     <div class="pm-outcome-right">
