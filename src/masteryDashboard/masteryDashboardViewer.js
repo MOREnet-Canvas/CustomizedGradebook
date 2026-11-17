@@ -690,8 +690,6 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                     <span class="pm-expand-arrow">▶</span>
                     <div class="pm-outcome-main">
                         <div class="pm-outcome-name">${escapeHtml(outcomeName)}</div>
-                        ${buildOutcomeProgressBarHtml(rollupScore.score, barColor)}
-                        ${paceLineHtml}
                     </div>
                     <div class="pm-outcome-right">
                         <div class="pm-outcome-score" style="color:${masteryFontColor};">
@@ -700,6 +698,11 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                         ${letterGrade ? `<div class="pm-outcome-grade"><span class="pm-outcome-grade-bullet" style="color:${masteryColor};">●</span> ${escapeHtml(letterGrade)}</div>` : ""}
                         ${latestDate ? `<div class="pm-outcome-date">${latestDate}</div>` : ""}
                     </div>
+                </div>
+                <!-- Full-width row so every card's bar (and mastery tick) is the same length -->
+                <div class="pm-outcome-progress-row">
+                    ${buildOutcomeProgressBarHtml(rollupScore.score, barColor)}
+                    ${paceLineHtml}
                 </div>
                 <div class="pm-assignment-details" style="display:none;">
                     <div class="pm-details-title">Loading assignments...</div>
