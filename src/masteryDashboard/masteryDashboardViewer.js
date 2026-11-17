@@ -23,7 +23,7 @@ import { getMasteryColor } from '../ui/masteryColors.js';
 import { resolveOutcomeName } from '../masteryOutlook/outcomeTypes.js';
 import { injectStyles } from '../ui/styles.js';
 import { MASTERY_DASHBOARD_CSS } from './masteryDashboardStyles.js';
-import { renderPacingPanel, clearPacingPanel } from './pacingPanel.js';
+import { buildPacingModel, renderPaceStat, clearPaceStat, buildOutcomePaceLineHtml } from './pacingPanel.js';
 import { parsePacing, todayInTimeZone } from '../services/pacingService.js';
 
 /** Course IANA time zone (from the course API), used for pacing target dates. */
@@ -114,10 +114,10 @@ function ensureHost(courseName = "Mastery View") {
             <div id="pm-stat-mastered">—</div>
             <div id="pm-stat-mastered-label"></div>
           </div>
+          <div id="pm-stat-pace" class="pm-stat-box" style="display:none;"></div>
         </div>
         <div id="pm-comment-panel-container"></div>
         <div id="pm-missing-banner"></div>
-        <div id="pm-pacing" style="display:none;"></div>
         <div id="pm-status">Loading…</div>
         <div id="pm-cards"></div>
       </div>
@@ -313,22 +313,24 @@ export async function renderMasteryDashboard() {
 }
 
 /**
- * Render the course pacing panel from rollup data already fetched.
- * No-op (slot stays hidden) when the root has no enabled data-outcome-pacing.
+ * Render course pacing from rollup data already fetched: the Pace stat box,
+ * plus a per-outcome lookup the card loop uses for its "Target … · …" line.
+ * Hidden (empty map) when the root has no enabled data-outcome-pacing.
  * Failures are logged and never block the rest of the dashboard.
  *
  * @param {HTMLElement|null} rootEl - #mastery-dashboard-root
  * @param {Array} rollupScores - rollups[0].scores
  * @param {Object} outcomeMap - outcome ID → linked outcome
  * @param {Object} [customNames] - teacher display names (data-outcome-names)
+ * @returns {Map<string, Object>} outcome ID → pacing summary item (required outcomes only)
  */
 function renderStudentPacing(rootEl, rollupScores, outcomeMap, customNames = {}) {
-    const slotEl = document.getElementById('pm-pacing');
+    const boxEl = document.getElementById('pm-stat-pace');
     try {
         const pacing = parsePacing(rootEl);
         if (!pacing) {
-            clearPacingPanel(slotEl);
-            return;
+            clearPaceStat(boxEl);
+            return new Map();
         }
 
         const scoresByOutcomeId = new Map(
@@ -343,16 +345,19 @@ function renderStudentPacing(rootEl, rollupScores, outcomeMap, customNames = {})
                 { id: outcome.id, title: outcome.display_name || title || `Outcome ${outcome.id}` }, customNames));
         }
 
-        const rendered = renderPacingPanel(slotEl, {
+        const summary = buildPacingModel({
             pacing,
             scoresByOutcomeId,
             outcomeNames,
             today: todayInTimeZone(courseTimeZone)
         });
-        debugLog(`Pacing panel ${rendered ? 'rendered' : 'skipped'} (tz: ${courseTimeZone || 'browser'})`);
+        renderPaceStat(boxEl, summary);
+        debugLog(`Pacing ${summary ? 'rendered' : 'skipped'} (tz: ${courseTimeZone || 'browser'})`);
+        return new Map((summary?.items ?? []).map(item => [item.id, item]));
     } catch (error) {
-        console.warn('[MasteryDashboard] Pacing panel failed:', error);
-        clearPacingPanel(slotEl);
+        console.warn('[MasteryDashboard] Pacing failed:', error);
+        clearPaceStat(boxEl);
+        return new Map();
     }
 }
 
@@ -368,7 +373,7 @@ function renderStudentPacing(rootEl, rollupScores, outcomeMap, customNames = {})
  */
 export async function renderStudentData(studentId, courseId, apiClient, statusEl, cardsEl) {
     // Clear any pacing panel from a previously selected student
-    clearPacingPanel(document.getElementById('pm-pacing'));
+    clearPaceStat(document.getElementById('pm-stat-pace'));
 
     // Fetch outcome rollups and submissions in parallel for the student
     debugStatus(statusEl, `Fetching mastery data for student ${studentId}...`);
@@ -629,8 +634,8 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         bannerEl.style.display = 'block';
     }
 
-    // Course pacing panel — only when the teacher saved an enabled configuration
-    renderStudentPacing(rootEl, rollupScores, outcomeMap, customOutcomeNames);
+    // Course pacing — only when the teacher saved an enabled configuration
+    const paceByOutcome = renderStudentPacing(rootEl, rollupScores, outcomeMap, customOutcomeNames);
 
     // Hide loading status now that header is populated
     statusEl.style.display = 'none';
@@ -654,6 +659,10 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
         // Teacher's custom name, then Canvas display_name, then title
         const outcomeName = resolveOutcomeName(
             { id: oid, title: outcome.display_name || outcome.title }, customOutcomeNames);
+
+        // Pacing line for required outcomes ("Target Sep 1, 2026 · Behind pace")
+        const paceItem = paceByOutcome.get(oid);
+        const paceLineHtml = paceItem ? buildOutcomePaceLineHtml(paceItem) : '';
 
         // AVG_OUTCOME is shown in the header stat box — skip it here
         if (outcome.title === AVG_OUTCOME_NAME) continue;
@@ -679,6 +688,7 @@ export async function renderStudentData(studentId, courseId, apiClient, statusEl
                     <span class="pm-expand-arrow">▶</span>
                     <div class="pm-outcome-main">
                         <div class="pm-outcome-name">${escapeHtml(outcomeName)}</div>
+                        ${paceLineHtml}
                     </div>
                     <div class="pm-outcome-right">
                         <div class="pm-outcome-score" style="color:${masteryFontColor};">
