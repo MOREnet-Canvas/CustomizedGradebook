@@ -40,6 +40,10 @@ export const PACING_CSS = `
 .pm-pace-pill--behind { background:#fce5e5; color:#a22b2b; }
 .pm-pace-bar { position:relative; height:10px; background:#dfe4e8; border-radius:999px; margin:14px 0 8px; }
 .pm-pace-fill { height:100%; background:#03893D; border-radius:999px; }
+.pm-pace-fill--onpace { background:#03893D; }
+.pm-pace-fill--soon { background:#b45f06; }
+.pm-pace-fill--behind { background:#c5221f; }
+.pm-pace-fill--none { background:#6b7780; }
 .pm-pace-tick { position:absolute; top:-4px; width:2px; height:18px; background:#273540; border-radius:1px; transform:translateX(-1px); }
 .pm-pace-detail { font-family:${FONT}; font-size:0.78rem; color:#555; line-height:1.4; -webkit-font-smoothing:antialiased; }
 .pm-pace-line { font-family:${FONT}; font-size:0.8rem; color:#555; margin-top:2px; line-height:1.4; -webkit-font-smoothing:antialiased; }
@@ -88,6 +92,20 @@ export function buildPacingModel({ pacing, scoresByOutcomeId, outcomeNames, toda
 }
 
 /**
+ * Bar tone for the Pace box: behind (any required outcome past target and not
+ * mastered) → soon (one due within DUE_SOON_DAYS) → onpace → none (no dates set).
+ * Independent of the pill, so the bar still warns when some dates are missing.
+ * @param {ReturnType<typeof computePacingSummary>} summary
+ * @returns {'behind'|'soon'|'onpace'|'none'}
+ */
+export function paceTone(summary) {
+    if (summary.behind > 0) return 'behind';
+    if (summary.dueSoon > 0) return 'soon';
+    if (summary.dated > 0) return 'onpace';
+    return 'none';
+}
+
+/**
  * Inner HTML for the "Pace" stat box.
  * @param {ReturnType<typeof computePacingSummary>} summary
  * @returns {string}
@@ -122,7 +140,7 @@ export function buildPaceStatHtml(summary) {
         ${pill}
       </div>
       <div class="pm-pace-bar" role="img" aria-label="${escapeHtml(label)}">
-        <div class="pm-pace-fill" style="width:${masteredPct}%;"></div>
+        <div class="pm-pace-fill pm-pace-fill--${paceTone(summary)}" style="width:${masteredPct}%;"></div>
         ${tick}
       </div>
       <div class="pm-pace-detail">${escapeHtml(detail)}</div>`;

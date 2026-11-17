@@ -123,6 +123,7 @@ describe('computePacingSummary', () => {
         expect(s.dated).toBe(3);
         expect(s.dueByToday).toBe(2);
         expect(s.behind).toBe(1);
+        expect(s.dueSoon).toBe(0);
         expect(s.noEvidence).toBe(1);
         expect(s.datesComplete).toBe(true);
         expect(s.overall).toBe(PACING_STATUS.BEHIND);

@@ -8,6 +8,7 @@ import {
     clearPaceStat,
     buildOutcomePaceLineHtml,
     buildOutcomeProgressBarHtml,
+    paceTone,
     PACING_STYLE_ID
 } from './pacingPanel.js';
 
@@ -83,6 +84,33 @@ describe('Pace stat box', () => {
         clearPaceStat(box);
         expect(box.innerHTML).toBe('');
         expect(box.style.display).toBe('none');
+    });
+});
+
+describe('pace bar color', () => {
+    const tone = scales => paceTone(model(scales));
+
+    test('red when any required outcome is past target and not mastered', () => {
+        expect(tone([{ id: '2', date: '2026-11-10', included: true }, { id: '3', date: '', included: true }])).toBe('behind');
+    });
+
+    test('amber when a not-mastered outcome is due within 7 days (today counts)', () => {
+        expect(tone([{ id: '2', date: '2026-11-17', included: true }])).toBe('soon');
+        expect(tone([{ id: '2', date: '2026-11-24', included: true }])).toBe('soon');
+        expect(tone([{ id: '2', date: '2026-11-25', included: true }])).toBe('onpace');
+    });
+
+    test('mastered outcomes due soon do not turn it amber', () => {
+        expect(tone([{ id: '1', date: '2026-11-20', included: true }])).toBe('onpace');
+    });
+
+    test('gray when no target dates are set', () => {
+        expect(tone([{ id: '2', date: '', included: true }])).toBe('none');
+    });
+
+    test('the fill carries the tone class', () => {
+        renderPaceStat(box, model([{ id: '2', date: '2026-11-10', included: true }]));
+        expect(box.querySelector('.pm-pace-fill').classList.contains('pm-pace-fill--behind')).toBe(true);
     });
 });
 
