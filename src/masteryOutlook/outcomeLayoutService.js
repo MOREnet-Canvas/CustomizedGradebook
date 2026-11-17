@@ -6,6 +6,7 @@
  * so Mastery Outlook (teachers) and the Mastery Dashboard (students) share it:
  *   data-outcome-order='["599","598"]'      regular outcome IDs, page order
  *   data-outcome-names="{&quot;598&quot;:&quot;Reading&quot;}"   { outcomeId: display name }
+ *   data-outcome-pacing="{&quot;v&quot;:1,…}"   course pacing (see services/pacingService.js)
  *
  * Both the outcome-list drag-and-drop and the Current Score column headers save
  * through saveOutcomeLayout(), so the two views always agree.
@@ -13,6 +14,7 @@
 
 import { logger } from '../utils/logger.js';
 import { findMasteryDashboardPageUrl, getPage, updatePage } from '../services/pageService.js';
+import { parsePacing, serializePacing } from '../services/pacingService.js';
 
 const ROOT_TAG_RE = /<div\s+id=["']mastery-dashboard-root["']/;
 
@@ -71,17 +73,31 @@ export function parseOutcomeLayout(body) {
 }
 
 /**
+ * Read the course pacing configuration from a Mastery Dashboard page body.
+ *
+ * @param {string} body - wiki page HTML
+ * @returns {{enabled: boolean, scales: Array<{id: string, date: string, included: boolean}>}|null}
+ *   null when the page has no (valid) pacing configuration
+ */
+export function parsePacingLayout(body) {
+    if (!body) return null;
+    const raw = readAttrJson(body, 'outcome-pacing');
+    return raw ? parsePacing(JSON.stringify(raw)) : null;
+}
+
+/**
  * Return `body` with the given layout parts written onto #mastery-dashboard-root.
  * Parts left undefined are untouched.
  *
  * @param {string} body
- * @param {{ order?: string[], names?: Object<string,string> }} layout
+ * @param {{ order?: string[], names?: Object<string,string>, pacing?: Object }} layout
  * @returns {string}
  */
-export function applyOutcomeLayout(body, { order, names } = {}) {
+export function applyOutcomeLayout(body, { order, names, pacing } = {}) {
     let out = body;
     if (order !== undefined) out = writeAttrJson(out, 'outcome-order', order.map(String));
     if (names !== undefined) out = writeAttrJson(out, 'outcome-names', names);
+    if (pacing !== undefined) out = writeAttrJson(out, 'outcome-pacing', JSON.parse(serializePacing(pacing)));
     return out;
 }
 
@@ -89,12 +105,12 @@ export function applyOutcomeLayout(body, { order, names } = {}) {
 let _saveChain = Promise.resolve();
 
 /**
- * Save the outcome order and/or custom names to the Mastery Dashboard page.
+ * Save the outcome order, custom names, and/or course pacing to the Mastery Dashboard page.
  * Never throws; resolves false when the page is missing or the save failed.
  *
  * @param {string|number} courseId
  * @param {Object} apiClient
- * @param {{ order?: string[], names?: Object<string,string> }} layout
+ * @param {{ order?: string[], names?: Object<string,string>, pacing?: Object }} layout
  * @returns {Promise<boolean>}
  */
 export function saveOutcomeLayout(courseId, apiClient, layout) {

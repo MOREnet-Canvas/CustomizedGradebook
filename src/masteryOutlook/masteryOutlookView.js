@@ -20,7 +20,7 @@ import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
 import { fetchCourseStudents } from '../services/enrollmentService.js';
 import { findMasteryDashboardPageUrl, getPage } from '../services/pageService.js';
-import { parseOutcomeLayout } from './outcomeLayoutService.js';
+import { parseOutcomeLayout, parsePacingLayout } from './outcomeLayoutService.js';
 import { VIEWS, getView } from './viewRegistry.js';
 import { mountCourseResetCard } from './courseResetView.js';
 import {
@@ -702,6 +702,9 @@ async function enrichCache(cache, courseId, apiClient) {
         ]);
 
         const dashboardPage = pageUrl ? await getPage(courseId, pageUrl, apiClient) : null;
+        // In-memory only: lets the Pacing tab explain when there's no Mastery View page to save to
+        cache.meta.hasMasteryViewPage = !!dashboardPage?.body;
+        cache.meta.customOutcomePacing = null;
 
         // Map student names
         const studentMap = new Map();
@@ -723,6 +726,7 @@ async function enrichCache(cache, courseId, apiClient) {
             const { order, names } = parseOutcomeLayout(dashboardPage.body);
             if (order) cache.meta.customOutcomeOrder = order;
             cache.meta.customOutcomeNames = names;
+            cache.meta.customOutcomePacing = parsePacingLayout(dashboardPage.body);
         }
     } catch (e) {
         logger.warn('[MasteryOutlook] Failed to enrich cache', e);

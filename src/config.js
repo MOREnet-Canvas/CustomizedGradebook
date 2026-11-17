@@ -163,6 +163,12 @@ const defaultRatings = [
 ];
 export const OUTCOME_AND_RUBRIC_RATINGS = window.CG_CONFIG?.OUTCOME_AND_RUBRIC_RATINGS ?? defaultRatings;
 
+// Course pacing editor (Mastery Outlook "Pacing" tab). Defaults to on for the
+// dev and pilot builds only; a loader can force it with ENABLE_COURSE_PACING.
+// The student panel on Mastery View is data-driven and needs no flag.
+export const ENABLE_COURSE_PACING = window.CG_CONFIG?.ENABLE_COURSE_PACING
+    ?? (ENV_DEV || ENV_NAME === 'pilot');
+
 // Learning Mastery Gradebook colors (on by default; a district can turn it off
 // with ENABLE_LMGB_MASTERY_COLORS: false or choose another scheme)
 // LMGB_MASTERY_SCHEME: key of an opt-in palette in src/ui/masteryColors.js
