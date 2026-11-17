@@ -9,6 +9,8 @@ import {
     buildOutcomePaceLineHtml,
     buildOutcomeProgressBarHtml,
     paceTone,
+    paceBarColor,
+    PACE_COLORS,
     PACING_STYLE_ID
 } from './pacingPanel.js';
 
@@ -111,6 +113,22 @@ describe('pace bar color', () => {
     test('the fill carries the tone class', () => {
         renderPaceStat(box, model([{ id: '2', date: '2026-11-10', included: true }]));
         expect(box.querySelector('.pm-pace-fill').classList.contains('pm-pace-fill--behind')).toBe(true);
+    });
+});
+
+describe('outcome score bar pace color', () => {
+    test('mastered green, behind red, due within 7 days amber, later blue', () => {
+        expect(paceBarColor({ pacing: 'Mastered', days: -40 })).toBe(PACE_COLORS.mastered);
+        expect(paceBarColor({ pacing: 'Behind pace', days: -1 })).toBe(PACE_COLORS.behind);
+        expect(paceBarColor({ pacing: 'Due today', days: 0 })).toBe(PACE_COLORS.soon);
+        expect(paceBarColor({ pacing: 'Upcoming', days: 7 })).toBe(PACE_COLORS.soon);
+        expect(paceBarColor({ pacing: 'Upcoming', days: 8 })).toBe(PACE_COLORS.ontrack);
+        expect(PACE_COLORS.ontrack).toBe('#3B6EA5');
+    });
+
+    test('no target date or not required → null (keep the score color)', () => {
+        expect(paceBarColor({ pacing: 'No target date', days: null })).toBeNull();
+        expect(paceBarColor(undefined)).toBeNull();
     });
 });
 
