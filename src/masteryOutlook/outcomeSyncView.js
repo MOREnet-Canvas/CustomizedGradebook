@@ -28,6 +28,7 @@ import { fetchOutcomeNames, fetchOutcomeRollups } from './masteryOutlookDataServ
 import { writeMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { saveOutcomeLayout } from './outcomeLayoutService.js';
 import { notifyOutcomeLayout } from './masteryOutlookState.js';
+import { visibleStudents, displayClassStats } from './sectionFilter.js';
 import {
     isCurrentScoreOutcome, isSpecialOutcome, isRegularOutcome, orderOutcomesForPage
 } from './outcomeTypes.js';
@@ -45,7 +46,8 @@ export { isCurrentScoreOutcome, isRegularOutcome };
  * @returns {Object} classStats
  */
 export function computeCurrentScoreClassStats(cache, threshold, currentScoreOutcomeId) {
-    const studentPLAvgs = cache.students
+    const students = visibleStudents(cache);
+    const studentPLAvgs = students
         .map(student => student.outcomes?.find(o => String(o.outcomeId) === String(currentScoreOutcomeId))?.canvasScore)
         .filter(v => v !== null && v !== undefined);
 
@@ -56,7 +58,7 @@ export function computeCurrentScoreClassStats(cache, threshold, currentScoreOutc
             belowThresholdCount: 0,
             computedThreshold: threshold,
             avgSlope: null,
-            neCount: cache.students.length
+            neCount: students.length
         };
     }
 
@@ -77,7 +79,7 @@ export function computeCurrentScoreClassStats(cache, threshold, currentScoreOutc
         belowThresholdCount,
         computedThreshold: threshold,
         avgSlope: null,  // Not meaningful for Current Score
-        neCount: cache.students.length - studentPLAvgs.length
+        neCount: students.length - studentPLAvgs.length
     };
 }
 
@@ -130,7 +132,7 @@ function renderCourseSyncStrip(cache) {
         const oId = String(o.id);
         let needsCount = 0, overrideCount = 0, activeCount = 0;
 
-        for (const student of cache.students || []) {
+        for (const student of visibleStudents(cache)) {
             const od = student.outcomes?.find(s => String(s.outcomeId) === oId);
             if (!od) continue;
 
@@ -297,7 +299,7 @@ export function buildCrossOutcomeExceptionsView(cache, { showOverrides = true, s
     const outcomeById  = {};
     (cache.outcomes || []).forEach(o => { outcomeById[String(o.id)] = o; });
     const studentById  = {};
-    (cache.students || []).forEach(s => { studentById[String(s.id)] = s; });
+    visibleStudents(cache).forEach(s => { studentById[String(s.id)] = s; });
 
     const rows = [];
 
@@ -453,7 +455,7 @@ export function mountOutcomeSyncView(shell, cache, ctx) {
             const isCurrentScoreRow = isCurrentScoreOutcome(outcome.title);
             const displayStats      = isCurrentScoreRow
                 ? computeCurrentScoreClassStats(cache, threshold, outcome.id)
-                : outcome.classStats;
+                : displayClassStats(outcome, cache);
 
             const controller = mountOutcomeRow({
                 outcome, cache, ctx, state,

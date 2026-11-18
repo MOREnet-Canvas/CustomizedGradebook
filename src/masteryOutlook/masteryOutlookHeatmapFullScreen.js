@@ -8,6 +8,7 @@
 
 import { logger } from '../utils/logger.js';
 import { MASTERY_PALETTES, NE_HEATMAP_COLOR } from '../ui/masteryColors.js';
+import { visibleStudents } from './sectionFilter.js';
 
 /**
  * Escape HTML for safe rendering
@@ -50,8 +51,9 @@ export function openFullScreenHeatmap(cache, options = {}) {
 
     logger.info('[HeatmapFullScreen] Opening full-screen heatmap');
 
-    // Serialize cache data
-    const cacheJSON = JSON.stringify(cache);
+    // Serialize cache data: the popup is self-contained, so it gets only the
+    // students the section filter shows (a copy; the real cache is untouched).
+    const cacheJSON = JSON.stringify({ ...cache, students: visibleStudents(cache) });
     const lastUpdated = formatDate(cache.meta?.computedAt);
     const threshold = cache.outcomes[0]?.classStats?.computedThreshold || 2.2;
 

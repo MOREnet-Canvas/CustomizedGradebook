@@ -22,6 +22,7 @@ import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import { ENABLE_GRADE_OVERRIDE } from '../config.js';
 import { getAveragedOutcomes, getOutcomeDisplayName } from './outcomeTypes.js';
 import { rowSavePhase, rowsAwaitingOutcome } from './masteryOutlookState.js';
+import { visibleStudents } from './sectionFilter.js';
 
 /** Default sort: student name, A→Z. */
 export const DEFAULT_CURRENT_SCORE_SORT = Object.freeze({ key: 'name', dir: 'asc' });
@@ -86,11 +87,15 @@ function overrideOf(cache, outcomeId, studentId) {
  * Number of students with a locked Current Score override.
  * @param {Object} cache
  * @param {string|number} outcomeId - the Current Score outcome
+ * @param {Object[]} [students] - only count these students (e.g. one section)
  * @returns {number}
  */
-export function countLockedOverrides(cache, outcomeId) {
+export function countLockedOverrides(cache, outcomeId, students = null) {
     const entries = cache?.sync_state?.[String(outcomeId)] ?? {};
-    return Object.keys(entries).filter(sid => overrideOf(cache, outcomeId, sid)?.locked).length;
+    const only = students ? new Set(students.map(s => String(s.id))) : null;
+    return Object.keys(entries)
+        .filter(sid => !only || only.has(sid))
+        .filter(sid => overrideOf(cache, outcomeId, sid)?.locked).length;
 }
 
 /**
@@ -131,7 +136,7 @@ function formatLongDate(iso) {
  */
 export function buildCurrentScoreRows(outcome, cache) {
     const outcomes = getAveragedOutcomes(cache);
-    const rows = (cache.students || []).map(student => {
+    const rows = visibleStudents(cache).map(student => {
         const sid = String(student.id);
         const chips = outcomes.map(o => ({
             outcomeId: String(o.id),

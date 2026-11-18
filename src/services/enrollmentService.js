@@ -216,16 +216,17 @@ export async function fetchSingleEnrollment(courseId, apiClient) {
 }
 
 /**
- * Fetches all student enrollments for a course (teacher perspective).
- * Uses getAllPages to handle courses with more than 100 students.
+ * Fetches the active students in a course (teacher perspective), one entry
+ * per student. Uses getAllPages to handle courses with more than 100 students.
  *
  * @param {string|number} courseId - Canvas course ID
  * @param {Object} apiClient - Canvas API client instance
- * @returns {Promise<Array<{userId: string, name: string, sortableName: string, sectionId: string}>>} Normalized student list
+ * @returns {Promise<Array<{userId: string, name: string, sortableName: string, sectionId: string, sectionIds: string[]}>>}
+ *   Normalized student list. sectionIds lists every section the student is in; sectionId is the first.
  *
  * @example
  * const students = await fetchCourseStudents('12345', apiClient);
- * // [{ userId: '101', name: 'Jane Smith', sortableName: 'Smith, Jane', sectionId: '55' }, ...]
+ * // [{ userId: '101', name: 'Jane Smith', sortableName: 'Smith, Jane', sectionId: '55', sectionIds: ['55', '61'] }, ...]
  */
 export async function fetchCourseStudents(courseId, apiClient) {
     try {
@@ -237,12 +238,26 @@ export async function fetchCourseStudents(courseId, apiClient) {
 
         logger.trace(`[EnrollmentService] Fetched ${enrollments.length} student enrollments for course ${courseId}`);
 
-        return enrollments.map(e => ({
-            userId: String(e.user_id),
-            name: e.user?.name ?? e.user?.short_name ?? `Student ${e.user_id}`,
-            sortableName: e.user?.sortable_name ?? e.user?.name ?? `Student ${e.user_id}`,
-            sectionId: String(e.course_section_id)
-        }));
+        // One entry per student: a student in several sections has one
+        // enrollment per section, so merge them (sectionId = first section).
+        const byUser = new Map();
+        for (const e of enrollments) {
+            const userId = String(e.user_id);
+            const sectionId = String(e.course_section_id);
+            const existing = byUser.get(userId);
+            if (existing) {
+                if (!existing.sectionIds.includes(sectionId)) existing.sectionIds.push(sectionId);
+                continue;
+            }
+            byUser.set(userId, {
+                userId,
+                name: e.user?.name ?? e.user?.short_name ?? `Student ${e.user_id}`,
+                sortableName: e.user?.sortable_name ?? e.user?.name ?? `Student ${e.user_id}`,
+                sectionId,
+                sectionIds: [sectionId]
+            });
+        }
+        return [...byUser.values()];
 
     } catch (error) {
         logger.warn(`[EnrollmentService] Failed to fetch course students for ${courseId}:`, error.message);

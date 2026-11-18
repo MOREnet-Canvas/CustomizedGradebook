@@ -11,6 +11,7 @@ import { AVG_OUTCOME_NAME, EXCLUDED_OUTCOME_KEYWORDS } from '../config.js';
 import { getMasteryColor, NE_HEATMAP_COLOR } from '../ui/masteryColors.js';
 import { injectStyles } from '../ui/styles.js';
 import { HEATMAP_CSS } from './masteryOutlookHeatmapStyles.js';
+import { visibleStudents } from './sectionFilter.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -154,7 +155,7 @@ export function buildHeatmapGrid(cache, options = {}) {
         .filter(o => !isExcludedOutcome(o.title))
         .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
-    logger.debug(`[Heatmap] Displaying ${heatmapOutcomes.length} outcomes, ${cache.students.length} students`);
+    logger.debug(`[Heatmap] Displaying ${heatmapOutcomes.length} outcomes, ${visibleStudents(cache).length} students`);
 
     // Sort state (local to this heatmap instance)
     let sortState = { column: 'name', direction: 'asc' };
@@ -280,7 +281,7 @@ export function buildHeatmapGrid(cache, options = {}) {
         const tbody = document.createElement('tbody');
 
         // Sort students
-        const sortedStudents = sortStudents(cache.students, sortState);
+        const sortedStudents = sortStudents(visibleStudents(cache), sortState);
 
         sortedStudents.forEach((student, rowIndex) => {
             const row = document.createElement('tr');

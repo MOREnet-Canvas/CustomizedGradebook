@@ -37,6 +37,7 @@ import { ENABLE_COURSE_PACING } from '../config.js';
 import { setCurrentScoreOverride, clearCurrentScoreOverride, setCurrentScoreOverrideLock } from './masteryOutlookAvgService.js';
 import { saveOutcomeLayout } from './outcomeLayoutService.js';
 import { getOutcomeDisplayName } from './outcomeTypes.js';
+import { visibleStudents, displayClassStats } from './sectionFilter.js';
 
 // ─── Predicate ───────────────────────────────────────────────────────────────
 
@@ -136,12 +137,14 @@ export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
         pl_assignments: cache.pl_assignments ?? {},
         sync_state:     cache.sync_state     ?? {},
     };
-    const counts = aggregateSyncStatus(cache.students || [], outcome.id, plConfig);
+    // Counts follow the section filter (all students when none is selected)
+    const students = visibleStudents(cache);
+    const counts = aggregateSyncStatus(students, outcome.id, plConfig);
 
     // Count students whose row would be amber in the Manage Scores tab —
     // matches buildOutcomeStudentRow status logic exactly so the badge stays
     // in sync with what the teacher actually sees as needing action.
-    const needsCount = (cache.students || []).filter(student => {
+    const needsCount = students.filter(student => {
         const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         if (!od) return false;
         const syncEntry     = ((cache.sync_state ?? {})[String(outcome.id)] ?? {})[String(student.id)] ?? {};
@@ -171,7 +174,7 @@ export function buildSyncChip(outcome, cache, { isSpecial = false } = {}) {
     // Special outcomes (Current Score, excluded) are not managed by outcome overrides;
     // the Current Score shows how many of its own overrides are locked.
     if (isSpecial) {
-        const locked = countLockedOverrides(cache, outcome.id);
+        const locked = countLockedOverrides(cache, outcome.id, students);
         return locked > 0
             ? `<span class="od-sync-chip locked" title="${locked} locked Current Score override${locked === 1 ? '' : 's'} — outcome saves and Update Current Score leave ${locked === 1 ? 'it' : 'them'} alone">🔒 ${locked}</span>`
             : `<span class="od-sync-chip none">—</span>`;
@@ -246,7 +249,7 @@ export const TAB_FILTERS = {
  * @returns {Object[]} rows: { id, name, sortableName, ...outcomeData }
  */
 export function buildOutcomeStudentRows(outcome, cache, { isCurrentScoreRow = false } = {}) {
-    return (cache.students || []).map(student => {
+    return visibleStudents(cache).map(student => {
         const od = student.outcomes?.find(o => String(o.outcomeId) === String(outcome.id));
         const row = {
             id: student.id,
@@ -282,7 +285,7 @@ function countExceptionStudents(outcome, cache) {
     );
     const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
-    return cache.students.filter(student => {
+    return visibleStudents(cache).filter(student => {
         const sId = String(student.id);
         return describeOverrideException(outcomeSync[sId]) !== null || ignoredIds.has(sId);
     }).length;
@@ -297,7 +300,7 @@ function buildExceptionsTable(outcome, cache) {
     );
     const ignoredIds = new Set(ignored.map(ia => String(ia.student_id)));
 
-    const exceptionStudents = cache.students.filter(student => {
+    const exceptionStudents = visibleStudents(cache).filter(student => {
         const sId = String(student.id);
         return describeOverrideException(outcomeSync[sId]) !== null || ignoredIds.has(sId);
     });
@@ -799,12 +802,12 @@ function buildOutcomeDetailPanel(args) {
         const threshold = ctx.getThreshold();
         const opts = { isCurrentScoreRow };
         switch (id) {
-            case 'students':   return `Manage Scores (${cache.students.length})`;
+            case 'students':   return `Manage Scores (${visibleStudents(cache).length})`;
             case 'struggling': return `Struggling (${countTabStudents(outcome, 'struggling', cache, threshold, opts)})`;
             case 'declining':  return `Declining (${countTabStudents(outcome, 'declining', cache, threshold, opts)})`;
             case 'growing':    return `Growing (${countTabStudents(outcome, 'growing', cache, threshold, opts)})`;
             case 'exceptions': return `Exceptions (${countExceptionStudents(outcome, cache)})`;
-            default:           return `All Students (${cache.students.length})`;
+            default:           return `All Students (${visibleStudents(cache).length})`;
         }
     };
     const tabs = ['students', 'struggling', 'declining', 'growing',
@@ -927,15 +930,16 @@ function buildOutcomeDetailPanel(args) {
         const outcomeContainer = content.closest('.od-outcome-container');
         const chipEl = outcomeContainer?.querySelector('.od-pl-chip');
         const barEl = outcomeContainer?.querySelector('.od-spread-bar');
-        if (chipEl && outcome.classStats?.plAvg != null) {
+        const stats = displayClassStats(outcome, cache);
+        if (chipEl && stats?.plAvg != null) {
             const { profColor } = makeRenderers(ctx);
-            const c = profColor(outcome.classStats.plAvg);
+            const c = profColor(stats.plAvg);
             chipEl.style.background = c.bg;
             chipEl.style.color = c.tx;
-            chipEl.textContent = outcome.classStats.plAvg.toFixed(2);
+            chipEl.textContent = stats.plAvg.toFixed(2);
         }
-        if (barEl && outcome.classStats?.distribution) {
-            const d = outcome.classStats.distribution;
+        if (barEl && stats?.distribution) {
+            const d = stats.distribution;
             const total = Object.values(d).reduce((a, b) => a + b, 0) || 1;
             const { profColor } = makeRenderers(ctx);
             barEl.innerHTML = [
@@ -1009,14 +1013,15 @@ function buildOutcomeDetailPanel(args) {
             const container = content.closest('.od-outcome-container');
             const chipEl    = container?.querySelector('.od-pl-chip');
             const barEl     = container?.querySelector('.od-spread-bar');
-            if (chipEl && outcome.classStats?.plAvg != null) {
-                const c = profColor(outcome.classStats.plAvg);
+            const stats     = displayClassStats(outcome, cache);
+            if (chipEl && stats?.plAvg != null) {
+                const c = profColor(stats.plAvg);
                 chipEl.style.background = c.bg;
                 chipEl.style.color      = c.tx;
-                chipEl.textContent      = outcome.classStats.plAvg.toFixed(2);
+                chipEl.textContent      = stats.plAvg.toFixed(2);
             }
-            if (barEl && outcome.classStats?.distribution) {
-                const d     = outcome.classStats.distribution;
+            if (barEl && stats?.distribution) {
+                const d     = stats.distribution;
                 const total = Object.values(d).reduce((a, b) => a + b, 0) || 1;
                 barEl.innerHTML = [
                     [d['4'] / total * 100, profColor(4.0).bg],

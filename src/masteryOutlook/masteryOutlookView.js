@@ -12,13 +12,18 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { escapeHtml } from '../utils/html.js';
 import { injectStyles } from '../ui/styles.js';
 import { PL_OUTLOOK_CSS } from './plOutlookStyles.js';
 import { readMasteryOutlookCache, normalizeCacheMetadata } from './masteryOutlookCacheService.js';
 import { startPolling, stopPolling, startVisibilityListener, stopVisibilityListener } from './masteryOutlookPollingService.js';
 import { getThreshold, saveThreshold } from './thresholdStorage.js';
 import { getColorScheme, saveColorScheme } from './colorSchemeStorage.js';
-import { fetchCourseStudents } from '../services/enrollmentService.js';
+import { fetchCourseStudents, fetchCourseSections } from '../services/enrollmentService.js';
+import {
+    initSectionFilter, hasSectionChoice, getCourseSections, getSelectedSectionId, getSelectedSectionName,
+    setSelectedSectionId, visibleStudents, displayClassStats,
+} from './sectionFilter.js';
 import { findMasteryDashboardPageUrl, getPage } from '../services/pageService.js';
 import { parseOutcomeLayout, parsePacingLayout } from './outcomeLayoutService.js';
 import { VIEWS, getView } from './viewRegistry.js';
@@ -117,6 +122,11 @@ function buildShell(containerEl) {
         <div id="od-metrics" class="od-metrics"></div>
 
         <div class="od-controls-row">
+            <div id="od-section-control" class="od-section-control" style="display:none;">
+                <label class="od-control-label" for="od-section-select">Section:</label>
+                <select id="od-section-select" class="od-section-select"></select>
+            </div>
+
             <div id="od-threshold-control" class="od-threshold-control">
                 <span class="od-control-label">Re-teach threshold:</span>
                 <input type="range" id="od-threshold-slider" class="od-threshold-slider"
@@ -176,6 +186,8 @@ function buildShell(containerEl) {
         bannerRefreshBtn: containerEl.querySelector('#od-banner-refresh-btn'),
         exceptionsBtn:    containerEl.querySelector('#od-exceptions-btn'),
         exceptionsPanel:  containerEl.querySelector('#od-exceptions-panel'),
+        sectionControl:   containerEl.querySelector('#od-section-control'),
+        sectionSelect:    containerEl.querySelector('#od-section-select'),
         thresholdSlider:  containerEl.querySelector('#od-threshold-slider'),
         thresholdValue:   containerEl.querySelector('#od-threshold-value'),
         metricsEl:        containerEl.querySelector('#od-metrics'),
@@ -230,10 +242,7 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
     }
 
     setLastUpdated(shell.lastUpdatedEl, cache.meta.computedAt);
-    shell.subtitleEl.textContent =
-        `${cache.meta.studentCount} students ·
-         ${cache.meta.outcomeCount} outcomes ·
-         Marzano Power Law scores`;
+    renderSubtitle(shell, cache);
 
     // Initialize color scheme from localStorage
     const userId = window.ENV?.current_user_id;
@@ -242,6 +251,7 @@ function renderLoadedState(shell, cache, courseId, apiClient, onRefresh) {
         logger.debug(`[MasteryOutlook] Initialized color scheme: ${currentColorScheme}`);
     }
 
+    wireSectionFilter(shell, cache);
     wireThresholdSlider(shell, cache, courseId, apiClient);
     wireColorSchemeToggle(shell, cache, courseId, apiClient);
     renderMetricCards(shell.metricsEl, cache);
@@ -425,6 +435,9 @@ function wireExceptionsPanel(shell, cache) {
             </div>`;
     };
 
+    // Section filter changes redraw an open panel (replaced on every wire)
+    shell.rerenderExceptions = () => { if (panelOpen) renderPanel(); };
+
     shell.exceptionsBtn.addEventListener('click', () => {
         panelOpen = !panelOpen;
         if (panelOpen) {
@@ -470,18 +483,21 @@ function renderMetricCards(metricsEl, cache) {
     // Only include regular outcomes in metrics (exclude Current Score and excluded outcomes)
     const regularOutcomes = cache ? cache.outcomes.filter(o => isRegularOutcome(o)) : [];
 
+    // Section-aware stats (the stored classStats when no section is selected)
+    const statsOf = (o) => displayClassStats(o, cache);
+
     const cards = cache ? [
         {
             label: 'Class Canvas avg',
             value: overallPlAvg(cache, regularOutcomes),
-            sub:   'across all outcomes',
+            sub:   getSelectedSectionName() ? `across all outcomes · ${getSelectedSectionName()}` : 'across all outcomes',
             color: '#0F6E56'
         },
         {
             label: 'Re-teach flagged',
             value: regularOutcomes.filter(
-                o => o.classStats.plAvg !== null &&
-                    o.classStats.plAvg < threshold
+                o => statsOf(o).plAvg !== null &&
+                    statsOf(o).plAvg < threshold
             ).length,
             sub:   `of ${regularOutcomes.length} outcomes`,
             color: '#A32D2D'
@@ -495,8 +511,8 @@ function renderMetricCards(metricsEl, cache) {
         {
             label: 'Growing outcomes',
             value: regularOutcomes.filter(
-                o => o.classStats.avgSlope !== null &&
-                    o.classStats.avgSlope > 0.05
+                o => statsOf(o).avgSlope !== null &&
+                    statsOf(o).avgSlope > 0.05
             ).length,
             sub:   'positive Marzano trend',
             color: '#0F6E56'
@@ -594,6 +610,55 @@ function wireColorSchemeToggle(shell, cache, courseId, apiClient) {
     });
 }
 
+// ─── Section filter ───────────────────────────────────────────────────────────
+
+/**
+ * Header subtitle: student / outcome counts, narrowed to the selected section.
+ * @param {Object} shell
+ * @param {Object} cache
+ */
+function renderSubtitle(shell, cache) {
+    const section = getSelectedSectionName();
+    const students = section
+        ? `${visibleStudents(cache).length} of ${cache.meta.studentCount} students · ${section}`
+        : `${cache.meta.studentCount} students`;
+    shell.subtitleEl.textContent = `${students} · ${cache.meta.outcomeCount} outcomes · Marzano Power Law scores`;
+}
+
+/**
+ * Wire the Section dropdown (shown only when the course has 2+ sections).
+ * Changing it redraws the shared chrome and the active view for that section.
+ * Handlers are assigned (not added) because renderLoadedState runs again
+ * after every Refresh Data.
+ *
+ * @param {Object} shell
+ * @param {Object} cache
+ */
+function wireSectionFilter(shell, cache) {
+    if (!shell.sectionControl || !shell.sectionSelect) return;
+    if (!hasSectionChoice()) {
+        shell.sectionControl.style.display = 'none';
+        return;
+    }
+
+    const selected = getSelectedSectionId();
+    shell.sectionSelect.innerHTML = [
+        `<option value="">All sections</option>`,
+        ...getCourseSections().map(s =>
+            `<option value="${escapeHtml(s.id)}"${s.id === selected ? ' selected' : ''}>${escapeHtml(s.name)}</option>`),
+    ].join('');
+    shell.sectionControl.style.display = '';
+
+    shell.sectionSelect.onchange = () => {
+        setSelectedSectionId(shell.sectionSelect.value || null);
+        renderSubtitle(shell, cache);
+        renderMetricCards(shell.metricsEl, cache);
+        renderSidebar(shell.sidebarEl, cache);
+        shell.rerenderExceptions?.();
+        activeViewController?.refresh?.();
+    };
+}
+
 // ─── Threshold slider ─────────────────────────────────────────────────────────
 
 function wireThresholdSlider(shell, cache, courseId, apiClient) {
@@ -663,7 +728,7 @@ function wireRefreshButton(shell, courseId, apiClient, onRefresh) {
 function overallPlAvg(cache, regularOutcomes) {
     const outcomes = regularOutcomes || cache.outcomes;
     const avgs = outcomes
-        .map(o => o.classStats.plAvg)
+        .map(o => displayClassStats(o, cache).plAvg)
         .filter(v => v !== null);
     if (avgs.length === 0) return '—';
     return (avgs.reduce((a, b) => a + b, 0) / avgs.length).toFixed(2);
@@ -674,7 +739,7 @@ function countInterventionStudents(cache) {
     const threshold = getCurrentThreshold();
     const lowCounts = {};
 
-    cache.students.forEach(student => {
+    visibleStudents(cache).forEach(student => {
         let lowCount = 0;
         student.outcomes.forEach(outcome => {
             const regular = cache.outcomes.find(o => String(o.id) === String(outcome.outcomeId));
@@ -696,10 +761,13 @@ async function enrichCache(cache, courseId, apiClient) {
     if (!cache) return null;
 
     try {
-        const [students, pageUrl] = await Promise.all([
+        const [students, pageUrl, sections] = await Promise.all([
             fetchCourseStudents(courseId, apiClient),
-            findMasteryDashboardPageUrl(courseId, apiClient)
+            findMasteryDashboardPageUrl(courseId, apiClient),
+            fetchCourseSections(courseId, apiClient)
         ]);
+        // Section filter: the course's sections + this browser's saved choice
+        initSectionFilter(courseId, sections);
 
         const dashboardPage = pageUrl ? await getPage(courseId, pageUrl, apiClient) : null;
         // In-memory only: lets the Pacing tab explain when there's no Mastery View page to save to
@@ -715,6 +783,9 @@ async function enrichCache(cache, courseId, apiClient) {
             if (stu) {
                 cs.name = stu.name;
                 cs.sortableName = stu.sortableName;
+                // Current enrollments (a student can be in several sections)
+                cs.sectionIds = stu.sectionIds ?? [stu.sectionId];
+                cs.sectionId = cs.sectionIds[0];
             } else {
                 cs.name = `Student ${cs.id}`;
                 cs.sortableName = `Student ${cs.id}`;

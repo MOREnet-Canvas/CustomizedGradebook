@@ -30,6 +30,7 @@ import {
     initWriteScheduler,
 } from './plOutlookActions.js';
 import { refreshStudentOutcomeData } from './masteryOutlookDataService.js';
+import { visibleStudents, getSelectedSectionName } from './sectionFilter.js';
 import { fetchingStudentIds, rowSavePhase, queuedOutcomeIds, rowsAwaitingOutcome, countRowsAwaitingOutcome } from './masteryOutlookState.js';
 
 /**
@@ -379,7 +380,9 @@ function buildOutcomeStudentStates(outcome, cache) {
     const oidStr      = String(outcome.id);
     const plConfig    = { pl_assignments: cache.pl_assignments ?? {}, sync_state: syncState };
 
-    return cache.students
+    // Section filter: only the selected section's rows, so "Save grades to
+    // Canvas" (remainingIds) sends only the students the teacher can see.
+    return visibleStudents(cache)
         .map(student => {
             const sId         = String(student.id);
             const outcomeData = student.outcomes.find(o => String(o.outcomeId) === oidStr);
@@ -430,10 +433,12 @@ export function getOutcomeSaveSummary(outcome, cache) {
  * @param {Object}  summary       - from summarizeSaveStates
  * @param {string}  refreshBtn    - refresh button HTML
  * @param {number}  [awaitingOutcome=0] - rows saved but Canvas still updating the outcome score (non-blocking note)
+ * @param {string|null} [sectionName] - selected section; the banner and Save button say they cover only it
  * @returns {string} HTML
  */
-function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
+function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0, sectionName = null) {
     const { saving, verifying, queued, remaining, flagged = 0 } = summary;
+    const inSection = sectionName ? ` in ${escapeHtml(sectionName)}` : '';
     const awaitingNote = awaitingOutcome > 0
         ? ` <span class="os-status-banner-note" title="Saved to Canvas; waiting for Canvas to update the outcome score. This clears on its own.">· ⏳ ${awaitingOutcome} outcome score${awaitingOutcome !== 1 ? 's' : ''} updating</span>`
         : '';
@@ -454,7 +459,7 @@ function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
     if (!inProgress && remaining === 0) {
         return `<div class="os-status-banner ok">
              <div class="os-status-banner-left">
-               ✓ Canvas gradebook is up to date${awaitingNote}
+               ✓ Canvas gradebook is up to date${sectionName ? ` for ${escapeHtml(sectionName)}` : ''}${awaitingNote}
              </div>
              ${refreshBtn}
            </div>`;
@@ -463,12 +468,12 @@ function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
     if (!inProgress) {
         return `<div class="os-status-banner warn">
              <div class="os-status-banner-left">
-               ⬆ <b>${remaining}</b> student${remaining !== 1 ? 's' : ''} need${remaining === 1 ? 's' : ''} updating${awaitingNote}
+               ⬆ <b>${remaining}</b> student${remaining !== 1 ? 's' : ''}${inSection} need${remaining === 1 ? 's' : ''} updating${awaitingNote}
              </div>
              <div class="os-status-banner-actions">
                ${refreshBtn}
                <button class="btn btn-sm btn-primary" data-action="os-post-all">
-                 Save grades to Canvas
+                 Save grades to Canvas${sectionName ? ` (${escapeHtml(sectionName)})` : ''}
                </button>
              </div>
            </div>`;
@@ -480,7 +485,7 @@ function renderSaveBanner(summary, refreshBtn, awaitingOutcome = 0) {
     if (queued > 0)    parts.push(saving || verifying
         ? `${queued} queued`
         : `${plural(queued, 'student', 'students')} queued — waiting for the current save to finish`);
-    if (remaining > 0) parts.push(`${remaining} still to save`);
+    if (remaining > 0) parts.push(`${remaining} still to save${inSection}`);
 
     const lead = (saving > 0 || verifying > 0) ? '<span class="spinner"></span>' : '⏳';
     const phaseLabel = saving > 0 ? 'Saving…' : verifying > 0 ? 'Confirming…' : 'Queued…';
@@ -509,7 +514,7 @@ export function renderOutcomeStudentTable(outcome, cache) {
             title="Refresh scores from Canvas"
             aria-label="Refresh scores from Canvas">↻</button>`;
 
-    const toolbarHtml = renderSaveBanner(summary, refreshOutcomeBtn, countRowsAwaitingOutcome(outcome.id));
+    const toolbarHtml = renderSaveBanner(summary, refreshOutcomeBtn, countRowsAwaitingOutcome(outcome.id), getSelectedSectionName());
 
     // Legend commented out — color coding is self-evident from the dot colors
     // const tones = [['hi','≥ 3.25'],['good','≥ 2.5'],['dev','≥ 1.75'],['low','< 1.75']];
