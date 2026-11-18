@@ -146,15 +146,55 @@ export function daysUntil(date, today) {
 }
 
 /**
+ * Add whole days to a YYYY-MM-DD date. Null if the date is invalid.
+ * @param {string} date - YYYY-MM-DD
+ * @param {number} days - may be negative
+ * @returns {string|null}
+ */
+export function addDays(date, days) {
+    if (!isValidDate(date)) return null;
+    return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Date range for a pacing timeline.
+ *
+ * Uses the course start/end when known. A missing end falls back to the latest
+ * target date (+padDays), a missing start to the earliest (−padDays). The range
+ * always stretches to include today and every target date.
+ *
+ * @param {Object} params
+ * @param {string|null} [params.start] - course start, YYYY-MM-DD
+ * @param {string|null} [params.end] - course end, YYYY-MM-DD
+ * @param {string[]} [params.dates] - target dates, YYYY-MM-DD
+ * @param {string} params.today - YYYY-MM-DD
+ * @param {number} [params.padDays]
+ * @returns {{start: string, end: string}}
+ */
+export function timelineRange({ start, end, dates = [], today, padDays = 14 }) {
+    const known = [...dates, today].filter(isValidDate).sort();
+    const first = known[0];
+    const last = known[known.length - 1];
+
+    let from = isValidDate(start) ? start : addDays(first, -padDays);
+    let to = isValidDate(end) ? end : addDays(last, padDays);
+    if (first < from) from = addDays(first, -padDays);
+    if (last > to) to = addDays(last, padDays);
+    if (from >= to) to = addDays(from, 1);
+    return { start: from, end: to };
+}
+
+/**
  * Format a YYYY-MM-DD date for display ("Dec 4, 2026"); "Not set" when invalid.
  * @param {string} value
+ * @param {{year?: boolean}} [options] - year: false → "Dec 4"
  * @returns {string}
  */
-export function formatTargetDate(value) {
+export function formatTargetDate(value, { year = true } = {}) {
     if (!isValidDate(value)) return 'Not set';
     const [y, m, d] = value.split('-').map(Number);
     return new Intl.DateTimeFormat('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC'
+        month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}), timeZone: 'UTC'
     }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 

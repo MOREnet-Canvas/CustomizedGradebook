@@ -83,3 +83,28 @@ export async function fetchCourseName(courseId, apiClient) {
     }
 }
 
+/**
+ * Fetch a course's start/end dates and time zone.
+ *
+ * Course dates win; when the course has none, the term's dates are used.
+ * Any value Canvas doesn't have comes back null.
+ *
+ * @param {string} courseId - Course ID
+ * @param {CanvasApiClient} apiClient - Canvas API client instance
+ * @returns {Promise<{startAt: string|null, endAt: string|null, timeZone: string|null}>}
+ *   ISO timestamps as Canvas returns them
+ */
+export async function fetchCourseDates(courseId, apiClient) {
+    try {
+        const course = await apiClient.get(`/api/v1/courses/${courseId}?include[]=term`, {}, 'fetchCourseDates');
+        return {
+            startAt:  course?.start_at || course?.term?.start_at || null,
+            endAt:    course?.end_at   || course?.term?.end_at   || null,
+            timeZone: course?.time_zone || null
+        };
+    } catch (error) {
+        logger.warn(`[CourseService] Could not fetch course dates for ${courseId}:`, error.message);
+        return { startAt: null, endAt: null, timeZone: null };
+    }
+}
+
