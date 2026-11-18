@@ -16,6 +16,7 @@
  */
 
 import { escapeHtml } from '../utils/html.js';
+import { scoreTone, scoreToneStyle } from '../ui/masteryColors.js';
 import { DEFAULT_MASTERY_THRESHOLD } from '../config.js';
 import { getOutcomeDisplayName } from './outcomeTypes.js';
 import {
@@ -49,7 +50,7 @@ const markSvg = (mark, size) =>
 /** "in 5d" / "Due today" / "3d past" */
 function relativeDays(days) {
     if (days < 0) return `${-days}d past`;
-    if (days === 0) return 'Due today';
+    if (days === 0) return 'today';
     return `in ${days}d`;
 }
 
@@ -100,11 +101,13 @@ export function getPaceTimeline(cache, courseDates, now = new Date()) {
  *   outcomes: Array<{ id: string, name: string, date: string }>,
  *   rows: Array<{ id: string, name: string, sortableName: string, behind: number, dueToday: number,
  *     items: Array<{ id: string, name: string, score: number|null, date: string, days: number, pacing: string, pending: boolean }>,
- *     next: Object|null }>
+ *     next: Object|null, lastSubmitted: Object|null }>
  * }} outcomes = required, dated outcomes in the teacher's order
  */
 export function buildPaceRows(outcome, cache, { today, threshold = DEFAULT_MASTERY_THRESHOLD }) {
     const { outcomes, rows } = buildCurrentScoreRows(outcome, cache);
+    const studentsById = new Map((cache.students ?? []).map(s => [String(s.id), s]));
+    const averagedIds = outcomes.map(o => String(o.id));
     const scales = (cache?.meta?.customOutcomePacing?.scales ?? [])
         .filter(s => s.included && isValidDate(s.date));
     const dateById = new Map(scales.map(s => [String(s.id), s.date]));
@@ -135,8 +138,51 @@ export function buildPaceRows(outcome, cache, { today, threshold = DEFAULT_MASTE
                 items,
                 // items are in date order
                 next: items.find(i => i.pacing !== PACING_STATUS.MASTERED && i.days >= 0) ?? null,
+                lastSubmitted: lastSubmittedAssessment(studentsById.get(r.id), averagedIds, outcomeNames),
             };
         }),
+    };
+}
+
+/**
+ * The student's most recently submitted assessed assignment across the given
+ * outcomes, from the outcome attempts in the cache (submission date, falling
+ * back to assessment date). One assignment can assess several outcomes, so
+ * it carries one score per outcome.
+ *
+ * @param {Object|undefined} student - cache.students entry
+ * @param {string[]} outcomeIds
+ * @param {Map<string, string>} [outcomeNames] - display name per outcome ID
+ * @returns {{ assignmentId: string|null, assignmentName: string, timestamp: string,
+ *             scores: Array<{ outcomeId: string, name: string, score: number }> }|null}
+ */
+export function lastSubmittedAssessment(student, outcomeIds, outcomeNames = new Map()) {
+    const wanted = new Set(outcomeIds.map(String));
+    const attempts = (student?.outcomes ?? [])
+        .filter(od => wanted.has(String(od.outcomeId)))
+        .flatMap(od => (od.attempts ?? []).map(a => ({ ...a, outcomeId: String(od.outcomeId) })))
+        .filter(a => a.timestamp && !isNaN(Date.parse(a.timestamp)) && Number.isFinite(Number(a.score)));
+    if (!attempts.length) return null;
+
+    const latest = attempts.reduce((a, b) => (Date.parse(b.timestamp) > Date.parse(a.timestamp) ? b : a));
+    const sameAssignment = (a) => (latest.assignmentId != null
+        ? String(a.assignmentId) === String(latest.assignmentId)
+        : a === latest);
+    const latestByOutcome = new Map();
+    attempts.filter(sameAssignment).forEach(a => {
+        const prev = latestByOutcome.get(a.outcomeId);
+        if (!prev || Date.parse(a.timestamp) > Date.parse(prev.timestamp)) latestByOutcome.set(a.outcomeId, a);
+    });
+
+    return {
+        assignmentId: latest.assignmentId != null ? String(latest.assignmentId) : null,
+        assignmentName: latest.assignmentName || 'Assignment',
+        timestamp: latest.timestamp,
+        scores: outcomeIds.map(String).filter(id => latestByOutcome.has(id)).map(id => ({
+            outcomeId: id,
+            name: outcomeNames.get(id) ?? id,
+            score: Number(latestByOutcome.get(id).score),
+        })),
     };
 }
 
@@ -186,10 +232,53 @@ function rowStatus(row, today) {
     return { pill, label, next };
 }
 
+/** Plain-text "Quiz 3 · Nov 12 · Outcome 1 3.00, Outcome 2 2.50" (or null). */
+function lastSubmittedText(last, timeZone) {
+    if (!last) return null;
+    const date = formatTargetDate(isoToCourseDate(last.timestamp, timeZone), { year: false });
+    const scores = last.scores.map(s => `${s.name} ${s.score.toFixed(2)}`).join(', ');
+    return `${last.assignmentName} · ${date}${scores ? ` · ${scores}` : ''}`;
+}
+
+/** Most pills shown under a name; the rest are in the tooltip. */
+const MAX_LAST_PILLS = 3;
+
+function renderNameCell(row, timeZone) {
+    const last = row.lastSubmitted;
+    const lastHtml = last
+        ? `<div class="cs-pace-last" title="${escapeHtml(`Last submitted: ${lastSubmittedText(last, timeZone)}`)}">
+             <span class="cs-pace-last-name">${escapeHtml(last.assignmentName)}</span>
+             <span class="cs-pace-last-date">${escapeHtml(formatTargetDate(isoToCourseDate(last.timestamp, timeZone), { year: false }))}</span>
+             ${last.scores.slice(0, MAX_LAST_PILLS).map(s =>
+                 `<span class="os-pill cs-pace-last-pill" style="${scoreToneStyle(scoreTone(s.score))}">${s.score.toFixed(2)}</span>`).join('')}${
+             last.scores.length > MAX_LAST_PILLS ? `<span class="cs-pace-last-more">+${last.scores.length - MAX_LAST_PILLS}</span>` : ''}
+           </div>`
+        : '<div class="cs-pace-last cs-pace-last-none">No submissions yet</div>';
+    return `<div class="cs-pace-name"><span class="os-stu-name">${escapeHtml(row.name)}</span>${lastHtml}</div>`;
+}
+
+/**
+ * Stack level (0 = bottom line) per header tag so names whose positions are
+ * closer than `gap` percent go on separate lines. Input sorted by position.
+ * @param {number[]} positions - percent across the lane, ascending
+ * @param {number} [gap]
+ * @param {number} [levels]
+ * @returns {number[]}
+ */
+export function tagLevels(positions, gap = 11, levels = 2) {
+    const lastAt = new Array(levels).fill(-Infinity);
+    return positions.map(p => {
+        let level = lastAt.findIndex(at => p - at >= gap);
+        if (level === -1) level = lastAt.indexOf(Math.min(...lastAt));
+        lastAt[level] = p;
+        return level;
+    });
+}
+
 function renderStatusCell(row, today) {
     const { pill, label, next } = rowStatus(row, today);
     const icon = pill === 'behind' ? '✕ ' : pill === 'onpace' ? '✓ ' : '';
-    return `<div class="cs-pace-status"><span class="cs-pace-pill ${pill}">${icon}${escapeHtml(label)}</span><span class="cs-pace-next" title="${escapeHtml(next)}">${escapeHtml(next)}</span></div>`;
+    return `<div class="cs-pace-status"><span class="cs-pace-pill ${pill}">${icon}${escapeHtml(label)}</span><span class="cs-pace-next">${escapeHtml(next)}</span></div>`;
 }
 
 /**
@@ -207,6 +296,7 @@ function renderStatusCell(row, today) {
 export function renderPaceView(outcome, cache, sortState = DEFAULT_PACE_SORT,
                                { courseDates = null, now = new Date(), threshold = DEFAULT_MASTERY_THRESHOLD } = {}) {
     const { today, start, end } = getPaceTimeline(cache, courseDates, now);
+    const timeZone = courseDates?.timeZone ?? null;
     const { outcomes, rows } = buildPaceRows(outcome, cache, { today, threshold });
 
     const toolbar = renderCurrentScoreToolbar({
@@ -238,17 +328,19 @@ export function renderPaceView(outcome, cache, sortState = DEFAULT_PACE_SORT,
     // Header: month names, Today, and outcome names at their class target dates.
     const byDate = new Map();
     outcomes.forEach(o => byDate.set(o.date, [...(byDate.get(o.date) ?? []), o]));
+    const tags = [...byDate].sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, list]) => ({ date, names: list.map(o => o.name).join(', ') }));
+    // Names only stack when they'd overlap
+    const levels = tagLevels(tags.map(t => Number(x(t.date))));
     const headerLane = `
         <div class="cs-pace-lane cs-pace-lane-head">
           ${months.map(d => `<span class="cs-pace-month-line" style="left:${x(d)}%"></span>
-            <span class="cs-pace-month" style="left:${x(d)}%">${escapeHtml(formatTargetDate(d, { year: false }).split(' ')[0].toUpperCase())}</span>`).join('')}
+            <span class="cs-pace-month cs-pace-head-label" style="left:${x(d)}%">${escapeHtml(formatTargetDate(d, { year: false }).split(' ')[0].toUpperCase())}</span>`).join('')}
           <span class="cs-pace-today-line" style="left:${todayX}%"></span>
-          <span class="cs-pace-today" style="left:${todayX}%">Today</span>
-          ${[...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, list], i) => {
-              const names = list.map(o => o.name).join(', ');
+          <span class="cs-pace-today cs-pace-head-label" style="left:${todayX}%">Today</span>
+          ${tags.map(({ date, names }, i) => {
               const tip = `${names} — target ${formatTargetDate(date)}`;
-              // Alternate two lines so neighbouring names overlap less
-              return `<span class="cs-pace-tag${i % 2 ? ' alt' : ''}" style="left:${x(date)}%" title="${escapeHtml(tip)}">${escapeHtml(names)}</span>`;
+              return `<span class="cs-pace-tag cs-pace-head-label level-${levels[i]}" style="left:${x(date)}%" title="${escapeHtml(tip)}">${escapeHtml(names)}</span>`;
           }).join('')}
         </div>`;
 
@@ -264,7 +356,7 @@ export function renderPaceView(outcome, cache, sortState = DEFAULT_PACE_SORT,
         }).join('');
         return `
             <div class="cs-pace-row" data-stu="${escapeHtml(r.id)}">
-              <div class="cs-pace-name"><span class="os-stu-name">${escapeHtml(r.name)}</span></div>
+              ${renderNameCell(r, timeZone)}
               <div class="cs-pace-lane">${laneBackdrop}${marks}</div>
               ${renderStatusCell(r, today)}
             </div>`;
@@ -275,7 +367,8 @@ export function renderPaceView(outcome, cache, sortState = DEFAULT_PACE_SORT,
         const { label, next } = rowStatus(r, today);
         const items = r.items.map(i =>
             `${i.name} target ${formatTargetDate(i.date)}, ${MARKS[MARK_OF[i.pacing] ?? 'notdue'].label}`).join('; ');
-        return `<li>${escapeHtml(`${r.name}: ${label}. ${next}. ${items}`)}</li>`;
+        const last = lastSubmittedText(r.lastSubmitted, timeZone);
+        return `<li>${escapeHtml(`${r.name}: ${label}. ${next}. ${items}. ${last ? `Last submitted: ${last}` : 'No submissions yet'}.`)}</li>`;
     }).join('');
 
     const legend = ['met', 'behind', 'today', 'notdue']
@@ -289,9 +382,9 @@ export function renderPaceView(outcome, cache, sortState = DEFAULT_PACE_SORT,
         <div class="os-block cs-pace">
           <div class="cs-pace-grid" aria-hidden="true">
             <div class="cs-pace-row cs-pace-head">
-              <div class="cs-pace-name">Student</div>
+              <div class="cs-pace-name"><span class="cs-pace-head-label">Student · last submitted</span></div>
               ${headerLane}
-              <div class="cs-pace-status">Status</div>
+              <div class="cs-pace-status"><span class="cs-pace-head-label">Status</span></div>
             </div>
             ${body}
           </div>

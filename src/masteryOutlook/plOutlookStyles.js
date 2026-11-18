@@ -687,29 +687,40 @@ tr.cs-row-locked > td:first-child { box-shadow:inset 3px 0 0 var(--amber-border)
 .cs-mode-toggle button[aria-pressed="true"] { background:var(--blue); color:#fff; font-weight:600; }
 .cs-mode-toggle button:focus-visible { outline:2px solid var(--blue); outline-offset:-2px; }
 
-/* Pace view (currentScorePaceView.js) */
+/* Pace view (currentScorePaceView.js). Column widths are on the rows' own
+   font size, so header and body columns line up; header text is shrunk via
+   .cs-pace-head-label only. */
 .cs-pace { overflow-x:auto; padding:0; }
-.cs-pace-grid { min-width:52em; }
-.cs-pace-row { display:flex; align-items:stretch; border-top:1px solid var(--border-tertiary); min-height:3.4em; }
-.cs-pace-head { border-top:0; background:var(--bg-secondary); min-height:5.2em; font-size:0.769em; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-tertiary); }
-.cs-pace-name { flex:0 0 12em; display:flex; align-items:center; padding:0 0.769em; overflow:hidden; }
-.cs-pace-head .cs-pace-name, .cs-pace-head .cs-pace-status { align-items:flex-end; padding-bottom:0.6em; }
-.cs-pace-lane { flex:1 1 auto; position:relative; border-left:1px solid var(--border-tertiary); }
+.cs-pace-grid { min-width:56em; }
+.cs-pace-row { display:flex; align-items:stretch; border-top:1px solid var(--border-tertiary); min-height:3.8em; }
+.cs-pace-head { border-top:0; background:var(--bg-secondary); min-height:4.6em; }
+.cs-pace-head-label { font-size:0.769em; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-tertiary); white-space:nowrap; }
+.cs-pace-name { flex:0 0 15em; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; gap:0.2em; padding:0.385em 0.769em; min-width:0; }
+.cs-pace-status { flex:0 0 15em; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; gap:0.231em; padding:0.385em 0.923em; border-left:1px solid var(--border-tertiary); min-width:0; }
+.cs-pace-head .cs-pace-name, .cs-pace-head .cs-pace-status { justify-content:flex-end; padding-bottom:0.6em; }
+.cs-pace-lane { flex:1 1 auto; position:relative; min-width:0; border-left:1px solid var(--border-tertiary); }
 .cs-pace-track { position:absolute; left:1%; right:1%; top:50%; height:2px; margin-top:-1px; background:#E1E5E8; }
-.cs-pace-month-line { position:absolute; top:0; bottom:0; border-left:1px solid #EEF0F2; }
+.cs-pace-month-line { position:absolute; top:0; bottom:0; border-left:1px solid #E9EBEE; }
 .cs-pace-today-line { position:absolute; top:0; bottom:0; border-left:2px dashed var(--text-secondary); margin-left:-1px; }
-.cs-pace-month { position:absolute; top:0.5em; margin-left:0.4em; }
-.cs-pace-today { position:absolute; top:0.5em; transform:translateX(-50%); background:var(--bg-secondary); padding:0 0.3em; color:var(--text-primary); text-transform:none; letter-spacing:0; }
-.cs-pace-tag { position:absolute; bottom:0.5em; transform:translateX(-50%); max-width:9em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:none; letter-spacing:0; font-weight:600; color:var(--text-secondary); background:var(--bg-secondary); padding:0 0.3em; cursor:help; }
-.cs-pace-tag.alt { bottom:1.9em; }
-.cs-pace-mk { position:absolute; top:50%; transform:translate(-50%,-50%); display:flex; background:var(--bg-surface); border-radius:4px; cursor:help; line-height:0; }
+.cs-pace-lane-head .cs-pace-today-line { top:1.6em; }
+.cs-pace-month { position:absolute; top:0.6em; margin-left:0.5em; }
+.cs-pace-today { position:absolute; top:0.45em; transform:translateX(-50%); padding:0 0.3em; background:var(--bg-secondary); color:var(--text-primary); text-transform:none; letter-spacing:0; font-weight:700; z-index:1; }
+.cs-pace-tag { position:absolute; transform:translateX(-50%); max-width:11em; overflow:hidden; text-overflow:ellipsis; padding:0 0.3em; background:var(--bg-secondary); color:var(--text-secondary); text-transform:none; letter-spacing:0; cursor:help; z-index:1; }
+.cs-pace-tag.level-0 { bottom:0.6em; }
+.cs-pace-tag.level-1 { bottom:2.2em; }
+.cs-pace-mk { position:absolute; top:50%; transform:translate(-50%,-50%); display:flex; background:var(--bg-surface); border-radius:50%; cursor:help; line-height:0; z-index:1; }
 .cs-pace-mk.pending { opacity:.55; }
-.cs-pace-status { flex:0 0 14em; display:flex; flex-direction:column; justify-content:center; gap:0.231em; padding:0.385em 0.923em; border-left:1px solid var(--border-tertiary); min-width:0; }
+.cs-pace-last { display:flex; align-items:center; gap:0.385em; font-size:0.769em; color:var(--text-tertiary); white-space:nowrap; min-width:0; cursor:default; }
+.cs-pace-last-name { overflow:hidden; text-overflow:ellipsis; min-width:0; color:var(--text-secondary); }
+.cs-pace-last-date { flex:none; }
+.cs-pace-last-pill.os-pill { flex:none; font-size:1em; min-width:0; padding:0 0.5em; }
+.cs-pace-last-more { flex:none; }
+.cs-pace-last-none { font-style:italic; }
 .cs-pace-pill { align-self:flex-start; font-size:0.846em; font-weight:700; padding:0.154em 0.769em; border-radius:999px; white-space:nowrap; }
 .cs-pace-pill.behind { background:#fbe9e8; color:#a8261f; }
 .cs-pace-pill.today  { background:#FFF1CC; color:#5E4200; }
 .cs-pace-pill.onpace { background:#e6f4ec; color:#08703d; }
-.cs-pace-next { font-size:0.769em; color:var(--text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cs-pace-next { font-size:0.769em; color:var(--text-tertiary); line-height:1.35; }
 .cs-pace-empty { padding:1.2em; color:var(--text-secondary); line-height:1.5; }
 .cs-pace-legend-item { display:inline-flex; align-items:center; gap:0.3em; margin-right:1.2em; }
 .cs-pace-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; margin:0; padding:0; }

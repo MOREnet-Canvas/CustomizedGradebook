@@ -13,6 +13,7 @@ vi.mock('../../utils/logger.js', () => ({
 
 import {
     buildPaceRows, sortPaceRows, renderPaceView, getPaceTimeline, DEFAULT_PACE_SORT,
+    lastSubmittedAssessment, tagLevels,
 } from '../currentScorePaceView.js';
 import {
     renderCurrentScoreTable, wireCurrentScoreTable, CS_MODES, DEFAULT_CURRENT_SCORE_SORT,
@@ -227,5 +228,49 @@ describe('Scores | Pace toggle', () => {
         expect(state.csMode).toBe(CS_MODES.SCORES);
         expect(contentEl.querySelector('table')).not.toBeNull();
         teardown();
+    });
+});
+
+describe('lastSubmittedAssessment', () => {
+    const attempt = (assignmentId, assignmentName, timestamp, score) => ({ assignmentId, assignmentName, timestamp, score });
+    const student = {
+        id: '1',
+        outcomes: [
+            { outcomeId: O1, attempts: [attempt('a1', 'Quiz 1', '2026-10-01T15:00:00Z', 2), attempt('a3', 'Lab 3', '2026-11-12T15:00:00Z', 3.5)] },
+            { outcomeId: O2, attempts: [attempt('a3', 'Lab 3', '2026-11-12T15:00:00Z', 2.5)] },
+            { outcomeId: HW, attempts: [attempt('h9', 'Homework 9', '2026-11-16T15:00:00Z', 4)] },
+        ],
+    };
+    const names = new Map([[O1, 'Outcome 1'], [O2, 'Outcome 2']]);
+
+    test('latest assignment across the given outcomes, one score per outcome in the given order', () => {
+        expect(lastSubmittedAssessment(student, [O2, O1], names)).toEqual({
+            assignmentId: 'a3', assignmentName: 'Lab 3', timestamp: '2026-11-12T15:00:00Z',
+            scores: [{ outcomeId: O2, name: 'Outcome 2', score: 2.5 }, { outcomeId: O1, name: 'Outcome 1', score: 3.5 }],
+        });
+    });
+
+    test('null without attempts', () => {
+        expect(lastSubmittedAssessment({ outcomes: [{ outcomeId: O1, attempts: [] }] }, [O1])).toBeNull();
+        expect(lastSubmittedAssessment(undefined, [O1])).toBeNull();
+    });
+
+    test('shown under the student name, in the course time zone', () => {
+        const cache = makeCache();
+        cache.students[1].outcomes = student.outcomes;   // Alpha
+        document.body.innerHTML = renderPaceView(csOutcome(cache), cache, undefined, { courseDates: COURSE_DATES, now: NOW });
+        const last = document.querySelector('.cs-pace-row[data-stu="1"] .cs-pace-last');
+        expect(last.querySelector('.cs-pace-last-name').textContent).toBe('Lab 3');
+        expect(last.querySelector('.cs-pace-last-date').textContent).toBe('Nov 12');
+        expect([...last.querySelectorAll('.cs-pace-last-pill')].map(p => p.textContent)).toEqual(['2.50', '3.50']);
+        expect(document.querySelector('.cs-pace-row[data-stu="2"] .cs-pace-last').textContent).toContain('No submissions yet');
+        expect(document.querySelector('.cs-pace-sr').textContent).toContain('Last submitted: Lab 3 · Nov 12');
+    });
+});
+
+describe('tagLevels', () => {
+    test('names stack only when closer than the gap', () => {
+        expect(tagLevels([10, 30, 50, 60, 80])).toEqual([0, 0, 0, 1, 0]);
+        expect(tagLevels([10, 12, 14])).toEqual([0, 1, 0]);
     });
 });
