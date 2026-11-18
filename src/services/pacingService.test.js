@@ -13,6 +13,8 @@ import {
     pacingStatus,
     computePacingSummary,
     percentOf,
+    addDays,
+    timelineRange,
     PACING_ATTRIBUTE,
     PACING_STATUS,
     EVIDENCE_STATUS
@@ -165,4 +167,38 @@ test('percentOf clamps and handles zero total', () => {
     expect(percentOf(1, 3)).toBe(33);
     expect(percentOf(5, 3)).toBe(100);
     expect(percentOf(1, 0)).toBe(0);
+});
+
+describe('addDays / timelineRange', () => {
+    test('addDays crosses months and years; null for invalid', () => {
+        expect(addDays('2026-11-25', 7)).toBe('2026-12-02');
+        expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
+        expect(addDays('bad', 1)).toBeNull();
+    });
+
+    test('uses course start/end when they cover today and every target date', () => {
+        expect(timelineRange({ start: '2026-08-15', end: '2027-05-20', dates: ['2026-09-01'], today: '2026-11-17' }))
+            .toEqual({ start: '2026-08-15', end: '2027-05-20' });
+    });
+
+    test('falls back to target dates ± padding when the course has no dates', () => {
+        expect(timelineRange({ start: null, end: null, dates: ['2026-12-01', '2026-09-01'], today: '2026-11-17' }))
+            .toEqual({ start: '2026-08-18', end: '2026-12-15' });
+    });
+
+    test('stretches past the course end to include a later target date or today', () => {
+        expect(timelineRange({ start: '2026-08-15', end: '2026-10-01', dates: ['2026-12-01'], today: '2026-11-17' }).end)
+            .toBe('2026-12-15');
+    });
+
+    test('never returns an empty range', () => {
+        const r = timelineRange({ start: '2026-11-17', end: '2026-11-17', today: '2026-11-17', padDays: 0 });
+        expect(r.end > r.start).toBe(true);
+    });
+});
+
+describe('formatTargetDate options', () => {
+    test('year: false drops the year', () => {
+        expect(formatTargetDate('2026-12-04', { year: false })).toBe('Dec 4');
+    });
 });

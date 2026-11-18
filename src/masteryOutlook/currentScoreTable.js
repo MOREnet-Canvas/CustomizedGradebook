@@ -161,15 +161,27 @@ export function buildCurrentScoreRows(outcome, cache) {
  * @returns {Array}
  */
 export function sortCurrentScoreRows(rows, sortState = DEFAULT_CURRENT_SCORE_SORT) {
-    const { key = 'name', dir = 'asc' } = sortState || {};
-    const sign = dir === 'desc' ? -1 : 1;
+    const { key = 'name' } = sortState || {};
+    return sortStudentRows(rows, sortState, key === 'name' ? null : (row) => key === 'current'
+        ? row.current
+        : (row.chips.find(c => c.outcomeId === String(key))?.score ?? null));
+}
+
+/**
+ * Sort student rows by a numeric value (returns a new array). Rows whose value
+ * is null always go last; ties fall back to sortable name A→Z.
+ * Shared by the scores table and the pace view.
+ *
+ * @param {Array<{ sortableName: string }>} rows
+ * @param {{ dir?: 'asc'|'desc' }} sortState
+ * @param {((row: Object) => number|null)|null} valueOf - null sorts by name
+ * @returns {Array}
+ */
+export function sortStudentRows(rows, sortState, valueOf) {
+    const sign = sortState?.dir === 'desc' ? -1 : 1;
     const byName = (a, b) => a.sortableName.toLowerCase().localeCompare(b.sortableName.toLowerCase());
 
-    if (key === 'name') return [...rows].sort((a, b) => sign * byName(a, b));
-
-    const valueOf = (row) => key === 'current'
-        ? row.current
-        : (row.chips.find(c => c.outcomeId === String(key))?.score ?? null);
+    if (!valueOf) return [...rows].sort((a, b) => sign * byName(a, b));
 
     return [...rows].sort((a, b) => {
         const va = valueOf(a), vb = valueOf(b);
@@ -304,35 +316,36 @@ function renderOverrideCells(row, view) {
       <td class="c">${saveHtml}${error ? `<div class="cs-ov-error" role="alert">${escapeHtml(error)}</div>` : ''}</td>`;
 }
 
+/** Course Overview views: the scores table and the pace timeline. */
+export const CS_MODES = Object.freeze({ SCORES: 'scores', PACE: 'pace' });
+
 /**
- * Render the Current Score table (toolbar + table).
+ * Course Overview toolbar: optional Scores | Pace toggle, Sort by, ↑/↓, refresh.
+ * Shared by the scores table and the pace view (currentScorePaceView.js).
  *
- * @param {Object} outcome - the Current Score outcome
- * @param {Object} cache
- * @param {{ key: string, dir: 'asc'|'desc' }} [sortState]
- * @param {Object} [view] - from createCurrentScoreViewState (drafts, saving, errors, renamingId)
- * @param {{ overrideEnabled?: boolean }} [options]
+ * @param {Object} opts
+ * @param {Array<{ value: string, label: string }>} opts.sortOptions
+ * @param {{ key: string, dir: 'asc'|'desc' }} opts.sortState
+ * @param {string|null} [opts.mode] - a CS_MODES value; null hides the toggle
  * @returns {string} HTML
  */
-export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURRENT_SCORE_SORT,
-                                        view = createCurrentScoreViewState(),
-                                        { overrideEnabled = ENABLE_GRADE_OVERRIDE } = {}) {
-    const { outcomes, rows } = buildCurrentScoreRows(outcome, cache);
-    const sorted = sortCurrentScoreRows(rows, sortState);
+export function renderCurrentScoreToolbar({ sortOptions, sortState, mode = null }) {
     const dir = sortState?.dir === 'desc' ? 'desc' : 'asc';
-    const key = String(sortState?.key ?? 'name');
+    const key = String(sortState?.key ?? '');
+    const options = sortOptions.map(({ value, label }) =>
+        `<option value="${escapeHtml(value)}"${value === key ? ' selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('');
 
-    const option = (value, label) =>
-        `<option value="${escapeHtml(value)}"${value === key ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-    const options = [
-        option('name', 'Student name'),
-        option('current', 'Current Score'),
-        ...outcomes.map(o => option(String(o.id), getOutcomeDisplayName(o, cache))),
-    ].join('');
+    const modeButton = (value, label) =>
+        `<button type="button" data-action="cs-mode" data-mode="${value}" aria-pressed="${mode === value}">${label}</button>`;
+    const toggle = mode
+        ? `<div class="cs-mode-toggle" role="group" aria-label="View">${modeButton(CS_MODES.SCORES, 'Scores')}${modeButton(CS_MODES.PACE, 'Pace')}</div>`
+        : '';
 
-    const toolbar = `
+    return `
         <div class="os-status-banner syncing cs-toolbar">
           <div class="os-status-banner-left">
+            ${toggle}
             <label>Sort by
               <select data-action="cs-sort-key" aria-label="Sort students by">${options}</select>
             </label>
@@ -346,6 +359,34 @@ export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURR
                 aria-label="Refresh scores from Canvas">↻</button>
           </div>
         </div>`;
+}
+
+/**
+ * Render the Current Score table (toolbar + table).
+ *
+ * @param {Object} outcome - the Current Score outcome
+ * @param {Object} cache
+ * @param {{ key: string, dir: 'asc'|'desc' }} [sortState]
+ * @param {Object} [view] - from createCurrentScoreViewState (drafts, saving, errors, renamingId)
+ * @param {{ overrideEnabled?: boolean, showModeToggle?: boolean }} [options]
+ *   showModeToggle adds the Scores | Pace toggle (course pacing on)
+ * @returns {string} HTML
+ */
+export function renderCurrentScoreTable(outcome, cache, sortState = DEFAULT_CURRENT_SCORE_SORT,
+                                        view = createCurrentScoreViewState(),
+                                        { overrideEnabled = ENABLE_GRADE_OVERRIDE, showModeToggle = false } = {}) {
+    const { outcomes, rows } = buildCurrentScoreRows(outcome, cache);
+    const sorted = sortCurrentScoreRows(rows, sortState);
+
+    const toolbar = renderCurrentScoreToolbar({
+        sortState,
+        mode: showModeToggle ? CS_MODES.SCORES : null,
+        sortOptions: [
+            { value: 'name', label: 'Student name' },
+            { value: 'current', label: 'Current Score' },
+            ...outcomes.map(o => ({ value: String(o.id), label: getOutcomeDisplayName(o, cache) })),
+        ],
+    });
 
     const body = sorted.map(r => {
         const hasCurrent = r.current !== null;
@@ -418,7 +459,7 @@ export function moveOutcomeInOrder(order, draggedId, targetId, after) {
  *
  * @param {Object}   opts
  * @param {HTMLElement} opts.contentEl
- * @param {Object}   opts.state            - holds currentScoreSort and csView
+ * @param {Object}   opts.state            - holds currentScoreSort, csView, and (Pace view) csMode, paceSort
  * @param {Object}   opts.outcome          - the Current Score outcome
  * @param {Object}   opts.cache
  * @param {Function} opts.renderTable
@@ -480,10 +521,14 @@ export function wireCurrentScoreTable({
         renderTable();
     };
 
+    // Scores and Pace keep separate sort settings (state.paceSort is set by the host).
+    const sortField = () => (state.csMode === CS_MODES.PACE ? 'paceSort' : 'currentScoreSort');
+
     const onChange = (e) => {
         const el = e.target.closest?.('[data-action="cs-sort-key"]');
         if (!el) return;
-        state.currentScoreSort = { ...state.currentScoreSort, key: el.value };
+        const field = sortField();
+        state[field] = { ...state[field], key: el.value };
         renderTable();
     };
 
@@ -523,8 +568,16 @@ export function wireCurrentScoreTable({
         const action = el.dataset.action;
         if (action === 'cs-sort-dir') {
             e.stopPropagation();
-            const dir = state.currentScoreSort.dir === 'desc' ? 'asc' : 'desc';
-            state.currentScoreSort = { ...state.currentScoreSort, dir };
+            const field = sortField();
+            const dir = state[field]?.dir === 'desc' ? 'asc' : 'desc';
+            state[field] = { ...state[field], dir };
+            renderTable();
+            return;
+        }
+        if (action === 'cs-mode') {
+            e.stopPropagation();
+            if (el.dataset.mode === state.csMode) return;
+            state.csMode = el.dataset.mode;
             renderTable();
             return;
         }

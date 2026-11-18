@@ -30,7 +30,10 @@ import { runPLSync } from './plOutlookSync.js';
 import { readMasteryOutlookCache } from './masteryOutlookCacheService.js';
 import { fetchOutcomeRollupsForOutcome, refreshStudentOutcomeData, bulkFetchOutcomeResults, applyCanvasClassStats, fetchCourseRollupsForVerify, clearCourseRollupReuse } from './masteryOutlookDataService.js';
 import { fetchingStudentIds, syncingOutcomeIds, syncingOutcomePhase, queuedOutcomeIds, getOutcomeRowPhases, countRowsAwaitingOutcome, subscribeSaveStatus, runExclusive, isSaveQueueBusy, rowSavePhase, rowsAwaitingOutcome, subscribeOutcomeLayout, notifyOutcomeLayout } from './masteryOutlookState.js';
-import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT, createCurrentScoreViewState, countLockedOverrides } from './currentScoreTable.js';
+import { renderCurrentScoreTable, wireCurrentScoreTable, DEFAULT_CURRENT_SCORE_SORT, createCurrentScoreViewState, countLockedOverrides, CS_MODES } from './currentScoreTable.js';
+import { renderPaceView, DEFAULT_PACE_SORT } from './currentScorePaceView.js';
+import { fetchCourseDates } from '../services/courseService.js';
+import { ENABLE_COURSE_PACING } from '../config.js';
 import { setCurrentScoreOverride, clearCurrentScoreOverride, setCurrentScoreOverrideLock } from './masteryOutlookAvgService.js';
 import { saveOutcomeLayout } from './outcomeLayoutService.js';
 import { getOutcomeDisplayName } from './outcomeTypes.js';
@@ -632,8 +635,21 @@ function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial, r
     panel.appendChild(content);
 
     if (!state.currentScoreSort) state.currentScoreSort = { ...DEFAULT_CURRENT_SCORE_SORT };
+    if (!state.paceSort) state.paceSort = { ...DEFAULT_PACE_SORT };
     if (!state.csView) state.csView = createCurrentScoreViewState();
+    if (!ENABLE_COURSE_PACING || !state.csMode) state.csMode = CS_MODES.SCORES;
     const view = state.csView;
+
+    // Pace view timeline range — fetched the first time Pace is shown.
+    let courseDatesRequested = false;
+    const ensureCourseDates = () => {
+        if (courseDatesRequested || state.courseDates) return;
+        courseDatesRequested = true;
+        fetchCourseDates(ctx.courseId, ctx.apiClient).then(dates => {
+            state.courseDates = dates;
+            if (!torn && state.csMode === CS_MODES.PACE) renderWhenIdle();
+        });
+    };
 
     // Background redraws wait while the teacher is typing in the table, so the
     // input keeps focus; they run when focus leaves.
@@ -644,7 +660,13 @@ function buildCurrentScoreDetailPanel({ outcome, cache, ctx, state, isSpecial, r
     };
     const renderTable = () => {
         renderDeferred = false;
-        content.innerHTML = renderCurrentScoreTable(outcome, cache, state.currentScoreSort, view);
+        if (state.csMode === CS_MODES.PACE) {
+            ensureCourseDates();
+            content.innerHTML = renderPaceView(outcome, cache, state.paceSort, { courseDates: state.courseDates ?? null });
+        } else {
+            content.innerHTML = renderCurrentScoreTable(outcome, cache, state.currentScoreSort, view,
+                { showModeToggle: ENABLE_COURSE_PACING });
+        }
         const syncCellEl = content.closest('.od-outcome-container')?.querySelector('.od-sync-cell');
         if (syncCellEl) syncCellEl.innerHTML = buildSyncChip(outcome, cache, { isSpecial });
     };
