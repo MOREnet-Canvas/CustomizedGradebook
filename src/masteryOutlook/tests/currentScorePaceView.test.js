@@ -13,7 +13,7 @@ vi.mock('../../utils/logger.js', () => ({
 
 import {
     buildPaceRows, sortPaceRows, renderPaceView, getPaceTimeline, DEFAULT_PACE_SORT,
-    lastSubmittedAssessment, tagLevels,
+    lastSubmittedAssessment, tagLevels, speedGraderUrl,
 } from '../currentScorePaceView.js';
 import {
     renderCurrentScoreTable, wireCurrentScoreTable, CS_MODES, DEFAULT_CURRENT_SCORE_SORT,
@@ -265,6 +265,20 @@ describe('lastSubmittedAssessment', () => {
         expect([...last.querySelectorAll('.cs-pace-last-pill')].map(p => p.textContent)).toEqual(['2.50', '3.50']);
         expect(document.querySelector('.cs-pace-row[data-stu="2"] .cs-pace-last').textContent).toContain('No submissions yet');
         expect(document.querySelector('.cs-pace-sr').textContent).toContain('Last submitted: Lab 3 · Nov 12');
+    });
+
+    test('assignment name links to SpeedGrader for that student', () => {
+        const cache = makeCache();
+        cache.students[1].outcomes = student.outcomes;   // Alpha
+        document.body.innerHTML = renderPaceView(csOutcome(cache), cache, undefined, { courseDates: COURSE_DATES, now: NOW });
+        const link = document.querySelector('.cs-pace-row[data-stu="1"] a.cs-pace-last-name');
+        expect(link.getAttribute('href')).toBe('/courses/566/gradebook/speed_grader?assignment_id=a3&student_id=1');
+        expect(link.getAttribute('target')).toBe('_blank');
+    });
+
+    test('speedGraderUrl needs a course and assignment', () => {
+        expect(speedGraderUrl('566', null, '1')).toBeNull();
+        expect(speedGraderUrl(null, 'a3', '1')).toBeNull();
     });
 });
 
