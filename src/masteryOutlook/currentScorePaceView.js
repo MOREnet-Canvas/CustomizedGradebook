@@ -245,14 +245,17 @@ const MAX_LAST_PILLS = 3;
 
 /**
  * SpeedGrader URL for one student's submission, or null without both IDs.
+ * Cached attempt IDs can be outcome-result alignment IDs ("assignment_3484");
+ * the prefix is stripped. Other alignments (e.g. "live_assessments_…") get no link.
  * @param {string|number|null} courseId
- * @param {string|number|null} assignmentId
+ * @param {string|number|null} assignmentId - "3484" or "assignment_3484"
  * @param {string|number} studentId
  * @returns {string|null}
  */
 export function speedGraderUrl(courseId, assignmentId, studentId) {
-    if (courseId == null || assignmentId == null) return null;
-    return `/courses/${encodeURIComponent(courseId)}/gradebook/speed_grader?assignment_id=${encodeURIComponent(assignmentId)}&student_id=${encodeURIComponent(studentId)}`;
+    const id = String(assignmentId ?? '').match(/^(?:assignment_)?(\d+)$/)?.[1];
+    if (courseId == null || !id) return null;
+    return `/courses/${encodeURIComponent(courseId)}/gradebook/speed_grader?assignment_id=${id}&student_id=${encodeURIComponent(studentId)}`;
 }
 
 function renderNameCell(row, timeZone, courseId) {
