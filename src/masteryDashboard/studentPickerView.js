@@ -17,7 +17,7 @@ import { STUDENT_PICKER_CSS } from './studentPickerStyles.js';
  * Render the student picker UI
  *
  * @param {Object} options
- * @param {Array} options.students - Array of student objects {userId, name, sortableName, sectionId}
+ * @param {Array} options.students - Array of student objects {userId, name, sortableName, sectionId, sectionIds}
  * @param {Array} options.sections - Array of section objects {id, name}
  * @param {HTMLElement} options.cardsEl - Container element to render picker into
  * @param {Function} options.onStudentSelected - Callback(studentId, studentName) when student is selected
@@ -80,7 +80,7 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
     function getFilteredStudents() {
         const query = searchInput.value.trim().toLowerCase();
         return sortedStudents.filter(s => {
-            const inSection = !selectedSectionId || s.sectionId === selectedSectionId;
+            const inSection = !selectedSectionId || (s.sectionIds ?? [s.sectionId]).includes(selectedSectionId);
             const matchesQuery = !query || s.name.toLowerCase().includes(query) || s.sortableName.toLowerCase().includes(query);
             return inSection && matchesQuery;
         });
@@ -95,7 +95,7 @@ export function renderStudentPicker({ students, sections, cardsEl, onStudentSele
         } else {
             dropdown.innerHTML = filteredStudents.map((s, i) => {
                 const sectionLabel = sections.length > 1 && !selectedSectionId
-                    ? `<span class="pm-dropdown-section">${escapeHtml(getSectionName(sections, s.sectionId))}</span>`
+                    ? `<span class="pm-dropdown-section">${escapeHtml((s.sectionIds ?? [s.sectionId]).map(id => getSectionName(sections, id)).filter(Boolean).join(', '))}</span>`
                     : '';
                 return `<div role="option" data-index="${i}" data-user-id="${s.userId}" class="pm-dropdown-item">${escapeHtml(s.name)}${sectionLabel}</div>`;
             }).join('');

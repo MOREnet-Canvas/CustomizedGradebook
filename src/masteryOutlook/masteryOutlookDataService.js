@@ -184,17 +184,33 @@ function bucketDistribution(scores) {
 export function applyCanvasClassStats(outcome, cache, threshold) {
     if (!outcome.classStats) outcome.classStats = {};
     const cs = outcome.classStats;
-    const limit = threshold ?? cs.computedThreshold;
-    const scores = (cache.students || [])
-        .map(s => s.outcomes?.find(o => String(o.outcomeId) === String(outcome.id))?.canvasScore)
-        .filter(v => v !== null && v !== undefined);
-
-    cs.plAvg     = scores.length > 0 ? parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(4)) : null;
-    cs.classMean = cs.plAvg;
-    cs.distribution        = bucketDistribution(scores);
-    cs.belowThresholdCount = limit != null ? scores.filter(v => v < limit).length : 0;
-    if (limit != null) cs.computedThreshold = limit;
+    Object.assign(cs, computeCanvasClassStats(outcome.id, cache.students || [], threshold ?? cs.computedThreshold));
     return cs;
+}
+
+/**
+ * Canvas-score class stats for one outcome over a set of students — the
+ * numbers applyCanvasClassStats stores, without mutating anything. Also used
+ * for a single section (sectionFilter.displayClassStats).
+ *
+ * @param {string|number} outcomeId
+ * @param {Object[]} students - cache.students entries
+ * @param {number|null|undefined} threshold
+ * @returns {{ plAvg: number|null, classMean: number|null, distribution: Object,
+ *             belowThresholdCount: number, computedThreshold?: number }}
+ */
+export function computeCanvasClassStats(outcomeId, students, threshold) {
+    const scores = (students || [])
+        .map(s => s.outcomes?.find(o => String(o.outcomeId) === String(outcomeId))?.canvasScore)
+        .filter(v => v !== null && v !== undefined);
+    const plAvg = scores.length > 0 ? parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(4)) : null;
+    return {
+        plAvg,
+        classMean: plAvg,
+        distribution: bucketDistribution(scores),
+        belowThresholdCount: threshold != null ? scores.filter(v => v < threshold).length : 0,
+        ...(threshold != null ? { computedThreshold: threshold } : {}),
+    };
 }
 
 /** Delays between verify polls: quick at first (Canvas usually updates within seconds), then backing off. */
@@ -998,6 +1014,7 @@ export function computeOutcomeStats(data, threshold = 2.2) {
         return {
             id: student.userId.toString(),
             sectionId: student.sectionId,
+            sectionIds: student.sectionIds ?? [student.sectionId],
             outcomes: studentOutcomes
         };
     });

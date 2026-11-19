@@ -862,7 +862,9 @@ tr.cs-row-locked > td:first-child { box-shadow:inset 3px 0 0 var(--amber-border)
 .mo-shell .od-btn-banner-refresh { font-family:var(--mo-legacy-font); font-size:0.923em; font-weight:600; padding:0.385em 1.077em; border-radius:0.46em; border:0.077em solid #2E86C1; background:#2E86C1; color:#fff; cursor:pointer; }
 .mo-shell .od-exceptions-panel { display:none; margin-bottom:1rem; border:0.5px solid #e0e0e0; border-radius:0.615em; background:#fff; overflow:hidden; }
 .mo-shell .od-metrics { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:0.615em; margin-bottom:1rem; }
+.mo-shell .od-section-select { font:inherit; padding:0.231em 0.462em; border:1px solid var(--border-secondary); border-radius:0.308em; background:#fff; max-width:18em; }
 .mo-shell .od-controls-row { display:flex; justify-content:space-between; align-items:center; gap:1.231em; margin-bottom:1rem; flex-wrap:wrap; }
+.mo-shell .od-section-control,
 .mo-shell .od-threshold-control,
 .mo-shell .od-color-scheme-control { display:flex; align-items:center; gap:0.769em; padding:0.769em 0.923em; background:#f9f9f9; border-radius:0.615em; }
 .mo-shell .od-control-label { font-size:0.9rem; color:#666; font-weight:500; }
