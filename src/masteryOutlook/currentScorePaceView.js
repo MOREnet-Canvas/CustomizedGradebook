@@ -243,11 +243,30 @@ function lastSubmittedText(last, timeZone) {
 /** Most pills shown under a name; the rest are in the tooltip. */
 const MAX_LAST_PILLS = 3;
 
-function renderNameCell(row, timeZone) {
+/**
+ * SpeedGrader URL for one student's submission, or null without both IDs.
+ * Cached attempt IDs can be outcome-result alignment IDs ("assignment_3484");
+ * the prefix is stripped. Other alignments (e.g. "live_assessments_…") get no link.
+ * @param {string|number|null} courseId
+ * @param {string|number|null} assignmentId - "3484" or "assignment_3484"
+ * @param {string|number} studentId
+ * @returns {string|null}
+ */
+export function speedGraderUrl(courseId, assignmentId, studentId) {
+    const id = String(assignmentId ?? '').match(/^(?:assignment_)?(\d+)$/)?.[1];
+    if (courseId == null || !id) return null;
+    return `/courses/${encodeURIComponent(courseId)}/gradebook/speed_grader?assignment_id=${id}&student_id=${encodeURIComponent(studentId)}`;
+}
+
+function renderNameCell(row, timeZone, courseId) {
     const last = row.lastSubmitted;
+    const sgUrl = last ? speedGraderUrl(courseId, last.assignmentId, row.id) : null;
+    const lastName = sgUrl
+        ? `<a class="cs-pace-last-name" href="${escapeHtml(sgUrl)}" target="_blank" rel="noopener" title="Open in SpeedGrader">${escapeHtml(last.assignmentName)}</a>`
+        : `<span class="cs-pace-last-name">${escapeHtml(last?.assignmentName ?? '')}</span>`;
     const lastHtml = last
         ? `<div class="cs-pace-last" title="${escapeHtml(`Last submitted: ${lastSubmittedText(last, timeZone)}`)}">
-             <span class="cs-pace-last-name">${escapeHtml(last.assignmentName)}</span>
+             ${lastName}
              <span class="cs-pace-last-date">${escapeHtml(formatTargetDate(isoToCourseDate(last.timestamp, timeZone), { year: false }))}</span>
              ${last.scores.slice(0, MAX_LAST_PILLS).map(s =>
                  `<span class="os-pill cs-pace-last-pill" style="${scoreToneStyle(scoreTone(s.score))}">${s.score.toFixed(2)}</span>`).join('')}${
@@ -356,7 +375,7 @@ export function renderPaceView(outcome, cache, sortState = DEFAULT_PACE_SORT,
         }).join('');
         return `
             <div class="cs-pace-row" data-stu="${escapeHtml(r.id)}">
-              ${renderNameCell(r, timeZone)}
+              ${renderNameCell(r, timeZone, cache?.meta?.courseId ?? null)}
               <div class="cs-pace-lane">${laneBackdrop}${marks}</div>
               ${renderStatusCell(r, today)}
             </div>`;

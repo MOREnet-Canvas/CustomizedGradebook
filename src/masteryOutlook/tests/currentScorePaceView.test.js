@@ -13,7 +13,7 @@ vi.mock('../../utils/logger.js', () => ({
 
 import {
     buildPaceRows, sortPaceRows, renderPaceView, getPaceTimeline, DEFAULT_PACE_SORT,
-    lastSubmittedAssessment, tagLevels,
+    lastSubmittedAssessment, tagLevels, speedGraderUrl,
 } from '../currentScorePaceView.js';
 import {
     renderCurrentScoreTable, wireCurrentScoreTable, CS_MODES, DEFAULT_CURRENT_SCORE_SORT,
@@ -236,8 +236,8 @@ describe('lastSubmittedAssessment', () => {
     const student = {
         id: '1',
         outcomes: [
-            { outcomeId: O1, attempts: [attempt('a1', 'Quiz 1', '2026-10-01T15:00:00Z', 2), attempt('a3', 'Lab 3', '2026-11-12T15:00:00Z', 3.5)] },
-            { outcomeId: O2, attempts: [attempt('a3', 'Lab 3', '2026-11-12T15:00:00Z', 2.5)] },
+            { outcomeId: O1, attempts: [attempt('a1', 'Quiz 1', '2026-10-01T15:00:00Z', 2), attempt('assignment_3484', 'Lab 3', '2026-11-12T15:00:00Z', 3.5)] },
+            { outcomeId: O2, attempts: [attempt('assignment_3484', 'Lab 3', '2026-11-12T15:00:00Z', 2.5)] },
             { outcomeId: HW, attempts: [attempt('h9', 'Homework 9', '2026-11-16T15:00:00Z', 4)] },
         ],
     };
@@ -245,7 +245,7 @@ describe('lastSubmittedAssessment', () => {
 
     test('latest assignment across the given outcomes, one score per outcome in the given order', () => {
         expect(lastSubmittedAssessment(student, [O2, O1], names)).toEqual({
-            assignmentId: 'a3', assignmentName: 'Lab 3', timestamp: '2026-11-12T15:00:00Z',
+            assignmentId: 'assignment_3484', assignmentName: 'Lab 3', timestamp: '2026-11-12T15:00:00Z',
             scores: [{ outcomeId: O2, name: 'Outcome 2', score: 2.5 }, { outcomeId: O1, name: 'Outcome 1', score: 3.5 }],
         });
     });
@@ -265,6 +265,22 @@ describe('lastSubmittedAssessment', () => {
         expect([...last.querySelectorAll('.cs-pace-last-pill')].map(p => p.textContent)).toEqual(['2.50', '3.50']);
         expect(document.querySelector('.cs-pace-row[data-stu="2"] .cs-pace-last').textContent).toContain('No submissions yet');
         expect(document.querySelector('.cs-pace-sr').textContent).toContain('Last submitted: Lab 3 · Nov 12');
+    });
+
+    test('assignment name links to SpeedGrader for that student', () => {
+        const cache = makeCache();
+        cache.students[1].outcomes = student.outcomes;   // Alpha
+        document.body.innerHTML = renderPaceView(csOutcome(cache), cache, undefined, { courseDates: COURSE_DATES, now: NOW });
+        const link = document.querySelector('.cs-pace-row[data-stu="1"] a.cs-pace-last-name');
+        expect(link.getAttribute('href')).toBe('/courses/566/gradebook/speed_grader?assignment_id=3484&student_id=1');
+        expect(link.getAttribute('target')).toBe('_blank');
+    });
+
+    test('speedGraderUrl needs a course and assignment', () => {
+        expect(speedGraderUrl('566', null, '1')).toBeNull();
+        expect(speedGraderUrl(null, '3484', '1')).toBeNull();
+        expect(speedGraderUrl('566', 'live_assessments_12', '1')).toBeNull();
+        expect(speedGraderUrl('566', '3484', '1')).toBe('/courses/566/gradebook/speed_grader?assignment_id=3484&student_id=1');
     });
 });
 

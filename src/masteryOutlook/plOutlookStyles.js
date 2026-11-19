@@ -712,6 +712,7 @@ tr.cs-row-locked > td:first-child { box-shadow:inset 3px 0 0 var(--amber-border)
 .cs-pace-mk.pending { opacity:.55; }
 .cs-pace-last { display:flex; align-items:center; gap:0.385em; font-size:0.769em; color:var(--text-tertiary); white-space:nowrap; min-width:0; cursor:default; }
 .cs-pace-last-name { overflow:hidden; text-overflow:ellipsis; min-width:0; color:var(--text-secondary); }
+a.cs-pace-last-name { text-decoration:underline; }
 .cs-pace-last-date { flex:none; }
 .cs-pace-last-pill.os-pill { flex:none; font-size:1em; min-width:0; padding:0 0.5em; }
 .cs-pace-last-more { flex:none; }
